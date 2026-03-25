@@ -43,7 +43,7 @@ pub fn compute_summary(verdicts: &[FunctionVerdict]) -> AnalysisSummary {
     };
 
     let median_crap = if total_functions > 0 {
-        if total_functions % 2 == 0 {
+        if total_functions.is_multiple_of(2) {
             (scores[total_functions / 2 - 1] + scores[total_functions / 2]) / 2.0
         } else {
             scores[total_functions / 2]
@@ -58,7 +58,7 @@ pub fn compute_summary(verdicts: &[FunctionVerdict]) -> AnalysisSummary {
         exceeding_threshold: exceeding,
         average_crap,
         median_crap,
-        max_crap: max_crap.map(|value| super::crap::classify_risk(value)).map(|risk_level| {
+        max_crap: max_crap.map(super::crap::classify_risk).map(|risk_level| {
             super::types::CrapScore {
                 value: max_crap.unwrap(),
                 risk_level,

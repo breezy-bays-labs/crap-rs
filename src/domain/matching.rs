@@ -38,11 +38,8 @@ pub fn match_functions(
             }
         };
 
-        let coverage = compute_function_coverage(
-            &comp.identity.file_path,
-            comp.identity.span,
-            file_lines,
-        );
+        let coverage =
+            compute_function_coverage(&comp.identity.file_path, comp.identity.span, file_lines);
         results.push((comp.clone(), coverage));
     }
 

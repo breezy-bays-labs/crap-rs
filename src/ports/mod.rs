@@ -14,8 +14,5 @@ pub trait ComplexityPort {
 
 /// Port for parsing coverage data into per-file, per-line hit counts.
 pub trait CoveragePort {
-    fn parse(
-        &self,
-        data: &str,
-    ) -> Result<HashMap<String, Vec<LineCoverage>>, CrapError>;
+    fn parse(&self, data: &str) -> Result<HashMap<String, Vec<LineCoverage>>, CrapError>;
 }

@@ -14,19 +14,14 @@ pub struct SourceSpan {
 // ── Complexity Metric ────────────────────────────────────────────────
 
 /// Which complexity metric to use for CRAP score computation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ComplexityMetric {
     /// Counts nesting depth + structural complexity (default for Rust).
+    #[default]
     Cognitive,
     /// Counts decision points (branches). Classic CRAP metric.
     Cyclomatic,
-}
-
-impl Default for ComplexityMetric {
-    fn default() -> Self {
-        Self::Cognitive
-    }
 }
 
 impl fmt::Display for ComplexityMetric {
