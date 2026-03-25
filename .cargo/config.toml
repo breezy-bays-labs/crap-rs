@@ -1,0 +1,5 @@
+# Share a single target directory across all worktrees.
+# Prevents each worktree from building its own multi-GB target/.
+# See: ops/playbooks/disk-hygiene.md
+[build]
+target-dir = "/Users/cmbays/Github/crap4rs/target"
