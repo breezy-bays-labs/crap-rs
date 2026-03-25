@@ -1,0 +1,47 @@
+[package]
+name = "crap4rs"
+version = "0.1.0"
+edition = "2024"
+authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
+description = "CRAP score analyzer for Rust — find complex, under-tested functions"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/breezy-bays-labs/crap4rs"
+keywords = ["crap", "complexity", "coverage", "testing", "quality"]
+categories = ["development-tools::testing", "command-line-utilities"]
+
+[lib]
+name = "crap4rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "crap4rs"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# AST parsing for complexity analysis
+syn = { version = "2", features = ["full", "parsing", "visit"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Terminal output
+comfy-table = "7"
+colored = "3"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# File discovery
+walkdir = "2"
+glob = "0.3"
+
+[dev-dependencies]
+proptest = "1"
+pretty_assertions = "1"
+insta = { version = "1", features = ["json"] }
+tempfile = "3"
