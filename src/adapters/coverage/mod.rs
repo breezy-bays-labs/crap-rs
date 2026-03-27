@@ -105,11 +105,23 @@ fn flush_block(
     if let Some(path) = current_path
         && !current_lines.is_empty()
     {
-        let lines: Vec<LineCoverage> = current_lines
-            .iter()
-            .map(|(&line, &hits)| LineCoverage { line, hits })
+        // Merge with any existing coverage for this file (handles repeated
+        // SF blocks from concatenated tracefiles or TN: sections).
+        let existing = coverage.entry(path.to_owned()).or_default();
+        let mut merged: BTreeMap<usize, u64> = BTreeMap::new();
+        for lc in existing.iter() {
+            merged.insert(lc.line, lc.hits);
+        }
+        for (&line, &hits) in current_lines.iter() {
+            merged
+                .entry(line)
+                .and_modify(|h| *h = h.saturating_add(hits))
+                .or_insert(hits);
+        }
+        *existing = merged
+            .into_iter()
+            .map(|(line, hits)| LineCoverage { line, hits })
             .collect();
-        coverage.insert(path.to_owned(), lines);
     }
     current_lines.clear();
 }
@@ -194,6 +206,20 @@ mod tests {
     fn path_boundary_not_confused_by_prefix_substring() {
         let output = parse("SF:/project-old/src/main.rs\nDA:1,1\nend_of_record\n");
         assert!(output.coverage.contains_key("/project-old/src/main.rs"));
+    }
+
+    #[test]
+    fn repeated_sf_blocks_merge_coverage() {
+        let input = "\
+SF:/project/src/main.rs\nDA:1,3\nDA:2,5\nend_of_record\n\
+SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
+        let output = parse(input);
+        assert_eq!(output.coverage.len(), 1);
+        let lines = &output.coverage["src/main.rs"];
+        assert_eq!(lines.len(), 3);
+        assert_eq!((lines[0].line, lines[0].hits), (1, 3));
+        assert_eq!((lines[1].line, lines[1].hits), (2, 7)); // 5 + 2
+        assert_eq!((lines[2].line, lines[2].hits), (3, 7));
     }
 
     #[test]
