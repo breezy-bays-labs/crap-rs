@@ -1,59 +1,34 @@
 # CLAUDE.md — crap4rs
 
+CRAP (Change Risk Anti-Patterns) analyzer for Rust codebases. Library crate + thin CLI binary.
+
 ## Architecture
 
-Hexagonal (ports & adapters) with strict dependency direction:
+Hexagonal (ports & adapters), strict dependency direction:
 
 ```
 domain/ → ports/ → adapters/ → core/ → cli/
 ```
 
-- **domain/** — Pure logic (CRAP formula, matching, thresholds, types). No I/O, no external crates.
-- **ports/** — Trait definitions for complexity extraction and coverage parsing.
-- **adapters/** — Implementations of port traits (syn complexity walker, LCOV parser, reporters).
-- **core/** — Wiring layer: composes adapters through ports, exposes `analyze()` API.
-- **cli/** — Thin shell over core (clap). Argument parsing, output formatting.
+| Layer | Purpose | External crates? |
+|-------|---------|-----------------|
+| `domain/` | CRAP formula, matching, thresholds, types | None — pure logic |
+| `ports/` | Trait definitions (ComplexityPort, CoveragePort) | Domain types only |
+| `adapters/` | syn walker, LCOV parser, reporters | syn, serde, comfy-table |
+| `core/` | Wires adapters through ports, exposes `analyze()` | Ports + adapters |
+| `cli/` | clap argument parsing, output formatting | clap, core |
 
-## Dependency Direction
+Never import "inward." Library crate layout preserves future `crap-core` extraction.
 
-Never import "inward":
-- `domain` imports nothing external
-- `ports` use domain types only
-- `adapters` implement port traits, may use external crates (syn, serde)
-- `core` wires adapters through ports
-- `cli` calls core
+## Design Decisions
 
-## Key Design Decisions
+**Line-range matching** (not name matching): syn gives `(file, start_line, end_line)` per function, LCOV `DA:` gives `(file, line, hits)`. Join on file + line range. No demangling, no FN/FNDA parsing.
 
-### Line-Range Matching (not name matching)
+**Complexity metrics**: cognitive (default, better for match-heavy Rust) and cyclomatic via `--metric` flag. `ComplexityPort` is metric-agnostic.
 
-crap4rs matches complexity with coverage using **line ranges**, not function names. This is a deliberate divergence from crap4ts's span-overlap matching:
+**LCOV only**: parse `SF:` and `DA:` records from `cargo-llvm-cov --lcov`. Ignore `FN:`/`FNDA:` (mangled symbols, redundant).
 
-- Syn extracts `(file, fn_name, start_line, end_line, complexity)` per function
-- LCOV `DA:` lines give `(file, line_number, hit_count)` per line
-- Coverage for a function = DA lines within its line range
-- No demangling, no name matching, no span-overlap logic needed
-
-This works because Rust functions have deterministic line ranges from the AST, and LCOV DA data is per-line.
-
-### Complexity Metrics
-
-Supports both cognitive (default) and cyclomatic complexity via `--metric` flag:
-- **Cognitive** (default for Rust): penalizes nesting, better for match-heavy idiomatic Rust
-- **Cyclomatic**: counts decision points, matches original CRAP paper
-
-The `ComplexityPort` trait is metric-agnostic — it returns a numeric value per function.
-
-### LCOV Only
-
-MVP parses `cargo-llvm-cov --lcov` output exclusively. Only `SF:` and `DA:` records are used. `FN:`/`FNDA:` records are ignored (mangled Rust symbols, redundant with line-range strategy).
-
-## Development Rules
-
-- **TDD** — Write tests before implementation for all domain and adapter code.
-- **Domain purity** — `src/domain/` must never import external crates or perform I/O.
-- **Dependency direction** — Never import "inward".
-- **Property tests** — CRAP formula must have property tests validated against crap4ts reference values.
+**Spike reference**: `~/Github/ops/pipelines/crap4rs/crap4rs-20260324-council-spike.md`
 
 ## Commands
 
@@ -64,33 +39,72 @@ MVP parses `cargo-llvm-cov --lcov` output exclusively. Only `SF:` and `DA:` reco
 | Coverage | `cargo llvm-cov --lcov --output-path lcov.info` |
 | Lint | `cargo clippy -- -D warnings` |
 | Format | `cargo fmt` |
-| Quick verify | `cargo fmt --check && cargo clippy -- -D warnings && cargo test` |
+| Quick verify | `cargo fmt --check && cargo clippy -- -D warnings && cargo nextest run` |
+
+## Development Rules
+
+- **TDD** — tests before implementation for all domain and adapter code
+- **Domain purity** — `src/domain/` must never import external crates or perform I/O
+- **Dependency direction** — never import "inward"
+- **Property tests required** — CRAP formula, LCOV parser, line-range matching, complexity walker (see invariants below)
+- **Fixtures over mocks** — real `.rs` files for complexity, real LCOV for coverage
+- **Self-referential test** — crap4rs must analyze its own source as an integration test
+- **Cross-validate** — CRAP formula output must match crap4ts reference values exactly
+- **Regression files committed** — `proptest-regressions/` dirs are committed to git, never gitignored. Commit regression file + fix in the same PR. Delete regression files only when the corresponding test is deleted.
+
+## Property Test Invariants
+
+| Function | Key Invariants |
+|----------|---------------|
+| `compute_crap()` | `crap(c, 100%) == c`, `crap(c, 0%) == c^2 + c`, monotonic in both dimensions, always >= 1.0 |
+| LCOV parser | empty input → empty result (no panic), malformed lines skipped, DA values non-negative |
+| Line-range matching | coverage always in [0, 100], file-scoped (no cross-file leakage), no off-by-one on range boundaries |
+| Syn walker | complexity >= 1 for any parseable fn, flat match: cognitive=1 vs cyclomatic=N |
+
+**crap4ts reference values** (oracle test — must match exactly):
+
+| Complexity | Coverage | CRAP |
+|------------|----------|------|
+| 1 | 100% | 1.00 |
+| 1 | 0% | 2.00 |
+| 10 | 100% | 10.00 |
+| 10 | 0% | 110.00 |
+| 5 | 50% | 8.13 |
+| 15 | 90% | 15.23 |
+
+## Session Plan
+
+| Session | Issues | Work | Notes |
+|---------|--------|------|-------|
+| 1 | #1, #2, #3 | LCOV parser + syn walker + matching | #1 and #2 can parallelize |
+| 2 | #4, #5 | clap CLI + reporters | |
+| 3 | #6 | Core `analyze()` + integration tests | Self-referential test |
+| 4 | (if needed) | Dogfooding edge cases, crates.io prep | |
 
 ## Commit Convention
-
-Conventional commits with architectural scope:
 
 ```
 feat(domain):  feat(ports):  feat(adapters):  feat(core):  feat(cli):
 fix(domain):   test:         ci:              docs:        chore:
 ```
 
-## Reference
+## Worktree Setup
 
-- **crap4ts** (TypeScript equivalent): `~/Github/crap4ts/`
-- **Pipeline note**: `~/Github/ops/pipelines/crap4rs/crap4rs-20260324-council-spike.md`
+```bash
+git worktree add ../crap4rs-issue-N -b feat/topic-name
+```
+
+Shared target directory in `.cargo/config.toml` — all worktrees share one `target/`.
+
+## Cross-References
+
+- **crap4ts** (TS equivalent): `~/Github/crap4ts/`
+- **Ecosystem plan**: `~/.claude/projects/-Users-cmbays-github-ops/memory/project_crap-ecosystem-plan.md`
 - **Testing standard**: `~/Github/ops/standards/testing.md`
+- **Quality loop**: `~/Github/ops/playbooks/quality-loop.md`
+- **Kanban board**: `~/Github/ops/boards/crap4rs/v0.1.0-mvp.md`
 
 ## Compact Instructions
 
-During context compaction, preserve:
-- Architecture (ports-and-adapters, dependency direction)
-- Line-range matching strategy (not name matching)
-- Metric design (cognitive default, cyclomatic via flag)
-- Which sessions/milestones are complete vs remaining
-- Reference values from crap4ts for property tests
-
-Discard:
-- Full file contents from reads older than 5 tool calls
-- Search results not acted on
-- Detailed spike output (findings are captured in pipeline note)
+Preserve: architecture, line-range matching strategy, metric design, property test invariants, session/milestone progress.
+Discard: full file contents from old reads, search results not acted on, completed PR details.
