@@ -150,6 +150,25 @@ pub struct AnalysisResult {
     pub passed: bool,
 }
 
+// ── Parse Diagnostics ──────────────────────────────────────────────
+
+/// Non-fatal issues encountered during coverage parsing.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParseDiagnostic {
+    /// A DA record could not be parsed (bad format, missing fields, invalid values).
+    MalformedRecord {
+        /// 1-based line number in the LCOV input where the issue occurred.
+        line_number: usize,
+        /// The raw line content that failed to parse.
+        content: String,
+    },
+    /// An SF record had an empty path.
+    EmptySourceFile {
+        /// The 1-based line number in the LCOV input.
+        line_number: usize,
+    },
+}
+
 // ── Errors ──────────────────────────────────────────────────────────
 
 #[derive(Debug, thiserror::Error)]
