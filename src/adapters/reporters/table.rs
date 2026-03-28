@@ -121,8 +121,13 @@ fn crap_color(exceeds: bool, text: &str) -> String {
     }
 }
 
-// Tests use `colored::control::set_override()` (process-global state).
-// Safe under nextest (process isolation) but would race under `cargo test`.
+/// Guards `colored::control::set_override()` — a process-global flag.
+/// All tests that call `set_override` must hold this lock to prevent
+/// races under `cargo test` (threaded). Nextest doesn't need this
+/// (process isolation) but the lock is harmless there.
+#[cfg(test)]
+static COLOR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,6 +138,7 @@ mod tests {
 
     #[test]
     fn test_empty_shows_no_functions() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_empty_result();
         let output = format_table(&result, 8.0);
@@ -144,6 +150,7 @@ mod tests {
 
     #[test]
     fn test_sorted_by_crap_descending() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(&result, 8.0);
@@ -169,6 +176,7 @@ mod tests {
 
     #[test]
     fn test_all_columns_present() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_single_function_result(
             "test_fn",
@@ -190,6 +198,7 @@ mod tests {
 
     #[test]
     fn test_function_details_in_columns() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_single_function_result(
             "parse_record",
@@ -210,6 +219,7 @@ mod tests {
 
     #[test]
     fn test_crap_two_decimal_places() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 5.0, RiskLevel::Low, 8.0);
@@ -219,6 +229,7 @@ mod tests {
 
     #[test]
     fn test_coverage_one_decimal_place() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 85.0, 1.0, RiskLevel::Low, 8.0);
@@ -228,6 +239,7 @@ mod tests {
 
     #[test]
     fn test_version_header() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_empty_result();
         let output = format_table(&result, 8.0);
@@ -236,6 +248,7 @@ mod tests {
 
     #[test]
     fn test_summary_line_contents() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(&result, 8.0);
@@ -247,6 +260,7 @@ mod tests {
 
     #[test]
     fn test_summary_pass_variant() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
@@ -257,6 +271,7 @@ mod tests {
 
     #[test]
     fn test_summary_distribution() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(&result, 8.0);
@@ -269,11 +284,10 @@ mod tests {
     }
 
     // ── Color helper tests (force color on for ANSI assertions) ───────
-    // Each test forces colored output on. With nextest (separate processes),
-    // this doesn't interfere with snapshot tests that force color off.
 
     #[test]
     fn test_risk_color_low_green() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::Low, "low");
         assert!(out.contains("\x1b[32m"), "Expected green ANSI: {out:?}");
@@ -281,6 +295,7 @@ mod tests {
 
     #[test]
     fn test_risk_color_acceptable_no_color() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::Acceptable, "acceptable");
         assert!(!out.contains("\x1b["), "Expected no ANSI escapes: {out:?}");
@@ -289,6 +304,7 @@ mod tests {
 
     #[test]
     fn test_risk_color_moderate_yellow() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::Moderate, "moderate");
         assert!(out.contains("\x1b[33m"), "Expected yellow ANSI: {out:?}");
@@ -296,6 +312,7 @@ mod tests {
 
     #[test]
     fn test_risk_color_high_bold_red() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::High, "high");
         // colored combines bold+red as \x1b[1;31m
@@ -307,6 +324,7 @@ mod tests {
 
     #[test]
     fn test_coverage_color_thresholds() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let low = coverage_color(30.0, "30.0");
         assert!(low.contains("\x1b[31m"), "Expected red for <50%: {low:?}");
@@ -326,6 +344,7 @@ mod tests {
 
     #[test]
     fn test_coverage_color_boundary_50() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let at_50 = coverage_color(50.0, "50.0");
         assert!(
@@ -336,6 +355,7 @@ mod tests {
 
     #[test]
     fn test_coverage_color_boundary_80() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let at_80 = coverage_color(80.0, "80.0");
         assert!(
@@ -346,6 +366,7 @@ mod tests {
 
     #[test]
     fn test_crap_exceeding_bold_red() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let out = crap_color(true, "15.00");
         assert!(
@@ -356,6 +377,7 @@ mod tests {
 
     #[test]
     fn test_crap_within_no_emphasis() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(true);
         let out = crap_color(false, "5.00");
         assert!(!out.contains("\x1b["), "Expected no ANSI: {out:?}");
@@ -364,6 +386,7 @@ mod tests {
 
     #[test]
     fn test_full_table_snapshot() {
+        let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(&result, 8.0);
@@ -474,12 +497,14 @@ mod proptests {
 
         #[test]
         fn prop_format_table_never_panics(result in arb_analysis_result()) {
+            let _guard = super::COLOR_LOCK.lock().unwrap();
             colored::control::set_override(false);
             let _ = format_table(&result, 8.0);
         }
 
         #[test]
         fn prop_format_table_row_count(result in arb_analysis_result()) {
+            let _guard = super::COLOR_LOCK.lock().unwrap();
             colored::control::set_override(false);
             let output = format_table(&result, 8.0);
             if result.functions.is_empty() {
