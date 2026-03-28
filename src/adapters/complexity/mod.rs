@@ -101,6 +101,38 @@ impl<'ast> Visit<'ast> for FunctionFinder {
 
         syn::visit::visit_impl_item_fn(self, node);
     }
+
+    fn visit_trait_item_fn(&mut self, node: &'ast syn::TraitItemFn) {
+        // Only record trait methods that have a default body
+        if let Some(block) = &node.default {
+            let method_name = node.sig.ident.to_string();
+            let qualified = match &self.current_impl_type {
+                Some(ty) => format!("{ty}::{method_name}"),
+                None => method_name,
+            };
+            let span = span_of(node);
+            let complexity = count_complexity(block, self.metric);
+
+            self.functions.push(FunctionComplexity {
+                identity: FunctionIdentity {
+                    file_path: self.file_path.clone(),
+                    qualified_name: qualified,
+                    span,
+                },
+                complexity,
+                metric: self.metric,
+            });
+        }
+
+        syn::visit::visit_trait_item_fn(self, node);
+    }
+
+    fn visit_item_trait(&mut self, node: &'ast syn::ItemTrait) {
+        let prev = self.current_impl_type.take();
+        self.current_impl_type = Some(node.ident.to_string());
+        syn::visit::visit_item_trait(self, node);
+        self.current_impl_type = prev;
+    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -153,7 +185,9 @@ fn count_cognitive_stmt(stmt: &syn::Stmt, nesting: u32) -> u32 {
             if let Some(init) = &local.init {
                 total += count_cognitive_expr(&init.expr, nesting);
                 if let Some((_, diverge)) = &init.diverge {
-                    total += count_cognitive_expr(diverge, nesting);
+                    // let...else is a branching construct: +1 structural + nesting
+                    total += 1 + nesting;
+                    total += count_cognitive_expr(diverge, nesting + 1);
                 }
             }
             total
@@ -167,6 +201,7 @@ fn count_cognitive_expr(expr: &Expr, nesting: u32) -> u32 {
         Expr::If(expr_if) => count_cognitive_if(expr_if, nesting),
         Expr::Match(expr_match) => {
             let mut total = 1 + nesting; // +1 structural, +nesting
+            total += count_cognitive_expr(&expr_match.expr, nesting);
             for arm in &expr_match.arms {
                 if let Some(guard) = &arm.guard {
                     total += count_cognitive_expr(&guard.1, nesting + 1);
@@ -183,6 +218,7 @@ fn count_cognitive_expr(expr: &Expr, nesting: u32) -> u32 {
         }
         Expr::ForLoop(expr_for) => {
             let mut total = 1 + nesting;
+            total += count_cognitive_expr(&expr_for.expr, nesting);
             total += count_cognitive_block(&expr_for.body, nesting + 1);
             total
         }
@@ -192,7 +228,7 @@ fn count_cognitive_expr(expr: &Expr, nesting: u32) -> u32 {
             total
         }
         Expr::Binary(bin) => count_cognitive_binary_chain(bin),
-        Expr::Try(_) => 1,
+        Expr::Try(expr_try) => 1 + count_cognitive_expr(&expr_try.expr, nesting),
         Expr::Break(_) => 1,
         Expr::Continue(_) => 1,
         Expr::Block(expr_block) => count_cognitive_block(&expr_block.block, nesting),
@@ -363,6 +399,8 @@ fn count_cyclomatic_stmt(stmt: &syn::Stmt) -> u32 {
             if let Some(init) = &local.init {
                 total += count_cyclomatic_expr(&init.expr);
                 if let Some((_, diverge)) = &init.diverge {
+                    // let...else is a decision point: +1
+                    total += 1;
                     total += count_cyclomatic_expr(diverge);
                 }
             }
@@ -385,6 +423,7 @@ fn count_cyclomatic_expr(expr: &Expr) -> u32 {
         }
         Expr::Match(expr_match) => {
             let mut total = expr_match.arms.len().saturating_sub(1) as u32;
+            total += count_cyclomatic_expr(&expr_match.expr);
             for arm in &expr_match.arms {
                 if let Some(guard) = &arm.guard {
                     total += count_cyclomatic_expr(&guard.1);
@@ -399,7 +438,12 @@ fn count_cyclomatic_expr(expr: &Expr) -> u32 {
             total += count_cyclomatic_block(&expr_while.body);
             total
         }
-        Expr::ForLoop(expr_for) => 1 + count_cyclomatic_block(&expr_for.body),
+        Expr::ForLoop(expr_for) => {
+            let mut total = 1;
+            total += count_cyclomatic_expr(&expr_for.expr);
+            total += count_cyclomatic_block(&expr_for.body);
+            total
+        }
         Expr::Loop(expr_loop) => 1 + count_cyclomatic_block(&expr_loop.body),
         Expr::Binary(bin) => {
             let mut total = match bin.op {
@@ -410,7 +454,7 @@ fn count_cyclomatic_expr(expr: &Expr) -> u32 {
             total += count_cyclomatic_expr(&bin.right);
             total
         }
-        Expr::Try(_) => 1,
+        Expr::Try(expr_try) => 1 + count_cyclomatic_expr(&expr_try.expr),
         Expr::Block(expr_block) => count_cyclomatic_block(&expr_block.block),
         Expr::Return(ret) => {
             if let Some(e) = &ret.expr {
@@ -744,6 +788,71 @@ mod tests {
         let f = find_fn(&fns, "loop_with_break");
         // base(1) + loop(+1) + if(+1) + break(+1) = 4
         assert_eq!(f.complexity, 4);
+    }
+
+    // ── let...else ─────────────────────────────────────────────────────
+
+    #[test]
+    fn let_else_cognitive() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "let_else_early_exit");
+        // base(1) + let-else(+1+0nesting) = 2
+        assert_eq!(f.complexity, 2);
+    }
+
+    #[test]
+    fn let_else_cyclomatic() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cyclomatic);
+        let f = find_fn(&fns, "let_else_early_exit");
+        // base(1) + let-else(+1) = 2
+        assert_eq!(f.complexity, 2);
+    }
+
+    // ── Chained ? and nested expressions ──────────────────────────────
+
+    #[test]
+    fn chained_try_cognitive() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "chained_try");
+        // base(1) + ?(+1) + ?(+1) = 3
+        assert_eq!(f.complexity, 3);
+    }
+
+    #[test]
+    fn chained_try_cyclomatic() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cyclomatic);
+        let f = find_fn(&fns, "chained_try");
+        // base(1) + ?(+1) + ?(+1) = 3
+        assert_eq!(f.complexity, 3);
+    }
+
+    #[test]
+    fn match_scrutinee_try_cognitive() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "match_with_try_scrutinee");
+        // base(1) + match(+1+0) + ?(+1) in scrutinee = 3
+        assert_eq!(f.complexity, 3);
+    }
+
+    // ── Trait default methods ─────────────────────────────────────────
+
+    #[test]
+    fn trait_default_method_found() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "Describable::describe");
+        // base(1) + if(+1+0) = 2
+        assert_eq!(f.complexity, 2);
+    }
+
+    #[test]
+    fn trait_method_without_default_not_found() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cognitive);
+        // `name` has no default body — should NOT appear
+        assert!(
+            fns.iter()
+                .all(|f| f.identity.qualified_name != "Describable::name"),
+            "Trait methods without default bodies should not be recorded"
+        );
     }
 
     // ── Impl methods complexity ────────────────────────────────────────

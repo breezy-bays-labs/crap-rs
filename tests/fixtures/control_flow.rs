@@ -74,3 +74,43 @@ pub fn loop_with_break(max: usize) -> usize {
     }
     count
 }
+
+/// let...else early exit — cognitive: base(1) + let-else(+1+0) = 2, cyclomatic: base(1) + let-else(+1) = 2.
+pub fn let_else_early_exit(input: Option<i32>) -> i32 {
+    let Some(value) = input else {
+        return 0;
+    };
+    value * 2
+}
+
+/// Chained ? operators — each ? adds +1, and inner expressions are visited.
+/// cognitive: base(1) + ?(+1) + ?(+1) = 3, cyclomatic: base(1) + ?(+1) + ?(+1) = 3.
+pub fn chained_try(input: &str) -> Result<usize, String> {
+    let parsed: usize = input.parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
+    let doubled = parsed.checked_mul(2).ok_or("overflow".to_string())?;
+    Ok(doubled)
+}
+
+/// match with ? in scrutinee — the ? inside the match input is counted.
+/// cognitive: base(1) + match(+1+0) + ?(+1) = 3, cyclomatic: base(1) + match-arms + ?(+1).
+pub fn match_with_try_scrutinee(input: &str) -> Result<&str, String> {
+    match input.parse::<i32>().map_err(|e| e.to_string())? {
+        0 => Ok("zero"),
+        1..=100 => Ok("positive"),
+        _ => Ok("other"),
+    }
+}
+
+/// Trait with a default method — should be found by the walker.
+pub trait Describable {
+    fn name(&self) -> &str;
+
+    /// Default method with branching — cognitive: base(1) + if(+1+0) = 2.
+    fn describe(&self) -> String {
+        if self.name().is_empty() {
+            "<unnamed>".to_string()
+        } else {
+            format!("Item: {}", self.name())
+        }
+    }
+}
