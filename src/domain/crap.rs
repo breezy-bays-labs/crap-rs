@@ -111,6 +111,16 @@ mod tests {
     }
 
     #[test]
+    fn rejects_nan_coverage() {
+        assert!(compute_crap(5, f64::NAN).is_err());
+    }
+
+    #[test]
+    fn rejects_neg_infinite_coverage() {
+        assert!(compute_crap(5, f64::NEG_INFINITY).is_err());
+    }
+
+    #[test]
     fn clamps_coverage_above_100() {
         let score = compute_crap(5, 150.0).unwrap();
         assert_eq!(score.value, 5.0); // Same as 100%
@@ -129,11 +139,76 @@ mod tests {
     fn crap4ts_oracle_moderate_half_covered() {
         let score = compute_crap(5, 50.0).unwrap();
         assert_eq!(score.value, 8.13);
+        assert_eq!(score.risk_level, RiskLevel::Moderate);
     }
 
     #[test]
     fn crap4ts_oracle_high_complexity_mostly_covered() {
         let score = compute_crap(15, 90.0).unwrap();
         assert_eq!(score.value, 15.23);
+        assert_eq!(score.risk_level, RiskLevel::Moderate);
+    }
+
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn full_coverage_equals_complexity(complexity in 1..1000u32) {
+            let score = compute_crap(complexity, 100.0).unwrap();
+            assert_eq!(score.value, f64::from(complexity));
+        }
+
+        #[test]
+        fn zero_coverage_equals_c_squared_plus_c(complexity in 1..1000u32) {
+            let c = f64::from(complexity);
+            let expected = round_to_2(c * c + c);
+            let score = compute_crap(complexity, 0.0).unwrap();
+            assert_eq!(score.value, expected);
+        }
+
+        #[test]
+        fn score_always_gte_one(complexity in 1..1000u32, coverage in 0.0..=100.0f64) {
+            let score = compute_crap(complexity, coverage).unwrap();
+            prop_assert!(score.value >= 1.0, "CRAP score {} < 1.0", score.value);
+        }
+
+        #[test]
+        fn monotonic_in_coverage(
+            complexity in 1..100u32,
+            cov_lo in 0.0..50.0f64,
+            cov_delta in 0.01..50.0f64,
+        ) {
+            let cov_hi = (cov_lo + cov_delta).min(100.0);
+            let score_lo = compute_crap(complexity, cov_lo).unwrap();
+            let score_hi = compute_crap(complexity, cov_hi).unwrap();
+            prop_assert!(
+                score_hi.value <= score_lo.value,
+                "Higher coverage ({cov_hi}%) should give lower CRAP, got {} vs {}",
+                score_hi.value, score_lo.value
+            );
+        }
+
+        #[test]
+        fn monotonic_in_complexity(
+            comp_lo in 1..500u32,
+            comp_delta in 1..500u32,
+            coverage in 0.0..=100.0f64,
+        ) {
+            let comp_hi = comp_lo.saturating_add(comp_delta);
+            let score_lo = compute_crap(comp_lo, coverage).unwrap();
+            let score_hi = compute_crap(comp_hi, coverage).unwrap();
+            prop_assert!(
+                score_hi.value >= score_lo.value,
+                "Higher complexity ({comp_hi}) should give higher CRAP, got {} vs {}",
+                score_hi.value, score_lo.value
+            );
+        }
     }
 }
