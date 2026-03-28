@@ -121,4 +121,19 @@ mod tests {
         let score = compute_crap(5, -10.0).unwrap();
         assert_eq!(score.value, 30.0); // Same as 0%
     }
+
+    // ── crap4ts oracle cross-validation ────────────────────────────────
+    // These values must match crap4ts exactly (CLAUDE.md reference table).
+
+    #[test]
+    fn crap4ts_oracle_moderate_half_covered() {
+        let score = compute_crap(5, 50.0).unwrap();
+        assert_eq!(score.value, 8.13);
+    }
+
+    #[test]
+    fn crap4ts_oracle_high_complexity_mostly_covered() {
+        let score = compute_crap(15, 90.0).unwrap();
+        assert_eq!(score.value, 15.23);
+    }
 }
