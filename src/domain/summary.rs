@@ -220,4 +220,17 @@ mod tests {
         let summary = compute_summary(&verdicts);
         assert_eq!(summary.average_crap, 6.0);
     }
+
+    #[test]
+    fn tied_scores_first_wins_worst_function() {
+        let verdicts = vec![
+            make_verdict("a.rs", "first", 10.0, 30.0),
+            make_verdict("a.rs", "second", 10.0, 30.0),
+        ];
+        let summary = compute_summary(&verdicts);
+        assert_eq!(
+            summary.worst_function.as_ref().unwrap().qualified_name,
+            "first"
+        );
+    }
 }
