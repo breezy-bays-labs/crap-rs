@@ -64,6 +64,13 @@ pub struct CoverageRatio {
     pub percent: f64,
 }
 
+/// Line-level coverage data parsed from LCOV DA entries.
+#[derive(Debug, Clone)]
+pub struct LineCoverage {
+    pub line: usize,
+    pub hits: u64,
+}
+
 /// Per-function coverage data parsed from LCOV.
 #[derive(Debug, Clone, Serialize)]
 pub struct FunctionCoverage {

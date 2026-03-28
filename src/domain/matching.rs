@@ -5,15 +5,8 @@
 //! This is dramatically simpler than crap4ts's span-overlap matching because
 //! we bypass function name matching entirely.
 
-use super::types::{CoverageRatio, FunctionComplexity, FunctionCoverage, SourceSpan};
+use super::types::{CoverageRatio, FunctionComplexity, FunctionCoverage, LineCoverage, SourceSpan};
 use std::collections::HashMap;
-
-/// Line-level coverage data parsed from LCOV DA entries.
-#[derive(Debug, Clone)]
-pub struct LineCoverage {
-    pub line: usize,
-    pub hits: u64,
-}
 
 /// Match complexity entries with coverage using line-range overlap.
 ///

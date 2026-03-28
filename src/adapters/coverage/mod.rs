@@ -5,8 +5,7 @@
 //! are ignored because function matching uses line ranges from syn, not
 //! LCOV function names (which are mangled Rust symbols).
 
-use crate::domain::matching::LineCoverage;
-use crate::domain::types::{CrapError, ParseDiagnostic};
+use crate::domain::types::{CrapError, LineCoverage, ParseDiagnostic};
 use crate::ports::{CoveragePort, ParseOutput};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
