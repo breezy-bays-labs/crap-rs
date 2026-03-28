@@ -13,7 +13,7 @@ use crate::adapters::coverage::LcovParser;
 use crate::domain::crap::compute_crap;
 use crate::domain::matching::match_functions;
 use crate::domain::summary::compute_summary;
-use crate::domain::threshold::DEFAULT_THRESHOLD;
+use crate::domain::threshold::ThresholdConfig;
 use crate::domain::types::{AnalysisResult, ComplexityMetric, FunctionVerdict, ScoredFunction};
 use crate::ports::{ComplexityPort, CoveragePort};
 
@@ -24,8 +24,8 @@ pub struct AnalyzeOptions {
     pub src: PathBuf,
     /// Path to the LCOV coverage file.
     pub coverage: PathBuf,
-    /// CRAP score threshold — functions above this are flagged.
-    pub threshold: f64,
+    /// Threshold configuration with optional per-path overrides.
+    pub threshold_config: ThresholdConfig,
     /// Which complexity metric to use.
     pub metric: ComplexityMetric,
     /// Glob patterns to exclude from file discovery.
@@ -39,7 +39,7 @@ impl Default for AnalyzeOptions {
         Self {
             src: PathBuf::from("src"),
             coverage: PathBuf::from("lcov.info"),
-            threshold: DEFAULT_THRESHOLD,
+            threshold_config: ThresholdConfig::default(),
             metric: ComplexityMetric::default(),
             exclude: Vec::new(),
             respect_gitignore: true,
@@ -113,22 +113,68 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisResult> {
     // 4. Match complexity with coverage using line-range join
     let matched = match_functions(&all_complexities, &parse_output.coverage);
 
-    // 5. Score each function, produce verdicts, and build result
-    score_and_summarize(&matched, options.threshold)
+    // 5. Compile threshold overrides for glob matching
+    let resolver = ThresholdResolver::new(&options.threshold_config)?;
+
+    // 6. Score each function, produce verdicts, and build result
+    score_and_summarize(&matched, &resolver)
 }
 
-/// Score matched functions against the threshold and produce the final result.
+/// Resolves per-function thresholds using glob-based overrides.
+///
+/// Compiled once per analysis run. Patterns are evaluated in declaration
+/// order with last-match-wins semantics.
+struct ThresholdResolver {
+    global: f64,
+    overrides: Vec<(globset::GlobMatcher, f64)>,
+}
+
+impl ThresholdResolver {
+    fn new(config: &ThresholdConfig) -> Result<Self> {
+        let overrides = config
+            .overrides
+            .iter()
+            .map(|o| {
+                let glob = globset::Glob::new(&o.pattern)
+                    .with_context(|| format!("invalid glob pattern: {}", o.pattern))?
+                    .compile_matcher();
+                Ok((glob, o.threshold))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(Self {
+            global: config.global,
+            overrides,
+        })
+    }
+
+    /// Resolve the threshold for a given file path.
+    /// Last matching override wins; falls back to global.
+    fn resolve(&self, file_path: &str) -> f64 {
+        let mut threshold = self.global;
+        for (matcher, override_threshold) in &self.overrides {
+            if matcher.is_match(file_path) {
+                threshold = *override_threshold;
+            }
+        }
+        threshold
+    }
+}
+
+/// Score matched functions against the threshold config and produce the final result.
 fn score_and_summarize(
     matched: &[(
         crate::domain::types::FunctionComplexity,
         crate::domain::types::FunctionCoverage,
     )],
-    threshold: f64,
+    resolver: &ThresholdResolver,
 ) -> Result<AnalysisResult> {
     let mut verdicts = Vec::with_capacity(matched.len());
     for (comp, cov) in matched {
         let crap = compute_crap(comp.complexity, cov.line_coverage.percent)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        let threshold = resolver.resolve(&comp.identity.file_path);
 
         verdicts.push(FunctionVerdict {
             scored: ScoredFunction {
@@ -192,6 +238,7 @@ fn discover_rust_files(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::threshold::{DEFAULT_THRESHOLD, ThresholdOverride};
     use std::fs;
 
     fn setup_test_project(dir: &Path) {
@@ -240,7 +287,10 @@ pub fn with_branch(x: i32) -> &'static str {
         let opts = AnalyzeOptions {
             src: dir.path().join("src"),
             coverage: dir.path().join("lcov.info"),
-            threshold: DEFAULT_THRESHOLD,
+            threshold_config: ThresholdConfig {
+                global: DEFAULT_THRESHOLD,
+                ..ThresholdConfig::default()
+            },
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
@@ -261,7 +311,10 @@ pub fn with_branch(x: i32) -> &'static str {
         let opts = AnalyzeOptions {
             src: dir.path().join("src"),
             coverage: dir.path().join("lcov.info"),
-            threshold: DEFAULT_THRESHOLD,
+            threshold_config: ThresholdConfig {
+                global: DEFAULT_THRESHOLD,
+                ..ThresholdConfig::default()
+            },
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
@@ -287,7 +340,10 @@ pub fn with_branch(x: i32) -> &'static str {
         let opts = AnalyzeOptions {
             src: dir.path().join("src"),
             coverage: dir.path().join("lcov.info"),
-            threshold: DEFAULT_THRESHOLD,
+            threshold_config: ThresholdConfig {
+                global: DEFAULT_THRESHOLD,
+                ..ThresholdConfig::default()
+            },
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
@@ -313,7 +369,10 @@ pub fn with_branch(x: i32) -> &'static str {
         let opts = AnalyzeOptions {
             src: dir.path().join("src"),
             coverage: dir.path().join("lcov.info"),
-            threshold: 100.0, // Very high threshold
+            threshold_config: ThresholdConfig {
+                global: 100.0,
+                ..ThresholdConfig::default()
+            }, // Very high threshold
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
@@ -334,7 +393,10 @@ pub fn with_branch(x: i32) -> &'static str {
         let opts = AnalyzeOptions {
             src: dir.path().join("src"),
             coverage: dir.path().join("lcov.info"),
-            threshold: 1.0,
+            threshold_config: ThresholdConfig {
+                global: 1.0,
+                ..ThresholdConfig::default()
+            },
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
@@ -359,7 +421,10 @@ pub fn with_branch(x: i32) -> &'static str {
         let opts = AnalyzeOptions {
             src: dir.path().join("src"),
             coverage: dir.path().join("lcov.info"),
-            threshold: 0.5, // Very low threshold — everything exceeds
+            threshold_config: ThresholdConfig {
+                global: 0.5,
+                ..ThresholdConfig::default()
+            }, // Very low threshold — everything exceeds
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
@@ -527,7 +592,10 @@ pub fn with_branch(x: i32) -> &'static str {
         let opts = AnalyzeOptions {
             src: dir.path().join("src"),
             coverage: dir.path().join("lcov.info"),
-            threshold: DEFAULT_THRESHOLD,
+            threshold_config: ThresholdConfig {
+                global: DEFAULT_THRESHOLD,
+                ..ThresholdConfig::default()
+            },
             ..AnalyzeOptions::default()
         };
 
@@ -540,5 +608,108 @@ pub fn with_branch(x: i32) -> &'static str {
         assert!(summary.median_crap > 0.0);
         assert!(summary.max_crap.is_some());
         assert!(summary.worst_function.is_some());
+    }
+
+    // ── ThresholdResolver tests ───────────────────────────────────────
+
+    #[test]
+    fn resolver_global_only() {
+        let config = ThresholdConfig {
+            global: 10.0,
+            overrides: vec![],
+        };
+        let resolver = ThresholdResolver::new(&config).unwrap();
+        assert_eq!(resolver.resolve("domain/crap.rs"), 10.0);
+        assert_eq!(resolver.resolve("adapters/coverage/mod.rs"), 10.0);
+    }
+
+    #[test]
+    fn resolver_override_matches() {
+        let config = ThresholdConfig {
+            global: 8.0,
+            overrides: vec![ThresholdOverride {
+                pattern: "domain/**".to_string(),
+                threshold: 5.0,
+            }],
+        };
+        let resolver = ThresholdResolver::new(&config).unwrap();
+        assert_eq!(resolver.resolve("domain/crap.rs"), 5.0);
+        assert_eq!(resolver.resolve("adapters/coverage/mod.rs"), 8.0);
+    }
+
+    #[test]
+    fn resolver_last_match_wins() {
+        let config = ThresholdConfig {
+            global: 8.0,
+            overrides: vec![
+                ThresholdOverride {
+                    pattern: "**/*.rs".to_string(),
+                    threshold: 10.0,
+                },
+                ThresholdOverride {
+                    pattern: "domain/**".to_string(),
+                    threshold: 5.0,
+                },
+            ],
+        };
+        let resolver = ThresholdResolver::new(&config).unwrap();
+        // domain/crap.rs matches both — last wins (5.0)
+        assert_eq!(resolver.resolve("domain/crap.rs"), 5.0);
+        // adapters/mod.rs matches only first (10.0)
+        assert_eq!(resolver.resolve("adapters/mod.rs"), 10.0);
+    }
+
+    #[test]
+    fn resolver_no_match_falls_back_to_global() {
+        let config = ThresholdConfig {
+            global: 8.0,
+            overrides: vec![ThresholdOverride {
+                pattern: "domain/**".to_string(),
+                threshold: 5.0,
+            }],
+        };
+        let resolver = ThresholdResolver::new(&config).unwrap();
+        assert_eq!(resolver.resolve("cli/mod.rs"), 8.0);
+    }
+
+    #[test]
+    fn resolver_invalid_glob_rejected() {
+        let config = ThresholdConfig {
+            global: 8.0,
+            overrides: vec![ThresholdOverride {
+                pattern: "[invalid".to_string(),
+                threshold: 5.0,
+            }],
+        };
+        assert!(ThresholdResolver::new(&config).is_err());
+    }
+
+    #[test]
+    fn analyze_with_per_path_overrides() {
+        let dir = tempfile::tempdir().unwrap();
+        setup_test_project(dir.path());
+
+        let opts = AnalyzeOptions {
+            src: dir.path().join("src"),
+            coverage: dir.path().join("lcov.info"),
+            threshold_config: ThresholdConfig {
+                global: 100.0, // Very high — everything passes by default
+                overrides: vec![ThresholdOverride {
+                    pattern: "lib.rs".to_string(),
+                    threshold: 0.5, // Very low — everything in lib.rs fails
+                }],
+            },
+            metric: ComplexityMetric::Cognitive,
+            exclude: Vec::new(),
+            respect_gitignore: false,
+        };
+
+        let result = analyze(&opts).unwrap();
+        // All functions are in lib.rs, which has the 0.5 override
+        assert!(!result.passed);
+        for v in &result.functions {
+            assert_eq!(v.threshold, 0.5);
+            assert!(v.exceeds);
+        }
     }
 }

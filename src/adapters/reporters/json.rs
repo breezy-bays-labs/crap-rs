@@ -24,6 +24,10 @@ struct JsonEnvelope<'a> {
     result: &'a AnalysisResult,
 }
 
+// Note: per-function thresholds are already visible in each FunctionVerdict's
+// `threshold` field. Consumers can compare individual function thresholds
+// against the envelope's global `threshold` to detect overrides.
+
 /// Format an analysis result as pretty-printed JSON with a versioned envelope.
 pub fn format_json(
     result: &AnalysisResult,
