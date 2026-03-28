@@ -212,3 +212,77 @@ mod proptests {
         }
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(512))]
+
+        /// Full coverage means CRAP score equals complexity.
+        #[test]
+        fn full_coverage_equals_complexity(complexity in 1..1000u32) {
+            let score = compute_crap(complexity, 100.0).unwrap();
+            prop_assert_eq!(score.value, f64::from(complexity));
+        }
+
+        /// Zero coverage means CRAP = c² + c.
+        #[test]
+        fn zero_coverage_equals_c_squared_plus_c(complexity in 1..1000u32) {
+            let score = compute_crap(complexity, 0.0).unwrap();
+            let c = f64::from(complexity);
+            let expected = (((c * c + c) * 100.0).round()) / 100.0;
+            prop_assert_eq!(score.value, expected);
+        }
+
+        /// CRAP score is always >= 1.0 for valid inputs.
+        #[test]
+        fn always_at_least_one(
+            complexity in 1..500u32,
+            coverage in 0.0..=100.0f64,
+        ) {
+            let score = compute_crap(complexity, coverage).unwrap();
+            prop_assert!(score.value >= 1.0, "CRAP {} < 1.0", score.value);
+        }
+
+        /// Higher coverage → lower CRAP (monotonic decreasing in coverage).
+        #[test]
+        fn monotonic_in_coverage(
+            complexity in 1..500u32,
+            cov_lo in 0.0..100.0f64,
+        ) {
+            // Pick cov_hi strictly above cov_lo
+            let cov_hi = (cov_lo + 0.01).min(100.0);
+            if cov_lo >= cov_hi {
+                return Ok(());
+            }
+            let score_lo = compute_crap(complexity, cov_lo).unwrap();
+            let score_hi = compute_crap(complexity, cov_hi).unwrap();
+            prop_assert!(
+                score_hi.value <= score_lo.value,
+                "CRAP({}, {:.2}) = {} > CRAP({}, {:.2}) = {}",
+                complexity, cov_hi, score_hi.value,
+                complexity, cov_lo, score_lo.value,
+            );
+        }
+
+        /// Higher complexity → higher CRAP (monotonic increasing in complexity).
+        #[test]
+        fn monotonic_in_complexity(
+            comp_lo in 1..499u32,
+            coverage in 0.0..=100.0f64,
+        ) {
+            let comp_hi = comp_lo + 1;
+            let score_lo = compute_crap(comp_lo, coverage).unwrap();
+            let score_hi = compute_crap(comp_hi, coverage).unwrap();
+            prop_assert!(
+                score_hi.value >= score_lo.value,
+                "CRAP({}, {:.2}) = {} < CRAP({}, {:.2}) = {}",
+                comp_hi, coverage, score_hi.value,
+                comp_lo, coverage, score_lo.value,
+            );
+        }
+    }
+}
