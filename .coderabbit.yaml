@@ -1,0 +1,14 @@
+language: en
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "src/domain/**"
+      instructions: "Domain layer must be pure — no external crate imports, no I/O, no Rust-language-specific assumptions. These modules are destined for crap-core extraction."
+    - path: "src/ports/**"
+      instructions: "Port traits must be language-agnostic. No syn, LCOV, or Rust-specific types. ComplexityPort and CoveragePort must work for any language."
+    - path: "src/adapters/**"
+      instructions: "Adapters implement port traits. Flag any inward imports (adapters importing from core/cli). All Rust-specific code (syn, LCOV) belongs here."
+    - path: "tests/**"
+      instructions: "Property tests required for CRAP formula, LCOV parser, matching, and complexity walker. Regression files must be committed."
