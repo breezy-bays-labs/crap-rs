@@ -4,8 +4,9 @@
 //! then matches against constructed LCOV-like coverage data.
 
 use crap4rs::adapters::complexity::SynComplexityAdapter;
-use crap4rs::domain::matching::{LineCoverage, match_functions};
+use crap4rs::domain::matching::match_functions;
 use crap4rs::domain::types::ComplexityMetric;
+use crap4rs::domain::types::LineCoverage;
 use crap4rs::ports::ComplexityPort;
 use std::collections::HashMap;
 

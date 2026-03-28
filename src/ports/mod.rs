@@ -1,5 +1,6 @@
-use crate::domain::matching::LineCoverage;
-use crate::domain::types::{ComplexityMetric, CrapError, FunctionComplexity, ParseDiagnostic};
+use crate::domain::types::{
+    ComplexityMetric, CrapError, FunctionComplexity, LineCoverage, ParseDiagnostic,
+};
 use std::collections::HashMap;
 
 /// Port for extracting per-function complexity from source code.
