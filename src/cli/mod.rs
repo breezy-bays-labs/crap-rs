@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::SystemTime;
 
 use anyhow::{Result, bail};
 use clap::{Args, Parser, ValueEnum, ValueHint};
@@ -330,7 +331,6 @@ fn check_src_has_rust_files(path: &std::path::Path) -> Result<()> {
 // ── Timestamp ──────────────────────────────────────────────────────
 
 fn now_unix_epoch() -> String {
-    use std::time::SystemTime;
     let secs = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()

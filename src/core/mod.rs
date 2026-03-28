@@ -102,6 +102,14 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisResult> {
         }
     }
 
+    if all_complexities.is_empty() {
+        bail!(
+            "no functions extracted from source files in {}\n  \
+             hint: check that source files contain valid Rust function definitions",
+            options.src.display()
+        );
+    }
+
     // 4. Match complexity with coverage using line-range join
     let matched = match_functions(&all_complexities, &parse_output.coverage);
 
@@ -360,6 +368,30 @@ pub fn with_branch(x: i32) -> &'static str {
         let result = analyze(&opts).unwrap();
         assert!(!result.passed);
         assert!(result.summary.exceeding_threshold > 0);
+    }
+
+    #[test]
+    fn analyze_no_functions_extracted_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        // .rs file with no function definitions
+        fs::write(src_dir.join("lib.rs"), "// just a comment\n").unwrap();
+        fs::write(
+            dir.path().join("lcov.info"),
+            "SF:lib.rs\nDA:1,1\nend_of_record\n",
+        )
+        .unwrap();
+
+        let opts = AnalyzeOptions {
+            src: src_dir,
+            coverage: dir.path().join("lcov.info"),
+            respect_gitignore: false,
+            ..AnalyzeOptions::default()
+        };
+
+        let err = analyze(&opts).unwrap_err();
+        assert!(err.to_string().contains("no functions extracted"));
     }
 
     #[test]
