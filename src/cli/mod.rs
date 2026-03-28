@@ -9,6 +9,8 @@ use std::process::ExitCode;
 use anyhow::{Result, bail};
 use clap::{Args, Parser, ValueEnum, ValueHint};
 
+use crap4rs::adapters::reporters;
+use crap4rs::core::AnalyzeOptions;
 use crap4rs::domain::threshold::DEFAULT_THRESHOLD;
 use crap4rs::domain::types::ComplexityMetric;
 
@@ -179,11 +181,40 @@ fn run_inner() -> Result<bool> {
     validate_inputs(&cli)?;
     preflight_checks(&cli)?;
 
-    // TODO(#6): wire to core::analyze() — requires #2 (syn walker), #3 (matching), #5 (reporters)
-    bail!(
-        "analysis engine not yet implemented (see issue #6)\n  \
-         hint: this CLI parses and validates args but cannot analyze yet"
-    );
+    let options = AnalyzeOptions {
+        src: cli.input.src.clone(),
+        coverage: cli.input.coverage.clone(),
+        threshold: cli.output.threshold,
+        metric: cli.input.metric.into(),
+        exclude: cli.filter.exclude.clone(),
+        respect_gitignore: !cli.filter.no_gitignore,
+    };
+
+    let mut result = crap4rs::core::analyze(&options)?;
+    let passed = result.passed;
+
+    // Filter to only failing functions if requested (summary stays unfiltered)
+    if cli.output.only_failing {
+        result.functions.retain(|v| v.exceeds);
+    }
+
+    if !cli.display.quiet {
+        let output = match cli.output.format {
+            FormatArg::Table => reporters::format_table(&result, cli.output.threshold),
+            FormatArg::Json => {
+                let config = reporters::json::JsonConfig {
+                    tool_version: env!("CARGO_PKG_VERSION").to_string(),
+                    metric: cli.input.metric.into(),
+                    threshold: cli.output.threshold,
+                    timestamp: now_unix_epoch(),
+                };
+                reporters::format_json(&result, &config)?
+            }
+        };
+        print!("{output}");
+    }
+
+    Ok(passed)
 }
 
 // ── Validation ──────────────────────────────────────────────────────
@@ -294,6 +325,17 @@ fn check_src_has_rust_files(path: &std::path::Path) -> Result<()> {
         );
     }
     Ok(())
+}
+
+// ── Timestamp ──────────────────────────────────────────────────────
+
+fn now_unix_epoch() -> String {
+    use std::time::SystemTime;
+    let secs = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    format!("{secs}")
 }
 
 // ── Color wiring ────────────────────────────────────────────────────
