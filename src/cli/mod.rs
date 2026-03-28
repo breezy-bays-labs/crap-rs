@@ -93,10 +93,17 @@ pub struct OutputArgs {
 #[command(next_help_heading = "Filtering")]
 pub struct FilterArgs {
     /// Glob patterns to exclude from analysis (repeatable)
+    ///
+    /// Build artifacts (target/) are excluded automatically via .gitignore.
+    /// Test files are NOT excluded by default — use `--exclude "tests/**"`
+    /// if you want to skip them.
     #[arg(long, action = clap::ArgAction::Append)]
     pub exclude: Vec<String>,
 
     /// Do not respect .gitignore files
+    ///
+    /// By default, paths in .gitignore are skipped (e.g., target/).
+    /// Pass this flag to analyze all files regardless of .gitignore.
     #[arg(long)]
     pub no_gitignore: bool,
 }
@@ -172,19 +179,10 @@ fn run_inner() -> Result<bool> {
     validate_inputs(&cli)?;
 
     // TODO(#6): wire to core::analyze() — requires #2 (syn walker), #3 (matching), #5 (reporters)
-    if !cli.display.quiet {
-        eprintln!(
-            "crap4rs: analysis not yet implemented (see issue #6)\n\
-             Parsed: src={}, coverage={}, metric={}, threshold={}, format={:?}",
-            cli.input.src.display(),
-            cli.input.coverage.display(),
-            ComplexityMetric::from(cli.input.metric),
-            cli.output.threshold,
-            cli.output.format,
-        );
-    }
-
-    Ok(true)
+    bail!(
+        "analysis engine not yet implemented (see issue #6)\n  \
+         hint: this CLI parses and validates args but cannot analyze yet"
+    );
 }
 
 // ── Validation ──────────────────────────────────────────────────────
