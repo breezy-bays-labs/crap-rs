@@ -172,15 +172,17 @@ fn run_inner() -> Result<bool> {
     validate_inputs(&cli)?;
 
     // TODO(#6): wire to core::analyze() — requires #2 (syn walker), #3 (matching), #5 (reporters)
-    eprintln!(
-        "crap4rs: analysis not yet implemented (see issue #6)\n\
-         Parsed: src={}, coverage={}, metric={}, threshold={}, format={:?}",
-        cli.input.src.display(),
-        cli.input.coverage.display(),
-        ComplexityMetric::from(cli.input.metric),
-        cli.output.threshold,
-        cli.output.format,
-    );
+    if !cli.display.quiet {
+        eprintln!(
+            "crap4rs: analysis not yet implemented (see issue #6)\n\
+             Parsed: src={}, coverage={}, metric={}, threshold={}, format={:?}",
+            cli.input.src.display(),
+            cli.input.coverage.display(),
+            ComplexityMetric::from(cli.input.metric),
+            cli.output.threshold,
+            cli.output.format,
+        );
+    }
 
     Ok(true)
 }
@@ -455,18 +457,16 @@ mod tests {
     }
 
     #[test]
-    fn color_never_disables_colored() {
+    fn color_overrides_set_global_state() {
+        // Combined into one test to avoid nondeterministic interleaving —
+        // colored::control uses a process-global flag that parallel tests
+        // can race on.
         apply_color(ColorArg::Never);
         assert!(!colored::control::SHOULD_COLORIZE.should_colorize());
-        // Restore default
-        apply_color(ColorArg::Auto);
-    }
 
-    #[test]
-    fn color_always_enables_colored() {
         apply_color(ColorArg::Always);
         assert!(colored::control::SHOULD_COLORIZE.should_colorize());
-        // Restore default
+
         apply_color(ColorArg::Auto);
     }
 }
