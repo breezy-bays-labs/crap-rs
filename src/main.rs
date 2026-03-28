@@ -1,8 +1,7 @@
+use std::process::ExitCode;
+
 mod cli;
 
-fn main() {
-    if let Err(e) = cli::run() {
-        eprintln!("Error: {e:#}");
-        std::process::exit(1);
-    }
+fn main() -> ExitCode {
+    cli::run()
 }
