@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 186fae7d8b06ae8af3a6263a62a2b46abe750e4ea0b77586bdb7faff222193fd # shrinks to fixture = "simple_functions.rs"
+cc 5f76be4ffcba6d1eaa1a1c4572d8eab43b3bde712b4fc66d7dca9c67c1fca0ed # shrinks to fixture = "simple_functions.rs", metric = Cognitive
