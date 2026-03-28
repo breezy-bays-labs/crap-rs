@@ -101,6 +101,18 @@ pub fn match_with_try_scrutinee(input: &str) -> Result<&str, String> {
     }
 }
 
+/// for loop with ? in iterator — the ? inside the iterator expression is counted.
+/// cognitive: base(1) + for(+1+0) + ?(+1) = 3, cyclomatic: base(1) + for(+1) + ?(+1) = 3.
+pub fn for_with_try_iterator(input: &str) -> Result<usize, String> {
+    let mut total = 0;
+    for ch in input.parse::<String>().map_err(|e| e.to_string())?.chars() {
+        if ch.is_alphabetic() {
+            total += 1;
+        }
+    }
+    Ok(total)
+}
+
 /// Trait with a default method — should be found by the walker.
 pub trait Describable {
     fn name(&self) -> &str;

@@ -827,6 +827,22 @@ mod tests {
     }
 
     #[test]
+    fn for_iterator_try_cognitive() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "for_with_try_iterator");
+        // base(1) + for(+1+0) + ?(+1) in iterator + if(+1+1nesting) = 5
+        assert_eq!(f.complexity, 5);
+    }
+
+    #[test]
+    fn for_iterator_try_cyclomatic() {
+        let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cyclomatic);
+        let f = find_fn(&fns, "for_with_try_iterator");
+        // base(1) + for(+1) + ?(+1) in iterator + if(+1) = 4
+        assert_eq!(f.complexity, 4);
+    }
+
+    #[test]
     fn match_scrutinee_try_cognitive() {
         let fns = extract_fixture("control_flow.rs", ComplexityMetric::Cognitive);
         let f = find_fn(&fns, "match_with_try_scrutinee");
