@@ -247,9 +247,20 @@ fn check_coverage_has_data(path: &std::path::Path) -> Result<()> {
 
     let file = std::fs::File::open(path)?;
     let reader = BufReader::new(file);
+    let mut in_sf_block = false;
+
     for line in reader.lines() {
         let line = line?;
-        if line.starts_with("DA:") {
+        if line.starts_with("SF:") {
+            in_sf_block = true;
+            continue;
+        }
+        if in_sf_block
+            && let Some(rest) = line.strip_prefix("DA:")
+            && let Some((line_no, hits)) = rest.split_once(',')
+            && line_no.parse::<usize>().is_ok()
+            && hits.split(',').next().unwrap_or("").parse::<u64>().is_ok()
+        {
             return Ok(());
         }
     }
@@ -552,6 +563,28 @@ mod tests {
         std::fs::write(&cov, "SF:src/main.rs\nDA:1,5\nend_of_record\n").unwrap();
 
         assert!(check_coverage_has_data(&cov).is_ok());
+    }
+
+    #[test]
+    fn preflight_coverage_da_outside_sf_block_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let cov = dir.path().join("orphan_da.info");
+        std::fs::write(&cov, "DA:1,5\nend_of_record\n").unwrap();
+
+        let err = check_coverage_has_data(&cov).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("no coverage data found"));
+    }
+
+    #[test]
+    fn preflight_coverage_malformed_da_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let cov = dir.path().join("bad_da.info");
+        std::fs::write(&cov, "SF:src/main.rs\nDA:not_a_number\nend_of_record\n").unwrap();
+
+        let err = check_coverage_has_data(&cov).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("no coverage data found"));
     }
 
     #[test]
