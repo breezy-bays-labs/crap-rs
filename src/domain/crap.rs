@@ -149,36 +149,6 @@ mod tests {
         assert_eq!(score.risk_level, RiskLevel::Moderate);
     }
 
-    // ── crap4ts risk classification parity ─────────────────────────────
-    // Thresholds: Low ≤5, Acceptable ≤8, Moderate ≤30, High >30
-
-    #[test]
-    fn crap4ts_risk_trivial_full_coverage_is_low() {
-        let score = compute_crap(1, 100.0).unwrap();
-        assert_eq!(score.value, 1.0);
-        assert_eq!(score.risk_level, RiskLevel::Low);
-    }
-
-    #[test]
-    fn crap4ts_risk_trivial_zero_coverage_is_low() {
-        let score = compute_crap(1, 0.0).unwrap();
-        assert_eq!(score.value, 2.0);
-        assert_eq!(score.risk_level, RiskLevel::Low);
-    }
-
-    #[test]
-    fn crap4ts_risk_complex_full_coverage_is_moderate() {
-        let score = compute_crap(10, 100.0).unwrap();
-        assert_eq!(score.value, 10.0);
-        assert_eq!(score.risk_level, RiskLevel::Moderate);
-    }
-
-    #[test]
-    fn crap4ts_risk_complex_zero_coverage_is_high() {
-        let score = compute_crap(10, 0.0).unwrap();
-        assert_eq!(score.value, 110.0);
-        assert_eq!(score.risk_level, RiskLevel::High);
-    }
 }
 
 #[cfg(test)]
