@@ -23,6 +23,7 @@ clap = { version = "4", features = ["derive"] }
 
 # AST parsing for complexity analysis
 syn = { version = "2", features = ["full", "parsing", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
