@@ -18,7 +18,8 @@ fn self_referential_analysis() {
 
     // Create a minimal LCOV that covers a few known domain functions
     let lcov = make_self_coverage(&src);
-    let lcov_path = std::env::temp_dir().join("crap4rs-self-test.lcov");
+    let tmp = tempfile::tempdir().unwrap();
+    let lcov_path = tmp.path().join("lcov.info");
     std::fs::write(&lcov_path, &lcov).unwrap();
 
     let opts = AnalyzeOptions {
@@ -73,7 +74,8 @@ fn self_referential_with_cyclomatic() {
     let src = manifest_dir.join("src");
 
     let lcov = make_self_coverage(&src);
-    let lcov_path = std::env::temp_dir().join("crap4rs-self-cyclomatic.lcov");
+    let tmp = tempfile::tempdir().unwrap();
+    let lcov_path = tmp.path().join("lcov.info");
     std::fs::write(&lcov_path, &lcov).unwrap();
 
     let opts = AnalyzeOptions {
@@ -102,7 +104,8 @@ fn self_referential_known_functions_present() {
     let src = manifest_dir.join("src");
 
     let lcov = make_self_coverage(&src);
-    let lcov_path = std::env::temp_dir().join("crap4rs-self-known.lcov");
+    let tmp = tempfile::tempdir().unwrap();
+    let lcov_path = tmp.path().join("lcov.info");
     std::fs::write(&lcov_path, &lcov).unwrap();
 
     let opts = AnalyzeOptions {
@@ -149,7 +152,8 @@ fn exclude_pattern_filters_correctly() {
     let src = manifest_dir.join("src");
 
     let lcov = make_self_coverage(&src);
-    let lcov_path = std::env::temp_dir().join("crap4rs-self-exclude.lcov");
+    let tmp_all = tempfile::tempdir().unwrap();
+    let lcov_path = tmp_all.path().join("lcov.info");
     std::fs::write(&lcov_path, &lcov).unwrap();
 
     // Analyze all files
