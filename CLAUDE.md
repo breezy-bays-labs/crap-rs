@@ -96,6 +96,30 @@ git worktree add ../crap4rs-issue-N -b feat/topic-name
 
 Shared target directory in `.cargo/config.toml` — all worktrees share one `target/`.
 
+## Future: Unified `crap` Monorepo
+
+crap4rs is designed for extraction into a unified `crap` monorepo that supports multiple languages (Rust, TypeScript, and potentially others). The current ports-and-adapters architecture maps directly to the future structure:
+
+```
+crap/ (future monorepo)
+├── crates/
+│   ├── crap-core/           ← domain/ + ports/ + core/ from this repo
+│   ├── crap-rust/           ← adapters/ from this repo (syn walker, LCOV parser)
+│   ├── crap-typescript/     ← new: tree-sitter-typescript, Istanbul JSON parser
+│   └── crap-cli/            ← cli/ from this repo, expanded for multi-language
+├── bindings/napi/           ← napi-rs for npm distribution
+└── packages/crap4ts/        ← npm wrapper replacing current crap4ts
+```
+
+**What this means for development now:**
+- `domain/` and `ports/` must stay **language-agnostic** — no Rust-specific assumptions, no `syn` imports, no LCOV-specific types. These become `crap-core`.
+- `ComplexityPort` and `CoveragePort` traits must work for any language's complexity/coverage data.
+- Report generation, config parsing, threshold logic, and the CRAP formula belong in domain/core — not in adapters.
+- `adapters/` is where all Rust-specific code lives (syn walker, LCOV parser). These become `crap-rust`.
+- When adding new features, ask: "Is this language-specific or universal?" Universal → domain/core. Language-specific → adapters.
+
+Tracking: `breezy-bays-labs/ops#231`
+
 ## Cross-References
 
 - **crap4ts** (TS equivalent): `~/Github/crap4ts/`
