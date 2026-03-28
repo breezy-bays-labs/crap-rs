@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # CLAUDE.md — crap4rs
 
 CRAP (Change Risk Anti-Patterns) analyzer for Rust codebases. Library crate + thin CLI binary.
@@ -27,8 +29,6 @@ Never import "inward." Library crate layout preserves future `crap-core` extract
 **Complexity metrics**: cognitive (default, better for match-heavy Rust) and cyclomatic via `--metric` flag. `ComplexityPort` is metric-agnostic.
 
 **LCOV only**: parse `SF:` and `DA:` records from `cargo-llvm-cov --lcov`. Ignore `FN:`/`FNDA:` (mangled symbols, redundant).
-
-**Spike reference**: `~/Github/ops/pipelines/crap4rs/crap4rs-20260324-council-spike.md`
 
 ## Commands
 
@@ -118,15 +118,10 @@ crap/ (future monorepo)
 - `adapters/` is where all Rust-specific code lives (syn walker, LCOV parser). These become `crap-rust`.
 - When adding new features, ask: "Is this language-specific or universal?" Universal → domain/core. Language-specific → adapters.
 
-Tracking: `breezy-bays-labs/ops#231`
-
 ## Cross-References
 
-- **crap4ts** (TS equivalent): `~/Github/crap4ts/`
-- **Ecosystem plan**: `~/.claude/projects/-Users-cmbays-github-ops/memory/project_crap-ecosystem-plan.md`
-- **Testing standard**: `~/Github/ops/standards/testing.md`
-- **Quality loop**: `~/Github/ops/playbooks/quality-loop.md`
-- **Kanban board**: `~/Github/ops/boards/crap4rs/v0.1.0-mvp.md`
+- **crap4ts** (TS equivalent): [breezy-bays-labs/crap4ts](https://github.com/breezy-bays-labs/crap4ts)
+- **Unified monorepo tracking**: breezy-bays-labs/ops#231
 
 ## Compact Instructions
 
