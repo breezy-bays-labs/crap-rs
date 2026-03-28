@@ -177,6 +177,7 @@ fn run_inner() -> Result<bool> {
 
     apply_color(cli.display.color);
     validate_inputs(&cli)?;
+    preflight_checks(&cli)?;
 
     // TODO(#6): wire to core::analyze() — requires #2 (syn walker), #3 (matching), #5 (reporters)
     bail!(
@@ -228,6 +229,57 @@ fn validate_inputs(cli: &Cli) -> Result<()> {
         bail!(
             "threshold must be a finite positive number, got: {}",
             cli.output.threshold
+        );
+    }
+    Ok(())
+}
+
+// ── Pre-flight checks ──────────────────────────────────────────────
+
+fn preflight_checks(cli: &Cli) -> Result<()> {
+    check_coverage_has_data(&cli.input.coverage)?;
+    check_src_has_rust_files(&cli.input.src)?;
+    Ok(())
+}
+
+fn check_coverage_has_data(path: &std::path::Path) -> Result<()> {
+    use std::io::{BufRead, BufReader};
+
+    let file = std::fs::File::open(path)?;
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with("DA:") {
+            return Ok(());
+        }
+    }
+    bail!(
+        "no coverage data found in {}\n  \
+         hint: ensure tests ran with coverage enabled (`cargo llvm-cov --lcov`)",
+        path.display()
+    );
+}
+
+fn check_src_has_rust_files(path: &std::path::Path) -> Result<()> {
+    fn has_rs_files(dir: &std::path::Path) -> std::io::Result<bool> {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let ft = entry.file_type()?;
+            if ft.is_file() && entry.path().extension().is_some_and(|ext| ext == "rs") {
+                return Ok(true);
+            }
+            if ft.is_dir() && has_rs_files(&entry.path())? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    if !has_rs_files(path)? {
+        bail!(
+            "no Rust source files found in {}\n  \
+             hint: check that --src points to a directory containing .rs files",
+            path.display()
         );
     }
     Ok(())
@@ -466,5 +518,76 @@ mod tests {
         assert!(colored::control::SHOULD_COLORIZE.should_colorize());
 
         apply_color(ColorArg::Auto);
+    }
+
+    // ── Pre-flight check tests ─────────────────────────────────────────
+
+    #[test]
+    fn preflight_empty_coverage_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let cov = dir.path().join("empty.info");
+        std::fs::write(&cov, "").unwrap();
+
+        let err = check_coverage_has_data(&cov).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("no coverage data found"));
+        assert!(msg.contains("cargo llvm-cov"));
+    }
+
+    #[test]
+    fn preflight_coverage_no_da_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let cov = dir.path().join("no_da.info");
+        std::fs::write(&cov, "SF:src/main.rs\nend_of_record\n").unwrap();
+
+        let err = check_coverage_has_data(&cov).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("no coverage data found"));
+    }
+
+    #[test]
+    fn preflight_coverage_with_da_lines_passes() {
+        let dir = tempfile::tempdir().unwrap();
+        let cov = dir.path().join("good.info");
+        std::fs::write(&cov, "SF:src/main.rs\nDA:1,5\nend_of_record\n").unwrap();
+
+        assert!(check_coverage_has_data(&cov).is_ok());
+    }
+
+    #[test]
+    fn preflight_src_dir_no_rust_files() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("readme.txt"), "hello").unwrap();
+
+        let err = check_src_has_rust_files(dir.path()).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("no Rust source files found"));
+    }
+
+    #[test]
+    fn preflight_src_dir_empty() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let err = check_src_has_rust_files(dir.path()).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("no Rust source files found"));
+    }
+
+    #[test]
+    fn preflight_src_dir_with_rs_files_passes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("main.rs"), "fn main() {}").unwrap();
+
+        assert!(check_src_has_rust_files(dir.path()).is_ok());
+    }
+
+    #[test]
+    fn preflight_src_dir_nested_rs_files_passes() {
+        let dir = tempfile::tempdir().unwrap();
+        let nested = dir.path().join("sub");
+        std::fs::create_dir(&nested).unwrap();
+        std::fs::write(nested.join("lib.rs"), "pub fn foo() {}").unwrap();
+
+        assert!(check_src_has_rust_files(dir.path()).is_ok());
     }
 }
