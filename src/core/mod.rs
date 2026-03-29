@@ -88,74 +88,11 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
 
     // Phase 1: file intersection — filter to only changed files when --diff is set
     let diff_data = if let Some(ref diff_ref) = options.diff_ref {
-        let diff_adapter = GitDiffAdapter::new();
-
-        // Find the git repo root so we can reconcile paths.
-        // Git diff outputs paths relative to repo root, but the complexity
-        // adapter uses paths relative to options.src. We bridge via src_prefix.
-        //
-        // Note: source_files use the original options.src path (may be a symlink),
-        // while src_canonical resolves symlinks. Use options.src for strip_prefix
-        // on source_files to avoid symlink mismatches (e.g. /var vs /private/var).
-        let repo_root = git_toplevel(&src_canonical)?;
-        let src_prefix = src_canonical
-            .strip_prefix(&repo_root)
-            .with_context(|| {
-                format!(
-                    "--src directory {} is not inside the git repository at {}\n  \
-                     hint: --diff requires --src to be within the git work tree",
-                    src_canonical.display(),
-                    repo_root.display(),
-                )
-            })?
-            .to_string_lossy()
-            .replace('\\', "/");
-
-        // Paths passed to `git diff -- <paths>` must be repo-relative
-        let repo_relative_paths: Vec<String> = source_files
-            .iter()
-            .map(|p| {
-                let src_rel = p
-                    .strip_prefix(&options.src)
-                    .unwrap_or(p)
-                    .to_string_lossy()
-                    .replace('\\', "/");
-                if src_prefix.is_empty() {
-                    src_rel
-                } else {
-                    format!("{src_prefix}/{src_rel}")
-                }
-            })
-            .collect();
-
-        let raw_diff = diff_adapter
-            .changed_regions(diff_ref, &repo_root, &repo_relative_paths)
-            .map_err(|e| anyhow::anyhow!(e))?;
-
-        // Strip src_prefix from diff result keys to get src-relative paths
-        let prefix_with_slash = if src_prefix.is_empty() {
-            String::new()
-        } else {
-            format!("{src_prefix}/")
-        };
-        let diff_result: std::collections::HashMap<String, FileChangeKind> = raw_diff
-            .into_iter()
-            .filter_map(|(path, kind)| {
-                if prefix_with_slash.is_empty() {
-                    Some((path, kind))
-                } else {
-                    path.strip_prefix(&prefix_with_slash)
-                        .map(|stripped| (stripped.to_string(), kind))
-                }
-            })
-            .collect();
+        let diff_result =
+            compute_diff_regions(diff_ref, &src_canonical, &options.src, &source_files)?;
 
         source_files.retain(|p| {
-            let rel = p
-                .strip_prefix(&options.src)
-                .unwrap_or(p)
-                .to_string_lossy()
-                .replace('\\', "/");
+            let rel = src_relative_path(p, &options.src);
             diff_result.contains_key(&*rel)
         });
         if source_files.is_empty() {
@@ -198,11 +135,7 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
         let source = std::fs::read_to_string(file_path)
             .with_context(|| format!("failed to read source file: {}", file_path.display()))?;
 
-        let relative = file_path
-            .strip_prefix(&options.src)
-            .unwrap_or(file_path)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let relative = src_relative_path(file_path, &options.src);
 
         match complexity_adapter.extract(&source, &relative, options.metric) {
             Ok(fns) => all_complexities.extend(fns),
@@ -367,6 +300,78 @@ fn score_and_summarize(
 }
 
 /// Find the git repository root by running `git rev-parse --show-toplevel`.
+/// Strip `src_root` prefix from a path, returning a forward-slash-normalised string.
+/// Panics if the path is not under `src_root` (a bug in the file walker).
+fn src_relative_path(path: &Path, src_root: &Path) -> String {
+    path.strip_prefix(src_root)
+        .expect("discovered file should be under the source root")
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+/// Compute diff regions for the given ref, reconciling repo-root-relative paths
+/// from `git diff` with src-relative paths used by the complexity adapter.
+fn compute_diff_regions(
+    diff_ref: &str,
+    src_canonical: &Path,
+    src_original: &Path,
+    source_files: &[PathBuf],
+) -> Result<std::collections::HashMap<String, FileChangeKind>> {
+    let diff_adapter = GitDiffAdapter::new();
+
+    // Git diff outputs paths relative to repo root, but the complexity
+    // adapter uses paths relative to options.src. We bridge via src_prefix.
+    let repo_root = git_toplevel(src_canonical)?;
+    let src_prefix = src_canonical
+        .strip_prefix(&repo_root)
+        .with_context(|| {
+            format!(
+                "--src directory {} is not inside the git repository at {}\n  \
+                 hint: --diff requires --src to be within the git work tree",
+                src_canonical.display(),
+                repo_root.display(),
+            )
+        })?
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    // Paths passed to `git diff -- <paths>` must be repo-relative.
+    // source_files use the original (possibly symlinked) src path.
+    let repo_relative_paths: Vec<String> = source_files
+        .iter()
+        .map(|p| {
+            let src_rel = src_relative_path(p, src_original);
+            if src_prefix.is_empty() {
+                src_rel
+            } else {
+                format!("{src_prefix}/{src_rel}")
+            }
+        })
+        .collect();
+
+    let raw_diff = diff_adapter
+        .changed_regions(diff_ref, &repo_root, &repo_relative_paths)
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+    // Strip src_prefix from diff result keys to get src-relative paths
+    let prefix_with_slash = if src_prefix.is_empty() {
+        String::new()
+    } else {
+        format!("{src_prefix}/")
+    };
+    Ok(raw_diff
+        .into_iter()
+        .filter_map(|(path, kind)| {
+            if prefix_with_slash.is_empty() {
+                Some((path, kind))
+            } else {
+                path.strip_prefix(&prefix_with_slash)
+                    .map(|stripped| (stripped.to_string(), kind))
+            }
+        })
+        .collect())
+}
+
 fn git_toplevel(from_dir: &Path) -> Result<PathBuf> {
     let output = std::process::Command::new("git")
         .current_dir(from_dir)

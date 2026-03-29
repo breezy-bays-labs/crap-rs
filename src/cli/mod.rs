@@ -3,7 +3,7 @@
 //! Parses args with clap, validates inputs, delegates to `core::analyze()`.
 //! No business logic lives here.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
@@ -218,7 +218,7 @@ fn run_inner() -> Result<bool> {
     // Validate --diff ref if provided
     if let Some(ref diff_ref) = cli.filter.diff {
         validate_diff_ref(diff_ref)?;
-        preflight_git_worktree()?;
+        preflight_git_worktree(&effective_src)?;
     }
 
     let options = AnalyzeOptions {
@@ -382,8 +382,9 @@ fn validate_diff_ref(diff_ref: &str) -> Result<()> {
     Ok(())
 }
 
-fn preflight_git_worktree() -> Result<()> {
+fn preflight_git_worktree(src: &Path) -> Result<()> {
     let output = std::process::Command::new("git")
+        .current_dir(src)
         .args(["rev-parse", "--is-inside-work-tree"])
         .output();
 
@@ -909,7 +910,8 @@ mod tests {
     #[test]
     fn preflight_git_worktree_passes_in_git_repo() {
         // We're running tests from inside a git repo
-        assert!(preflight_git_worktree().is_ok());
+        let cwd = std::env::current_dir().unwrap();
+        assert!(preflight_git_worktree(&cwd).is_ok());
     }
 
     #[test]
