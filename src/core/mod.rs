@@ -516,6 +516,7 @@ pub fn with_branch(x: i32) -> &'static str {
                 total: 10,
                 percent: 100.0,
             },
+            branch_coverage: None,
         };
 
         let config = crate::domain::threshold::ThresholdConfig::default();

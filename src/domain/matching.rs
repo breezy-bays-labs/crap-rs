@@ -751,6 +751,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             };
             let comp_b = FunctionComplexity {
                 identity: FunctionIdentity {
@@ -760,6 +761,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             };
 
             let line_data = {

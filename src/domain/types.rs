@@ -345,7 +345,7 @@ pub enum FileChangeKind {
 // ── Errors ──────────────────────────────────────────────────────────
 
 #[cfg(test)]
-mod tests {
+mod contributor_tests {
     use super::*;
 
     #[test]
