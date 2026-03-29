@@ -33,6 +33,7 @@ fn self_referential_analysis() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        ..AnalyzeOptions::default()
     };
 
     let result = analyze(&opts).unwrap().result;
@@ -92,6 +93,7 @@ fn self_referential_with_cyclomatic() {
         metric: ComplexityMetric::Cyclomatic,
         exclude: Vec::new(),
         respect_gitignore: false,
+        ..AnalyzeOptions::default()
     };
 
     let result = analyze(&opts).unwrap().result;
@@ -125,6 +127,7 @@ fn self_referential_known_functions_present() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        ..AnalyzeOptions::default()
     };
 
     let result = analyze(&opts).unwrap().result;
@@ -177,6 +180,7 @@ fn exclude_pattern_filters_correctly() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        ..AnalyzeOptions::default()
     };
     let all_result = analyze(&all_opts).unwrap().result;
 
@@ -191,6 +195,7 @@ fn exclude_pattern_filters_correctly() {
         metric: ComplexityMetric::Cognitive,
         exclude: vec!["adapters/**".to_string()],
         respect_gitignore: false,
+        ..AnalyzeOptions::default()
     };
     let filtered_result = analyze(&filtered_opts).unwrap().result;
 
