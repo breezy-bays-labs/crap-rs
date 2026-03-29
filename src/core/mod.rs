@@ -100,7 +100,14 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
         let repo_root = git_toplevel(&src_canonical)?;
         let src_prefix = src_canonical
             .strip_prefix(&repo_root)
-            .unwrap_or(Path::new(""))
+            .with_context(|| {
+                format!(
+                    "--src directory {} is not inside the git repository at {}\n  \
+                     hint: --diff requires --src to be within the git work tree",
+                    src_canonical.display(),
+                    repo_root.display(),
+                )
+            })?
             .to_string_lossy()
             .replace('\\', "/");
 
@@ -123,7 +130,7 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
 
         let raw_diff = diff_adapter
             .changed_regions(diff_ref, &repo_root, &repo_relative_paths)
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
+            .map_err(|e| anyhow::anyhow!(e))?;
 
         // Strip src_prefix from diff result keys to get src-relative paths
         let prefix_with_slash = if src_prefix.is_empty() {
