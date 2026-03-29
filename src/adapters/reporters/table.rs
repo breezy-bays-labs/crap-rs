@@ -464,7 +464,7 @@ mod proptests {
                         .partial_cmp(&b.scored.crap.value)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 })
-                .map(|v| v.scored.crap.clone());
+                .map(|v| v.scored.crap);
             let avg = if total > 0 {
                 verdicts.iter().map(|v| v.scored.crap.value).sum::<f64>() / total as f64
             } else {

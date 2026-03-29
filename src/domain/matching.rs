@@ -293,7 +293,7 @@ mod proptests {
             let result = match_functions(&[comp], &line_data);
             for (_, cov) in &result {
                 let pct = cov.line_coverage.percent;
-                prop_assert!(pct >= 0.0 && pct <= 100.0, "Coverage percent {pct} out of range");
+                prop_assert!((0.0..=100.0).contains(&pct), "Coverage percent {pct} out of range");
             }
         }
 
