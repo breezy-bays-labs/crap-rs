@@ -13,6 +13,8 @@ pub struct JsonConfig<'a> {
     pub timestamp: String,
     /// When present, diagnostics are included in the JSON output (--verbose).
     pub diagnostics: Option<&'a AnalysisDiagnostics>,
+    /// Git ref used for diff filtering (`--diff <ref>`). `None` when not in diff mode.
+    pub diff_ref: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -23,6 +25,7 @@ struct JsonEnvelope<'a> {
     timestamp: &'a str,
     metric: &'a ComplexityMetric,
     threshold: f64,
+    diff_ref: Option<&'a str>,
     result: &'a AnalysisResult,
     #[serde(skip_serializing_if = "Option::is_none")]
     diagnostics: Option<&'a AnalysisDiagnostics>,
@@ -44,6 +47,7 @@ pub fn format_json(
         timestamp: &config.timestamp,
         metric: &config.metric,
         threshold: config.threshold,
+        diff_ref: config.diff_ref,
         result,
         diagnostics: config.diagnostics,
     };
@@ -63,6 +67,7 @@ mod tests {
             threshold: 8.0,
             timestamp: "2026-03-28T12:00:00Z".to_string(),
             diagnostics: None,
+            diff_ref: None,
         }
     }
 
@@ -244,6 +249,28 @@ mod tests {
     }
 
     #[test]
+    fn test_diff_ref_present_in_json() {
+        let result = make_empty_result();
+        let config = JsonConfig {
+            diff_ref: Some("main"),
+            ..default_config()
+        };
+        let v = parse_json(&result, &config);
+        assert_eq!(v["diff_ref"], "main");
+    }
+
+    #[test]
+    fn test_diff_ref_null_when_none() {
+        let result = make_empty_result();
+        let v = parse_json(&result, &default_config());
+        assert!(
+            v.get("diff_ref").is_some(),
+            "diff_ref key should be present"
+        );
+        assert!(v["diff_ref"].is_null(), "diff_ref should be null");
+    }
+
+    #[test]
     fn test_diagnostics_omitted_when_none() {
         let result = make_empty_result();
         let v = parse_json(&result, &default_config());
@@ -396,6 +423,7 @@ mod proptests {
             threshold,
             timestamp: "2026-01-01T00:00:00Z".to_string(),
             diagnostics: None,
+            diff_ref: None,
         })
     }
 

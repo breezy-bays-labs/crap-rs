@@ -10,15 +10,16 @@ use ignore::WalkBuilder;
 
 use crate::adapters::complexity::SynComplexityAdapter;
 use crate::adapters::coverage::LcovParser;
+use crate::adapters::diff::GitDiffAdapter;
 use crate::domain::crap::compute_crap;
-use crate::domain::matching::match_functions;
+use crate::domain::matching::{match_functions, overlaps_any};
 use crate::domain::summary::compute_summary;
 use crate::domain::threshold::ThresholdConfig;
 use crate::domain::types::{
-    AnalysisDiagnostics, AnalysisResult, ComplexityMetric, CoverageMetric, FunctionVerdict,
-    ScoredFunction,
+    AnalysisDiagnostics, AnalysisResult, ComplexityMetric, CoverageMetric, FileChangeKind,
+    FunctionVerdict, ScoredFunction,
 };
-use crate::ports::{ComplexityPort, CoveragePort};
+use crate::ports::{ComplexityPort, CoveragePort, DiffPort};
 
 /// Options for running a CRAP analysis.
 #[derive(Debug)]
@@ -37,6 +38,8 @@ pub struct AnalyzeOptions {
     pub exclude: Vec<String>,
     /// Whether to respect .gitignore files during file discovery.
     pub respect_gitignore: bool,
+    /// Git ref to diff against. When set, only changed functions are analyzed.
+    pub diff_ref: Option<String>,
 }
 
 /// Full output from an analysis run, including both the scored results
@@ -57,6 +60,7 @@ impl Default for AnalyzeOptions {
             coverage_metric: CoverageMetric::default(),
             exclude: Vec::new(),
             respect_gitignore: true,
+            diff_ref: None,
         }
     }
 }
@@ -71,7 +75,7 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
         .unwrap_or_else(|_| options.src.clone());
 
     // 1. Discover .rs source files
-    let source_files =
+    let mut source_files =
         discover_rust_files(&options.src, &options.exclude, options.respect_gitignore)?;
     let files_found = source_files.len();
     if source_files.is_empty() {
@@ -81,6 +85,89 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
             options.src.display()
         );
     }
+
+    // Phase 1: file intersection — filter to only changed files when --diff is set
+    let diff_data = if let Some(ref diff_ref) = options.diff_ref {
+        let diff_adapter = GitDiffAdapter::new();
+
+        // Find the git repo root so we can reconcile paths.
+        // Git diff outputs paths relative to repo root, but the complexity
+        // adapter uses paths relative to options.src. We bridge via src_prefix.
+        //
+        // Note: source_files use the original options.src path (may be a symlink),
+        // while src_canonical resolves symlinks. Use options.src for strip_prefix
+        // on source_files to avoid symlink mismatches (e.g. /var vs /private/var).
+        let repo_root = git_toplevel(&src_canonical)?;
+        let src_prefix = src_canonical
+            .strip_prefix(&repo_root)
+            .unwrap_or(Path::new(""))
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        // Paths passed to `git diff -- <paths>` must be repo-relative
+        let repo_relative_paths: Vec<String> = source_files
+            .iter()
+            .map(|p| {
+                let src_rel = p
+                    .strip_prefix(&options.src)
+                    .unwrap_or(p)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                if src_prefix.is_empty() {
+                    src_rel
+                } else {
+                    format!("{src_prefix}/{src_rel}")
+                }
+            })
+            .collect();
+
+        let raw_diff = diff_adapter
+            .changed_regions(diff_ref, &repo_root, &repo_relative_paths)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        // Strip src_prefix from diff result keys to get src-relative paths
+        let prefix_with_slash = if src_prefix.is_empty() {
+            String::new()
+        } else {
+            format!("{src_prefix}/")
+        };
+        let diff_result: std::collections::HashMap<String, FileChangeKind> = raw_diff
+            .into_iter()
+            .filter_map(|(path, kind)| {
+                if prefix_with_slash.is_empty() {
+                    Some((path, kind))
+                } else {
+                    path.strip_prefix(&prefix_with_slash)
+                        .map(|stripped| (stripped.to_string(), kind))
+                }
+            })
+            .collect();
+
+        source_files.retain(|p| {
+            let rel = p
+                .strip_prefix(&options.src)
+                .unwrap_or(p)
+                .to_string_lossy()
+                .replace('\\', "/");
+            diff_result.contains_key(&*rel)
+        });
+        if source_files.is_empty() {
+            return Ok(AnalysisOutput {
+                result: empty_passing_result(),
+                diagnostics: AnalysisDiagnostics {
+                    parse_diagnostics: vec![],
+                    files_found,
+                    files_unparseable: 0,
+                    functions_extracted: 0,
+                    functions_matched: 0,
+                    functions_no_coverage: 0,
+                },
+            });
+        }
+        Some(diff_result)
+    } else {
+        None
+    };
 
     // 2. Read and parse coverage data
     let coverage_data = std::fs::read_to_string(&options.coverage).with_context(|| {
@@ -121,6 +208,28 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     }
 
     let functions_extracted = all_complexities.len();
+
+    // Phase 2: hunk overlap — filter to only functions overlapping changed hunks
+    if let Some(ref diff_result) = diff_data {
+        all_complexities.retain(|comp| match diff_result.get(&comp.identity.file_path) {
+            Some(FileChangeKind::NewFile) => true,
+            Some(FileChangeKind::Modified(ranges)) => overlaps_any(&comp.identity.span, ranges),
+            None => false,
+        });
+        if all_complexities.is_empty() {
+            return Ok(AnalysisOutput {
+                result: empty_passing_result(),
+                diagnostics: AnalysisDiagnostics {
+                    parse_diagnostics,
+                    files_found,
+                    files_unparseable,
+                    functions_extracted,
+                    functions_matched: 0,
+                    functions_no_coverage: 0,
+                },
+            });
+        }
+    }
 
     if all_complexities.is_empty() {
         bail!(
@@ -248,6 +357,34 @@ fn score_and_summarize(
         summary,
         passed,
     })
+}
+
+/// Find the git repository root by running `git rev-parse --show-toplevel`.
+fn git_toplevel(from_dir: &Path) -> Result<PathBuf> {
+    let output = std::process::Command::new("git")
+        .current_dir(from_dir)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .context("failed to run git rev-parse")?;
+
+    if output.status.success() {
+        let toplevel = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        PathBuf::from(&toplevel)
+            .canonicalize()
+            .with_context(|| format!("failed to canonicalize git toplevel: {toplevel}"))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("not inside a git work tree: {}", stderr.trim());
+    }
+}
+
+/// Produce an empty, passing result for when diff filtering yields no functions.
+fn empty_passing_result() -> AnalysisResult {
+    AnalysisResult {
+        functions: vec![],
+        summary: compute_summary(&[]),
+        passed: true,
+    }
 }
 
 /// Walk the source directory and collect all `.rs` files, respecting
@@ -739,6 +876,34 @@ pub fn with_branch(x: i32) -> &'static str {
             }],
         };
         assert!(ThresholdResolver::new(&config).is_err());
+    }
+
+    // ── Diff mode unit tests ───────────────────────────────────────
+
+    #[test]
+    fn analyze_diff_ref_none_is_backward_compat() {
+        let dir = tempfile::tempdir().unwrap();
+        setup_test_project(dir.path());
+
+        let opts = AnalyzeOptions {
+            src: dir.path().join("src"),
+            coverage: dir.path().join("lcov.info"),
+            diff_ref: None,
+            respect_gitignore: false,
+            ..AnalyzeOptions::default()
+        };
+
+        let result = analyze(&opts).unwrap().result;
+        assert_eq!(result.functions.len(), 2);
+        assert_eq!(result.summary.total_functions, 2);
+    }
+
+    #[test]
+    fn empty_passing_result_has_zero_functions() {
+        let result = empty_passing_result();
+        assert!(result.functions.is_empty());
+        assert!(result.passed);
+        assert_eq!(result.summary.total_functions, 0);
     }
 
     #[test]

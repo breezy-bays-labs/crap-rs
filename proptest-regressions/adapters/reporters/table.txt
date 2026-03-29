@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc d6c0da965f9334e1db9103eff2eb3a9c39011a9174a4c63d4640cf958493026b # shrinks to result = AnalysisResult { functions: [], summary: AnalysisSummary { total_functions: 0, total_files: 0, exceeding_threshold: 0, average_crap: 0.0, median_crap: 0.0, max_crap: None, worst_function: None, distribution: RiskDistribution { low: 0, acceptable: 0, moderate: 0, high: 0 } }, passed: true }
+cc e408ac401f6d36065dbb6fef872cc3179abb726bce7a1256f567f39107eb4d7f # shrinks to result = AnalysisResult { functions: [], summary: AnalysisSummary { total_functions: 0, total_files: 0, exceeding_threshold: 0, average_crap: 0.0, median_crap: 0.0, max_crap: None, worst_function: None, distribution: RiskDistribution { low: 0, acceptable: 0, moderate: 0, high: 0 } }, passed: true }
