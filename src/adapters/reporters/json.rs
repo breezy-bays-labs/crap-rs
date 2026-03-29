@@ -364,6 +364,7 @@ mod proptests {
                             value: crap_value,
                             risk_level: risk,
                         },
+                        contributors: vec![],
                     },
                     threshold,
                     exceeds: crap_value > threshold,

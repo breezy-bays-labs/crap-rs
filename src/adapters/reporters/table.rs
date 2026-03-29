@@ -11,7 +11,7 @@ use comfy_table::{ContentArrangement, Table};
 /// coverage coloring. When `threshold` differs across functions (per-path
 /// overrides), the summary shows "varied (default: N)" instead of a single
 /// number. Returns a ready-to-print `String`.
-pub fn format_table(result: &AnalysisResult, threshold: f64) -> String {
+pub fn format_table(result: &AnalysisResult, threshold: f64, breakdown: bool) -> String {
     let mut output = String::new();
 
     // Header
@@ -57,7 +57,13 @@ pub fn format_table(result: &AnalysisResult, threshold: f64) -> String {
     }
 
     output.push('\n');
-    output.push_str(&table.to_string());
+
+    if breakdown {
+        output.push_str(&inject_breakdown_subrows(&table.to_string(), &sorted));
+    } else {
+        output.push_str(&table.to_string());
+    }
+
     output.push('\n');
 
     // Summary line 1
@@ -100,6 +106,79 @@ pub fn format_table(result: &AnalysisResult, threshold: f64) -> String {
     ));
 
     output
+}
+
+/// Inject contributor sub-rows into the table string after each exceeding function's row.
+///
+/// Splits the rendered table into lines, locates each exceeding function's row via
+/// word-boundary name matching, and inserts indented contributor sub-rows after it.
+///
+/// The 15-space indent is a fixed approximation of the File column width produced by
+/// comfy-table's Dynamic arrangement. It aligns sub-rows under the Function column
+/// in typical output. If comfy-table column widths change (e.g., very long file paths),
+/// the alignment may drift — switching to position-indexed matching (per the ADR) would
+/// make this robust.
+fn inject_breakdown_subrows(
+    table_str: &str,
+    sorted: &[&crate::domain::types::FunctionVerdict],
+) -> String {
+    let mut result_lines: Vec<String> = Vec::new();
+    for line in table_str.lines() {
+        result_lines.push(line.to_string());
+        for verdict in sorted.iter() {
+            if verdict.exceeds
+                && !verdict.scored.contributors.is_empty()
+                && row_contains_name(line, &verdict.scored.identity.qualified_name)
+            {
+                let contributors = &verdict.scored.contributors;
+                let last_idx = contributors.len() - 1;
+                for (i, c) in contributors.iter().enumerate() {
+                    result_lines.push(format_contributor_subrow(c, i == last_idx));
+                }
+                break;
+            }
+        }
+    }
+    result_lines.join("\n")
+}
+
+/// Format a single contributor sub-row with tree-drawing prefix.
+fn format_contributor_subrow(
+    c: &crate::domain::types::ComplexityContributor,
+    is_last: bool,
+) -> String {
+    let tree = if is_last { "└─" } else { "├─" };
+    let increment_str = if c.increment > 1 {
+        format!("+{} (nested)", c.increment)
+    } else {
+        format!("+{}", c.increment)
+    };
+    format!(
+        "               {} line {}: {} ({})",
+        tree, c.line, c.kind, increment_str
+    )
+}
+
+/// Check if a table row line contains the given function name as a whole word.
+/// The character after the name must be a space, `|`, or end-of-string,
+/// preventing "parse" from matching a row containing "parse_extra".
+///
+/// Checks all occurrences (not just the first) so that a function name that
+/// appears in the file-path column is not mistakenly matched before the
+/// function-name column is reached.
+fn row_contains_name(line: &str, name: &str) -> bool {
+    let mut start = 0;
+    while let Some(pos) = line[start..].find(name) {
+        let abs_pos = start + pos;
+        if matches!(
+            line.as_bytes().get(abs_pos + name.len()),
+            None | Some(b' ') | Some(b'|')
+        ) {
+            return true;
+        }
+        start = abs_pos + 1;
+    }
+    false
 }
 
 /// Check if functions have different threshold values (per-path overrides active).
@@ -149,7 +228,7 @@ static COLOR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 mod tests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::*;
-    use crate::domain::types::RiskLevel;
+    use crate::domain::types::{AnalysisResult, RiskLevel};
 
     // ── Snapshot tests (color disabled) ────────────────────────────────
 
@@ -158,7 +237,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_empty_result();
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("crap4rs v"));
         assert!(output.contains("No functions analyzed"));
         // No table header should be present
@@ -170,7 +249,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         let lines: Vec<&str> = output.lines().collect();
 
         // Find data rows (after header row + separator)
@@ -204,7 +283,7 @@ mod tests {
             RiskLevel::Acceptable,
             8.0,
         );
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("File"));
         assert!(output.contains("Function"));
         assert!(output.contains("CC"));
@@ -226,7 +305,7 @@ mod tests {
             RiskLevel::Moderate,
             8.0,
         );
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("src/adapters/coverage/mod.rs"));
         assert!(output.contains("parse_record"));
         assert!(output.contains("6"));
@@ -240,7 +319,7 @@ mod tests {
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 5.0, RiskLevel::Low, 8.0);
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("5.00"));
     }
 
@@ -250,7 +329,7 @@ mod tests {
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 85.0, 1.0, RiskLevel::Low, 8.0);
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("85.0"));
     }
 
@@ -259,7 +338,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_empty_result();
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.starts_with(&format!("crap4rs v{}", env!("CARGO_PKG_VERSION"))));
     }
 
@@ -268,7 +347,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("3 functions"));
         assert!(output.contains("2 above threshold (8)"));
         assert!(output.contains("worst: 45.2"));
@@ -281,7 +360,7 @@ mod tests {
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("PASS"));
         assert!(!output.contains("FAIL"));
     }
@@ -291,13 +370,327 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(output.contains("avg: 21.1"));
         assert!(output.contains("median: 15.0"));
         assert!(output.contains("low: 1"));
         assert!(output.contains("acceptable: 0"));
         assert!(output.contains("moderate: 1"));
         assert!(output.contains("high: 1"));
+    }
+
+    // ── Breakdown sub-row tests ────────────────────────────────────────
+
+    fn make_contributors() -> Vec<crate::domain::types::ComplexityContributor> {
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        vec![
+            ComplexityContributor {
+                kind: ContributorKind::IfBranch,
+                line: 5,
+                column: Some(4),
+                increment: 1,
+            },
+            ComplexityContributor {
+                kind: ContributorKind::ForLoop,
+                line: 10,
+                column: Some(4),
+                increment: 2,
+            },
+        ]
+    }
+
+    fn make_nested_contributor() -> Vec<crate::domain::types::ComplexityContributor> {
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        vec![ComplexityContributor {
+            kind: ContributorKind::Match,
+            line: 3,
+            column: Some(4),
+            increment: 3,
+        }]
+    }
+
+    #[test]
+    fn test_breakdown_off_no_sub_rows() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict("my_fn", "src/lib.rs", 5, 30.0, 45.0, RiskLevel::High, 8.0),
+            make_contributors(),
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, false);
+        assert!(
+            !output.contains("├─"),
+            "breakdown=false should not show sub-rows: {output}"
+        );
+        assert!(
+            !output.contains("└─"),
+            "breakdown=false should not show sub-rows: {output}"
+        );
+    }
+
+    #[test]
+    fn test_breakdown_on_exceeding_shows_sub_rows() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "risky_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            make_contributors(),
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, true);
+        assert!(
+            output.contains("line 5:"),
+            "Should show line 5 contributor: {output}"
+        );
+        assert!(
+            output.contains("line 10:"),
+            "Should show line 10 contributor: {output}"
+        );
+        assert!(
+            output.contains("if-branch"),
+            "Should show kind 'if-branch': {output}"
+        );
+        assert!(
+            output.contains("for-loop"),
+            "Should show kind 'for-loop': {output}"
+        );
+    }
+
+    #[test]
+    fn test_breakdown_on_within_threshold_no_sub_rows() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict("safe_fn", "src/lib.rs", 2, 90.0, 2.0, RiskLevel::Low, 8.0),
+            make_contributors(),
+        );
+        // exceeds = crap_value > threshold → 2.0 > 8.0 = false
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_empty_result().summary,
+            passed: true,
+        };
+        let output = format_table(&result, 8.0, true);
+        assert!(
+            !output.contains("├─"),
+            "Non-exceeding fn should not show sub-rows even with breakdown=true: {output}"
+        );
+    }
+
+    #[test]
+    fn test_breakdown_tree_chars_last_uses_corner() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "corner_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            make_contributors(), // 2 contributors: first ├─, last └─
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, true);
+        assert!(output.contains("├─"), "Should have branch char: {output}");
+        assert!(output.contains("└─"), "Should have corner char: {output}");
+        // Make sure corner appears after branch
+        let branch_pos = output.find("├─").unwrap();
+        let corner_pos = output.find("└─").unwrap();
+        assert!(branch_pos < corner_pos, "├─ should appear before └─");
+    }
+
+    #[test]
+    fn test_breakdown_nesting_suffix() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "nested_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            make_nested_contributor(), // increment=3
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, true);
+        assert!(
+            output.contains("(nested)"),
+            "increment > 1 should show '(nested)': {output}"
+        );
+        assert!(output.contains("+3"), "Should show +3 increment: {output}");
+    }
+
+    #[test]
+    fn test_breakdown_sorted_by_line() {
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        // Contributors must be pre-sorted by (line, column) — as FunctionFinder guarantees.
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "mixed_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            vec![
+                ComplexityContributor {
+                    kind: ContributorKind::IfBranch,
+                    line: 5,
+                    column: Some(4),
+                    increment: 1,
+                },
+                ComplexityContributor {
+                    kind: ContributorKind::ForLoop,
+                    line: 20,
+                    column: Some(4),
+                    increment: 1,
+                },
+            ],
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, true);
+        let line5_pos = output.find("line 5:").unwrap();
+        let line20_pos = output.find("line 20:").unwrap();
+        assert!(
+            line5_pos < line20_pos,
+            "line 5 should appear before line 20: {output}"
+        );
+    }
+
+    #[test]
+    fn test_breakdown_substring_name_no_collision() {
+        // Regression: sub-row injection uses `line.contains(qualified_name)`.
+        // If one name is a prefix of another, both match the same table row.
+        // Assert each function's contributors appear exactly once.
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+
+        let v1 = make_verdict_with_contributors(
+            make_verdict("parse", "src/lib.rs", 5, 30.0, 45.0, RiskLevel::High, 8.0),
+            vec![ComplexityContributor {
+                kind: ContributorKind::IfBranch,
+                line: 3,
+                column: Some(4),
+                increment: 1,
+            }],
+        );
+        let v2 = make_verdict_with_contributors(
+            make_verdict(
+                "parse_extra",
+                "src/lib.rs",
+                5,
+                30.0,
+                40.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            vec![ComplexityContributor {
+                kind: ContributorKind::ForLoop,
+                line: 7,
+                column: Some(4),
+                increment: 1,
+            }],
+        );
+        let result = AnalysisResult {
+            functions: vec![v1, v2],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, true);
+
+        // Each contributor kind should appear exactly once
+        let if_branch_count = output.matches("if-branch").count();
+        let for_loop_count = output.matches("for-loop").count();
+        assert_eq!(
+            if_branch_count, 1,
+            "if-branch should appear exactly once (not doubled by prefix match): {output}"
+        );
+        assert_eq!(
+            for_loop_count, 1,
+            "for-loop should appear exactly once: {output}"
+        );
+    }
+
+    #[test]
+    fn test_breakdown_name_in_file_path_still_matches() {
+        // Regression: row_contains_name used line.find() (first occurrence only).
+        // If the function name is a substring of its own file path (e.g. `fn parse()`
+        // in `src/parse/mod.rs`), the first match lands in the path column where the
+        // next char is `/`, failing the word-boundary check and silently skipping
+        // sub-row injection. The fix loops all occurrences until one passes.
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+
+        let v = make_verdict_with_contributors(
+            make_verdict(
+                "parse",
+                "src/parse/mod.rs", // "parse" appears in path before function column
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            vec![ComplexityContributor {
+                kind: ContributorKind::IfBranch,
+                line: 3,
+                column: Some(4),
+                increment: 1,
+            }],
+        );
+        let result = AnalysisResult {
+            functions: vec![v],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, true);
+        assert!(
+            output.contains("if-branch"),
+            "Sub-row should appear even when function name is in file path: {output}"
+        );
     }
 
     // ── Varied threshold tests ──────────────────────────────────────────
@@ -313,7 +706,7 @@ mod tests {
         result.functions[1].threshold = 10.0;
         result.functions[2].threshold = 8.0;
 
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(
             output.contains("varied (default: 8)"),
             "Should show varied threshold: {output}"
@@ -326,7 +719,7 @@ mod tests {
         colored::control::set_override(false);
 
         let result = make_multi_function_result();
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(
             !output.contains("varied"),
             "Uniform thresholds should not show 'varied': {output}"
@@ -340,7 +733,7 @@ mod tests {
 
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         assert!(!output.contains("varied"));
     }
 
@@ -450,7 +843,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&result, 8.0);
+        let output = format_table(&result, 8.0, false);
         insta::assert_snapshot!(output);
     }
 }
@@ -501,6 +894,7 @@ mod proptests {
                             value: crap_value,
                             risk_level: risk,
                         },
+                        contributors: vec![],
                     },
                     threshold,
                     exceeds: crap_value > threshold,
@@ -553,6 +947,28 @@ mod proptests {
         })
     }
 
+    fn arb_contributor() -> impl Strategy<Value = crate::domain::types::ComplexityContributor> {
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        (
+            prop_oneof![
+                Just(ContributorKind::IfBranch),
+                Just(ContributorKind::ForLoop),
+                Just(ContributorKind::WhileLoop),
+                Just(ContributorKind::Match),
+                Just(ContributorKind::Try),
+                Just(ContributorKind::LogicalOperator),
+            ],
+            1usize..500,
+            1u32..5,
+        )
+            .prop_map(|(kind, line, increment)| ComplexityContributor {
+                kind,
+                line,
+                column: None,
+                increment,
+            })
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
 
@@ -560,14 +976,29 @@ mod proptests {
         fn prop_format_table_never_panics(result in arb_analysis_result()) {
             let _guard = super::COLOR_LOCK.lock().unwrap();
             colored::control::set_override(false);
-            let _ = format_table(&result, 8.0);
+            let _ = format_table(&result, 8.0, false);
+        }
+
+        #[test]
+        fn prop_format_table_with_breakdown_never_panics(
+            mut result in arb_analysis_result(),
+            contributors in prop::collection::vec(arb_contributor(), 0..5),
+        ) {
+            let _guard = super::COLOR_LOCK.lock().unwrap();
+            colored::control::set_override(false);
+            // Inject contributors into the first exceeding function (if any)
+            if let Some(v) = result.functions.iter_mut().find(|v| v.exceeds) {
+                v.scored.contributors = contributors;
+            }
+            // Must not panic regardless of contributor content
+            let _ = format_table(&result, 8.0, true);
         }
 
         #[test]
         fn prop_format_table_row_count(result in arb_analysis_result()) {
             let _guard = super::COLOR_LOCK.lock().unwrap();
             colored::control::set_override(false);
-            let output = format_table(&result, 8.0);
+            let output = format_table(&result, 8.0, false);
             if result.functions.is_empty() {
                 prop_assert!(output.contains("No functions analyzed"));
             } else {

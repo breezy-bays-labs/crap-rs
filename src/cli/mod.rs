@@ -137,6 +137,12 @@ pub struct DisplayArgs {
     /// Suppress report output, only set exit code
     #[arg(short, long)]
     pub quiet: bool,
+
+    /// Show complexity contributors for functions exceeding threshold.
+    ///
+    /// JSON output always includes contributors regardless of this flag.
+    #[arg(long)]
+    pub breakdown: bool,
 }
 
 // ── Top-level CLI ───────────────────────────────────────────────────
@@ -251,7 +257,9 @@ fn run_inner() -> Result<bool> {
 
     if !cli.display.quiet {
         let output = match cli.output.format {
-            FormatArg::Table => reporters::format_table(&result, effective_threshold),
+            FormatArg::Table => {
+                reporters::format_table(&result, effective_threshold, cli.display.breakdown)
+            }
             FormatArg::Json => {
                 let config = reporters::json::JsonConfig {
                     tool_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -912,6 +920,18 @@ mod tests {
         // We're running tests from inside a git repo
         let cwd = std::env::current_dir().unwrap();
         assert!(preflight_git_worktree(&cwd).is_ok());
+    }
+
+    #[test]
+    fn breakdown_flag_parsed() {
+        let cli = parse(&["--coverage", "lcov.info", "--breakdown"]).unwrap();
+        assert!(cli.display.breakdown);
+    }
+
+    #[test]
+    fn breakdown_flag_default_false() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert!(!cli.display.breakdown);
     }
 
     #[test]

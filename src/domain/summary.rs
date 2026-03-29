@@ -95,6 +95,7 @@ mod tests {
                     value: crap_value,
                     risk_level,
                 },
+                contributors: vec![],
             },
             threshold,
             exceeds: crap_value > threshold,

@@ -157,6 +157,7 @@ mod tests {
             },
             complexity: 1,
             metric: ComplexityMetric::Cognitive,
+            contributors: vec![],
         }
     }
 
@@ -549,6 +550,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             }
         })
     }
@@ -629,6 +631,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             };
             let comp_b = FunctionComplexity {
                 identity: FunctionIdentity {
@@ -638,6 +641,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             };
 
             let mut line_data: HashMap<String, Vec<LineCoverage>> = HashMap::new();
@@ -682,6 +686,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             };
 
             // Place lines at boundary positions
@@ -746,6 +751,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             };
             let comp_b = FunctionComplexity {
                 identity: FunctionIdentity {
@@ -755,6 +761,7 @@ mod proptests {
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
+                contributors: vec![],
             };
 
             let line_data = {
