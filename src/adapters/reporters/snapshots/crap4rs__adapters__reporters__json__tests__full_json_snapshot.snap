@@ -3,6 +3,7 @@ source: src/adapters/reporters/json.rs
 expression: v
 ---
 {
+  "diff_ref": null,
   "language": "rust",
   "metric": "cognitive",
   "result": {

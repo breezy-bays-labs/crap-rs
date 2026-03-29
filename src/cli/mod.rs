@@ -3,7 +3,7 @@
 //! Parses args with clap, validates inputs, delegates to `core::analyze()`.
 //! No business logic lives here.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
@@ -114,6 +114,13 @@ pub struct FilterArgs {
     /// Pass this flag to analyze all files regardless of .gitignore.
     #[arg(long)]
     pub no_gitignore: bool,
+
+    /// Git ref to diff against — only analyze functions in changed files/hunks
+    ///
+    /// Scopes analysis to functions in files that changed since the given ref.
+    /// Useful for CI PR gating: `crap4rs --coverage lcov.info --diff main`
+    #[arg(long, value_name = "REF")]
+    pub diff: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -208,6 +215,12 @@ fn run_inner() -> Result<bool> {
     validate_inputs(&cli.input.coverage, &effective_src, effective_threshold)?;
     preflight_checks(&cli.input.coverage, &effective_src)?;
 
+    // Validate --diff ref if provided
+    if let Some(ref diff_ref) = cli.filter.diff {
+        validate_diff_ref(diff_ref)?;
+        preflight_git_worktree(&effective_src)?;
+    }
+
     let options = AnalyzeOptions {
         src: effective_src,
         coverage: cli.input.coverage.clone(),
@@ -215,6 +228,7 @@ fn run_inner() -> Result<bool> {
         metric: effective_metric,
         exclude: effective_exclude,
         respect_gitignore: !cli.filter.no_gitignore,
+        diff_ref: cli.filter.diff.clone(),
         ..AnalyzeOptions::default()
     };
 
@@ -245,6 +259,7 @@ fn run_inner() -> Result<bool> {
                     threshold: effective_threshold,
                     timestamp: now_unix_epoch(),
                     diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
+                    diff_ref: cli.filter.diff.as_deref(),
                 };
                 reporters::format_json(&result, &config)?
             }
@@ -350,6 +365,45 @@ fn validate_inputs(
         );
     }
     Ok(())
+}
+
+// ── Diff validation ────────────────────────────────────────────────
+
+fn validate_diff_ref(diff_ref: &str) -> Result<()> {
+    if diff_ref.is_empty() {
+        bail!("invalid diff ref: ref must not be empty");
+    }
+    if diff_ref.starts_with('-') {
+        bail!(
+            "invalid diff ref: {diff_ref}\n  \
+             hint: ref must not start with a dash"
+        );
+    }
+    Ok(())
+}
+
+fn preflight_git_worktree(src: &Path) -> Result<()> {
+    let output = std::process::Command::new("git")
+        .current_dir(src)
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => Ok(()),
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            bail!(
+                "not inside a git work tree\n  \
+                 hint: --diff requires a git repository\n  \
+                 git: {stderr}",
+            );
+        }
+        Err(e) => bail!(
+            "not inside a git work tree\n  \
+             hint: --diff requires git to be installed\n  \
+             error: {e}",
+        ),
+    }
 }
 
 // ── Pre-flight checks ──────────────────────────────────────────────
@@ -803,6 +857,61 @@ mod tests {
         });
         let exclude = merge_exclude(&cli, &file_config);
         assert_eq!(exclude, vec!["tests/**"]);
+    }
+
+    // ── --diff flag tests ───────────────────────────────────────────
+
+    #[test]
+    fn diff_flag_accepts_ref() {
+        let cli = parse(&["--coverage", "lcov.info", "--diff", "main"]).unwrap();
+        assert_eq!(cli.filter.diff, Some("main".to_string()));
+    }
+
+    #[test]
+    fn diff_flag_defaults_to_none() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert_eq!(cli.filter.diff, None);
+    }
+
+    #[test]
+    fn diff_flag_accepts_commit_sha() {
+        let cli = parse(&["--coverage", "lcov.info", "--diff", "abc123"]).unwrap();
+        assert_eq!(cli.filter.diff, Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn diff_flag_accepts_head_tilde() {
+        let cli = parse(&["--coverage", "lcov.info", "--diff", "HEAD~1"]).unwrap();
+        assert_eq!(cli.filter.diff, Some("HEAD~1".to_string()));
+    }
+
+    #[test]
+    fn validate_diff_ref_rejects_empty_string() {
+        let err = validate_diff_ref("").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("must not be empty"));
+    }
+
+    #[test]
+    fn validate_diff_ref_rejects_dash_prefix() {
+        let err = validate_diff_ref("--malicious").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("invalid diff ref"));
+        assert!(msg.contains("must not start with a dash"));
+    }
+
+    #[test]
+    fn validate_diff_ref_accepts_normal_ref() {
+        assert!(validate_diff_ref("main").is_ok());
+        assert!(validate_diff_ref("HEAD~1").is_ok());
+        assert!(validate_diff_ref("abc123").is_ok());
+    }
+
+    #[test]
+    fn preflight_git_worktree_passes_in_git_repo() {
+        // We're running tests from inside a git repo
+        let cwd = std::env::current_dir().unwrap();
+        assert!(preflight_git_worktree(&cwd).is_ok());
     }
 
     #[test]
