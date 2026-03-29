@@ -14,7 +14,7 @@ use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
 use crap4rs::core::AnalyzeOptions;
 use crap4rs::domain::threshold::{DEFAULT_THRESHOLD, ThresholdConfig, is_valid_threshold};
-use crap4rs::domain::types::ComplexityMetric;
+use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
 
 // ── ValueEnum wrappers (keep domain types clap-free) ────────────────
 
@@ -217,8 +217,17 @@ fn run_inner() -> Result<bool> {
         respect_gitignore: !cli.filter.no_gitignore,
     };
 
-    let mut result = crap4rs::core::analyze(&options)?;
+    let analysis = crap4rs::core::analyze(&options)?;
+    let mut result = analysis.result;
     let passed = result.passed;
+
+    // Always warn about non-fatal issues (details require --verbose)
+    warn_if_issues(&analysis.diagnostics);
+
+    // Print full diagnostics to stderr when --verbose
+    if cli.display.verbose {
+        print_diagnostics(&analysis.diagnostics);
+    }
 
     // Filter to only failing functions if requested (summary stays unfiltered)
     if cli.output.only_failing {
@@ -234,6 +243,7 @@ fn run_inner() -> Result<bool> {
                     metric: effective_metric,
                     threshold: effective_threshold,
                     timestamp: now_unix_epoch(),
+                    diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
                 };
                 reporters::format_json(&result, &config)?
             }
@@ -411,6 +421,47 @@ fn now_unix_epoch() -> String {
         .unwrap_or_default()
         .as_secs();
     format!("{secs}")
+}
+
+// ── Verbose diagnostics ────────────────────────────────────────────
+
+fn warn_if_issues(diag: &AnalysisDiagnostics) {
+    if !diag.parse_diagnostics.is_empty() {
+        eprintln!(
+            "warning: {} LCOV parse issue(s) encountered (use --verbose for details)",
+            diag.parse_diagnostics.len()
+        );
+    }
+    if diag.files_unparseable > 0 {
+        eprintln!(
+            "warning: {} source file(s) could not be parsed (use --verbose for details)",
+            diag.files_unparseable
+        );
+    }
+}
+
+fn print_diagnostics(diag: &AnalysisDiagnostics) {
+    eprintln!(
+        "verbose: file discovery: {} files found, {} unparseable",
+        diag.files_found, diag.files_unparseable
+    );
+    eprintln!(
+        "verbose: complexity: {} functions extracted",
+        diag.functions_extracted
+    );
+    eprintln!(
+        "verbose: matching: {} matched with coverage, {} without coverage data",
+        diag.functions_matched, diag.functions_no_coverage
+    );
+    if !diag.parse_diagnostics.is_empty() {
+        eprintln!(
+            "verbose: LCOV parse diagnostics ({}):",
+            diag.parse_diagnostics.len()
+        );
+        for d in &diag.parse_diagnostics {
+            eprintln!("  {d}");
+        }
+    }
 }
 
 // ── Color wiring ────────────────────────────────────────────────────
