@@ -13,6 +13,7 @@ expression: v
         "scored": {
           "complexity": 5,
           "complexity_metric": "cognitive",
+          "contributors": [],
           "coverage_percent": 80.0,
           "crap": {
             "risk_level": "acceptable",

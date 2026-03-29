@@ -9,8 +9,8 @@ pub use table::format_table;
 #[cfg(test)]
 pub(crate) mod test_fixtures {
     use crate::domain::types::{
-        AnalysisResult, AnalysisSummary, CrapScore, FunctionIdentity, FunctionVerdict,
-        RiskDistribution, RiskLevel, ScoredFunction, SourceSpan,
+        AnalysisResult, AnalysisSummary, ComplexityContributor, CrapScore, FunctionIdentity,
+        FunctionVerdict, RiskDistribution, RiskLevel, ScoredFunction, SourceSpan,
     };
 
     pub fn make_verdict(
@@ -39,10 +39,34 @@ pub(crate) mod test_fixtures {
                     value: crap_value,
                     risk_level: risk,
                 },
+                contributors: vec![],
             },
             threshold,
             exceeds: crap_value > threshold,
         }
+    }
+
+    pub fn make_verdict_with_contributors(
+        name: &str,
+        file: &str,
+        complexity: u32,
+        coverage_pct: f64,
+        crap_value: f64,
+        risk: RiskLevel,
+        threshold: f64,
+        contributors: Vec<ComplexityContributor>,
+    ) -> FunctionVerdict {
+        let mut v = make_verdict(
+            name,
+            file,
+            complexity,
+            coverage_pct,
+            crap_value,
+            risk,
+            threshold,
+        );
+        v.scored.contributors = contributors;
+        v
     }
 
     pub fn make_empty_result() -> AnalysisResult {
