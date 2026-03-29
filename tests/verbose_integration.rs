@@ -62,6 +62,7 @@ fn verbose_stderr_lines_present() {
     setup_dir(dir.path(), SIMPLE_SRC, SIMPLE_LCOV);
 
     let output = run(dir.path(), &["--verbose"]);
+    assert_success(&output);
     let err = stderr_str(&output);
 
     assert!(
@@ -86,6 +87,7 @@ fn no_verbose_no_verbose_lines() {
     setup_dir(dir.path(), SIMPLE_SRC, SIMPLE_LCOV);
 
     let output = run(dir.path(), &[]);
+    assert_success(&output);
     let err = stderr_str(&output);
 
     assert!(
@@ -103,6 +105,7 @@ fn warn_without_verbose_on_lcov_parse_issues() {
     setup_dir(dir.path(), SIMPLE_SRC, malformed_lcov);
 
     let output = run(dir.path(), &[]);
+    assert_success(&output);
     let err = stderr_str(&output);
 
     assert!(
@@ -122,6 +125,7 @@ fn verbose_adds_lcov_parse_detail() {
     setup_dir(dir.path(), SIMPLE_SRC, malformed_lcov);
 
     let output = run(dir.path(), &["--verbose"]);
+    assert_success(&output);
     let err = stderr_str(&output);
 
     assert!(
@@ -146,6 +150,7 @@ fn warn_on_unparseable_source_files() {
         .expect("write broken.rs");
 
     let output = run(dir.path(), &[]);
+    assert_success(&output);
     let err = stderr_str(&output);
 
     assert!(
@@ -227,6 +232,7 @@ fn verbose_counts_match_source() {
     setup_dir(dir.path(), two_fn_src, two_fn_lcov);
 
     let output = run(dir.path(), &["--verbose"]);
+    assert_success(&output);
     let err = stderr_str(&output);
 
     assert!(
@@ -247,6 +253,7 @@ fn verbose_quiet_suppresses_stdout_not_stderr() {
     setup_dir(dir.path(), SIMPLE_SRC, SIMPLE_LCOV);
 
     let output = run(dir.path(), &["--verbose", "--quiet"]);
+    assert_success(&output);
     let err = stderr_str(&output);
     let out = stdout_str(&output);
 
@@ -272,6 +279,7 @@ fn verbose_no_coverage_count() {
     setup_dir(dir.path(), two_fn_src, unmatched_lcov);
 
     let output = run(dir.path(), &["--verbose"]);
+    assert_success(&output);
     let err = stderr_str(&output);
 
     assert!(
