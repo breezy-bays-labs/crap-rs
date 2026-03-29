@@ -40,7 +40,7 @@ fn simple_functions_fully_covered() {
         make_da_for_range(1, total_lines, true),
     );
 
-    let matched = match_functions(&fns, &line_data);
+    let matched = match_functions(&fns, &line_data, None);
 
     assert_eq!(matched.len(), fns.len());
     for (comp, cov) in &matched {
@@ -84,7 +84,7 @@ fn impl_methods_matched_correctly() {
         ),
     );
 
-    let matched = match_functions(&fns, &line_data);
+    let matched = match_functions(&fns, &line_data, None);
     assert_eq!(matched.len(), fns.len());
 
     // new should have coverage, others should have 0 total (no DA lines in their range)
@@ -110,7 +110,7 @@ fn function_with_no_coverage_file() {
     // Empty line data — no coverage for this file at all
     let line_data: HashMap<String, Vec<LineCoverage>> = HashMap::new();
 
-    let matched = match_functions(&fns, &line_data);
+    let matched = match_functions(&fns, &line_data, None);
     assert_eq!(matched.len(), fns.len());
 
     for (_, cov) in &matched {
@@ -141,7 +141,7 @@ fn mixed_coverage_per_function() {
     let mut line_data = HashMap::new();
     line_data.insert("src/lib.rs".to_string(), da_lines);
 
-    let matched = match_functions(&fns, &line_data);
+    let matched = match_functions(&fns, &line_data, None);
 
     // Every function should have some coverage data
     for (comp, cov) in &matched {

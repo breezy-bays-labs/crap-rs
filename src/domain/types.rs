@@ -71,12 +71,46 @@ pub struct LineCoverage {
     pub hits: u64,
 }
 
+/// Branch-level coverage data parsed from LCOV BRDA entries.
+/// Language-agnostic: only line position and execution count.
+/// Format-specific identifiers (block, branch IDs) stay in the adapter.
+#[derive(Debug, Clone)]
+pub struct BranchCoverage {
+    pub line: usize,
+    pub taken: Option<u64>,
+}
+
+// ── Coverage Metric ─────────────────────────────────────────────────
+
+/// Which coverage metric to use for analysis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CoverageMetric {
+    /// Line-level coverage from DA records (default).
+    #[default]
+    Line,
+    /// Branch-level coverage from BRDA records.
+    Branch,
+}
+
+impl fmt::Display for CoverageMetric {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Line => write!(f, "line"),
+            Self::Branch => write!(f, "branch"),
+        }
+    }
+}
+
 /// Per-function coverage data parsed from LCOV.
 #[derive(Debug, Clone, Serialize)]
 pub struct FunctionCoverage {
     pub file_path: String,
     pub span: SourceSpan,
     pub line_coverage: CoverageRatio,
+    /// Branch coverage ratio within this function's span.
+    /// `None` means no branch points exist in the span (not the same as zero).
+    pub branch_coverage: Option<CoverageRatio>,
 }
 
 // ── CRAP Scoring ────────────────────────────────────────────────────
@@ -245,5 +279,16 @@ mod tests {
     fn parse_diagnostic_display_empty_source_file() {
         let d = ParseDiagnostic::EmptySourceFile { line_number: 7 };
         assert_eq!(d.to_string(), "line 7: empty SF path");
+    }
+
+    #[test]
+    fn coverage_metric_display() {
+        assert_eq!(CoverageMetric::Line.to_string(), "line");
+        assert_eq!(CoverageMetric::Branch.to_string(), "branch");
+    }
+
+    #[test]
+    fn coverage_metric_default_is_line() {
+        assert_eq!(CoverageMetric::default(), CoverageMetric::Line);
     }
 }

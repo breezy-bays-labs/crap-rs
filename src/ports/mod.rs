@@ -1,5 +1,5 @@
 use crate::domain::types::{
-    ComplexityMetric, CrapError, FunctionComplexity, LineCoverage, ParseDiagnostic,
+    BranchCoverage, ComplexityMetric, CrapError, FunctionComplexity, LineCoverage, ParseDiagnostic,
 };
 use std::collections::HashMap;
 
@@ -17,6 +17,9 @@ pub trait ComplexityPort {
 #[derive(Debug)]
 pub struct ParseOutput {
     pub coverage: HashMap<String, Vec<LineCoverage>>,
+    /// Branch coverage data from BRDA records, keyed by file path.
+    /// `None` when no BRDA records were encountered in the entire input.
+    pub branches: Option<HashMap<String, Vec<BranchCoverage>>>,
     pub diagnostics: Vec<ParseDiagnostic>,
 }
 

@@ -15,7 +15,8 @@ use crate::domain::matching::match_functions;
 use crate::domain::summary::compute_summary;
 use crate::domain::threshold::ThresholdConfig;
 use crate::domain::types::{
-    AnalysisDiagnostics, AnalysisResult, ComplexityMetric, FunctionVerdict, ScoredFunction,
+    AnalysisDiagnostics, AnalysisResult, ComplexityMetric, CoverageMetric, FunctionVerdict,
+    ScoredFunction,
 };
 use crate::ports::{ComplexityPort, CoveragePort};
 
@@ -30,6 +31,8 @@ pub struct AnalyzeOptions {
     pub threshold_config: ThresholdConfig,
     /// Which complexity metric to use.
     pub metric: ComplexityMetric,
+    /// Which coverage metric to use for analysis.
+    pub coverage_metric: CoverageMetric,
     /// Glob patterns to exclude from file discovery.
     pub exclude: Vec<String>,
     /// Whether to respect .gitignore files during file discovery.
@@ -51,6 +54,7 @@ impl Default for AnalyzeOptions {
             coverage: PathBuf::from("lcov.info"),
             threshold_config: ThresholdConfig::default(),
             metric: ComplexityMetric::default(),
+            coverage_metric: CoverageMetric::default(),
             exclude: Vec::new(),
             respect_gitignore: true,
         }
@@ -127,7 +131,11 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     }
 
     // 4. Match complexity with coverage using line-range join
-    let matched = match_functions(&all_complexities, &parse_output.coverage);
+    let matched = match_functions(
+        &all_complexities,
+        &parse_output.coverage,
+        parse_output.branches.as_ref(),
+    );
 
     // Count functions with no LCOV data (file not in coverage map)
     let functions_no_coverage = matched
@@ -337,6 +345,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let result = analyze(&opts).unwrap().result;
@@ -361,6 +370,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let result = analyze(&opts).unwrap().result;
@@ -390,6 +400,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let result = analyze(&opts).unwrap().result;
@@ -419,6 +430,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let result = analyze(&opts).unwrap().result;
@@ -443,6 +455,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let result = analyze(&opts).unwrap().result;
@@ -471,6 +484,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let result = analyze(&opts).unwrap().result;
@@ -742,6 +756,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let output = analyze(&opts).unwrap();
@@ -834,6 +849,7 @@ pub fn with_branch(x: i32) -> &'static str {
             metric: ComplexityMetric::Cognitive,
             exclude: Vec::new(),
             respect_gitignore: false,
+            ..AnalyzeOptions::default()
         };
 
         let result = analyze(&opts).unwrap().result;
@@ -843,5 +859,60 @@ pub fn with_branch(x: i32) -> &'static str {
             assert_eq!(v.threshold, 0.5);
             assert!(v.exceeds);
         }
+    }
+
+    #[test]
+    fn analyze_options_default_coverage_metric_is_line() {
+        let opts = AnalyzeOptions::default();
+        assert_eq!(opts.coverage_metric, CoverageMetric::Line);
+    }
+
+    #[test]
+    fn analyze_passes_branch_data_through() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(
+            src_dir.join("lib.rs"),
+            r#"
+pub fn with_branch(x: i32) -> &'static str {
+    if x > 0 {
+        "positive"
+    } else {
+        "non-positive"
+    }
+}
+"#,
+        )
+        .unwrap();
+
+        // LCOV with both DA and BRDA records
+        fs::write(
+            dir.path().join("lcov.info"),
+            "SF:lib.rs\n\
+             DA:2,1\n\
+             DA:3,1\n\
+             DA:4,1\n\
+             DA:5,0\n\
+             DA:6,0\n\
+             BRDA:2,0,0,1\n\
+             BRDA:2,0,1,0\n\
+             end_of_record\n",
+        )
+        .unwrap();
+
+        let opts = AnalyzeOptions {
+            src: dir.path().join("src"),
+            coverage: dir.path().join("lcov.info"),
+            respect_gitignore: false,
+            ..AnalyzeOptions::default()
+        };
+
+        let result = analyze(&opts).unwrap().result;
+        assert_eq!(result.functions.len(), 1);
+
+        // CRAP score should still use line coverage (dark infra)
+        let verdict = &result.functions[0];
+        assert!(verdict.scored.crap.value > 0.0);
     }
 }

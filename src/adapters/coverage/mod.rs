@@ -1,14 +1,19 @@
 //! LCOV coverage parser adapter.
 //!
 //! Parses `cargo-llvm-cov --lcov` output into per-file, per-line hit data.
-//! Only uses SF (source file) and DA (line data) records — FN/FNDA records
-//! are ignored because function matching uses line ranges from syn, not
-//! LCOV function names (which are mangled Rust symbols).
+//! Uses SF (source file), DA (line data), and BRDA (branch data) records.
+//! FN/FNDA records are ignored because function matching uses line ranges
+//! from syn, not LCOV function names (which are mangled Rust symbols).
 
-use crate::domain::types::{CrapError, LineCoverage, ParseDiagnostic};
+use crate::domain::types::{BranchCoverage, CrapError, LineCoverage, ParseDiagnostic};
 use crate::ports::{CoveragePort, ParseOutput};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
+
+/// Branch key: (line, block, branch) for deduplication and merging.
+type BranchKey = (usize, u32, u32);
+/// Per-file branch accumulator used during parsing before conversion to domain types.
+type RawBranches = HashMap<String, BTreeMap<BranchKey, Option<u64>>>;
 
 /// Parses LCOV format coverage data.
 ///
@@ -39,13 +44,21 @@ impl LcovParser {
 impl CoveragePort for LcovParser {
     fn parse(&self, data: &str) -> Result<ParseOutput, CrapError> {
         let mut coverage: HashMap<String, Vec<LineCoverage>> = HashMap::new();
+        let mut raw_branches: RawBranches = HashMap::new();
         let mut diagnostics: Vec<ParseDiagnostic> = Vec::new();
         let mut current_path: Option<String> = None;
         let mut current_lines: BTreeMap<usize, u64> = BTreeMap::new();
+        let mut current_branches: BTreeMap<(usize, u32, u32), Option<u64>> = BTreeMap::new();
 
         for (line, line_number) in data.lines().zip(1usize..) {
             if let Some(path) = line.strip_prefix("SF:") {
-                flush_block(&mut coverage, current_path.as_deref(), &mut current_lines);
+                flush_block(
+                    &mut coverage,
+                    &mut raw_branches,
+                    current_path.as_deref(),
+                    &mut current_lines,
+                    &mut current_branches,
+                );
 
                 if path.is_empty() {
                     diagnostics.push(ParseDiagnostic::EmptySourceFile { line_number });
@@ -70,13 +83,63 @@ impl CoveragePort for LcovParser {
                         });
                     }
                 }
+            } else if let Some(brda_rest) = line.strip_prefix("BRDA:")
+                && current_path.is_some()
+            {
+                match parse_brda(brda_rest) {
+                    Ok((line_no, block, branch, taken)) => {
+                        let key = (line_no, block, branch);
+                        current_branches
+                            .entry(key)
+                            .and_modify(|existing| {
+                                *existing = match (*existing, taken) {
+                                    (Some(a), Some(b)) => Some(a.saturating_add(b)),
+                                    (Some(a), None) => Some(a),
+                                    (None, Some(b)) => Some(b),
+                                    (None, None) => None,
+                                };
+                            })
+                            .or_insert(taken);
+                    }
+                    Err(_) => {
+                        diagnostics.push(ParseDiagnostic::MalformedRecord {
+                            line_number,
+                            content: line.to_string(),
+                        });
+                    }
+                }
             }
         }
 
-        flush_block(&mut coverage, current_path.as_deref(), &mut current_lines);
+        flush_block(
+            &mut coverage,
+            &mut raw_branches,
+            current_path.as_deref(),
+            &mut current_lines,
+            &mut current_branches,
+        );
+
+        // Convert raw branch accumulator to domain types, dropping block/branch IDs
+        let branches = if raw_branches.is_empty() {
+            None
+        } else {
+            Some(
+                raw_branches
+                    .into_iter()
+                    .map(|(file, entries)| {
+                        let vec = entries
+                            .into_iter()
+                            .map(|((line, _, _), taken)| BranchCoverage { line, taken })
+                            .collect();
+                        (file, vec)
+                    })
+                    .collect(),
+            )
+        };
 
         Ok(ParseOutput {
             coverage,
+            branches,
             diagnostics,
         })
     }
@@ -96,33 +159,80 @@ fn parse_da(da: &str) -> Result<(usize, u64), ()> {
     Ok((line_no, hits))
 }
 
+/// Parse a BRDA record value (after "BRDA:" prefix).
+/// Format: line,block,branch,taken where taken is "-" or a non-negative integer.
+/// Line 0 is treated as malformed (LCOV is 1-based).
+fn parse_brda(brda: &str) -> Result<(usize, u32, u32, Option<u64>), ()> {
+    let mut parts = brda.splitn(4, ',');
+    let line_str = parts.next().ok_or(())?;
+    let block_str = parts.next().ok_or(())?;
+    let branch_str = parts.next().ok_or(())?;
+    let taken_str = parts.next().ok_or(())?;
+
+    let line_no: usize = line_str.parse().map_err(|_| ())?;
+    if line_no == 0 {
+        return Err(());
+    }
+    let block: u32 = block_str.parse().map_err(|_| ())?;
+    let branch: u32 = branch_str.parse().map_err(|_| ())?;
+    let taken = if taken_str == "-" {
+        None
+    } else {
+        Some(taken_str.parse::<u64>().map_err(|_| ())?)
+    };
+
+    Ok((line_no, block, branch, taken))
+}
+
 fn flush_block(
     coverage: &mut HashMap<String, Vec<LineCoverage>>,
+    raw_branches: &mut RawBranches,
     current_path: Option<&str>,
     current_lines: &mut BTreeMap<usize, u64>,
+    current_branches: &mut BTreeMap<(usize, u32, u32), Option<u64>>,
 ) {
-    if let Some(path) = current_path
-        && !current_lines.is_empty()
-    {
-        // Merge with any existing coverage for this file (handles repeated
-        // SF blocks from concatenated tracefiles or TN: sections).
-        let existing = coverage.entry(path.to_owned()).or_default();
-        let mut merged: BTreeMap<usize, u64> = BTreeMap::new();
-        for lc in existing.iter() {
-            merged.insert(lc.line, lc.hits);
+    if let Some(path) = current_path {
+        if !current_lines.is_empty() {
+            // Merge with any existing coverage for this file (handles repeated
+            // SF blocks from concatenated tracefiles or TN: sections).
+            let existing = coverage.entry(path.to_owned()).or_default();
+            let mut merged: BTreeMap<usize, u64> = BTreeMap::new();
+            for lc in existing.iter() {
+                merged.insert(lc.line, lc.hits);
+            }
+            for (&line, &hits) in current_lines.iter() {
+                merged
+                    .entry(line)
+                    .and_modify(|h| *h = h.saturating_add(hits))
+                    .or_insert(hits);
+            }
+            *existing = merged
+                .into_iter()
+                .map(|(line, hits)| LineCoverage { line, hits })
+                .collect();
         }
-        for (&line, &hits) in current_lines.iter() {
-            merged
-                .entry(line)
-                .and_modify(|h| *h = h.saturating_add(hits))
-                .or_insert(hits);
+
+        if !current_branches.is_empty() {
+            // Merge with any existing branches for this file (handles repeated
+            // SF blocks from concatenated tracefiles — same merge as DA lines).
+            let file_branches = raw_branches.entry(path.to_owned()).or_default();
+            for (&key, &taken) in current_branches.iter() {
+                file_branches
+                    .entry(key)
+                    .and_modify(|existing| {
+                        *existing = match (*existing, taken) {
+                            (Some(a), Some(b)) => Some(a.saturating_add(b)),
+                            (Some(a), None) => Some(a),
+                            (None, Some(b)) => Some(b),
+                            (None, None) => None,
+                        };
+                    })
+                    .or_insert(taken);
+            }
         }
-        *existing = merged
-            .into_iter()
-            .map(|(line, hits)| LineCoverage { line, hits })
-            .collect();
     }
     current_lines.clear();
+    current_branches.clear();
 }
 
 #[cfg(test)]
@@ -349,6 +459,144 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         assert_eq!(output.coverage.len(), 1);
         assert_eq!(output.coverage["src/main.rs"].len(), 1);
         assert!(output.diagnostics.is_empty());
+        // BRDA record should now be parsed
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        assert_eq!(branches["src/main.rs"].len(), 1);
+        assert_eq!(branches["src/main.rs"][0].taken, Some(1));
+    }
+
+    // ── BRDA parsing tests ──────────────────────────────────────────
+
+    #[test]
+    fn brda_and_da_records_parsed() {
+        let output =
+            parse("SF:/project/src/lib.rs\nDA:1,5\nBRDA:1,0,0,3\nBRDA:1,0,1,0\nend_of_record\n");
+        assert_eq!(output.coverage["src/lib.rs"].len(), 1);
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        let file_branches = &branches["src/lib.rs"];
+        assert_eq!(file_branches.len(), 2);
+    }
+
+    #[test]
+    fn brda_dash_maps_to_none() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0,0,-\nend_of_record\n");
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        assert_eq!(branches["src/lib.rs"][0].taken, None);
+    }
+
+    #[test]
+    fn brda_numeric_maps_to_some() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0,0,5\nend_of_record\n");
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        assert_eq!(branches["src/lib.rs"][0].taken, Some(5));
+    }
+
+    #[test]
+    fn brda_zero_maps_to_some_zero() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0,0,0\nend_of_record\n");
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        assert_eq!(branches["src/lib.rs"][0].taken, Some(0));
+    }
+
+    #[test]
+    fn duplicate_brda_sum_taken() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0,0,3\nBRDA:10,0,0,7\nend_of_record\n");
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        let file_branches = &branches["src/lib.rs"];
+        // Duplicates merged by summing: 3 + 7 = 10
+        assert_eq!(file_branches.len(), 1);
+        assert_eq!(file_branches[0].taken, Some(10));
+    }
+
+    #[test]
+    fn brda_dash_and_numeric_merge() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0,0,-\nBRDA:10,0,0,5\nend_of_record\n");
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        // None + Some(5) = Some(5)
+        assert_eq!(branches["src/lib.rs"][0].taken, Some(5));
+    }
+
+    #[test]
+    fn malformed_brda_produces_diagnostic() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:not,valid\nend_of_record\n");
+        assert_eq!(output.diagnostics.len(), 1);
+        match &output.diagnostics[0] {
+            ParseDiagnostic::MalformedRecord {
+                line_number,
+                content,
+            } => {
+                assert_eq!(*line_number, 2);
+                assert_eq!(content, "BRDA:not,valid");
+            }
+            _ => panic!("Expected MalformedRecord"),
+        }
+    }
+
+    #[test]
+    fn brda_missing_fields_is_malformed() {
+        // Only 2 fields instead of 4
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0\nend_of_record\n");
+        assert_eq!(output.diagnostics.len(), 1);
+        assert!(matches!(
+            &output.diagnostics[0],
+            ParseDiagnostic::MalformedRecord { .. }
+        ));
+    }
+
+    #[test]
+    fn brda_missing_taken_is_malformed() {
+        // Only 3 fields instead of 4
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0,0\nend_of_record\n");
+        assert_eq!(output.diagnostics.len(), 1);
+        assert!(matches!(
+            &output.diagnostics[0],
+            ParseDiagnostic::MalformedRecord { .. }
+        ));
+    }
+
+    #[test]
+    fn repeated_sf_blocks_merge_branch_coverage() {
+        let input = "\
+SF:/project/src/main.rs\nBRDA:1,0,0,3\nBRDA:1,0,1,2\nend_of_record\n\
+SF:/project/src/main.rs\nBRDA:1,0,0,7\nBRDA:2,0,0,1\nend_of_record\n";
+        let output = parse(input);
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        let file_branches = &branches["src/main.rs"];
+        // BRDA:1,0,0 appears in both blocks: 3 + 7 = 10
+        // BRDA:1,0,1 appears only in first: 2
+        // BRDA:2,0,0 appears only in second: 1
+        assert_eq!(file_branches.len(), 3);
+        let by_line: std::collections::HashMap<usize, Vec<Option<u64>>> = {
+            let mut m: std::collections::HashMap<usize, Vec<Option<u64>>> =
+                std::collections::HashMap::new();
+            for b in file_branches {
+                m.entry(b.line).or_default().push(b.taken);
+            }
+            m
+        };
+        // Line 1 has two branches: taken=10 (merged) and taken=2
+        let line1 = by_line.get(&1).unwrap();
+        assert_eq!(line1.len(), 2);
+        assert!(line1.contains(&Some(10)));
+        assert!(line1.contains(&Some(2)));
+        // Line 2 has one branch: taken=1
+        assert_eq!(by_line[&2], vec![Some(1)]);
+    }
+
+    #[test]
+    fn brda_line_zero_is_malformed() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:0,0,0,5\nend_of_record\n");
+        assert_eq!(output.diagnostics.len(), 1);
+        assert!(matches!(
+            &output.diagnostics[0],
+            ParseDiagnostic::MalformedRecord { .. }
+        ));
+    }
+
+    #[test]
+    fn no_brda_produces_none_branches() {
+        let output = parse("SF:/project/src/lib.rs\nDA:1,5\nend_of_record\n");
+        assert!(output.branches.is_none());
     }
 }
 
@@ -401,6 +649,13 @@ mod proptests {
                     prop_assert!(lc.line > 0);
                 }
             }
+        }
+
+        #[test]
+        fn no_panic_on_arbitrary_brda(input in "BRDA:.*") {
+            let lcov = format!("SF:/project/src/test.rs\n{input}\nend_of_record\n");
+            let parser = LcovParser::new(PathBuf::from("/project"));
+            let _ = parser.parse(&lcov);
         }
 
         #[test]

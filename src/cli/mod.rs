@@ -215,6 +215,7 @@ fn run_inner() -> Result<bool> {
         metric: effective_metric,
         exclude: effective_exclude,
         respect_gitignore: !cli.filter.no_gitignore,
+        ..AnalyzeOptions::default()
     };
 
     let analysis = crap4rs::core::analyze(&options)?;
