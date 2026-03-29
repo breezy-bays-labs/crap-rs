@@ -299,7 +299,14 @@ fn count_cognitive_expr(
             total += count_cognitive_block(&expr_loop.body, nesting + 1, contributors);
             total
         }
-        Expr::Binary(bin) => count_cognitive_binary_chain(bin, contributors),
+        Expr::Binary(bin) => {
+            // count_cognitive_binary_chain handles all &&/|| operators in the tree.
+            // count_cognitive_binary_operands walks the non-binary leaves so that
+            // constructs like `?`, `if`, etc. inside binary expressions are also counted.
+            count_cognitive_binary_chain(bin, contributors)
+                + count_cognitive_binary_operands(&bin.left, nesting, contributors)
+                + count_cognitive_binary_operands(&bin.right, nesting, contributors)
+        }
         Expr::Try(expr_try) => {
             add_contributor(
                 contributors,
@@ -478,6 +485,24 @@ fn count_cognitive_binary_chain(
     }
 
     total
+}
+
+/// Walk the non-binary leaf sub-expressions of a binary expression tree and count their
+/// cognitive contributions. Binary sub-expressions are skipped (their logical operators
+/// are already counted by `count_cognitive_binary_chain`); only non-binary leaves (e.g.,
+/// `?`, nested `if`, closures) reach `count_cognitive_expr`.
+fn count_cognitive_binary_operands(
+    expr: &Expr,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    match expr {
+        Expr::Binary(bin) => {
+            count_cognitive_binary_operands(&bin.left, nesting, contributors)
+                + count_cognitive_binary_operands(&bin.right, nesting, contributors)
+        }
+        other => count_cognitive_expr(other, nesting, contributors),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

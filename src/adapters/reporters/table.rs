@@ -59,43 +59,7 @@ pub fn format_table(result: &AnalysisResult, threshold: f64, breakdown: bool) ->
     output.push('\n');
 
     if breakdown {
-        // Inject sub-rows after each exceeding function's table row.
-        // Strategy: split table string into lines, find each exceeding function by
-        // qualified_name, insert contributor sub-rows immediately after.
-        let table_str = table.to_string();
-        let table_lines: Vec<&str> = table_str.lines().collect();
-        let mut result_lines: Vec<String> = Vec::with_capacity(table_lines.len());
-
-        for line in &table_lines {
-            result_lines.push(line.to_string());
-            // Check if this line corresponds to an exceeding function with contributors.
-            // Use word-boundary matching: the character immediately after the name must be
-            // a space, `|`, or end-of-string — preventing "parse" from matching "parse_extra".
-            for verdict in &sorted {
-                if verdict.exceeds
-                    && !verdict.scored.contributors.is_empty()
-                    && row_contains_name(line, &verdict.scored.identity.qualified_name)
-                {
-                    let contributors = &verdict.scored.contributors;
-                    let last_idx = contributors.len() - 1;
-                    for (i, c) in contributors.iter().enumerate() {
-                        let tree = if i == last_idx { "└─" } else { "├─" };
-                        let increment_str = if c.increment > 1 {
-                            format!("+{} (nested)", c.increment)
-                        } else {
-                            format!("+{}", c.increment)
-                        };
-                        let kind_str = c.kind.to_string();
-                        result_lines.push(format!(
-                            "               {} line {}: {} ({})",
-                            tree, c.line, kind_str, increment_str
-                        ));
-                    }
-                    break;
-                }
-            }
-        }
-        output.push_str(&result_lines.join("\n"));
+        output.push_str(&inject_breakdown_subrows(&table.to_string(), &sorted));
     } else {
         output.push_str(&table.to_string());
     }
@@ -142,6 +106,57 @@ pub fn format_table(result: &AnalysisResult, threshold: f64, breakdown: bool) ->
     ));
 
     output
+}
+
+/// Inject contributor sub-rows into the table string after each exceeding function's row.
+///
+/// Splits the rendered table into lines, locates each exceeding function's row via
+/// word-boundary name matching, and inserts indented contributor sub-rows after it.
+///
+/// The 15-space indent is a fixed approximation of the File column width produced by
+/// comfy-table's Dynamic arrangement. It aligns sub-rows under the Function column
+/// in typical output. If comfy-table column widths change (e.g., very long file paths),
+/// the alignment may drift — switching to position-indexed matching (per the ADR) would
+/// make this robust.
+fn inject_breakdown_subrows(
+    table_str: &str,
+    sorted: &[&crate::domain::types::FunctionVerdict],
+) -> String {
+    let mut result_lines: Vec<String> = Vec::new();
+    for line in table_str.lines() {
+        result_lines.push(line.to_string());
+        for verdict in sorted.iter() {
+            if verdict.exceeds
+                && !verdict.scored.contributors.is_empty()
+                && row_contains_name(line, &verdict.scored.identity.qualified_name)
+            {
+                let contributors = &verdict.scored.contributors;
+                let last_idx = contributors.len() - 1;
+                for (i, c) in contributors.iter().enumerate() {
+                    result_lines.push(format_contributor_subrow(c, i == last_idx));
+                }
+                break;
+            }
+        }
+    }
+    result_lines.join("\n")
+}
+
+/// Format a single contributor sub-row with tree-drawing prefix.
+fn format_contributor_subrow(
+    c: &crate::domain::types::ComplexityContributor,
+    is_last: bool,
+) -> String {
+    let tree = if is_last { "└─" } else { "├─" };
+    let increment_str = if c.increment > 1 {
+        format!("+{} (nested)", c.increment)
+    } else {
+        format!("+{}", c.increment)
+    };
+    format!(
+        "               {} line {}: {} ({})",
+        tree, c.line, c.kind, increment_str
+    )
 }
 
 /// Check if a table row line contains the given function name as a whole word.
@@ -932,6 +947,28 @@ mod proptests {
         })
     }
 
+    fn arb_contributor() -> impl Strategy<Value = crate::domain::types::ComplexityContributor> {
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        (
+            prop_oneof![
+                Just(ContributorKind::IfBranch),
+                Just(ContributorKind::ForLoop),
+                Just(ContributorKind::WhileLoop),
+                Just(ContributorKind::Match),
+                Just(ContributorKind::Try),
+                Just(ContributorKind::LogicalOperator),
+            ],
+            1usize..500,
+            1u32..5,
+        )
+            .prop_map(|(kind, line, increment)| ComplexityContributor {
+                kind,
+                line,
+                column: None,
+                increment,
+            })
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
 
@@ -940,6 +977,21 @@ mod proptests {
             let _guard = super::COLOR_LOCK.lock().unwrap();
             colored::control::set_override(false);
             let _ = format_table(&result, 8.0, false);
+        }
+
+        #[test]
+        fn prop_format_table_with_breakdown_never_panics(
+            mut result in arb_analysis_result(),
+            contributors in prop::collection::vec(arb_contributor(), 0..5),
+        ) {
+            let _guard = super::COLOR_LOCK.lock().unwrap();
+            colored::control::set_override(false);
+            // Inject contributors into the first exceeding function (if any)
+            if let Some(v) = result.functions.iter_mut().find(|v| v.exceeds) {
+                v.scored.contributors = contributors;
+            }
+            // Must not panic regardless of contributor content
+            let _ = format_table(&result, 8.0, true);
         }
 
         #[test]
