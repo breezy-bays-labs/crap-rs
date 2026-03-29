@@ -86,20 +86,11 @@ fn parse_config(content: &str) -> Result<FileConfig> {
     let overrides = raw
         .overrides
         .into_iter()
-        .map(|o| {
-            if !is_valid_threshold(o.threshold) {
-                anyhow::bail!(
-                    "override threshold must be a finite positive number, got: {} (pattern: {})",
-                    o.threshold,
-                    o.pattern
-                );
-            }
-            Ok(ThresholdOverride {
-                pattern: o.pattern,
-                threshold: o.threshold,
-            })
+        .map(|o| ThresholdOverride {
+            pattern: o.pattern,
+            threshold: o.threshold,
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect();
 
     Ok(FileConfig {
         threshold: raw.threshold,
@@ -115,6 +106,15 @@ fn validate_raw_config(raw: &RawConfig) -> Result<()> {
         && !is_valid_threshold(t)
     {
         anyhow::bail!("threshold must be a finite positive number, got: {t}");
+    }
+    for o in &raw.overrides {
+        if !is_valid_threshold(o.threshold) {
+            anyhow::bail!(
+                "override threshold must be a finite positive number, got: {} (pattern: {})",
+                o.threshold,
+                o.pattern
+            );
+        }
     }
     Ok(())
 }
