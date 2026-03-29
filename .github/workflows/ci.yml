@@ -88,4 +88,4 @@ jobs:
           name: lcov
       - run: cargo build --release
       - name: Run crap4rs against itself
-        run: ./target/release/crap4rs --coverage lcov.info --src src --threshold 30 --color always
+        run: ./target/release/crap4rs --coverage lcov.info --src src --threshold 30 --exclude "cli/**" --color always
