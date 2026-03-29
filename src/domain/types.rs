@@ -242,6 +242,22 @@ pub struct AnalysisDiagnostics {
     pub functions_no_coverage: usize,
 }
 
+// ── Diff Types ─────────────────────────────────────────────────────
+
+/// Describes how a file changed relative to a diff ref.
+///
+/// Files absent from the change map are unchanged and should be excluded.
+/// Invariant: `Modified` always contains at least one span — deletion-only
+/// hunks (zero new lines) are filtered out by the adapter, so a file with
+/// only deletions never appears in the map.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileChangeKind {
+    /// Entirely new file — include all functions.
+    NewFile,
+    /// Modified file — include functions overlapping these spans.
+    Modified(Vec<SourceSpan>),
+}
+
 // ── Errors ──────────────────────────────────────────────────────────
 
 #[derive(Debug, thiserror::Error)]
@@ -257,6 +273,9 @@ pub enum CrapError {
 
     #[error("Failed to parse source file: {0}")]
     SourceParse(String),
+
+    #[error("Failed to compute diff: {0}")]
+    DiffCompute(String),
 
     #[error(transparent)]
     Io(#[from] std::io::Error),

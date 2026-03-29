@@ -10,6 +10,16 @@ use super::types::{
 };
 use std::collections::HashMap;
 
+/// Returns `true` if `span` overlaps any of the `changed_ranges`.
+///
+/// Both `span` and each range use inclusive start/end lines.
+/// An empty `changed_ranges` slice always returns `false`.
+pub fn overlaps_any(span: &SourceSpan, changed_ranges: &[SourceSpan]) -> bool {
+    changed_ranges
+        .iter()
+        .any(|range| span.start_line <= range.end_line && range.start_line <= span.end_line)
+}
+
 /// Match complexity entries with coverage using line-range overlap.
 ///
 /// For each function in `complexities`, finds DA lines from `line_data`
@@ -393,6 +403,129 @@ mod tests {
         assert_eq!(a_bc.total, 1);
         // b.rs has no branch data → None
         assert!(result[1].1.branch_coverage.is_none());
+    }
+}
+
+#[cfg(test)]
+mod overlaps_any_tests {
+    use super::*;
+
+    fn span(start: usize, end: usize) -> SourceSpan {
+        SourceSpan {
+            start_line: start,
+            end_line: end,
+        }
+    }
+
+    #[test]
+    fn overlap_partial() {
+        assert!(overlaps_any(&span(5, 15), &[span(10, 20)]));
+    }
+
+    #[test]
+    fn no_overlap() {
+        assert!(!overlaps_any(&span(1, 5), &[span(10, 20)]));
+    }
+
+    #[test]
+    fn adjacent_disjoint() {
+        assert!(!overlaps_any(&span(1, 10), &[span(11, 20)]));
+    }
+
+    #[test]
+    fn touching_boundary() {
+        assert!(overlaps_any(&span(1, 10), &[span(10, 20)]));
+    }
+
+    #[test]
+    fn contained() {
+        assert!(overlaps_any(&span(5, 8), &[span(1, 20)]));
+    }
+
+    #[test]
+    fn exact_match() {
+        assert!(overlaps_any(&span(5, 10), &[span(5, 10)]));
+    }
+
+    #[test]
+    fn single_line_spans() {
+        assert!(overlaps_any(&span(5, 5), &[span(5, 5)]));
+    }
+
+    #[test]
+    fn empty_ranges() {
+        assert!(!overlaps_any(&span(1, 100), &[]));
+    }
+
+    #[test]
+    fn multiple_ranges_hit_second() {
+        assert!(overlaps_any(&span(50, 60), &[span(1, 5), span(55, 70)]));
+    }
+}
+
+#[cfg(test)]
+mod overlaps_any_proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_span() -> impl Strategy<Value = SourceSpan> {
+        (1..10_000usize, 1..10_000usize).prop_map(|(a, b)| {
+            let (start, end) = if a <= b { (a, b) } else { (b, a) };
+            SourceSpan {
+                start_line: start,
+                end_line: end,
+            }
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn commutative(a in arb_span(), b in arb_span()) {
+            prop_assert_eq!(
+                overlaps_any(&a, &[b]),
+                overlaps_any(&b, &[a]),
+            );
+        }
+
+        #[test]
+        fn reflexive(s in arb_span()) {
+            prop_assert!(overlaps_any(&s, &[s]));
+        }
+
+        #[test]
+        fn empty_is_always_false(s in arb_span()) {
+            prop_assert!(!overlaps_any(&s, &[]));
+        }
+
+        #[test]
+        fn subset_implies_overlap(
+            outer_start in 1..5_000usize,
+            outer_len in 10..5_000usize,
+            inner_offset in 1..9usize,
+        ) {
+            let outer_end = outer_start + outer_len;
+            let inner_start = outer_start + inner_offset.min(outer_len - 1);
+            let inner_end = inner_start.min(outer_end);
+            let outer = SourceSpan { start_line: outer_start, end_line: outer_end };
+            let inner = SourceSpan { start_line: inner_start, end_line: inner_end };
+            prop_assert!(overlaps_any(&inner, &[outer]));
+        }
+
+        #[test]
+        fn adjacent_disjoint_property(
+            start in 1..5_000usize,
+            len1 in 1..5_000usize,
+            len2 in 1..5_000usize,
+        ) {
+            let end1 = start + len1;
+            let start2 = end1 + 1; // gap of 1
+            let end2 = start2 + len2;
+            let a = SourceSpan { start_line: start, end_line: end1 };
+            let b = SourceSpan { start_line: start2, end_line: end2 };
+            prop_assert!(!overlaps_any(&a, &[b]));
+        }
     }
 }
 
