@@ -637,13 +637,11 @@ mod tests {
         let if_branch_count = output.matches("if-branch").count();
         let for_loop_count = output.matches("for-loop").count();
         assert_eq!(
-            if_branch_count,
-            1,
+            if_branch_count, 1,
             "if-branch should appear exactly once (not doubled by prefix match): {output}"
         );
         assert_eq!(
-            for_loop_count,
-            1,
+            for_loop_count, 1,
             "for-loop should appear exactly once: {output}"
         );
     }

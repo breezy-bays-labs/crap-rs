@@ -394,7 +394,10 @@ mod tests {
         assert_eq!(ContributorKind::IfBranch.to_string(), "if-branch");
         assert_eq!(ContributorKind::ForLoop.to_string(), "for-loop");
         assert_eq!(ContributorKind::DoWhileLoop.to_string(), "do-while-loop");
-        assert_eq!(ContributorKind::LogicalOperator.to_string(), "logical-operator");
+        assert_eq!(
+            ContributorKind::LogicalOperator.to_string(),
+            "logical-operator"
+        );
         assert_eq!(ContributorKind::MatchArm.to_string(), "match-arm");
         assert_eq!(ContributorKind::LetElse.to_string(), "let-else");
         assert_eq!(ContributorKind::OptionalChain.to_string(), "optional-chain");
