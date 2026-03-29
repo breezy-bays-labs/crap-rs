@@ -503,6 +503,38 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
     }
 
     #[test]
+    fn brda_missing_fields_is_malformed() {
+        // Only 2 fields instead of 4
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0\nend_of_record\n");
+        assert_eq!(output.diagnostics.len(), 1);
+        assert!(matches!(
+            &output.diagnostics[0],
+            ParseDiagnostic::MalformedRecord { .. }
+        ));
+    }
+
+    #[test]
+    fn brda_missing_taken_is_malformed() {
+        // Only 3 fields instead of 4
+        let output = parse("SF:/project/src/lib.rs\nBRDA:10,0,0\nend_of_record\n");
+        assert_eq!(output.diagnostics.len(), 1);
+        assert!(matches!(
+            &output.diagnostics[0],
+            ParseDiagnostic::MalformedRecord { .. }
+        ));
+    }
+
+    #[test]
+    fn brda_line_zero_is_malformed() {
+        let output = parse("SF:/project/src/lib.rs\nBRDA:0,0,0,5\nend_of_record\n");
+        assert_eq!(output.diagnostics.len(), 1);
+        assert!(matches!(
+            &output.diagnostics[0],
+            ParseDiagnostic::MalformedRecord { .. }
+        ));
+    }
+
+    #[test]
     fn no_brda_produces_none_branches() {
         let output = parse("SF:/project/src/lib.rs\nDA:1,5\nend_of_record\n");
         assert!(output.branches.is_none());
