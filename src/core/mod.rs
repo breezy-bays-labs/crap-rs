@@ -14,7 +14,9 @@ use crate::domain::crap::compute_crap;
 use crate::domain::matching::match_functions;
 use crate::domain::summary::compute_summary;
 use crate::domain::threshold::ThresholdConfig;
-use crate::domain::types::{AnalysisResult, ComplexityMetric, FunctionVerdict, ScoredFunction};
+use crate::domain::types::{
+    AnalysisDiagnostics, AnalysisResult, ComplexityMetric, FunctionVerdict, ScoredFunction,
+};
 use crate::ports::{ComplexityPort, CoveragePort};
 
 /// Options for running a CRAP analysis.
@@ -34,6 +36,14 @@ pub struct AnalyzeOptions {
     pub respect_gitignore: bool,
 }
 
+/// Full output from an analysis run, including both the scored results
+/// and process diagnostics (surfaced by `--verbose`).
+#[derive(Debug)]
+pub struct AnalysisOutput {
+    pub result: AnalysisResult,
+    pub diagnostics: AnalysisDiagnostics,
+}
+
 impl Default for AnalyzeOptions {
     fn default() -> Self {
         Self {
@@ -48,8 +58,8 @@ impl Default for AnalyzeOptions {
 }
 
 /// Run CRAP analysis: discover files, extract complexity, parse coverage,
-/// match, score, and produce results.
-pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisResult> {
+/// match, score, and produce results with diagnostics.
+pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     // Canonicalize src path so LCOV absolute paths can be stripped correctly
     let src_canonical = options
         .src
@@ -59,6 +69,7 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisResult> {
     // 1. Discover .rs source files
     let source_files =
         discover_rust_files(&options.src, &options.exclude, options.respect_gitignore)?;
+    let files_found = source_files.len();
     if source_files.is_empty() {
         bail!(
             "no Rust source files found in {}\n  \
@@ -78,10 +89,12 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisResult> {
     let parse_output = parser
         .parse(&coverage_data)
         .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let parse_diagnostics = parse_output.diagnostics;
 
     // 3. Extract complexity from each source file
     let complexity_adapter = SynComplexityAdapter::new();
     let mut all_complexities = Vec::new();
+    let mut files_unparseable = 0usize;
 
     for file_path in &source_files {
         let source = std::fs::read_to_string(file_path)
@@ -97,10 +110,13 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisResult> {
             Ok(fns) => all_complexities.extend(fns),
             Err(e) => {
                 // Non-fatal: skip unparseable files (e.g., proc-macro crates)
+                files_unparseable += 1;
                 eprintln!("warning: skipping {relative}: {e}");
             }
         }
     }
+
+    let functions_extracted = all_complexities.len();
 
     if all_complexities.is_empty() {
         bail!(
@@ -113,11 +129,38 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisResult> {
     // 4. Match complexity with coverage using line-range join
     let matched = match_functions(&all_complexities, &parse_output.coverage);
 
+    // Count functions with no LCOV data (file not in coverage map)
+    let functions_no_coverage = matched
+        .iter()
+        .filter(|(comp, _)| !parse_output.coverage.contains_key(&comp.identity.file_path))
+        .count();
+    let functions_matched = matched.len() - functions_no_coverage;
+
     // 5. Compile threshold overrides for glob matching
     let resolver = ThresholdResolver::new(&options.threshold_config)?;
 
     // 6. Score each function, produce verdicts, and build result
-    score_and_summarize(&matched, &resolver)
+    let result = score_and_summarize(&matched, &resolver)?;
+
+    let diagnostics = AnalysisDiagnostics {
+        parse_diagnostics,
+        files_found,
+        files_unparseable,
+        functions_extracted,
+        functions_matched,
+        functions_no_coverage,
+    };
+
+    debug_assert_eq!(
+        diagnostics.functions_matched + diagnostics.functions_no_coverage,
+        result.functions.len(),
+        "diagnostics counts must partition scored functions"
+    );
+
+    Ok(AnalysisOutput {
+        result,
+        diagnostics,
+    })
 }
 
 /// Resolves per-function thresholds using glob-based overrides.
@@ -296,7 +339,7 @@ pub fn with_branch(x: i32) -> &'static str {
             respect_gitignore: false,
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
 
         assert_eq!(result.functions.len(), 2);
         assert_eq!(result.summary.total_functions, 2);
@@ -320,7 +363,7 @@ pub fn with_branch(x: i32) -> &'static str {
             respect_gitignore: false,
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         let simple = result
             .functions
             .iter()
@@ -349,7 +392,7 @@ pub fn with_branch(x: i32) -> &'static str {
             respect_gitignore: false,
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         let branching = result
             .functions
             .iter()
@@ -378,7 +421,7 @@ pub fn with_branch(x: i32) -> &'static str {
             respect_gitignore: false,
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         assert!(result.passed);
         assert_eq!(result.summary.exceeding_threshold, 0);
     }
@@ -402,7 +445,7 @@ pub fn with_branch(x: i32) -> &'static str {
             respect_gitignore: false,
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         let simple = result
             .functions
             .iter()
@@ -430,7 +473,7 @@ pub fn with_branch(x: i32) -> &'static str {
             respect_gitignore: false,
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         assert!(!result.passed);
         assert!(result.summary.exceeding_threshold > 0);
     }
@@ -526,7 +569,7 @@ pub fn with_branch(x: i32) -> &'static str {
             ..AnalyzeOptions::default()
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         // Should only find lib.rs, not tests/test_lib.rs
         for v in &result.functions {
             assert!(
@@ -549,7 +592,7 @@ pub fn with_branch(x: i32) -> &'static str {
             ..AnalyzeOptions::default()
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         // All functions should use cyclomatic metric
         for v in &result.functions {
             assert_eq!(v.scored.complexity_metric, ComplexityMetric::Cyclomatic);
@@ -599,7 +642,7 @@ pub fn with_branch(x: i32) -> &'static str {
             ..AnalyzeOptions::default()
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         let summary = &result.summary;
 
         assert_eq!(summary.total_functions, 2);
@@ -685,6 +728,95 @@ pub fn with_branch(x: i32) -> &'static str {
     }
 
     #[test]
+    fn analyze_returns_diagnostics() {
+        let dir = tempfile::tempdir().unwrap();
+        setup_test_project(dir.path());
+
+        let opts = AnalyzeOptions {
+            src: dir.path().join("src"),
+            coverage: dir.path().join("lcov.info"),
+            threshold_config: ThresholdConfig {
+                global: DEFAULT_THRESHOLD,
+                ..ThresholdConfig::default()
+            },
+            metric: ComplexityMetric::Cognitive,
+            exclude: Vec::new(),
+            respect_gitignore: false,
+        };
+
+        let output = analyze(&opts).unwrap();
+        let diag = &output.diagnostics;
+
+        assert_eq!(diag.files_found, 1);
+        assert_eq!(diag.files_unparseable, 0);
+        assert_eq!(diag.functions_extracted, 2);
+        assert!(diag.parse_diagnostics.is_empty());
+        // Both functions are in lib.rs which has LCOV data
+        assert_eq!(diag.functions_matched, 2);
+        assert_eq!(diag.functions_no_coverage, 0);
+    }
+
+    #[test]
+    fn analyze_diagnostics_counts_no_coverage_functions() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("lib.rs"), "pub fn covered() -> i32 { 1 }").unwrap();
+        fs::write(
+            src_dir.join("other.rs"),
+            "pub fn not_covered() -> i32 { 2 }",
+        )
+        .unwrap();
+
+        // LCOV only has coverage for lib.rs, not other.rs
+        fs::write(
+            dir.path().join("lcov.info"),
+            "SF:lib.rs\nDA:1,1\nend_of_record\n",
+        )
+        .unwrap();
+
+        let opts = AnalyzeOptions {
+            src: src_dir,
+            coverage: dir.path().join("lcov.info"),
+            respect_gitignore: false,
+            ..AnalyzeOptions::default()
+        };
+
+        let output = analyze(&opts).unwrap();
+        let diag = &output.diagnostics;
+
+        assert_eq!(diag.files_found, 2);
+        assert_eq!(diag.functions_extracted, 2);
+        assert_eq!(diag.functions_matched, 1);
+        assert_eq!(diag.functions_no_coverage, 1);
+    }
+
+    #[test]
+    fn analyze_diagnostics_surfaces_parse_diagnostics() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("lib.rs"), "pub fn simple() -> i32 { 42 }").unwrap();
+
+        // LCOV with a malformed DA line
+        fs::write(
+            dir.path().join("lcov.info"),
+            "SF:lib.rs\nDA:1,1\nDA:bad_line\nend_of_record\n",
+        )
+        .unwrap();
+
+        let opts = AnalyzeOptions {
+            src: src_dir,
+            coverage: dir.path().join("lcov.info"),
+            respect_gitignore: false,
+            ..AnalyzeOptions::default()
+        };
+
+        let output = analyze(&opts).unwrap();
+        assert_eq!(output.diagnostics.parse_diagnostics.len(), 1);
+    }
+
+    #[test]
     fn analyze_with_per_path_overrides() {
         let dir = tempfile::tempdir().unwrap();
         setup_test_project(dir.path());
@@ -704,7 +836,7 @@ pub fn with_branch(x: i32) -> &'static str {
             respect_gitignore: false,
         };
 
-        let result = analyze(&opts).unwrap();
+        let result = analyze(&opts).unwrap().result;
         // All functions are in lib.rs, which has the 0.5 override
         assert!(!result.passed);
         for v in &result.functions {

@@ -35,7 +35,7 @@ fn self_referential_analysis() {
         respect_gitignore: false,
     };
 
-    let result = analyze(&opts).unwrap();
+    let result = analyze(&opts).unwrap().result;
 
     // Must find functions (we know crap4rs has many)
     assert!(
@@ -94,7 +94,7 @@ fn self_referential_with_cyclomatic() {
         respect_gitignore: false,
     };
 
-    let result = analyze(&opts).unwrap();
+    let result = analyze(&opts).unwrap().result;
 
     // All functions should use cyclomatic metric
     for v in &result.functions {
@@ -127,7 +127,7 @@ fn self_referential_known_functions_present() {
         respect_gitignore: false,
     };
 
-    let result = analyze(&opts).unwrap();
+    let result = analyze(&opts).unwrap().result;
 
     let names: Vec<&str> = result
         .functions
@@ -178,7 +178,7 @@ fn exclude_pattern_filters_correctly() {
         exclude: Vec::new(),
         respect_gitignore: false,
     };
-    let all_result = analyze(&all_opts).unwrap();
+    let all_result = analyze(&all_opts).unwrap().result;
 
     // Analyze with adapter exclusion
     let filtered_opts = AnalyzeOptions {
@@ -192,7 +192,7 @@ fn exclude_pattern_filters_correctly() {
         exclude: vec!["adapters/**".to_string()],
         respect_gitignore: false,
     };
-    let filtered_result = analyze(&filtered_opts).unwrap();
+    let filtered_result = analyze(&filtered_opts).unwrap().result;
 
     // Filtered should have fewer functions
     assert!(
