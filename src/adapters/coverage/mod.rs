@@ -10,6 +10,11 @@ use crate::ports::{CoveragePort, ParseOutput};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
+/// Branch key: (line, block, branch) for deduplication and merging.
+type BranchKey = (usize, u32, u32);
+/// Per-file branch accumulator used during parsing before conversion to domain types.
+type RawBranches = HashMap<String, BTreeMap<BranchKey, Option<u64>>>;
+
 /// Parses LCOV format coverage data.
 ///
 /// Uses a single-pass block accumulator: iterates lines once,
@@ -39,7 +44,7 @@ impl LcovParser {
 impl CoveragePort for LcovParser {
     fn parse(&self, data: &str) -> Result<ParseOutput, CrapError> {
         let mut coverage: HashMap<String, Vec<LineCoverage>> = HashMap::new();
-        let mut branches: Option<HashMap<String, Vec<BranchCoverage>>> = None;
+        let mut raw_branches: RawBranches = HashMap::new();
         let mut diagnostics: Vec<ParseDiagnostic> = Vec::new();
         let mut current_path: Option<String> = None;
         let mut current_lines: BTreeMap<usize, u64> = BTreeMap::new();
@@ -49,7 +54,7 @@ impl CoveragePort for LcovParser {
             if let Some(path) = line.strip_prefix("SF:") {
                 flush_block(
                     &mut coverage,
-                    &mut branches,
+                    &mut raw_branches,
                     current_path.as_deref(),
                     &mut current_lines,
                     &mut current_branches,
@@ -108,11 +113,29 @@ impl CoveragePort for LcovParser {
 
         flush_block(
             &mut coverage,
-            &mut branches,
+            &mut raw_branches,
             current_path.as_deref(),
             &mut current_lines,
             &mut current_branches,
         );
+
+        // Convert raw branch accumulator to domain types, dropping block/branch IDs
+        let branches = if raw_branches.is_empty() {
+            None
+        } else {
+            Some(
+                raw_branches
+                    .into_iter()
+                    .map(|(file, entries)| {
+                        let vec = entries
+                            .into_iter()
+                            .map(|((line, _, _), taken)| BranchCoverage { line, taken })
+                            .collect();
+                        (file, vec)
+                    })
+                    .collect(),
+            )
+        };
 
         Ok(ParseOutput {
             coverage,
@@ -163,7 +186,7 @@ fn parse_brda(brda: &str) -> Result<(usize, u32, u32, Option<u64>), ()> {
 
 fn flush_block(
     coverage: &mut HashMap<String, Vec<LineCoverage>>,
-    branches: &mut Option<HashMap<String, Vec<BranchCoverage>>>,
+    raw_branches: &mut RawBranches,
     current_path: Option<&str>,
     current_lines: &mut BTreeMap<usize, u64>,
     current_branches: &mut BTreeMap<(usize, u32, u32), Option<u64>>,
@@ -190,15 +213,22 @@ fn flush_block(
         }
 
         if !current_branches.is_empty() {
-            let branch_vec: Vec<BranchCoverage> = current_branches
-                .iter()
-                .map(|(&(line, _, _), &taken)| BranchCoverage { line, taken })
-                .collect();
-            branches
-                .get_or_insert_with(HashMap::new)
-                .entry(path.to_owned())
-                .or_default()
-                .extend(branch_vec);
+            // Merge with any existing branches for this file (handles repeated
+            // SF blocks from concatenated tracefiles — same merge as DA lines).
+            let file_branches = raw_branches.entry(path.to_owned()).or_default();
+            for (&key, &taken) in current_branches.iter() {
+                file_branches
+                    .entry(key)
+                    .and_modify(|existing| {
+                        *existing = match (*existing, taken) {
+                            (Some(a), Some(b)) => Some(a.saturating_add(b)),
+                            (Some(a), None) => Some(a),
+                            (None, Some(b)) => Some(b),
+                            (None, None) => None,
+                        };
+                    })
+                    .or_insert(taken);
+            }
         }
     }
     current_lines.clear();
@@ -522,6 +552,35 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
             &output.diagnostics[0],
             ParseDiagnostic::MalformedRecord { .. }
         ));
+    }
+
+    #[test]
+    fn repeated_sf_blocks_merge_branch_coverage() {
+        let input = "\
+SF:/project/src/main.rs\nBRDA:1,0,0,3\nBRDA:1,0,1,2\nend_of_record\n\
+SF:/project/src/main.rs\nBRDA:1,0,0,7\nBRDA:2,0,0,1\nend_of_record\n";
+        let output = parse(input);
+        let branches = output.branches.as_ref().expect("branches should be Some");
+        let file_branches = &branches["src/main.rs"];
+        // BRDA:1,0,0 appears in both blocks: 3 + 7 = 10
+        // BRDA:1,0,1 appears only in first: 2
+        // BRDA:2,0,0 appears only in second: 1
+        assert_eq!(file_branches.len(), 3);
+        let by_line: std::collections::HashMap<usize, Vec<Option<u64>>> = {
+            let mut m: std::collections::HashMap<usize, Vec<Option<u64>>> =
+                std::collections::HashMap::new();
+            for b in file_branches {
+                m.entry(b.line).or_default().push(b.taken);
+            }
+            m
+        };
+        // Line 1 has two branches: taken=10 (merged) and taken=2
+        let line1 = by_line.get(&1).unwrap();
+        assert_eq!(line1.len(), 2);
+        assert!(line1.contains(&Some(10)));
+        assert!(line1.contains(&Some(2)));
+        // Line 2 has one branch: taken=1
+        assert_eq!(by_line[&2], vec![Some(1)]);
     }
 
     #[test]
