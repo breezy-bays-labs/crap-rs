@@ -36,6 +36,9 @@ colored = "3"
 # Config file parsing
 toml = "0.8"
 
+# Regex (hunk header parsing in diff adapter)
+regex = "1"
+
 # Error handling
 thiserror = "2"
 anyhow = "1"
