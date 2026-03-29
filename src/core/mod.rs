@@ -283,6 +283,7 @@ fn score_and_summarize(
                 complexity_metric: comp.metric,
                 coverage_percent: cov.line_coverage.percent,
                 crap,
+                contributors: comp.contributors.clone(),
             },
             threshold,
             exceeds: crap.value > threshold,
@@ -477,6 +478,54 @@ pub fn with_branch(x: i32) -> &'static str {
              end_of_record\n",
         )
         .unwrap();
+    }
+
+    #[test]
+    fn score_and_summarize_threads_contributors() {
+        use crate::domain::types::{
+            ComplexityContributor, ContributorKind, FunctionCoverage, SourceSpan,
+        };
+
+        let contributor = ComplexityContributor {
+            kind: ContributorKind::IfBranch,
+            line: 5,
+            column: Some(4),
+            increment: 1,
+        };
+        let comp = crate::domain::types::FunctionComplexity {
+            identity: crate::domain::types::FunctionIdentity {
+                file_path: "src/lib.rs".to_string(),
+                qualified_name: "test_fn".to_string(),
+                span: SourceSpan {
+                    start_line: 1,
+                    end_line: 10,
+                },
+            },
+            complexity: 2,
+            metric: crate::domain::types::ComplexityMetric::Cognitive,
+            contributors: vec![contributor.clone()],
+        };
+        let cov = FunctionCoverage {
+            file_path: "src/lib.rs".to_string(),
+            span: SourceSpan {
+                start_line: 1,
+                end_line: 10,
+            },
+            line_coverage: crate::domain::types::CoverageRatio {
+                covered: 10,
+                total: 10,
+                percent: 100.0,
+            },
+        };
+
+        let config = crate::domain::threshold::ThresholdConfig::default();
+        let resolver = ThresholdResolver::new(&config).unwrap();
+        let result = score_and_summarize(&[(comp, cov)], &resolver).unwrap();
+
+        assert_eq!(result.functions.len(), 1);
+        let verdict = &result.functions[0];
+        assert_eq!(verdict.scored.contributors.len(), 1);
+        assert_eq!(verdict.scored.contributors[0], contributor);
     }
 
     #[test]
