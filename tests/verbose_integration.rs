@@ -140,12 +140,10 @@ fn verbose_adds_lcov_parse_detail() {
 fn warn_on_unparseable_source_files() {
     let dir = tempfile::tempdir().unwrap();
 
-    // Second .rs file with syntax that syn cannot parse
-    let src = dir.path().join("src");
-    std::fs::create_dir_all(&src).expect("create src dir");
-    std::fs::write(src.join("lib.rs"), SIMPLE_SRC).expect("write lib.rs");
-    std::fs::write(src.join("broken.rs"), "this is not rust {{{").expect("write broken.rs");
-    std::fs::write(dir.path().join("lcov.info"), SIMPLE_LCOV).expect("write lcov.info");
+    setup_dir(dir.path(), SIMPLE_SRC, SIMPLE_LCOV);
+    // Add a second .rs file with syntax that syn cannot parse
+    std::fs::write(dir.path().join("src/broken.rs"), "this is not rust {{{")
+        .expect("write broken.rs");
 
     let output = run(dir.path(), &[]);
     let err = stderr_str(&output);
