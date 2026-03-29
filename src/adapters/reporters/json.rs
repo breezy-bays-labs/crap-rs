@@ -1,16 +1,18 @@
 //! JSON reporter — formats `AnalysisResult` as structured JSON
 //! with a versioned envelope for CI pipelines and tooling consumption.
 
-use crate::domain::types::{AnalysisResult, ComplexityMetric};
+use crate::domain::types::{AnalysisDiagnostics, AnalysisResult, ComplexityMetric};
 use serde::Serialize;
 
 /// Configuration for the JSON envelope metadata.
 #[derive(Debug)]
-pub struct JsonConfig {
+pub struct JsonConfig<'a> {
     pub tool_version: String,
     pub metric: ComplexityMetric,
     pub threshold: f64,
     pub timestamp: String,
+    /// When present, diagnostics are included in the JSON output (--verbose).
+    pub diagnostics: Option<&'a AnalysisDiagnostics>,
 }
 
 #[derive(Serialize)]
@@ -22,6 +24,8 @@ struct JsonEnvelope<'a> {
     metric: &'a ComplexityMetric,
     threshold: f64,
     result: &'a AnalysisResult,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diagnostics: Option<&'a AnalysisDiagnostics>,
 }
 
 // Note: per-function thresholds are already visible in each FunctionVerdict's
@@ -31,7 +35,7 @@ struct JsonEnvelope<'a> {
 /// Format an analysis result as pretty-printed JSON with a versioned envelope.
 pub fn format_json(
     result: &AnalysisResult,
-    config: &JsonConfig,
+    config: &JsonConfig<'_>,
 ) -> Result<String, serde_json::Error> {
     let envelope = JsonEnvelope {
         schema_version: 1,
@@ -41,6 +45,7 @@ pub fn format_json(
         metric: &config.metric,
         threshold: config.threshold,
         result,
+        diagnostics: config.diagnostics,
     };
     serde_json::to_string_pretty(&envelope)
 }
@@ -51,12 +56,13 @@ mod tests {
     use crate::adapters::reporters::test_fixtures::*;
     use crate::domain::types::{ComplexityMetric, RiskLevel};
 
-    fn default_config() -> JsonConfig {
+    fn default_config() -> JsonConfig<'static> {
         JsonConfig {
             tool_version: "0.1.0".to_string(),
             metric: ComplexityMetric::Cognitive,
             threshold: 8.0,
             timestamp: "2026-03-28T12:00:00Z".to_string(),
+            diagnostics: None,
         }
     }
 
@@ -236,6 +242,53 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
         insta::assert_json_snapshot!(v);
     }
+
+    #[test]
+    fn test_diagnostics_omitted_when_none() {
+        let result = make_empty_result();
+        let v = parse_json(&result, &default_config());
+        assert!(
+            v.get("diagnostics").is_none(),
+            "diagnostics should be absent without --verbose"
+        );
+    }
+
+    #[test]
+    fn test_diagnostics_included_when_present() {
+        use crate::domain::types::{AnalysisDiagnostics, ParseDiagnostic};
+
+        let diag = AnalysisDiagnostics {
+            parse_diagnostics: vec![ParseDiagnostic::MalformedRecord {
+                line_number: 5,
+                content: "DA:bad".to_string(),
+            }],
+            files_found: 10,
+            files_unparseable: 1,
+            functions_extracted: 42,
+            functions_matched: 40,
+            functions_no_coverage: 2,
+        };
+
+        let result = make_empty_result();
+        let config = JsonConfig {
+            diagnostics: Some(&diag),
+            ..default_config()
+        };
+        let v = parse_json(&result, &config);
+
+        let d = v.get("diagnostics").expect("should have diagnostics key");
+        assert_eq!(d["files_found"], 10);
+        assert_eq!(d["files_unparseable"], 1);
+        assert_eq!(d["functions_extracted"], 42);
+        assert_eq!(d["functions_matched"], 40);
+        assert_eq!(d["functions_no_coverage"], 2);
+
+        let parse_diags = d["parse_diagnostics"].as_array().unwrap();
+        assert_eq!(parse_diags.len(), 1);
+        assert_eq!(parse_diags[0]["kind"], "malformed_record");
+        assert_eq!(parse_diags[0]["line_number"], 5);
+        assert_eq!(parse_diags[0]["content"], "DA:bad");
+    }
 }
 
 #[cfg(test)]
@@ -336,12 +389,13 @@ mod proptests {
         })
     }
 
-    fn arb_config() -> impl Strategy<Value = JsonConfig> {
+    fn arb_config() -> impl Strategy<Value = JsonConfig<'static>> {
         (1.0..100.0f64,).prop_map(|(threshold,)| JsonConfig {
             tool_version: "0.1.0".to_string(),
             metric: ComplexityMetric::Cognitive,
             threshold,
             timestamp: "2026-01-01T00:00:00Z".to_string(),
+            diagnostics: None,
         })
     }
 
