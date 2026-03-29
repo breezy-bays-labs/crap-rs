@@ -76,8 +76,7 @@ pub fn format_table(result: &AnalysisResult, threshold: f64, breakdown: bool) ->
                     && !verdict.scored.contributors.is_empty()
                     && row_contains_name(line, &verdict.scored.identity.qualified_name)
                 {
-                    let mut contributors = verdict.scored.contributors.clone();
-                    contributors.sort_by_key(|c| (c.line, c.column));
+                    let contributors = &verdict.scored.contributors;
                     let last_idx = contributors.len() - 1;
                     for (i, c) in contributors.iter().enumerate() {
                         let tree = if i == last_idx { "└─" } else { "├─" };
@@ -148,15 +147,23 @@ pub fn format_table(result: &AnalysisResult, threshold: f64, breakdown: bool) ->
 /// Check if a table row line contains the given function name as a whole word.
 /// The character after the name must be a space, `|`, or end-of-string,
 /// preventing "parse" from matching a row containing "parse_extra".
+///
+/// Checks all occurrences (not just the first) so that a function name that
+/// appears in the file-path column is not mistakenly matched before the
+/// function-name column is reached.
 fn row_contains_name(line: &str, name: &str) -> bool {
-    if let Some(pos) = line.find(name) {
-        matches!(
-            line.as_bytes().get(pos + name.len()),
+    let mut start = 0;
+    while let Some(pos) = line[start..].find(name) {
+        let abs_pos = start + pos;
+        if matches!(
+            line.as_bytes().get(abs_pos + name.len()),
             None | Some(b' ') | Some(b'|')
-        )
-    } else {
-        false
+        ) {
+            return true;
+        }
+        start = abs_pos + 1;
     }
+    false
 }
 
 /// Check if functions have different threshold values (per-path overrides active).
@@ -542,6 +549,7 @@ mod tests {
         use crate::domain::types::{ComplexityContributor, ContributorKind};
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
+        // Contributors must be pre-sorted by (line, column) — as FunctionFinder guarantees.
         let verdict = make_verdict_with_contributors(
             "mixed_fn",
             "src/lib.rs",
@@ -552,14 +560,14 @@ mod tests {
             8.0,
             vec![
                 ComplexityContributor {
-                    kind: ContributorKind::ForLoop,
-                    line: 20,
+                    kind: ContributorKind::IfBranch,
+                    line: 5,
                     column: Some(4),
                     increment: 1,
                 },
                 ComplexityContributor {
-                    kind: ContributorKind::IfBranch,
-                    line: 5,
+                    kind: ContributorKind::ForLoop,
+                    line: 20,
                     column: Some(4),
                     increment: 1,
                 },
@@ -637,6 +645,44 @@ mod tests {
             for_loop_count,
             1,
             "for-loop should appear exactly once: {output}"
+        );
+    }
+
+    #[test]
+    fn test_breakdown_name_in_file_path_still_matches() {
+        // Regression: row_contains_name used line.find() (first occurrence only).
+        // If the function name is a substring of its own file path (e.g. `fn parse()`
+        // in `src/parse/mod.rs`), the first match lands in the path column where the
+        // next char is `/`, failing the word-boundary check and silently skipping
+        // sub-row injection. The fix loops all occurrences until one passes.
+        use crate::domain::types::{ComplexityContributor, ContributorKind};
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+
+        let v = make_verdict_with_contributors(
+            "parse",
+            "src/parse/mod.rs", // "parse" appears in path before function column
+            5,
+            30.0,
+            45.0,
+            RiskLevel::High,
+            8.0,
+            vec![ComplexityContributor {
+                kind: ContributorKind::IfBranch,
+                line: 3,
+                column: Some(4),
+                increment: 1,
+            }],
+        );
+        let result = AnalysisResult {
+            functions: vec![v],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table(&result, 8.0, true);
+        assert!(
+            output.contains("if-branch"),
+            "Sub-row should appear even when function name is in file path: {output}"
         );
     }
 
