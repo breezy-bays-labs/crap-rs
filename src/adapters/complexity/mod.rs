@@ -8,6 +8,7 @@ use crate::domain::types::{
     FunctionIdentity, SourceSpan,
 };
 use crate::ports::ComplexityPort;
+use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{Expr, ExprBinary, ItemFn, ItemImpl};
@@ -148,6 +149,20 @@ impl<'ast> Visit<'ast> for FunctionFinder {
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
+fn add_contributor(
+    contributors: &mut Vec<ComplexityContributor>,
+    kind: ContributorKind,
+    span: Span,
+    increment: u32,
+) {
+    contributors.push(ComplexityContributor {
+        kind,
+        line: span.start().line,
+        column: Some(span.start().column as u32),
+        increment,
+    });
+}
+
 fn span_of(item: &impl syn::spanned::Spanned) -> SourceSpan {
     let sp = item.span();
     SourceSpan {
@@ -209,12 +224,7 @@ fn count_cognitive_stmt(
                 total += count_cognitive_expr(&init.expr, nesting, contributors);
                 if let Some((else_token, diverge)) = &init.diverge {
                     // let...else is a branching construct: +1 structural + nesting
-                    contributors.push(ComplexityContributor {
-                        kind: ContributorKind::LetElse,
-                        line: else_token.span.start().line,
-                        column: Some(else_token.span.start().column as u32),
-                        increment: 1 + nesting,
-                    });
+                    add_contributor(contributors, ContributorKind::LetElse, else_token.span, 1 + nesting);
                     total += 1 + nesting;
                     total += count_cognitive_expr(diverge, nesting + 1, contributors);
                 }
@@ -233,12 +243,7 @@ fn count_cognitive_expr(
     match expr {
         Expr::If(expr_if) => count_cognitive_if(expr_if, nesting, contributors),
         Expr::Match(expr_match) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Match,
-                line: expr_match.match_token.span.start().line,
-                column: Some(expr_match.match_token.span.start().column as u32),
-                increment: 1 + nesting,
-            });
+            add_contributor(contributors, ContributorKind::Match, expr_match.match_token.span, 1 + nesting);
             let mut total = 1 + nesting; // +1 structural, +nesting
             total += count_cognitive_expr(&expr_match.expr, nesting, contributors);
             for arm in &expr_match.arms {
@@ -250,66 +255,36 @@ fn count_cognitive_expr(
             total
         }
         Expr::While(expr_while) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::WhileLoop,
-                line: expr_while.while_token.span.start().line,
-                column: Some(expr_while.while_token.span.start().column as u32),
-                increment: 1 + nesting,
-            });
+            add_contributor(contributors, ContributorKind::WhileLoop, expr_while.while_token.span, 1 + nesting);
             let mut total = 1 + nesting;
             total += count_cognitive_expr(&expr_while.cond, nesting, contributors);
             total += count_cognitive_block(&expr_while.body, nesting + 1, contributors);
             total
         }
         Expr::ForLoop(expr_for) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::ForLoop,
-                line: expr_for.for_token.span.start().line,
-                column: Some(expr_for.for_token.span.start().column as u32),
-                increment: 1 + nesting,
-            });
+            add_contributor(contributors, ContributorKind::ForLoop, expr_for.for_token.span, 1 + nesting);
             let mut total = 1 + nesting;
             total += count_cognitive_expr(&expr_for.expr, nesting, contributors);
             total += count_cognitive_block(&expr_for.body, nesting + 1, contributors);
             total
         }
         Expr::Loop(expr_loop) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Loop,
-                line: expr_loop.loop_token.span.start().line,
-                column: Some(expr_loop.loop_token.span.start().column as u32),
-                increment: 1 + nesting,
-            });
+            add_contributor(contributors, ContributorKind::Loop, expr_loop.loop_token.span, 1 + nesting);
             let mut total = 1 + nesting;
             total += count_cognitive_block(&expr_loop.body, nesting + 1, contributors);
             total
         }
         Expr::Binary(bin) => count_cognitive_binary_chain(bin, contributors),
         Expr::Try(expr_try) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Try,
-                line: expr_try.question_token.span.start().line,
-                column: Some(expr_try.question_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::Try, expr_try.question_token.span, 1);
             1 + count_cognitive_expr(&expr_try.expr, nesting, contributors)
         }
         Expr::Break(expr_break) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Break,
-                line: expr_break.break_token.span.start().line,
-                column: Some(expr_break.break_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::Break, expr_break.break_token.span, 1);
             1
         }
         Expr::Continue(expr_continue) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Continue,
-                line: expr_continue.continue_token.span.start().line,
-                column: Some(expr_continue.continue_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::Continue, expr_continue.continue_token.span, 1);
             1
         }
         Expr::Block(expr_block) => count_cognitive_block(&expr_block.block, nesting, contributors),
@@ -358,12 +333,7 @@ fn count_cognitive_if(
     contributors: &mut Vec<ComplexityContributor>,
 ) -> u32 {
     // if: +1 + nesting
-    contributors.push(ComplexityContributor {
-        kind: ContributorKind::IfBranch,
-        line: expr_if.if_token.span.start().line,
-        column: Some(expr_if.if_token.span.start().column as u32),
-        increment: 1 + nesting,
-    });
+    add_contributor(contributors, ContributorKind::IfBranch, expr_if.if_token.span, 1 + nesting);
     let mut total = 1 + nesting;
 
     // Count complexity in the condition (for && / || chains)
@@ -377,12 +347,7 @@ fn count_cognitive_if(
         match else_branch.as_ref() {
             Expr::If(else_if) => {
                 // else if: +1 continuation (no nesting increment)
-                contributors.push(ComplexityContributor {
-                    kind: ContributorKind::IfBranch,
-                    line: else_if.if_token.span.start().line,
-                    column: Some(else_if.if_token.span.start().column as u32),
-                    increment: 1,
-                });
+                add_contributor(contributors, ContributorKind::IfBranch, else_if.if_token.span, 1);
                 total += 1;
                 total += count_cognitive_expr(&else_if.cond, nesting, contributors);
                 total += count_cognitive_block(&else_if.then_branch, nesting + 1, contributors);
@@ -411,12 +376,7 @@ fn count_cognitive_else(
     match expr {
         Expr::If(else_if) => {
             // else if: +1 continuation
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::IfBranch,
-                line: else_if.if_token.span.start().line,
-                column: Some(else_if.if_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::IfBranch, else_if.if_token.span, 1);
             let mut total = 1;
             total += count_cognitive_expr(&else_if.cond, nesting, contributors);
             total += count_cognitive_block(&else_if.then_branch, nesting + 1, contributors);
@@ -451,12 +411,7 @@ fn count_cognitive_binary_chain(
         match op {
             BoolOp::And | BoolOp::Or => {
                 if last_is_logical != Some(*op) {
-                    contributors.push(ComplexityContributor {
-                        kind: ContributorKind::LogicalOperator,
-                        line: span.start().line,
-                        column: Some(span.start().column as u32),
-                        increment: 1,
-                    });
+                    add_contributor(contributors, ContributorKind::LogicalOperator, *span, 1);
                     total += 1; // New sequence or operator switch
                 }
                 last_is_logical = Some(*op);
@@ -536,12 +491,7 @@ fn count_cyclomatic_stmt(stmt: &syn::Stmt, contributors: &mut Vec<ComplexityCont
                 total += count_cyclomatic_expr(&init.expr, contributors);
                 if let Some((else_token, diverge)) = &init.diverge {
                     // let...else is a decision point: +1
-                    contributors.push(ComplexityContributor {
-                        kind: ContributorKind::LetElse,
-                        line: else_token.span.start().line,
-                        column: Some(else_token.span.start().column as u32),
-                        increment: 1,
-                    });
+                    add_contributor(contributors, ContributorKind::LetElse, else_token.span, 1);
                     total += 1;
                     total += count_cyclomatic_expr(diverge, contributors);
                 }
@@ -555,12 +505,7 @@ fn count_cyclomatic_stmt(stmt: &syn::Stmt, contributors: &mut Vec<ComplexityCont
 fn count_cyclomatic_expr(expr: &Expr, contributors: &mut Vec<ComplexityContributor>) -> u32 {
     match expr {
         Expr::If(expr_if) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::IfBranch,
-                line: expr_if.if_token.span.start().line,
-                column: Some(expr_if.if_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::IfBranch, expr_if.if_token.span, 1);
             let mut total = 1; // +1 for if
             total += count_cyclomatic_expr(&expr_if.cond, contributors);
             total += count_cyclomatic_block(&expr_if.then_branch, contributors);
@@ -573,12 +518,7 @@ fn count_cyclomatic_expr(expr: &Expr, contributors: &mut Vec<ComplexityContribut
             // N-1 MatchArm contributors for N arms (arms beyond first)
             let arm_count = expr_match.arms.len().saturating_sub(1) as u32;
             for arm in expr_match.arms.iter().skip(1) {
-                contributors.push(ComplexityContributor {
-                    kind: ContributorKind::MatchArm,
-                    line: arm.pat.span().start().line,
-                    column: Some(arm.pat.span().start().column as u32),
-                    increment: 1,
-                });
+                add_contributor(contributors, ContributorKind::MatchArm, arm.pat.span(), 1);
             }
             let mut total = arm_count;
             total += count_cyclomatic_expr(&expr_match.expr, contributors);
@@ -591,48 +531,28 @@ fn count_cyclomatic_expr(expr: &Expr, contributors: &mut Vec<ComplexityContribut
             total
         }
         Expr::While(expr_while) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::WhileLoop,
-                line: expr_while.while_token.span.start().line,
-                column: Some(expr_while.while_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::WhileLoop, expr_while.while_token.span, 1);
             let mut total = 1;
             total += count_cyclomatic_expr(&expr_while.cond, contributors);
             total += count_cyclomatic_block(&expr_while.body, contributors);
             total
         }
         Expr::ForLoop(expr_for) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::ForLoop,
-                line: expr_for.for_token.span.start().line,
-                column: Some(expr_for.for_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::ForLoop, expr_for.for_token.span, 1);
             let mut total = 1;
             total += count_cyclomatic_expr(&expr_for.expr, contributors);
             total += count_cyclomatic_block(&expr_for.body, contributors);
             total
         }
         Expr::Loop(expr_loop) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Loop,
-                line: expr_loop.loop_token.span.start().line,
-                column: Some(expr_loop.loop_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::Loop, expr_loop.loop_token.span, 1);
             1 + count_cyclomatic_block(&expr_loop.body, contributors)
         }
         Expr::Binary(bin) => {
             let span = binop_span(&bin.op);
             let inc = match bin.op {
                 syn::BinOp::And(_) | syn::BinOp::Or(_) => {
-                    contributors.push(ComplexityContributor {
-                        kind: ContributorKind::LogicalOperator,
-                        line: span.start().line,
-                        column: Some(span.start().column as u32),
-                        increment: 1,
-                    });
+                    add_contributor(contributors, ContributorKind::LogicalOperator, span, 1);
                     1
                 }
                 _ => 0,
@@ -641,12 +561,7 @@ fn count_cyclomatic_expr(expr: &Expr, contributors: &mut Vec<ComplexityContribut
                 + count_cyclomatic_expr(&bin.right, contributors)
         }
         Expr::Try(expr_try) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Try,
-                line: expr_try.question_token.span.start().line,
-                column: Some(expr_try.question_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::Try, expr_try.question_token.span, 1);
             1 + count_cyclomatic_expr(&expr_try.expr, contributors)
         }
         Expr::Block(expr_block) => count_cyclomatic_block(&expr_block.block, contributors),
@@ -680,21 +595,11 @@ fn count_cyclomatic_expr(expr: &Expr, contributors: &mut Vec<ComplexityContribut
             total
         }
         Expr::Break(expr_break) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Break,
-                line: expr_break.break_token.span.start().line,
-                column: Some(expr_break.break_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::Break, expr_break.break_token.span, 1);
             1
         }
         Expr::Continue(expr_continue) => {
-            contributors.push(ComplexityContributor {
-                kind: ContributorKind::Continue,
-                line: expr_continue.continue_token.span.start().line,
-                column: Some(expr_continue.continue_token.span.start().column as u32),
-                increment: 1,
-            });
+            add_contributor(contributors, ContributorKind::Continue, expr_continue.continue_token.span, 1);
             1
         }
         Expr::Reference(r) => count_cyclomatic_expr(&r.expr, contributors),
