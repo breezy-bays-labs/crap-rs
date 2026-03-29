@@ -11,6 +11,84 @@ pub struct SourceSpan {
     pub end_line: usize,
 }
 
+// ── Complexity Contributors ──────────────────────────────────────────
+
+/// Identifies the kind of construct that contributed to a complexity score.
+///
+/// Universal variants apply to all languages. Rust-specific variants are
+/// only emitted by the Rust adapter. TypeScript-specific variants are
+/// reserved for the future and never emitted by the Rust adapter.
+///
+/// `#[non_exhaustive]` ensures forward-compatibility as new languages
+/// are added to the unified crap monorepo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum ContributorKind {
+    // Universal
+    IfBranch,
+    ForLoop,
+    WhileLoop,
+    DoWhileLoop,
+    Catch,
+    LogicalOperator,
+    // Rust-specific
+    Match,
+    MatchArm,
+    Try,
+    LetElse,
+    Loop,
+    Break,
+    Continue,
+    /// Intentionally not emitted — unsafe blocks are not yet counted.
+    Unsafe,
+    // TypeScript-specific (never emitted by Rust adapter)
+    Switch,
+    CaseBranch,
+    Ternary,
+    OptionalChain,
+}
+
+impl fmt::Display for ContributorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::IfBranch => "if-branch",
+            Self::ForLoop => "for-loop",
+            Self::WhileLoop => "while-loop",
+            Self::DoWhileLoop => "do-while-loop",
+            Self::Catch => "catch",
+            Self::LogicalOperator => "logical-operator",
+            Self::Match => "match",
+            Self::MatchArm => "match-arm",
+            Self::Try => "try",
+            Self::LetElse => "let-else",
+            Self::Loop => "loop",
+            Self::Break => "break",
+            Self::Continue => "continue",
+            // Intentionally not emitted — unsafe blocks not yet counted.
+            Self::Unsafe => "unsafe",
+            Self::Switch => "switch",
+            Self::CaseBranch => "case-branch",
+            Self::Ternary => "ternary",
+            Self::OptionalChain => "optional-chain",
+        };
+        f.write_str(s)
+    }
+}
+
+/// A single construct that contributed to a function's complexity score.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ComplexityContributor {
+    pub kind: ContributorKind,
+    /// 1-based line number of the construct.
+    pub line: usize,
+    /// 0-based column offset from syn Span, if available.
+    pub column: Option<u32>,
+    /// How much this contributor added to the total.
+    /// Cognitive: `1 + nesting_depth`. Cyclomatic: always 1.
+    pub increment: u32,
+}
+
 // ── Complexity Metric ────────────────────────────────────────────────
 
 /// Which complexity metric to use for CRAP score computation.
@@ -54,6 +132,9 @@ pub struct FunctionComplexity {
     pub complexity: u32,
     /// Which metric produced this value.
     pub metric: ComplexityMetric,
+    /// Individual constructs that contributed to the complexity score.
+    /// Sorted by (line, column). Empty when complexity == 1.
+    pub contributors: Vec<ComplexityContributor>,
 }
 
 /// Coverage ratio for a function.
@@ -152,6 +233,9 @@ pub struct ScoredFunction {
     pub complexity_metric: ComplexityMetric,
     pub coverage_percent: f64,
     pub crap: CrapScore,
+    /// Individual constructs that contributed to the complexity score.
+    /// Always present; empty when complexity == 1.
+    pub contributors: Vec<ComplexityContributor>,
 }
 
 /// A scored function compared against a threshold.
@@ -259,6 +343,90 @@ pub enum FileChangeKind {
 }
 
 // ── Errors ──────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contributor_kind_serializes_as_kebab_case() {
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::IfBranch).unwrap(),
+            "\"if-branch\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::ForLoop).unwrap(),
+            "\"for-loop\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::MatchArm).unwrap(),
+            "\"match-arm\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::LogicalOperator).unwrap(),
+            "\"logical-operator\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::LetElse).unwrap(),
+            "\"let-else\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::WhileLoop).unwrap(),
+            "\"while-loop\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::DoWhileLoop).unwrap(),
+            "\"do-while-loop\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::CaseBranch).unwrap(),
+            "\"case-branch\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContributorKind::OptionalChain).unwrap(),
+            "\"optional-chain\""
+        );
+    }
+
+    #[test]
+    fn contributor_kind_display_matches_serde() {
+        // Display output must equal the JSON string (sans quotes)
+        assert_eq!(ContributorKind::IfBranch.to_string(), "if-branch");
+        assert_eq!(ContributorKind::ForLoop.to_string(), "for-loop");
+        assert_eq!(ContributorKind::DoWhileLoop.to_string(), "do-while-loop");
+        assert_eq!(ContributorKind::LogicalOperator.to_string(), "logical-operator");
+        assert_eq!(ContributorKind::MatchArm.to_string(), "match-arm");
+        assert_eq!(ContributorKind::LetElse.to_string(), "let-else");
+        assert_eq!(ContributorKind::OptionalChain.to_string(), "optional-chain");
+        assert_eq!(ContributorKind::CaseBranch.to_string(), "case-branch");
+    }
+
+    #[test]
+    fn complexity_contributor_fields_accessible() {
+        let c = ComplexityContributor {
+            kind: ContributorKind::Match,
+            line: 42,
+            column: Some(4),
+            increment: 2,
+        };
+        assert_eq!(c.kind, ContributorKind::Match);
+        assert_eq!(c.line, 42);
+        assert_eq!(c.column, Some(4));
+        assert_eq!(c.increment, 2);
+    }
+
+    #[test]
+    fn complexity_contributor_no_column() {
+        let c = ComplexityContributor {
+            kind: ContributorKind::Break,
+            line: 10,
+            column: None,
+            increment: 1,
+        };
+        assert!(c.column.is_none());
+        assert_eq!(c.increment, 1);
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum CrapError {
