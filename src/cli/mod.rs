@@ -279,8 +279,9 @@ fn merge_exclude(cli: &Cli, file_config: &Option<FileConfig>) -> Vec<String> {
     if let Some(fc) = file_config
         && let Some(fc_exclude) = &fc.exclude
     {
+        let seen: std::collections::HashSet<String> = exclude.iter().cloned().collect();
         for pattern in fc_exclude {
-            if !exclude.contains(pattern) {
+            if !seen.contains(pattern) {
                 exclude.push(pattern.clone());
             }
         }

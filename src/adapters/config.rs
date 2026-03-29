@@ -1,4 +1,4 @@
-//! Config file adapter — loads `.crap4rs.toml` and converts to domain types.
+//! Config file adapter — loads `crap4rs.toml` and converts to domain types.
 //!
 //! Handles TOML parsing and config file discovery. All CLI-representable
 //! options are supported. Per-path threshold overrides use glob patterns.
