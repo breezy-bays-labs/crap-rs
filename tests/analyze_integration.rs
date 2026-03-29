@@ -4,6 +4,7 @@
 //! coverage parsing → matching → scoring → verdict → summary.
 
 use crap4rs::core::{AnalyzeOptions, analyze};
+use crap4rs::domain::threshold::ThresholdConfig;
 use crap4rs::domain::types::ComplexityMetric;
 use std::path::PathBuf;
 
@@ -25,7 +26,10 @@ fn self_referential_analysis() {
     let opts = AnalyzeOptions {
         src: src.clone(),
         coverage: lcov_path,
-        threshold: 30.0,
+        threshold_config: ThresholdConfig {
+            global: 30.0,
+            ..ThresholdConfig::default()
+        },
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
@@ -81,7 +85,10 @@ fn self_referential_with_cyclomatic() {
     let opts = AnalyzeOptions {
         src,
         coverage: lcov_path,
-        threshold: 30.0,
+        threshold_config: ThresholdConfig {
+            global: 30.0,
+            ..ThresholdConfig::default()
+        },
         metric: ComplexityMetric::Cyclomatic,
         exclude: Vec::new(),
         respect_gitignore: false,
@@ -111,7 +118,10 @@ fn self_referential_known_functions_present() {
     let opts = AnalyzeOptions {
         src,
         coverage: lcov_path,
-        threshold: 30.0,
+        threshold_config: ThresholdConfig {
+            global: 30.0,
+            ..ThresholdConfig::default()
+        },
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
@@ -160,7 +170,10 @@ fn exclude_pattern_filters_correctly() {
     let all_opts = AnalyzeOptions {
         src: src.clone(),
         coverage: lcov_path.clone(),
-        threshold: 100.0,
+        threshold_config: ThresholdConfig {
+            global: 100.0,
+            ..ThresholdConfig::default()
+        },
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
@@ -171,7 +184,10 @@ fn exclude_pattern_filters_correctly() {
     let filtered_opts = AnalyzeOptions {
         src,
         coverage: lcov_path,
-        threshold: 100.0,
+        threshold_config: ThresholdConfig {
+            global: 100.0,
+            ..ThresholdConfig::default()
+        },
         metric: ComplexityMetric::Cognitive,
         exclude: vec!["adapters/**".to_string()],
         respect_gitignore: false,

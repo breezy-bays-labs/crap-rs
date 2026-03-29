@@ -10,9 +10,10 @@ use std::time::SystemTime;
 use anyhow::{Result, bail};
 use clap::{Args, Parser, ValueEnum, ValueHint};
 
+use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
 use crap4rs::core::AnalyzeOptions;
-use crap4rs::domain::threshold::DEFAULT_THRESHOLD;
+use crap4rs::domain::threshold::{DEFAULT_THRESHOLD, ThresholdConfig, is_valid_threshold};
 use crap4rs::domain::types::ComplexityMetric;
 
 // ── ValueEnum wrappers (keep domain types clap-free) ────────────────
@@ -65,13 +66,17 @@ pub struct InputArgs {
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
     pub coverage: PathBuf,
 
-    /// Root directory of Rust source files to analyze
-    #[arg(long, value_name = "DIR", default_value = "src", value_hint = ValueHint::DirPath)]
-    pub src: PathBuf,
+    /// Root directory of Rust source files to analyze [default: src]
+    #[arg(long, value_name = "DIR", value_hint = ValueHint::DirPath)]
+    pub src: Option<PathBuf>,
 
-    /// Complexity metric to use
-    #[arg(long, value_enum, default_value_t = MetricArg::Cognitive)]
-    pub metric: MetricArg,
+    /// Complexity metric to use [default: cognitive]
+    #[arg(long, value_enum)]
+    pub metric: Option<MetricArg>,
+
+    /// Path to config file (default: auto-discover crap4rs.toml)
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
+    pub config: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -81,11 +86,11 @@ pub struct OutputArgs {
     #[arg(short, long, value_enum, default_value_t = FormatArg::Table)]
     pub format: FormatArg,
 
-    /// CRAP score threshold — functions above this fail the check
+    /// CRAP score threshold — functions above this fail the check [default: 8]
     // allow_hyphen_values: lets clap parse `--threshold -5` as a value
     // (not a flag), so our validate_inputs can give an actionable error.
-    #[arg(long, default_value_t = DEFAULT_THRESHOLD, allow_hyphen_values = true)]
-    pub threshold: f64,
+    #[arg(long, allow_hyphen_values = true)]
+    pub threshold: Option<f64>,
 
     /// Only show functions that exceed the threshold
     #[arg(long)]
@@ -179,15 +184,36 @@ fn run_inner() -> Result<bool> {
     let cli = Cli::parse();
 
     apply_color(cli.display.color);
-    validate_inputs(&cli)?;
-    preflight_checks(&cli)?;
+
+    // Load config file (explicit path or auto-discovered)
+    let file_config = load_file_config(&cli)?;
+
+    // Merge: CLI explicit > config file > hardcoded defaults
+    let effective_src = cli
+        .input
+        .src
+        .clone()
+        .or_else(|| file_config.as_ref().and_then(|c| c.src.clone()))
+        .unwrap_or_else(|| PathBuf::from("src"));
+    let effective_metric: ComplexityMetric = cli
+        .input
+        .metric
+        .map(Into::into)
+        .or_else(|| file_config.as_ref().and_then(|c| c.metric))
+        .unwrap_or_default();
+    let (threshold_config, effective_threshold) = merge_threshold(&cli, &file_config);
+    let effective_exclude = merge_exclude(&cli, &file_config);
+
+    // Validate effective values (after merging)
+    validate_inputs(&cli.input.coverage, &effective_src, effective_threshold)?;
+    preflight_checks(&cli.input.coverage, &effective_src)?;
 
     let options = AnalyzeOptions {
-        src: cli.input.src.clone(),
+        src: effective_src,
         coverage: cli.input.coverage.clone(),
-        threshold: cli.output.threshold,
-        metric: cli.input.metric.into(),
-        exclude: cli.filter.exclude.clone(),
+        threshold_config,
+        metric: effective_metric,
+        exclude: effective_exclude,
         respect_gitignore: !cli.filter.no_gitignore,
     };
 
@@ -201,12 +227,12 @@ fn run_inner() -> Result<bool> {
 
     if !cli.display.quiet {
         let output = match cli.output.format {
-            FormatArg::Table => reporters::format_table(&result, cli.output.threshold),
+            FormatArg::Table => reporters::format_table(&result, effective_threshold),
             FormatArg::Json => {
                 let config = reporters::json::JsonConfig {
                     tool_version: env!("CARGO_PKG_VERSION").to_string(),
-                    metric: cli.input.metric.into(),
-                    threshold: cli.output.threshold,
+                    metric: effective_metric,
+                    threshold: effective_threshold,
                     timestamp: now_unix_epoch(),
                 };
                 reporters::format_json(&result, &config)?
@@ -218,49 +244,98 @@ fn run_inner() -> Result<bool> {
     Ok(passed)
 }
 
+// ── Config loading & merging ───────────────────────────────────────
+
+fn load_file_config(cli: &Cli) -> Result<Option<FileConfig>> {
+    if let Some(path) = &cli.input.config {
+        Ok(Some(config::load_config(path)?))
+    } else {
+        match config::discover_config()? {
+            Some(path) => Ok(Some(config::load_config(&path)?)),
+            None => Ok(None),
+        }
+    }
+}
+
+/// Merge CLI threshold with config file. Returns (ThresholdConfig, effective_display_threshold).
+fn merge_threshold(cli: &Cli, file_config: &Option<FileConfig>) -> (ThresholdConfig, f64) {
+    let global = cli
+        .output
+        .threshold
+        .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
+        .unwrap_or(DEFAULT_THRESHOLD);
+
+    let overrides = file_config
+        .as_ref()
+        .map(|fc| fc.overrides.clone())
+        .unwrap_or_default();
+
+    let config = ThresholdConfig { global, overrides };
+    (config, global)
+}
+
+fn merge_exclude(cli: &Cli, file_config: &Option<FileConfig>) -> Vec<String> {
+    let mut exclude = cli.filter.exclude.clone();
+    if let Some(fc) = file_config
+        && let Some(fc_exclude) = &fc.exclude
+    {
+        let seen: std::collections::HashSet<String> = exclude.iter().cloned().collect();
+        for pattern in fc_exclude {
+            if !seen.contains(pattern) {
+                exclude.push(pattern.clone());
+            }
+        }
+    }
+    exclude
+}
+
 // ── Validation ──────────────────────────────────────────────────────
 
-fn validate_inputs(cli: &Cli) -> Result<()> {
-    match std::fs::metadata(&cli.input.coverage) {
+fn validate_inputs(
+    coverage: &std::path::Path,
+    src: &std::path::Path,
+    threshold: f64,
+) -> Result<()> {
+    match std::fs::metadata(coverage) {
         Ok(m) if m.is_file() => {}
         Ok(_) => bail!(
             "coverage path is not a file: {}\n  \
              hint: pass --coverage pointing to an LCOV file, not a directory",
-            cli.input.coverage.display()
+            coverage.display()
         ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
             "coverage file not found: {}\n  \
              hint: run `cargo llvm-cov --lcov --output-path lcov.info` first",
-            cli.input.coverage.display()
+            coverage.display()
         ),
         Err(e) => bail!(
             "cannot access coverage file: {}: {e}\n  \
              hint: check file permissions",
-            cli.input.coverage.display()
+            coverage.display()
         ),
     }
-    match std::fs::metadata(&cli.input.src) {
+    match std::fs::metadata(src) {
         Ok(m) if m.is_dir() => {}
         Ok(_) => bail!(
             "source path is not a directory: {}\n  \
              hint: pass --src <DIR> pointing to your Rust source root",
-            cli.input.src.display()
+            src.display()
         ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
             "source directory not found: {}\n  \
              hint: pass --src <DIR> pointing to your Rust source root",
-            cli.input.src.display()
+            src.display()
         ),
         Err(e) => bail!(
             "cannot access source directory: {}: {e}\n  \
              hint: check directory permissions",
-            cli.input.src.display()
+            src.display()
         ),
     }
-    if !cli.output.threshold.is_finite() || cli.output.threshold <= 0.0 {
+    if !is_valid_threshold(threshold) {
         bail!(
             "threshold must be a finite positive number, got: {}",
-            cli.output.threshold
+            threshold
         );
     }
     Ok(())
@@ -268,9 +343,9 @@ fn validate_inputs(cli: &Cli) -> Result<()> {
 
 // ── Pre-flight checks ──────────────────────────────────────────────
 
-fn preflight_checks(cli: &Cli) -> Result<()> {
-    check_coverage_has_data(&cli.input.coverage)?;
-    check_src_has_rust_files(&cli.input.src)?;
+fn preflight_checks(coverage: &std::path::Path, src: &std::path::Path) -> Result<()> {
+    check_coverage_has_data(coverage)?;
+    check_src_has_rust_files(src)?;
     Ok(())
 }
 
@@ -353,6 +428,7 @@ fn apply_color(choice: ColorArg) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
         let mut full = vec!["crap4rs"];
@@ -370,13 +446,13 @@ mod tests {
     fn minimal_valid_args() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         assert_eq!(cli.input.coverage, PathBuf::from("lcov.info"));
-        assert_eq!(cli.input.src, PathBuf::from("src"));
+        assert_eq!(cli.input.src, None);
     }
 
     #[test]
-    fn default_metric_is_cognitive() {
+    fn default_metric_is_none() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        assert!(matches!(cli.input.metric, MetricArg::Cognitive));
+        assert!(cli.input.metric.is_none());
     }
 
     #[test]
@@ -386,9 +462,9 @@ mod tests {
     }
 
     #[test]
-    fn default_threshold_matches_domain() {
+    fn default_threshold_is_none() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        assert_eq!(cli.output.threshold, DEFAULT_THRESHOLD);
+        assert!(cli.output.threshold.is_none());
     }
 
     #[test]
@@ -400,7 +476,7 @@ mod tests {
     #[test]
     fn metric_cyclomatic() {
         let cli = parse(&["--coverage", "lcov.info", "--metric", "cyclomatic"]).unwrap();
-        assert!(matches!(cli.input.metric, MetricArg::Cyclomatic));
+        assert!(matches!(cli.input.metric, Some(MetricArg::Cyclomatic)));
     }
 
     #[test]
@@ -412,13 +488,13 @@ mod tests {
     #[test]
     fn custom_threshold() {
         let cli = parse(&["--coverage", "lcov.info", "--threshold", "15.5"]).unwrap();
-        assert_eq!(cli.output.threshold, 15.5);
+        assert_eq!(cli.output.threshold, Some(15.5));
     }
 
     #[test]
     fn custom_src() {
         let cli = parse(&["--coverage", "lcov.info", "--src", "crates/"]).unwrap();
-        assert_eq!(cli.input.src, PathBuf::from("crates/"));
+        assert_eq!(cli.input.src, Some(PathBuf::from("crates/")));
     }
 
     #[test]
@@ -497,8 +573,12 @@ mod tests {
 
     #[test]
     fn validate_missing_coverage_file() {
-        let cli = parse(&["--coverage", "nonexistent.info"]).unwrap();
-        let err = validate_inputs(&cli).unwrap_err();
+        let err = validate_inputs(
+            Path::new("nonexistent.info"),
+            Path::new("src"),
+            DEFAULT_THRESHOLD,
+        )
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("coverage file not found"));
         assert!(msg.contains("cargo llvm-cov"));
@@ -506,49 +586,54 @@ mod tests {
 
     #[test]
     fn validate_missing_src_dir() {
-        // Use a file that exists for coverage but a nonexistent src dir
-        let cli = parse(&["--coverage", "Cargo.toml", "--src", "nonexistent_dir"]).unwrap();
-        let err = validate_inputs(&cli).unwrap_err();
+        let err = validate_inputs(
+            Path::new("Cargo.toml"),
+            Path::new("nonexistent_dir"),
+            DEFAULT_THRESHOLD,
+        )
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("source directory not found"));
     }
 
     #[test]
     fn validate_negative_threshold() {
-        let cli = parse(&["--coverage", "Cargo.toml", "--threshold", "-5"]).unwrap();
-        let err = validate_inputs(&cli).unwrap_err();
+        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), -5.0).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
 
     #[test]
     fn validate_zero_threshold() {
-        let cli = parse(&["--coverage", "Cargo.toml", "--threshold", "0"]).unwrap();
-        let err = validate_inputs(&cli).unwrap_err();
+        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), 0.0).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
 
     #[test]
     fn validate_infinity_threshold() {
-        let cli = parse(&["--coverage", "Cargo.toml", "--threshold", "inf"]).unwrap();
-        let err = validate_inputs(&cli).unwrap_err();
+        let err =
+            validate_inputs(Path::new("Cargo.toml"), Path::new("src"), f64::INFINITY).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
 
     #[test]
     fn validate_src_is_file_not_dir() {
-        let cli = parse(&["--coverage", "Cargo.toml", "--src", "Cargo.toml"]).unwrap();
-        let err = validate_inputs(&cli).unwrap_err();
+        let err = validate_inputs(
+            Path::new("Cargo.toml"),
+            Path::new("Cargo.toml"),
+            DEFAULT_THRESHOLD,
+        )
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("source path is not a directory"));
     }
 
     #[test]
     fn validate_coverage_is_dir_not_file() {
-        let cli = parse(&["--coverage", "src", "--src", "src"]).unwrap();
-        let err = validate_inputs(&cli).unwrap_err();
+        let err =
+            validate_inputs(Path::new("src"), Path::new("src"), DEFAULT_THRESHOLD).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("coverage path is not a file"));
     }
@@ -557,6 +642,115 @@ mod tests {
     fn format_short_flag() {
         let cli = parse(&["--coverage", "lcov.info", "-f", "json"]).unwrap();
         assert!(matches!(cli.output.format, FormatArg::Json));
+    }
+
+    #[test]
+    fn config_flag_accepts_path() {
+        let cli = parse(&["--coverage", "lcov.info", "--config", "my-config.toml"]).unwrap();
+        assert_eq!(cli.input.config, Some(PathBuf::from("my-config.toml")));
+    }
+
+    #[test]
+    fn config_flag_defaults_to_none() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert_eq!(cli.input.config, None);
+    }
+
+    #[test]
+    fn merge_threshold_cli_overrides_config() {
+        let cli = parse(&["--coverage", "lcov.info", "--threshold", "15.0"]).unwrap();
+        let file_config = Some(FileConfig {
+            threshold: Some(10.0),
+            ..FileConfig::default()
+        });
+        let (config, display) = merge_threshold(&cli, &file_config);
+        assert_eq!(config.global, 15.0);
+        assert_eq!(display, 15.0);
+    }
+
+    #[test]
+    fn merge_threshold_uses_config_when_cli_default() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            threshold: Some(12.0),
+            ..FileConfig::default()
+        });
+        let (config, display) = merge_threshold(&cli, &file_config);
+        assert_eq!(config.global, 12.0);
+        assert_eq!(display, 12.0);
+    }
+
+    #[test]
+    fn merge_threshold_preserves_overrides() {
+        use crap4rs::domain::threshold::ThresholdOverride;
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            threshold: Some(10.0),
+            overrides: vec![ThresholdOverride {
+                pattern: "domain/**".to_string(),
+                threshold: 5.0,
+            }],
+            ..FileConfig::default()
+        });
+        let (config, _) = merge_threshold(&cli, &file_config);
+        assert_eq!(config.overrides.len(), 1);
+        assert_eq!(config.overrides[0].pattern, "domain/**");
+    }
+
+    #[test]
+    fn merge_threshold_no_config() {
+        let cli = parse(&["--coverage", "lcov.info", "--threshold", "20.0"]).unwrap();
+        let (config, display) = merge_threshold(&cli, &None);
+        assert_eq!(config.global, 20.0);
+        assert!(config.overrides.is_empty());
+        assert_eq!(display, 20.0);
+    }
+
+    #[test]
+    fn merge_threshold_explicit_default_overrides_config() {
+        // User explicitly passes --threshold 8.0 (same as DEFAULT_THRESHOLD).
+        // This MUST override the config file's threshold of 12.0.
+        let cli = parse(&["--coverage", "lcov.info", "--threshold", "8.0"]).unwrap();
+        let file_config = Some(FileConfig {
+            threshold: Some(12.0),
+            ..FileConfig::default()
+        });
+        let (config, display) = merge_threshold(&cli, &file_config);
+        assert_eq!(
+            config.global, 8.0,
+            "explicit CLI default must override config"
+        );
+        assert_eq!(display, 8.0);
+    }
+
+    #[test]
+    fn merge_threshold_no_cli_no_config_uses_hardcoded_default() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let (config, display) = merge_threshold(&cli, &None);
+        assert_eq!(config.global, DEFAULT_THRESHOLD);
+        assert_eq!(display, DEFAULT_THRESHOLD);
+    }
+
+    #[test]
+    fn merge_exclude_combines_cli_and_config() {
+        let cli = parse(&["--coverage", "lcov.info", "--exclude", "tests/**"]).unwrap();
+        let file_config = Some(FileConfig {
+            exclude: Some(vec!["benches/**".to_string()]),
+            ..FileConfig::default()
+        });
+        let exclude = merge_exclude(&cli, &file_config);
+        assert_eq!(exclude, vec!["tests/**", "benches/**"]);
+    }
+
+    #[test]
+    fn merge_exclude_deduplicates() {
+        let cli = parse(&["--coverage", "lcov.info", "--exclude", "tests/**"]).unwrap();
+        let file_config = Some(FileConfig {
+            exclude: Some(vec!["tests/**".to_string()]),
+            ..FileConfig::default()
+        });
+        let exclude = merge_exclude(&cli, &file_config);
+        assert_eq!(exclude, vec!["tests/**"]);
     }
 
     #[test]

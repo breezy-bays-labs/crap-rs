@@ -8,7 +8,9 @@ use comfy_table::{ContentArrangement, Table};
 /// Format an analysis result as a colored terminal table.
 ///
 /// The table is sorted by CRAP score descending, with risk-level and
-/// coverage coloring. Returns a ready-to-print `String`.
+/// coverage coloring. When `threshold` differs across functions (per-path
+/// overrides), the summary shows "varied (default: N)" instead of a single
+/// number. Returns a ready-to-print `String`.
 pub fn format_table(result: &AnalysisResult, threshold: f64) -> String {
     let mut output = String::new();
 
@@ -70,11 +72,17 @@ pub fn format_table(result: &AnalysisResult, threshold: f64) -> String {
         .map(|c| format!("{:.1}", c.value))
         .unwrap_or_else(|| "N/A".to_string());
 
+    let threshold_display = if has_varied_thresholds(&result.functions) {
+        format!("varied (default: {})", threshold)
+    } else {
+        format!("{}", threshold)
+    };
+
     output.push_str(&format!(
         "\nSummary: {} functions | {} above threshold ({}) | worst: {} | {}\n",
         result.summary.total_functions,
         result.summary.exceeding_threshold,
-        threshold,
+        threshold_display,
         worst,
         pass_fail,
     ));
@@ -92,6 +100,15 @@ pub fn format_table(result: &AnalysisResult, threshold: f64) -> String {
     ));
 
     output
+}
+
+/// Check if functions have different threshold values (per-path overrides active).
+fn has_varied_thresholds(functions: &[crate::domain::types::FunctionVerdict]) -> bool {
+    if functions.len() <= 1 {
+        return false;
+    }
+    let first = functions[0].threshold;
+    functions.iter().any(|v| v.threshold != first)
 }
 
 fn risk_color(level: &RiskLevel, text: &str) -> String {
@@ -281,6 +298,50 @@ mod tests {
         assert!(output.contains("acceptable: 0"));
         assert!(output.contains("moderate: 1"));
         assert!(output.contains("high: 1"));
+    }
+
+    // ── Varied threshold tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_varied_thresholds_detected() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+
+        let mut result = make_multi_function_result();
+        // Set different thresholds on different functions
+        result.functions[0].threshold = 5.0;
+        result.functions[1].threshold = 10.0;
+        result.functions[2].threshold = 8.0;
+
+        let output = format_table(&result, 8.0);
+        assert!(
+            output.contains("varied (default: 8)"),
+            "Should show varied threshold: {output}"
+        );
+    }
+
+    #[test]
+    fn test_uniform_thresholds_not_varied() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+
+        let result = make_multi_function_result();
+        let output = format_table(&result, 8.0);
+        assert!(
+            !output.contains("varied"),
+            "Uniform thresholds should not show 'varied': {output}"
+        );
+    }
+
+    #[test]
+    fn test_single_function_not_varied() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+
+        let result =
+            make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
+        let output = format_table(&result, 8.0);
+        assert!(!output.contains("varied"));
     }
 
     // ── Color helper tests (force color on for ANSI assertions) ───────
