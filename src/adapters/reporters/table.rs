@@ -399,13 +399,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
-            "my_fn",
-            "src/lib.rs",
-            5,
-            30.0,
-            45.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict("my_fn", "src/lib.rs", 5, 30.0, 45.0, RiskLevel::High, 8.0),
             make_contributors(),
         );
         let result = AnalysisResult {
@@ -429,13 +423,15 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
-            "risky_fn",
-            "src/lib.rs",
-            5,
-            30.0,
-            45.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict(
+                "risky_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
             make_contributors(),
         );
         let result = AnalysisResult {
@@ -467,13 +463,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
-            "safe_fn",
-            "src/lib.rs",
-            2,
-            90.0,
-            2.0,
-            RiskLevel::Low,
-            8.0,
+            make_verdict("safe_fn", "src/lib.rs", 2, 90.0, 2.0, RiskLevel::Low, 8.0),
             make_contributors(),
         );
         // exceeds = crap_value > threshold → 2.0 > 8.0 = false
@@ -494,13 +484,15 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
-            "corner_fn",
-            "src/lib.rs",
-            5,
-            30.0,
-            45.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict(
+                "corner_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
             make_contributors(), // 2 contributors: first ├─, last └─
         );
         let result = AnalysisResult {
@@ -522,13 +514,15 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
-            "nested_fn",
-            "src/lib.rs",
-            5,
-            30.0,
-            45.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict(
+                "nested_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
             make_nested_contributor(), // increment=3
         );
         let result = AnalysisResult {
@@ -551,13 +545,15 @@ mod tests {
         colored::control::set_override(false);
         // Contributors must be pre-sorted by (line, column) — as FunctionFinder guarantees.
         let verdict = make_verdict_with_contributors(
-            "mixed_fn",
-            "src/lib.rs",
-            5,
-            30.0,
-            45.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict(
+                "mixed_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
             vec![
                 ComplexityContributor {
                     kind: ContributorKind::IfBranch,
@@ -597,13 +593,7 @@ mod tests {
         colored::control::set_override(false);
 
         let v1 = make_verdict_with_contributors(
-            "parse",
-            "src/lib.rs",
-            5,
-            30.0,
-            45.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict("parse", "src/lib.rs", 5, 30.0, 45.0, RiskLevel::High, 8.0),
             vec![ComplexityContributor {
                 kind: ContributorKind::IfBranch,
                 line: 3,
@@ -612,13 +602,15 @@ mod tests {
             }],
         );
         let v2 = make_verdict_with_contributors(
-            "parse_extra",
-            "src/lib.rs",
-            5,
-            30.0,
-            40.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict(
+                "parse_extra",
+                "src/lib.rs",
+                5,
+                30.0,
+                40.0,
+                RiskLevel::High,
+                8.0,
+            ),
             vec![ComplexityContributor {
                 kind: ContributorKind::ForLoop,
                 line: 7,
@@ -658,13 +650,15 @@ mod tests {
         colored::control::set_override(false);
 
         let v = make_verdict_with_contributors(
-            "parse",
-            "src/parse/mod.rs", // "parse" appears in path before function column
-            5,
-            30.0,
-            45.0,
-            RiskLevel::High,
-            8.0,
+            make_verdict(
+                "parse",
+                "src/parse/mod.rs", // "parse" appears in path before function column
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
             vec![ComplexityContributor {
                 kind: ContributorKind::IfBranch,
                 line: 3,

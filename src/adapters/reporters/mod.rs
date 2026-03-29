@@ -47,24 +47,10 @@ pub(crate) mod test_fixtures {
     }
 
     pub fn make_verdict_with_contributors(
-        name: &str,
-        file: &str,
-        complexity: u32,
-        coverage_pct: f64,
-        crap_value: f64,
-        risk: RiskLevel,
-        threshold: f64,
+        verdict: FunctionVerdict,
         contributors: Vec<ComplexityContributor>,
     ) -> FunctionVerdict {
-        let mut v = make_verdict(
-            name,
-            file,
-            complexity,
-            coverage_pct,
-            crap_value,
-            risk,
-            threshold,
-        );
+        let mut v = verdict;
         v.scored.contributors = contributors;
         v
     }
