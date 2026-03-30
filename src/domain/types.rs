@@ -324,6 +324,10 @@ pub struct AnalysisDiagnostics {
     pub functions_matched: usize,
     /// Functions with no LCOV data (0% coverage assumed).
     pub functions_no_coverage: usize,
+    /// Files with at least one analyzed function.
+    pub files_analyzed: usize,
+    /// Files where every analyzed function has 0% line coverage.
+    pub files_zero_coverage: usize,
 }
 
 // ── Diff Types ─────────────────────────────────────────────────────
@@ -455,6 +459,22 @@ pub enum CrapError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn analysis_diagnostics_has_zero_coverage_fields() {
+        let diag = AnalysisDiagnostics {
+            parse_diagnostics: vec![],
+            files_found: 10,
+            files_unparseable: 0,
+            functions_extracted: 20,
+            functions_matched: 18,
+            functions_no_coverage: 2,
+            files_analyzed: 8,
+            files_zero_coverage: 3,
+        };
+        assert_eq!(diag.files_analyzed, 8);
+        assert_eq!(diag.files_zero_coverage, 3);
+    }
 
     #[test]
     fn parse_diagnostic_display_malformed_record() {

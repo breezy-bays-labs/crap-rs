@@ -28,22 +28,53 @@ High complexity + low coverage = high CRAP score = high risk of bugs when change
 cargo llvm-cov --lcov --output-path lcov.info
 
 # Run CRAP analysis
-crap4rs --src src/ --coverage lcov.info --threshold 8
+crap4rs --src src/ --coverage lcov.info
 ```
 
 ### Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--src <path>` | required | Path to Rust source files |
+| `--src <path>` | `src` | Path to Rust source files |
 | `--coverage <path>` | required | Path to LCOV coverage file |
-| `--threshold <n>` | 30 | CRAP score threshold (exit 1 if exceeded) |
+| `--threshold <n>` | 8 | CRAP score threshold (exit 1 if exceeded) |
 | `--metric <type>` | cognitive | Complexity metric: `cognitive` or `cyclomatic` |
 | `--format <type>` | table | Output format: `table` or `json` |
+| `--exclude <glob>` | — | Exclude paths matching glob (repeatable) |
+| `--verbose` | — | Print analysis diagnostics to stderr |
 
 ### Why cognitive by default?
 
 Rust's `match` expressions with many arms inflate cyclomatic complexity without adding real risk. A flat 20-arm match is cyclomatic 20 but cognitive 1. Cognitive complexity better reflects actual Rust code risk.
+
+## Coverage notes
+
+### `cargo llvm-cov --lib` only instruments unit-testable code
+
+`cargo llvm-cov --lib` instruments code that is invoked by `#[test]` functions in the same crate. It does **not** cover:
+
+- **Axum handlers** — only called via HTTP in integration tests, not unit tests
+- **Tauri entry points** — only called by the Tauri runtime
+- **BDD-tested code** — cucumber-rs scenarios run as separate processes, outside `--lib`
+
+These functions will show **0% line coverage**, even if they are thoroughly tested. This is expected, not a bug.
+
+**Mitigation:** use `--exclude` to skip paths where 0% coverage is unavoidable:
+
+```toml
+# crap4rs.toml — monorepo example (SvelteKit + Axum)
+# Only analyze unit-testable crates.
+
+threshold = 8
+
+exclude = [
+  "services/api/src/**",   # Axum handlers — integration-only, no unit test surface
+  "apps/desktop/**",       # Tauri entry point — no unit test surface
+  "**/tests/**",           # Test helpers have 0% coverage by definition
+]
+```
+
+When more than half of analyzed files show 0% coverage, `crap4rs` will print a warning with this hint automatically.
 
 ## Installation
 

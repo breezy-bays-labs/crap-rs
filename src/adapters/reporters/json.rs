@@ -294,6 +294,8 @@ mod tests {
             functions_extracted: 42,
             functions_matched: 40,
             functions_no_coverage: 2,
+            files_analyzed: 8,
+            files_zero_coverage: 2,
         };
 
         let result = make_empty_result();
