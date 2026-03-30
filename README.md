@@ -1,8 +1,10 @@
 # crap4rs
 
-CRAP (Change Risk Anti-Patterns) score analyzer for Rust codebases. Finds complex, under-tested functions.
+[![CI](https://github.com/breezy-bays-labs/crap4rs/actions/workflows/ci.yml/badge.svg)](https://github.com/breezy-bays-labs/crap4rs/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/crap4rs.svg)](https://crates.io/crates/crap4rs)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
-> **Status:** Pre-release. MVP in progress.
+CRAP (Change Risk Anti-Patterns) score analyzer for Rust codebases. Finds complex, under-tested functions.
 
 ## What is CRAP?
 
@@ -79,7 +81,7 @@ When more than half of analyzed files show 0% coverage, `crap4rs` will print a w
 ## Installation
 
 ```bash
-# From source (requires Rust toolchain)
+# From crates.io (requires Rust toolchain)
 cargo install crap4rs
 
 # Or clone and build
@@ -87,8 +89,6 @@ git clone https://github.com/breezy-bays-labs/crap4rs.git
 cd crap4rs
 cargo build --release
 ```
-
-> `cargo install` will work once published to crates.io. For now, build from source.
 
 ## Prerequisites
 
@@ -105,6 +105,10 @@ adapters/  syn walker, LCOV parser, reporters
 core/      Wires adapters through ports
 cli/       clap argument parsing
 ```
+
+## Known limitations
+
+`parse_unified_diff` and `analyze()` are the two most complex functions in crap4rs itself and currently exceed the `--strict` threshold (15). The tool passes its own default gate (threshold=25). This is tracked in [#54](https://github.com/breezy-bays-labs/crap4rs/issues/54) and is not a blocker for v0.1.0.
 
 ## Related
 
