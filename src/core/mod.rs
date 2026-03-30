@@ -204,17 +204,18 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     let result = score_and_summarize(&matched, &resolver)?;
 
     let (files_analyzed, files_zero_coverage) = {
-        let mut file_cov: std::collections::HashMap<&str, bool> = std::collections::HashMap::new();
+        let mut file_is_zero_coverage: std::collections::HashMap<&str, bool> =
+            std::collections::HashMap::new();
         for v in &result.functions {
-            let e = file_cov
+            let e = file_is_zero_coverage
                 .entry(v.scored.identity.file_path.as_str())
                 .or_insert(true);
             if v.scored.coverage_percent > 0.0 {
                 *e = false;
             }
         }
-        let total = file_cov.len();
-        let zero = file_cov.values().filter(|&&z| z).count();
+        let total = file_is_zero_coverage.len();
+        let zero = file_is_zero_coverage.values().filter(|&&z| z).count();
         (total, zero)
     };
 

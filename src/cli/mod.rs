@@ -534,7 +534,7 @@ fn warn_if_issues(diag: &AnalysisDiagnostics) {
     }
     if majority_zero_coverage(diag.files_analyzed, diag.files_zero_coverage) {
         eprintln!(
-            "warning: {}/{} analyzed files have 0% line coverage",
+            "warning: in {}/{} analyzed files, all analyzed functions have 0% line coverage",
             diag.files_zero_coverage, diag.files_analyzed
         );
         eprintln!(
@@ -560,7 +560,7 @@ fn print_diagnostics(diag: &AnalysisDiagnostics) {
         diag.functions_matched, diag.functions_no_coverage
     );
     eprintln!(
-        "verbose: coverage: {} files analyzed, {} with 0% coverage",
+        "verbose: coverage: {} files analyzed, {} where all analyzed functions have 0% line coverage",
         diag.files_analyzed, diag.files_zero_coverage
     );
     if !diag.parse_diagnostics.is_empty() {
