@@ -105,6 +105,8 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
                     functions_extracted: 0,
                     functions_matched: 0,
                     functions_no_coverage: 0,
+                    files_analyzed: 0,
+                    files_zero_coverage: 0,
                 },
             });
         }
@@ -166,6 +168,8 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
                     functions_extracted,
                     functions_matched: 0,
                     functions_no_coverage: 0,
+                    files_analyzed: 0,
+                    files_zero_coverage: 0,
                 },
             });
         }
@@ -199,6 +203,21 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     // 6. Score each function, produce verdicts, and build result
     let result = score_and_summarize(&matched, &resolver)?;
 
+    let (files_analyzed, files_zero_coverage) = {
+        let mut file_cov: std::collections::HashMap<&str, bool> = std::collections::HashMap::new();
+        for v in &result.functions {
+            let e = file_cov
+                .entry(v.scored.identity.file_path.as_str())
+                .or_insert(true);
+            if v.scored.coverage_percent > 0.0 {
+                *e = false;
+            }
+        }
+        let total = file_cov.len();
+        let zero = file_cov.values().filter(|&&z| z).count();
+        (total, zero)
+    };
+
     let diagnostics = AnalysisDiagnostics {
         parse_diagnostics,
         files_found,
@@ -206,6 +225,8 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
         functions_extracted,
         functions_matched,
         functions_no_coverage,
+        files_analyzed,
+        files_zero_coverage,
     };
 
     debug_assert_eq!(

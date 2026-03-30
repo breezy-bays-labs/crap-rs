@@ -515,6 +515,10 @@ fn now_unix_epoch() -> String {
 
 // ── Verbose diagnostics ────────────────────────────────────────────
 
+fn majority_zero_coverage(files_analyzed: usize, files_zero_coverage: usize) -> bool {
+    files_analyzed > 0 && files_zero_coverage * 2 > files_analyzed
+}
+
 fn warn_if_issues(diag: &AnalysisDiagnostics) {
     if !diag.parse_diagnostics.is_empty() {
         eprintln!(
@@ -526,6 +530,18 @@ fn warn_if_issues(diag: &AnalysisDiagnostics) {
         eprintln!(
             "warning: {} source file(s) could not be parsed (use --verbose for details)",
             diag.files_unparseable
+        );
+    }
+    if majority_zero_coverage(diag.files_analyzed, diag.files_zero_coverage) {
+        eprintln!(
+            "warning: {}/{} analyzed files have 0% line coverage",
+            diag.files_zero_coverage, diag.files_analyzed
+        );
+        eprintln!(
+            "  hint: `cargo llvm-cov --lib` does not cover integration-only code (handlers, Tauri entry, BDD tests)"
+        );
+        eprintln!(
+            "  hint: use --exclude to skip uncoverable paths (e.g., --exclude \"services/api/src/**\")"
         );
     }
 }
@@ -542,6 +558,10 @@ fn print_diagnostics(diag: &AnalysisDiagnostics) {
     eprintln!(
         "verbose: matching: {} matched with coverage, {} without coverage data",
         diag.functions_matched, diag.functions_no_coverage
+    );
+    eprintln!(
+        "verbose: coverage: {} files analyzed, {} with 0% coverage",
+        diag.files_analyzed, diag.files_zero_coverage
     );
     if !diag.parse_diagnostics.is_empty() {
         eprintln!(
@@ -1132,5 +1152,25 @@ mod tests {
         });
         let (config, _) = merge_threshold(&cli, &file_config);
         assert_eq!(config.global, 50.0);
+    }
+
+    // ── majority_zero_coverage predicate tests ─────────────────────────
+
+    #[test]
+    fn zero_coverage_warn_triggers_above_50_percent() {
+        assert!(majority_zero_coverage(10, 6));
+        assert!(majority_zero_coverage(1, 1));
+        assert!(majority_zero_coverage(3, 2));
+    }
+
+    #[test]
+    fn zero_coverage_warn_does_not_trigger_at_exactly_50_percent() {
+        assert!(!majority_zero_coverage(10, 5));
+        assert!(!majority_zero_coverage(2, 1));
+    }
+
+    #[test]
+    fn zero_coverage_warn_does_not_trigger_when_no_files() {
+        assert!(!majority_zero_coverage(0, 0));
     }
 }
