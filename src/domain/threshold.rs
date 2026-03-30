@@ -1,5 +1,35 @@
-/// Default CRAP score threshold.
-pub const DEFAULT_THRESHOLD: f64 = 8.0;
+/// Strict CRAP threshold — for high-quality or safety-critical code.
+/// Matches SonarSource S3776 cognitive complexity limit and eliminates false
+/// positives on well-tested idiomatic Rust (SeaORM-style large match arms).
+pub const STRICT_THRESHOLD: f64 = 15.0;
+
+/// Default CRAP threshold — balanced for typical Rust codebases.
+pub const DEFAULT_THRESHOLD: f64 = 25.0;
+
+/// Lenient CRAP threshold — for legacy or transitional code.
+pub const LENIENT_THRESHOLD: f64 = 40.0;
+
+/// Named threshold preset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThresholdPreset {
+    /// `STRICT_THRESHOLD` (15) — high-quality libraries, safety-critical code.
+    Strict,
+    /// `DEFAULT_THRESHOLD` (25) — typical Rust projects.
+    Default,
+    /// `LENIENT_THRESHOLD` (40) — legacy or transitional code.
+    Lenient,
+}
+
+impl ThresholdPreset {
+    /// Returns the f64 threshold value for this preset.
+    pub fn threshold(self) -> f64 {
+        match self {
+            Self::Strict => STRICT_THRESHOLD,
+            Self::Default => DEFAULT_THRESHOLD,
+            Self::Lenient => LENIENT_THRESHOLD,
+        }
+    }
+}
 
 /// Returns true if the value is a valid CRAP threshold (finite and positive).
 pub fn is_valid_threshold(value: f64) -> bool {
@@ -49,6 +79,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn threshold_constants() {
+        assert_eq!(DEFAULT_THRESHOLD, 25.0);
+        assert_eq!(STRICT_THRESHOLD, 15.0);
+        assert_eq!(LENIENT_THRESHOLD, 40.0);
+    }
+
+    #[test]
+    fn preset_to_threshold() {
+        assert_eq!(ThresholdPreset::Strict.threshold(), STRICT_THRESHOLD);
+        assert_eq!(ThresholdPreset::Default.threshold(), DEFAULT_THRESHOLD);
+        assert_eq!(ThresholdPreset::Lenient.threshold(), LENIENT_THRESHOLD);
+    }
+
+    #[test]
     fn default_config_uses_default_threshold() {
         let config = ThresholdConfig::default();
         assert_eq!(config.global, DEFAULT_THRESHOLD);
@@ -64,7 +108,7 @@ mod tests {
     #[test]
     fn has_overrides_true_when_present() {
         let config = ThresholdConfig {
-            global: 8.0,
+            global: DEFAULT_THRESHOLD,
             overrides: vec![ThresholdOverride {
                 pattern: "domain/**".to_string(),
                 threshold: 5.0,

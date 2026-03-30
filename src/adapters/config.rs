@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use crate::domain::threshold::{ThresholdOverride, is_valid_threshold};
+use crate::domain::threshold::{ThresholdOverride, ThresholdPreset, is_valid_threshold};
 use crate::domain::types::ComplexityMetric;
 
 // ── Public config type (adapter output) ────────────────────────────
@@ -20,6 +20,7 @@ use crate::domain::types::ComplexityMetric;
 #[derive(Debug, Clone, Default)]
 pub struct FileConfig {
     pub threshold: Option<f64>,
+    pub preset: Option<ThresholdPreset>,
     pub metric: Option<ComplexityMetric>,
     pub src: Option<PathBuf>,
     pub exclude: Option<Vec<String>>,
@@ -32,6 +33,7 @@ pub struct FileConfig {
 #[serde(deny_unknown_fields)]
 struct RawConfig {
     threshold: Option<f64>,
+    preset: Option<String>,
     metric: Option<String>,
     src: Option<String>,
     exclude: Option<Vec<String>>,
@@ -82,6 +84,7 @@ fn parse_config(content: &str) -> Result<FileConfig> {
     validate_raw_config(&raw)?;
 
     let metric = raw.metric.as_deref().map(parse_metric).transpose()?;
+    let preset = raw.preset.as_deref().map(parse_preset).transpose()?;
 
     let overrides = raw
         .overrides
@@ -94,6 +97,7 @@ fn parse_config(content: &str) -> Result<FileConfig> {
 
     Ok(FileConfig {
         threshold: raw.threshold,
+        preset,
         metric,
         src: raw.src.map(PathBuf::from),
         exclude: raw.exclude,
@@ -102,6 +106,9 @@ fn parse_config(content: &str) -> Result<FileConfig> {
 }
 
 fn validate_raw_config(raw: &RawConfig) -> Result<()> {
+    if raw.preset.is_some() && raw.threshold.is_some() {
+        anyhow::bail!("preset and threshold are mutually exclusive in config");
+    }
     if let Some(t) = raw.threshold
         && !is_valid_threshold(t)
     {
@@ -117,6 +124,15 @@ fn validate_raw_config(raw: &RawConfig) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn parse_preset(s: &str) -> Result<ThresholdPreset> {
+    match s {
+        "strict" => Ok(ThresholdPreset::Strict),
+        "default" => Ok(ThresholdPreset::Default),
+        "lenient" => Ok(ThresholdPreset::Lenient),
+        other => anyhow::bail!("unknown preset: {other}\n  valid values: strict, default, lenient"),
+    }
 }
 
 fn parse_metric(s: &str) -> Result<ComplexityMetric> {
@@ -270,6 +286,38 @@ threshold = 0.0
 "#;
         let err = parse_config(toml).unwrap_err();
         assert!(err.to_string().contains("finite positive"));
+    }
+
+    #[test]
+    fn parse_preset_strict() {
+        let config = parse_config(r#"preset = "strict""#).unwrap();
+        assert_eq!(config.preset, Some(ThresholdPreset::Strict));
+        assert_eq!(config.threshold, None);
+    }
+
+    #[test]
+    fn parse_preset_default() {
+        let config = parse_config(r#"preset = "default""#).unwrap();
+        assert_eq!(config.preset, Some(ThresholdPreset::Default));
+    }
+
+    #[test]
+    fn parse_preset_lenient() {
+        let config = parse_config(r#"preset = "lenient""#).unwrap();
+        assert_eq!(config.preset, Some(ThresholdPreset::Lenient));
+    }
+
+    #[test]
+    fn preset_and_threshold_mutually_exclusive() {
+        let toml = "preset = \"strict\"\nthreshold = 10.0\n";
+        let err = parse_config(toml).unwrap_err();
+        assert!(err.to_string().contains("mutually exclusive"));
+    }
+
+    #[test]
+    fn unknown_preset_rejected() {
+        let err = parse_config(r#"preset = "extreme""#).unwrap_err();
+        assert!(err.to_string().contains("unknown preset"));
     }
 
     #[test]

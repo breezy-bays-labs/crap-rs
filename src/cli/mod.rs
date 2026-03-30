@@ -13,7 +13,9 @@ use clap::{Args, Parser, ValueEnum, ValueHint};
 use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
 use crap4rs::core::AnalyzeOptions;
-use crap4rs::domain::threshold::{DEFAULT_THRESHOLD, ThresholdConfig, is_valid_threshold};
+use crap4rs::domain::threshold::{
+    DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
+};
 use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
 
 // ── ValueEnum wrappers (keep domain types clap-free) ────────────────
@@ -86,11 +88,19 @@ pub struct OutputArgs {
     #[arg(short, long, value_enum, default_value_t = FormatArg::Table)]
     pub format: FormatArg,
 
-    /// CRAP score threshold — functions above this fail the check [default: 8]
+    /// CRAP score threshold — functions above this fail the check [default: 25]
     // allow_hyphen_values: lets clap parse `--threshold -5` as a value
     // (not a flag), so our validate_inputs can give an actionable error.
-    #[arg(long, allow_hyphen_values = true)]
+    #[arg(long, allow_hyphen_values = true, group = "threshold_select")]
     pub threshold: Option<f64>,
+
+    /// Use strict threshold (15) — for high-quality or safety-critical code
+    #[arg(long, group = "threshold_select")]
+    pub strict: bool,
+
+    /// Use lenient threshold (40) — for legacy or transitional code
+    #[arg(long, group = "threshold_select")]
+    pub lenient: bool,
 
     /// Only show functions that exceed the threshold
     #[arg(long)]
@@ -293,10 +303,26 @@ fn load_file_config(cli: &Cli) -> Result<Option<FileConfig>> {
 }
 
 /// Merge CLI threshold with config file. Returns (ThresholdConfig, effective_display_threshold).
+///
+/// Resolution order (first match wins):
+/// 1. `--threshold N`   — explicit CLI value
+/// 2. `--strict`        → STRICT_THRESHOLD
+/// 3. `--lenient`       → LENIENT_THRESHOLD
+/// 4. config `preset`   → preset.threshold()
+/// 5. config `threshold`
+/// 6. DEFAULT_THRESHOLD
 fn merge_threshold(cli: &Cli, file_config: &Option<FileConfig>) -> (ThresholdConfig, f64) {
     let global = cli
         .output
         .threshold
+        .or_else(|| cli.output.strict.then_some(STRICT_THRESHOLD))
+        .or_else(|| cli.output.lenient.then_some(LENIENT_THRESHOLD))
+        .or_else(|| {
+            file_config
+                .as_ref()
+                .and_then(|c| c.preset)
+                .map(|p| p.threshold())
+        })
         .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
         .unwrap_or(DEFAULT_THRESHOLD);
 
@@ -1040,5 +1066,71 @@ mod tests {
         std::fs::write(nested.join("lib.rs"), "pub fn foo() {}").unwrap();
 
         assert!(check_src_has_rust_files(dir.path()).is_ok());
+    }
+
+    // ── --strict / --lenient flag tests ───────────────────────────────
+
+    #[test]
+    fn strict_flag_parses() {
+        let cli = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
+        assert!(cli.output.strict);
+    }
+
+    #[test]
+    fn lenient_flag_parses() {
+        let cli = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
+        assert!(cli.output.lenient);
+    }
+
+    #[test]
+    fn strict_and_threshold_mutually_exclusive() {
+        parse(&["--coverage", "lcov.info", "--strict", "--threshold", "20"]).unwrap_err();
+    }
+
+    #[test]
+    fn strict_and_lenient_mutually_exclusive() {
+        parse(&["--coverage", "lcov.info", "--strict", "--lenient"]).unwrap_err();
+    }
+
+    #[test]
+    fn merge_threshold_strict_flag() {
+        use crap4rs::domain::threshold::STRICT_THRESHOLD;
+        let cli = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
+        let (config, display) = merge_threshold(&cli, &None);
+        assert_eq!(config.global, STRICT_THRESHOLD);
+        assert_eq!(display, STRICT_THRESHOLD);
+    }
+
+    #[test]
+    fn merge_threshold_lenient_flag() {
+        use crap4rs::domain::threshold::LENIENT_THRESHOLD;
+        let cli = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
+        let (config, display) = merge_threshold(&cli, &None);
+        assert_eq!(config.global, LENIENT_THRESHOLD);
+        assert_eq!(display, LENIENT_THRESHOLD);
+    }
+
+    #[test]
+    fn merge_threshold_toml_preset_used_when_no_cli_flag() {
+        use crap4rs::domain::threshold::{STRICT_THRESHOLD, ThresholdPreset};
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            preset: Some(ThresholdPreset::Strict),
+            ..FileConfig::default()
+        });
+        let (config, _) = merge_threshold(&cli, &file_config);
+        assert_eq!(config.global, STRICT_THRESHOLD);
+    }
+
+    #[test]
+    fn merge_threshold_cli_threshold_overrides_toml_preset() {
+        use crap4rs::domain::threshold::ThresholdPreset;
+        let cli = parse(&["--coverage", "lcov.info", "--threshold", "50.0"]).unwrap();
+        let file_config = Some(FileConfig {
+            preset: Some(ThresholdPreset::Strict),
+            ..FileConfig::default()
+        });
+        let (config, _) = merge_threshold(&cli, &file_config);
+        assert_eq!(config.global, 50.0);
     }
 }
