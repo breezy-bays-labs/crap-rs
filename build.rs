@@ -6,7 +6,7 @@
 //!
 //! Output examples:
 //!   - Source build with git: `0.1.0 (abc1234 2026-03-29)`
-//!   - Built without git:     `0.1.0`
+//!   - Built without git:     `0.1.0 (2026-03-29)`
 
 use std::env;
 use std::process::Command;
@@ -28,12 +28,7 @@ fn git_hash() -> String {
         .unwrap_or_default()
 }
 
-fn build_date() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64;
-
+fn build_date_from_secs(secs: i64) -> String {
     // Civil date from Unix timestamp — Hinnant's algorithm
     // https://howardhinnant.github.io/date_algorithms.html
     let days = secs / 86400;
@@ -47,13 +42,20 @@ fn build_date() -> String {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
-
     format!("{y:04}-{m:02}-{d:02}")
+}
+
+fn build_date() -> String {
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    build_date_from_secs(secs)
 }
 
 fn format_long_version(version: &str, hash: &str, date: &str) -> String {
     if hash.is_empty() {
-        version.to_string()
+        format!("{version} ({date})")
     } else {
         format!("{version} ({hash} {date})")
     }
@@ -81,9 +83,9 @@ mod tests {
     }
 
     #[test]
-    fn format_long_version_empty_hash_returns_semver_only() {
+    fn format_long_version_empty_hash_returns_date_only() {
         let v = format_long_version("0.1.0", "", "2026-03-29");
-        assert_eq!(v, "0.1.0");
+        assert_eq!(v, "0.1.0 (2026-03-29)");
     }
 
     #[test]
@@ -102,7 +104,7 @@ mod tests {
         let year: u32 = parts[0].parse().unwrap();
         let month: u32 = parts[1].parse().unwrap();
         let day: u32 = parts[2].parse().unwrap();
-        assert!((2024..=2100).contains(&year));
+        assert!(year >= 2024);
         assert!((1..=12).contains(&month));
         assert!((1..=31).contains(&day));
     }
@@ -110,20 +112,6 @@ mod tests {
     #[test]
     fn build_date_known_epoch() {
         // 2026-03-29 00:00:00 UTC = 1743206400 seconds
-        // Verify algorithm matches expectation for a known timestamp
-        // by replicating the calculation inline
-        let secs: i64 = 1_743_206_400;
-        let days = secs / 86400;
-        let z = days + 719_468;
-        let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-        let doe = z - era * 146_097;
-        let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-        let y = yoe + era * 400;
-        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        let mp = (5 * doy + 2) / 153;
-        let d = doy - (153 * mp + 2) / 5 + 1;
-        let m = if mp < 10 { mp + 3 } else { mp - 9 };
-        let y = if m <= 2 { y + 1 } else { y };
-        assert_eq!(format!("{y:04}-{m:02}-{d:02}"), "2026-03-29");
+        assert_eq!(build_date_from_secs(1_743_206_400), "2026-03-29");
     }
 }

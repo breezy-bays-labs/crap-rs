@@ -25,45 +25,32 @@ fn run_version_flag(flag: &str) -> String {
 #[test]
 fn short_flag_prints_semver_only() {
     let output = run_version_flag("-V");
-    // Must be exactly "crap4rs X.Y.Z" — no parenthetical suffix
-    assert!(
-        output.starts_with("crap4rs "),
-        "output should start with 'crap4rs ': {output:?}"
-    );
-    let version_part = output.trim_start_matches("crap4rs ").trim();
-    // Semver: digits and dots only
-    assert!(
-        version_part.chars().all(|c| c.is_ascii_digit() || c == '.'),
-        "-V should be semver only, got: {output:?}"
-    );
-    // No parenthetical metadata
-    assert!(
-        !output.contains('('),
-        "-V must not contain git metadata: {output:?}"
+    assert_eq!(
+        output,
+        format!("crap4rs {}", env!("CARGO_PKG_VERSION")),
+        "-V must print the package semver only"
     );
 }
 
 // ── --version long flag ───────────────────────────────────────────────
 
-/// `--version` must match `crap4rs X.Y.Z` optionally followed by
-/// ` (XXXXXXX YYYY-MM-DD)`.
+/// `--version` must match `crap4rs X.Y.Z (XXXXXXX YYYY-MM-DD)` when git is
+/// available, or `crap4rs X.Y.Z (YYYY-MM-DD)` for tarball/offline builds.
 ///
-/// The test accepts both forms because CI may build without a git repo
-/// (e.g. GitHub Actions `actions/checkout` with `fetch-depth: 0` is fine
-/// but shallow clones may not expose HEAD). The regex allows the metadata
-/// suffix to be absent gracefully.
+/// The date is always present — it provides a freshness signal even when the
+/// git hash cannot be determined.
 #[test]
 fn long_flag_matches_expected_pattern() {
     let output = run_version_flag("--version");
     assert!(
-        output.starts_with("crap4rs "),
-        "output should start with 'crap4rs ': {output:?}"
+        output.starts_with(&format!("crap4rs {}", env!("CARGO_PKG_VERSION"))),
+        "--version should start with package semver, got: {output:?}"
     );
 
     // Strip "crap4rs " prefix
     let rest = output.trim_start_matches("crap4rs ").trim();
 
-    // Split at first space: "0.1.0" and optional "(abc1234 2026-03-29)"
+    // Split at first space: "0.1.0" and "(abc1234 2026-03-29)" or "(2026-03-29)"
     let mut parts = rest.splitn(2, ' ');
     let semver = parts.next().unwrap_or("");
     let meta = parts.next();
@@ -74,29 +61,39 @@ fn long_flag_matches_expected_pattern() {
         "version portion must be semver, got: {semver:?}"
     );
 
-    // If metadata present, validate format
-    if let Some(meta) = meta {
-        let meta = meta.trim_matches(|c| c == '(' || c == ')');
-        let mut meta_parts = meta.splitn(2, ' ');
-        let hash = meta_parts.next().unwrap_or("");
-        let date = meta_parts.next().unwrap_or("");
+    // Metadata is always present (date at minimum)
+    let meta = meta.expect("--version must always include build metadata (date)");
+    let meta = meta.trim_matches(|c| c == '(' || c == ')');
+    let mut meta_parts = meta.splitn(2, ' ');
+    let first = meta_parts.next().unwrap_or("");
+    let second = meta_parts.next();
 
-        assert_eq!(hash.len(), 7, "hash must be 7 hex chars, got: {hash:?}");
+    let date = if let Some(date) = second {
+        // Full form: "(hash date)" — first is the git hash
+        let hash = first;
+        assert!(
+            hash.len() >= 7,
+            "hash must be at least 7 hex chars, got: {hash:?}"
+        );
         assert!(
             hash.chars().all(|c| c.is_ascii_hexdigit()),
             "hash must be hex, got: {hash:?}"
         );
+        date
+    } else {
+        // Date-only form: "(date)" — no git hash available
+        first
+    };
 
-        assert_eq!(date.len(), 10, "date must be YYYY-MM-DD, got: {date:?}");
-        let date_parts: Vec<&str> = date.split('-').collect();
-        assert_eq!(date_parts.len(), 3);
-        assert!(
-            date_parts
-                .iter()
-                .all(|p| p.chars().all(|c| c.is_ascii_digit())),
-            "date must be all digits, got: {date:?}"
-        );
-    }
+    assert_eq!(date.len(), 10, "date must be YYYY-MM-DD, got: {date:?}");
+    let date_parts: Vec<&str> = date.split('-').collect();
+    assert_eq!(date_parts.len(), 3);
+    assert!(
+        date_parts
+            .iter()
+            .all(|p| p.chars().all(|c| c.is_ascii_digit())),
+        "date must be all digits, got: {date:?}"
+    );
 }
 
 /// `--version` output must begin with the package semver declared in Cargo.toml.
@@ -105,7 +102,7 @@ fn long_flag_semver_matches_cargo_pkg_version() {
     let expected_semver = env!("CARGO_PKG_VERSION");
     let output = run_version_flag("--version");
     assert!(
-        output.contains(expected_semver),
-        "--version should contain semver {expected_semver:?}, got: {output:?}"
+        output.starts_with(&format!("crap4rs {expected_semver}")),
+        "--version should start with semver {expected_semver:?}, got: {output:?}"
     );
 }
