@@ -320,7 +320,8 @@ fn merge_threshold(cli: &Cli, file_config: &Option<FileConfig>) -> (ThresholdCon
         .or_else(|| {
             file_config
                 .as_ref()
-                .and_then(|c| c.preset.map(|p| p.threshold()))
+                .and_then(|c| c.preset)
+                .map(|p| p.threshold())
         })
         .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
         .unwrap_or(DEFAULT_THRESHOLD);
