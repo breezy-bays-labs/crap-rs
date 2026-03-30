@@ -150,6 +150,7 @@ pub struct DisplayArgs {
 #[derive(Debug, Parser)]
 #[command(
     version,
+    long_version = env!("CRAP4RS_LONG_VERSION"),
     author,
     about = "CRAP score analyzer for Rust",
     long_about = "CRAP (Change Risk Anti-Patterns) score analyzer for Rust codebases.\n\n\
