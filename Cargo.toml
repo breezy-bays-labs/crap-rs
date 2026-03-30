@@ -6,8 +6,8 @@ authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
 description = "CRAP score analyzer for Rust — find complex, under-tested functions"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/breezy-bays-labs/crap4rs"
-keywords = ["crap", "complexity", "coverage", "quality"]
-categories = ["development-tools", "command-line-utilities"]
+keywords = ["crap", "complexity", "coverage", "testing", "quality"]
+categories = ["development-tools::testing", "command-line-utilities"]
 
 [lib]
 name = "crap4rs"
