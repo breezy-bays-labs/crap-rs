@@ -116,6 +116,26 @@ core/      Wires adapters through ports
 cli/       clap argument parsing
 ```
 
+## Extraction roadmap
+
+This repo is the Rust implementation today, but the longer-term direction is a shared multi-language CRAP toolchain:
+
+- `crap-core` — shared CRAP math, thresholds model, result types, and language-agnostic analysis interfaces
+- `crap4rs` — Rust-specific complexity and coverage adapters plus Rust-facing CLI/package surfaces
+- `crap4ts` — TypeScript-specific complexity and coverage adapters plus npm-facing package surfaces
+
+That split means:
+
+- shared analysis concepts should converge in `crap-core`
+- language parsers, coverage formats, and default threshold policy remain language-specific
+- matching `crap4rs` and `crap4ts` behavior does not require identical thresholds
+
+The current directory layout already reflects that extraction boundary:
+
+- `domain/`, `ports/`, and `core/` are the future `crap-core` seam
+- `adapters/` is the Rust-specific layer
+- `cli/` is the Rust delivery surface that may later become part of a unified monorepo layout
+
 ## Self-check
 
 The self-referential CI check runs at `--strict` (15) against `src`, excluding `cli/**`.
