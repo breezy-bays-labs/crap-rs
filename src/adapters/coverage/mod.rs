@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 
 /// Branch key: (line, block, branch) for deduplication and merging.
 type BranchKey = (usize, u32, u32);
+/// Per-file line accumulator used during parsing before conversion to domain types.
+type RawCoverage = HashMap<String, BTreeMap<usize, u64>>;
 /// Per-file branch accumulator used during parsing before conversion to domain types.
 type RawBranches = HashMap<String, BTreeMap<BranchKey, Option<u64>>>;
 
@@ -26,7 +28,7 @@ pub struct LcovParser {
 
 #[derive(Default)]
 struct ParseState {
-    coverage: HashMap<String, Vec<LineCoverage>>,
+    raw_coverage: RawCoverage,
     raw_branches: RawBranches,
     diagnostics: Vec<ParseDiagnostic>,
     current_path: Option<String>,
@@ -169,13 +171,13 @@ fn flush_block(state: &mut ParseState) {
         return;
     };
 
-    merge_line_block(&mut state.coverage, path, &state.current_lines);
+    merge_line_block(&mut state.raw_coverage, path, &state.current_lines);
     merge_branch_block(&mut state.raw_branches, path, &state.current_branches);
     clear_current_block(state);
 }
 
 fn merge_line_block(
-    coverage: &mut HashMap<String, Vec<LineCoverage>>,
+    raw_coverage: &mut RawCoverage,
     path: &str,
     current_lines: &BTreeMap<usize, u64>,
 ) {
@@ -183,15 +185,10 @@ fn merge_line_block(
         return;
     }
 
-    let existing = coverage.entry(path.to_owned()).or_default();
-    let mut merged: BTreeMap<usize, u64> = existing.iter().map(|lc| (lc.line, lc.hits)).collect();
+    let existing = raw_coverage.entry(path.to_owned()).or_default();
     for (&line, &hits) in current_lines {
-        merge_hits(&mut merged, line, hits);
+        merge_hits(existing, line, hits);
     }
-    *existing = merged
-        .into_iter()
-        .map(|(line, hits)| LineCoverage { line, hits })
-        .collect();
 }
 
 fn merge_branch_block(
@@ -242,6 +239,12 @@ fn clear_current_block(state: &mut ParseState) {
 }
 
 fn build_parse_output(state: ParseState) -> ParseOutput {
+    let coverage = state
+        .raw_coverage
+        .into_iter()
+        .map(|(file, entries)| (file, to_line_coverage(entries)))
+        .collect();
+
     let branches = (!state.raw_branches.is_empty()).then(|| {
         state
             .raw_branches
@@ -257,10 +260,17 @@ fn build_parse_output(state: ParseState) -> ParseOutput {
     });
 
     ParseOutput {
-        coverage: state.coverage,
+        coverage,
         branches,
         diagnostics: state.diagnostics,
     }
+}
+
+fn to_line_coverage(entries: BTreeMap<usize, u64>) -> Vec<LineCoverage> {
+    entries
+        .into_iter()
+        .map(|(line, hits)| LineCoverage { line, hits })
+        .collect()
 }
 
 #[cfg(test)]
