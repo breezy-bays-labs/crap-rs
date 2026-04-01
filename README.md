@@ -39,13 +39,21 @@ crap4rs --src src/ --coverage lcov.info
 |------|---------|-------------|
 | `--src <path>` | `src` | Path to Rust source files |
 | `--coverage <path>` | required | Path to LCOV coverage file |
-| `--threshold <n>` | 8 | CRAP score threshold (exit 1 if exceeded) |
+| `--threshold <n>` | 25 | CRAP score threshold (exit 1 if exceeded) |
 | `--metric <type>` | cognitive | Complexity metric: `cognitive` or `cyclomatic` |
 | `--format <type>` | table | Output format: `table` or `json` |
 | `--exclude <glob>` | — | Exclude paths matching glob (repeatable) |
 | `--verbose` | — | Print analysis diagnostics to stderr |
 | `--breakdown` | — | Show per-contributor complexity breakdown for failing functions in table output |
 | `--explain` | — | With `--breakdown`, explain nested cognitive increments in table output |
+
+Threshold presets are Rust-specific:
+
+- `--strict` = `15`
+- default = `25`
+- `--lenient` = `40`
+
+These do not match `crap4ts` exactly. The long-term goal is shared CRAP math and shared analysis concepts via `crap-core`, with language-specific adapters and threshold policy above that core.
 
 ### Why cognitive by default?
 
@@ -69,7 +77,7 @@ These functions will show **0% line coverage**, even if they are thoroughly test
 # crap4rs.toml — monorepo example (SvelteKit + Axum)
 # Only analyze unit-testable crates.
 
-threshold = 8
+preset = "strict"
 
 exclude = [
   "services/api/src/**",   # Axum handlers — integration-only, no unit test surface
