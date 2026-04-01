@@ -61,49 +61,104 @@ static HUNK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@").expect("hunk regex is valid")
 });
 
+#[derive(Default)]
+struct DiffParseState {
+    current_file: Option<String>,
+    is_new_file: bool,
+}
+
+enum DiffLine<'a> {
+    DiffHeader,
+    NewFileMode,
+    FilePath(&'a str),
+    Hunk(&'a str),
+    Other,
+}
+
 /// Parse unified diff output into a map of file path → change kind.
 fn parse_unified_diff(input: &str) -> HashMap<String, FileChangeKind> {
     let mut result: HashMap<String, FileChangeKind> = HashMap::new();
-    let mut current_file: Option<String> = None;
-    let mut is_new_file = false;
+    let mut state = DiffParseState::default();
 
     for line in input.lines() {
-        if let Some(path) = line.strip_prefix("+++ ") {
-            // With --no-prefix, +++ line is the raw path (or /dev/null for deletions)
-            if path == "/dev/null" {
-                current_file = None;
-                continue;
-            }
-            current_file = Some(normalize_path(path));
-        } else if line.starts_with("new file mode") {
-            is_new_file = true;
-        } else if line.starts_with("diff --git") {
-            // Reset new-file flag for each diff entry
-            is_new_file = false;
-        } else if line.starts_with("@@ ")
-            && let Some(ref file) = current_file
-        {
-            // Skip further hunk processing for files already marked as new
-            if result.get(file) == Some(&FileChangeKind::NewFile) {
-                continue;
-            }
-            if is_new_file {
-                result.insert(file.clone(), FileChangeKind::NewFile);
-            } else if let Some(span) = parse_hunk_header(line) {
-                result
-                    .entry(file.clone())
-                    .and_modify(|kind| {
-                        if let FileChangeKind::Modified(spans) = kind {
-                            spans.push(span);
-                        }
-                    })
-                    .or_insert_with(|| FileChangeKind::Modified(vec![span]));
-            }
-            // else: deletion-only hunk (count=0), skip
-        }
+        handle_diff_line(classify_diff_line(line), &mut state, &mut result);
     }
 
     result
+}
+
+fn classify_diff_line(line: &str) -> DiffLine<'_> {
+    if let Some(path) = line.strip_prefix("+++ ") {
+        DiffLine::FilePath(path)
+    } else if line.starts_with("new file mode") {
+        DiffLine::NewFileMode
+    } else if line.starts_with("diff --git") {
+        DiffLine::DiffHeader
+    } else if line.starts_with("@@ ") {
+        DiffLine::Hunk(line)
+    } else {
+        DiffLine::Other
+    }
+}
+
+fn handle_diff_line(
+    line: DiffLine<'_>,
+    state: &mut DiffParseState,
+    result: &mut HashMap<String, FileChangeKind>,
+) {
+    match line {
+        DiffLine::DiffHeader => state.is_new_file = false,
+        DiffLine::NewFileMode => state.is_new_file = true,
+        DiffLine::FilePath(path) => state.current_file = normalize_diff_path(path),
+        DiffLine::Hunk(header) => handle_hunk_line(header, state, result),
+        DiffLine::Other => {}
+    }
+}
+
+fn normalize_diff_path(path: &str) -> Option<String> {
+    if path == "/dev/null" {
+        None
+    } else {
+        Some(normalize_path(path))
+    }
+}
+
+fn handle_hunk_line(
+    header: &str,
+    state: &DiffParseState,
+    result: &mut HashMap<String, FileChangeKind>,
+) {
+    let Some(file) = state.current_file.as_ref() else {
+        return;
+    };
+
+    if result.get(file) == Some(&FileChangeKind::NewFile) {
+        return;
+    }
+
+    if state.is_new_file {
+        result.insert(file.clone(), FileChangeKind::NewFile);
+        return;
+    }
+
+    if let Some(span) = parse_hunk_header(header) {
+        append_modified_span(result, file, span);
+    }
+}
+
+fn append_modified_span(
+    result: &mut HashMap<String, FileChangeKind>,
+    file: &str,
+    span: SourceSpan,
+) {
+    result
+        .entry(file.to_owned())
+        .and_modify(|kind| {
+            if let FileChangeKind::Modified(spans) = kind {
+                spans.push(span);
+            }
+        })
+        .or_insert_with(|| FileChangeKind::Modified(vec![span]));
 }
 
 /// Parse a hunk header line to extract the new-side span.

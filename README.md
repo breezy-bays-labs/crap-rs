@@ -106,9 +106,9 @@ core/      Wires adapters through ports
 cli/       clap argument parsing
 ```
 
-## Known limitations
+## Self-check
 
-`parse_unified_diff` and `analyze()` are the two most complex functions in crap4rs itself and currently exceed the `--strict` threshold (15). The tool passes its own default gate (threshold=25). This is tracked in [#54](https://github.com/breezy-bays-labs/crap4rs/issues/54) and is not a blocker for v0.1.0.
+The self-referential CI check runs at `--strict` (15) against `src`, excluding `cli/**`.
 
 ## Related
 

@@ -88,5 +88,4 @@ jobs:
           name: lcov
       - run: cargo build --release
       - name: Run crap4rs against itself
-        # Explicit --threshold 30 is intentional. Goal is --strict (15) via #54.
-        run: ./target/release/crap4rs --coverage lcov.info --src src --threshold 30 --exclude "cli/**" --color always
+        run: ./target/release/crap4rs --coverage lcov.info --src src --strict --exclude "cli/**" --color always
