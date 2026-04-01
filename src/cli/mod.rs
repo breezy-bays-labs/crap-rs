@@ -153,6 +153,12 @@ pub struct DisplayArgs {
     /// JSON output always includes contributors regardless of this flag.
     #[arg(long)]
     pub breakdown: bool,
+
+    /// Explain nested breakdown increments in table output.
+    ///
+    /// Only affects table output, and only when `--breakdown` is enabled.
+    #[arg(long)]
+    pub explain: bool,
 }
 
 // ── Top-level CLI ───────────────────────────────────────────────────
@@ -268,9 +274,12 @@ fn run_inner() -> Result<bool> {
 
     if !cli.display.quiet {
         let output = match cli.output.format {
-            FormatArg::Table => {
-                reporters::format_table(&result, effective_threshold, cli.display.breakdown)
-            }
+            FormatArg::Table => reporters::format_table_with_explain(
+                &result,
+                effective_threshold,
+                cli.display.breakdown,
+                cli.display.explain,
+            ),
             FormatArg::Json => {
                 let config = reporters::json::JsonConfig {
                     tool_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -979,6 +988,18 @@ mod tests {
     fn breakdown_flag_default_false() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         assert!(!cli.display.breakdown);
+    }
+
+    #[test]
+    fn explain_flag_parsed() {
+        let cli = parse(&["--coverage", "lcov.info", "--explain"]).unwrap();
+        assert!(cli.display.explain);
+    }
+
+    #[test]
+    fn explain_flag_default_false() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert!(!cli.display.explain);
     }
 
     #[test]

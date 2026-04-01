@@ -4,7 +4,7 @@ pub mod json;
 pub mod table;
 
 pub use json::{JsonConfig, format_json};
-pub use table::format_table;
+pub use table::{format_table, format_table_with_explain};
 
 #[cfg(test)]
 pub(crate) mod test_fixtures {
