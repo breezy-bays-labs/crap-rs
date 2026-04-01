@@ -45,7 +45,7 @@ pub fn nested(x: bool, y: bool) -> i32 {
 ";
 
 const ZERO_COVERAGE_LCOV: &str = "\
-SF:lib.rs
+SF:src/lib.rs
 DA:1,0
 DA:2,0
 DA:3,0
@@ -79,16 +79,21 @@ fn explain_adds_legend_for_nested_breakdown_output() {
 }
 
 #[test]
-fn explain_without_breakdown_does_not_change_table_output() {
+fn explain_without_breakdown_errors() {
     let dir = tempfile::tempdir().unwrap();
     setup_dir(dir.path(), NESTED_SRC, ZERO_COVERAGE_LCOV);
 
     let output = run(dir.path(), &["--threshold", "1", "--explain"]);
-    assert_ran(&output);
-    let out = stdout_str(&output);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let err = String::from_utf8_lossy(&output.stderr);
 
-    assert!(!out.contains("Legend:"), "stdout:\n{out}");
-    assert!(!out.contains("(nested)"), "stdout:\n{out}");
+    assert!(err.contains("--breakdown"), "stderr:\n{err}");
+    assert!(err.contains("--explain"), "stderr:\n{err}");
 }
 
 #[test]

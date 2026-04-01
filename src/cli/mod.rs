@@ -213,6 +213,8 @@ pub fn run() -> ExitCode {
 fn run_inner() -> Result<bool> {
     let cli = Cli::parse();
 
+    validate_display_flags(&cli)?;
+
     apply_color(cli.display.color);
 
     // Load config file (explicit path or auto-discovered)
@@ -296,6 +298,16 @@ fn run_inner() -> Result<bool> {
     }
 
     Ok(passed)
+}
+
+fn validate_display_flags(cli: &Cli) -> Result<()> {
+    if cli.display.explain
+        && matches!(cli.output.format, FormatArg::Table)
+        && !cli.display.breakdown
+    {
+        bail!("--explain requires --breakdown for table output");
+    }
+    Ok(())
 }
 
 // ── Config loading & merging ───────────────────────────────────────
@@ -1000,6 +1012,21 @@ mod tests {
     fn explain_flag_default_false() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         assert!(!cli.display.explain);
+    }
+
+    #[test]
+    fn explain_requires_breakdown_for_table_output() {
+        let cli = parse(&["--coverage", "lcov.info", "--explain"]).unwrap();
+        let err = validate_display_flags(&cli).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("--breakdown"));
+        assert!(msg.contains("--explain"));
+    }
+
+    #[test]
+    fn explain_allowed_for_json_output() {
+        let cli = parse(&["--coverage", "lcov.info", "--format", "json", "--explain"]).unwrap();
+        assert!(validate_display_flags(&cli).is_ok());
     }
 
     #[test]
