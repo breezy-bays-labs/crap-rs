@@ -17,9 +17,9 @@ use crate::domain::summary::compute_summary;
 use crate::domain::threshold::ThresholdConfig;
 use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, ComplexityMetric, CoverageMetric, FileChangeKind,
-    FunctionVerdict, ScoredFunction,
+    FunctionComplexity, FunctionVerdict, ScoredFunction,
 };
-use crate::ports::{ComplexityPort, CoveragePort, DiffPort};
+use crate::ports::{ComplexityPort, CoveragePort, DiffPort, ParseOutput};
 
 /// Options for running a CRAP analysis.
 #[derive(Debug)]
@@ -50,6 +50,16 @@ pub struct AnalysisOutput {
     pub diagnostics: AnalysisDiagnostics,
 }
 
+struct DiscoveredSources {
+    source_files: Vec<PathBuf>,
+    files_found: usize,
+}
+
+struct ExtractedComplexities {
+    all_complexities: Vec<FunctionComplexity>,
+    files_unparseable: usize,
+}
+
 impl Default for AnalyzeOptions {
     fn default() -> Self {
         Self {
@@ -68,122 +78,41 @@ impl Default for AnalyzeOptions {
 /// Run CRAP analysis: discover files, extract complexity, parse coverage,
 /// match, score, and produce results with diagnostics.
 pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
-    // Canonicalize src path so LCOV absolute paths can be stripped correctly
-    let src_canonical = options
-        .src
-        .canonicalize()
-        .unwrap_or_else(|_| options.src.clone());
+    let src_canonical = canonicalize_src(&options.src);
+    let mut discovered = discover_sources(options)?;
+    let diff_data = load_diff_data(options, &src_canonical, &discovered.source_files)?;
 
-    // 1. Discover .rs source files
-    let mut source_files =
-        discover_rust_files(&options.src, &options.exclude, options.respect_gitignore)?;
-    let files_found = source_files.len();
-    if source_files.is_empty() {
-        bail!(
-            "no Rust source files found in {}\n  \
-             hint: check that --src points to a directory containing .rs files",
-            options.src.display()
-        );
-    }
-
-    // Phase 1: file intersection — filter to only changed files when --diff is set
-    let diff_data = if let Some(ref diff_ref) = options.diff_ref {
-        let diff_result =
-            compute_diff_regions(diff_ref, &src_canonical, &options.src, &source_files)?;
-
-        source_files.retain(|p| {
-            let rel = src_relative_path(p, &options.src);
-            diff_result.contains_key(&*rel)
-        });
-        if source_files.is_empty() {
-            return Ok(AnalysisOutput {
-                result: empty_passing_result(),
-                diagnostics: AnalysisDiagnostics {
-                    parse_diagnostics: vec![],
-                    files_found,
-                    files_unparseable: 0,
-                    functions_extracted: 0,
-                    functions_matched: 0,
-                    functions_no_coverage: 0,
-                    files_analyzed: 0,
-                    files_zero_coverage: 0,
-                },
-            });
-        }
-        Some(diff_result)
-    } else {
-        None
-    };
-
-    // 2. Read and parse coverage data
-    let coverage_data = std::fs::read_to_string(&options.coverage).with_context(|| {
-        format!(
-            "failed to read coverage file: {}",
-            options.coverage.display()
-        )
-    })?;
-    let parser = LcovParser::new(src_canonical);
-    let parse_output = parser
-        .parse(&coverage_data)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-    let parse_diagnostics = parse_output.diagnostics;
-
-    // 3. Extract complexity from each source file
-    let complexity_adapter = SynComplexityAdapter::new();
-    let mut all_complexities = Vec::new();
-    let mut files_unparseable = 0usize;
-
-    for file_path in &source_files {
-        let source = std::fs::read_to_string(file_path)
-            .with_context(|| format!("failed to read source file: {}", file_path.display()))?;
-
-        let relative = src_relative_path(file_path, &options.src);
-
-        match complexity_adapter.extract(&source, &relative, options.metric) {
-            Ok(fns) => all_complexities.extend(fns),
-            Err(e) => {
-                // Non-fatal: skip unparseable files (e.g., proc-macro crates)
-                files_unparseable += 1;
-                eprintln!("warning: skipping {relative}: {e}");
-            }
+    if let Some(ref diff_result) = diff_data {
+        retain_changed_source_files(&mut discovered.source_files, &options.src, diff_result);
+        if discovered.source_files.is_empty() {
+            return Ok(empty_output_with_diagnostics(diagnostics_for_empty_result(
+                vec![],
+                discovered.files_found,
+                0,
+                0,
+            )));
         }
     }
 
+    let parse_output = parse_coverage(options, &src_canonical)?;
+    let extracted = extract_complexities(&discovered.source_files, &options.src, options.metric)?;
+    let mut all_complexities = extracted.all_complexities;
     let functions_extracted = all_complexities.len();
 
-    // Phase 2: hunk overlap — filter to only functions overlapping changed hunks
     if let Some(ref diff_result) = diff_data {
-        all_complexities.retain(|comp| match diff_result.get(&comp.identity.file_path) {
-            Some(FileChangeKind::NewFile) => true,
-            Some(FileChangeKind::Modified(ranges)) => overlaps_any(&comp.identity.span, ranges),
-            None => false,
-        });
+        retain_changed_functions(&mut all_complexities, diff_result);
         if all_complexities.is_empty() {
-            return Ok(AnalysisOutput {
-                result: empty_passing_result(),
-                diagnostics: AnalysisDiagnostics {
-                    parse_diagnostics,
-                    files_found,
-                    files_unparseable,
-                    functions_extracted,
-                    functions_matched: 0,
-                    functions_no_coverage: 0,
-                    files_analyzed: 0,
-                    files_zero_coverage: 0,
-                },
-            });
+            return Ok(empty_output_with_diagnostics(diagnostics_for_empty_result(
+                parse_output.diagnostics,
+                discovered.files_found,
+                extracted.files_unparseable,
+                functions_extracted,
+            )));
         }
     }
 
-    if all_complexities.is_empty() {
-        bail!(
-            "no functions extracted from source files in {}\n  \
-             hint: check that source files contain valid Rust function definitions",
-            options.src.display()
-        );
-    }
+    ensure_functions_extracted(&all_complexities, &options.src)?;
 
-    // 4. Match complexity with coverage using line-range join
     let matched = match_functions(
         &all_complexities,
         &parse_output.coverage,
@@ -203,26 +132,12 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     // 6. Score each function, produce verdicts, and build result
     let result = score_and_summarize(&matched, &resolver)?;
 
-    let (files_analyzed, files_zero_coverage) = {
-        let mut file_is_zero_coverage: std::collections::HashMap<&str, bool> =
-            std::collections::HashMap::new();
-        for v in &result.functions {
-            let e = file_is_zero_coverage
-                .entry(v.scored.identity.file_path.as_str())
-                .or_insert(true);
-            if v.scored.coverage_percent > 0.0 {
-                *e = false;
-            }
-        }
-        let total = file_is_zero_coverage.len();
-        let zero = file_is_zero_coverage.values().filter(|&&z| z).count();
-        (total, zero)
-    };
+    let (files_analyzed, files_zero_coverage) = compute_file_coverage_stats(&result);
 
     let diagnostics = AnalysisDiagnostics {
-        parse_diagnostics,
-        files_found,
-        files_unparseable,
+        parse_diagnostics: parse_output.diagnostics,
+        files_found: discovered.files_found,
+        files_unparseable: extracted.files_unparseable,
         functions_extracted,
         functions_matched,
         functions_no_coverage,
@@ -240,6 +155,165 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
         result,
         diagnostics,
     })
+}
+
+fn canonicalize_src(src: &Path) -> PathBuf {
+    src.canonicalize().unwrap_or_else(|_| src.to_path_buf())
+}
+
+fn discover_sources(options: &AnalyzeOptions) -> Result<DiscoveredSources> {
+    let source_files =
+        discover_rust_files(&options.src, &options.exclude, options.respect_gitignore)?;
+    let files_found = source_files.len();
+    ensure_source_files_found(&source_files, &options.src)?;
+
+    Ok(DiscoveredSources {
+        source_files,
+        files_found,
+    })
+}
+
+fn ensure_source_files_found(source_files: &[PathBuf], src: &Path) -> Result<()> {
+    if source_files.is_empty() {
+        bail!(
+            "no Rust source files found in {}\n  \
+             hint: check that --src points to a directory containing .rs files",
+            src.display()
+        );
+    }
+    Ok(())
+}
+
+fn load_diff_data(
+    options: &AnalyzeOptions,
+    src_canonical: &Path,
+    source_files: &[PathBuf],
+) -> Result<Option<std::collections::HashMap<String, FileChangeKind>>> {
+    options
+        .diff_ref
+        .as_deref()
+        .map(|diff_ref| compute_diff_regions(diff_ref, src_canonical, &options.src, source_files))
+        .transpose()
+}
+
+fn retain_changed_source_files(
+    source_files: &mut Vec<PathBuf>,
+    src_root: &Path,
+    diff_result: &std::collections::HashMap<String, FileChangeKind>,
+) {
+    source_files.retain(|path| {
+        let rel = src_relative_path(path, src_root);
+        diff_result.contains_key(&rel)
+    });
+}
+
+fn parse_coverage(options: &AnalyzeOptions, src_canonical: &Path) -> Result<ParseOutput> {
+    let coverage_data = std::fs::read_to_string(&options.coverage).with_context(|| {
+        format!(
+            "failed to read coverage file: {}",
+            options.coverage.display()
+        )
+    })?;
+    let parser = LcovParser::new(src_canonical.to_path_buf());
+    parser
+        .parse(&coverage_data)
+        .map_err(|e| anyhow::anyhow!("{e}"))
+}
+
+fn extract_complexities(
+    source_files: &[PathBuf],
+    src_root: &Path,
+    metric: ComplexityMetric,
+) -> Result<ExtractedComplexities> {
+    let complexity_adapter = SynComplexityAdapter::new();
+    let mut all_complexities = Vec::new();
+    let mut files_unparseable = 0usize;
+
+    for file_path in source_files {
+        let source = std::fs::read_to_string(file_path)
+            .with_context(|| format!("failed to read source file: {}", file_path.display()))?;
+        let relative = src_relative_path(file_path, src_root);
+
+        match complexity_adapter.extract(&source, &relative, metric) {
+            Ok(fns) => all_complexities.extend(fns),
+            Err(e) => {
+                files_unparseable += 1;
+                eprintln!("warning: skipping {relative}: {e}");
+            }
+        }
+    }
+
+    Ok(ExtractedComplexities {
+        all_complexities,
+        files_unparseable,
+    })
+}
+
+fn retain_changed_functions(
+    all_complexities: &mut Vec<FunctionComplexity>,
+    diff_result: &std::collections::HashMap<String, FileChangeKind>,
+) {
+    all_complexities.retain(|comp| match diff_result.get(&comp.identity.file_path) {
+        Some(FileChangeKind::NewFile) => true,
+        Some(FileChangeKind::Modified(ranges)) => overlaps_any(&comp.identity.span, ranges),
+        None => false,
+    });
+}
+
+fn ensure_functions_extracted(all_complexities: &[FunctionComplexity], src: &Path) -> Result<()> {
+    if all_complexities.is_empty() {
+        bail!(
+            "no functions extracted from source files in {}\n  \
+             hint: check that source files contain valid Rust function definitions",
+            src.display()
+        );
+    }
+    Ok(())
+}
+
+fn diagnostics_for_empty_result(
+    parse_diagnostics: Vec<crate::domain::types::ParseDiagnostic>,
+    files_found: usize,
+    files_unparseable: usize,
+    functions_extracted: usize,
+) -> AnalysisDiagnostics {
+    AnalysisDiagnostics {
+        parse_diagnostics,
+        files_found,
+        files_unparseable,
+        functions_extracted,
+        functions_matched: 0,
+        functions_no_coverage: 0,
+        files_analyzed: 0,
+        files_zero_coverage: 0,
+    }
+}
+
+fn empty_output_with_diagnostics(diagnostics: AnalysisDiagnostics) -> AnalysisOutput {
+    AnalysisOutput {
+        result: empty_passing_result(),
+        diagnostics,
+    }
+}
+
+fn compute_file_coverage_stats(result: &AnalysisResult) -> (usize, usize) {
+    let mut file_is_zero_coverage: std::collections::HashMap<&str, bool> =
+        std::collections::HashMap::new();
+    for verdict in &result.functions {
+        let entry = file_is_zero_coverage
+            .entry(verdict.scored.identity.file_path.as_str())
+            .or_insert(true);
+        if verdict.scored.coverage_percent > 0.0 {
+            *entry = false;
+        }
+    }
+
+    let total = file_is_zero_coverage.len();
+    let zero = file_is_zero_coverage
+        .values()
+        .filter(|&&is_zero| is_zero)
+        .count();
+    (total, zero)
 }
 
 /// Resolves per-function thresholds using glob-based overrides.

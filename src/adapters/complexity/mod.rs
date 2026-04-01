@@ -555,172 +555,125 @@ fn count_cyclomatic_block(
     block: &syn::Block,
     contributors: &mut Vec<ComplexityContributor>,
 ) -> u32 {
-    block
-        .stmts
-        .iter()
-        .map(|stmt| count_cyclomatic_stmt(stmt, contributors))
-        .sum()
+    CyclomaticCounter::count_block(block, contributors)
 }
 
-fn count_cyclomatic_stmt(stmt: &syn::Stmt, contributors: &mut Vec<ComplexityContributor>) -> u32 {
-    match stmt {
-        syn::Stmt::Expr(expr, _) => count_cyclomatic_expr(expr, contributors),
-        syn::Stmt::Local(local) => {
-            let mut total = 0;
-            if let Some(init) = &local.init {
-                total += count_cyclomatic_expr(&init.expr, contributors);
-                if let Some((else_token, diverge)) = &init.diverge {
-                    // let...else is a decision point: +1
-                    add_contributor(contributors, ContributorKind::LetElse, else_token.span, 1);
-                    total += 1;
-                    total += count_cyclomatic_expr(diverge, contributors);
-                }
-            }
-            total
-        }
-        syn::Stmt::Item(_) | syn::Stmt::Macro(_) => 0,
+struct CyclomaticCounter<'a> {
+    contributors: &'a mut Vec<ComplexityContributor>,
+    total: u32,
+}
+
+impl<'a> CyclomaticCounter<'a> {
+    fn count_block(block: &syn::Block, contributors: &'a mut Vec<ComplexityContributor>) -> u32 {
+        let mut counter = Self {
+            contributors,
+            total: 0,
+        };
+        counter.visit_block(block);
+        counter.total
+    }
+
+    fn bump(&mut self, kind: ContributorKind, span: Span, increment: u32) {
+        add_contributor(self.contributors, kind, span, increment);
+        self.total += increment;
     }
 }
 
-fn count_cyclomatic_expr(expr: &Expr, contributors: &mut Vec<ComplexityContributor>) -> u32 {
-    match expr {
-        Expr::If(expr_if) => {
-            add_contributor(
-                contributors,
-                ContributorKind::IfBranch,
-                expr_if.if_token.span,
+impl<'ast> Visit<'ast> for CyclomaticCounter<'_> {
+    fn visit_stmt(&mut self, stmt: &'ast syn::Stmt) {
+        match stmt {
+            syn::Stmt::Expr(expr, _) => self.visit_expr(expr),
+            syn::Stmt::Local(local) => self.visit_local(local),
+            syn::Stmt::Item(_) | syn::Stmt::Macro(_) => {}
+        }
+    }
+
+    fn visit_local(&mut self, local: &'ast syn::Local) {
+        let Some(init) = &local.init else {
+            return;
+        };
+
+        self.visit_expr(&init.expr);
+        if let Some((else_token, diverge)) = &init.diverge {
+            self.bump(ContributorKind::LetElse, else_token.span, 1);
+            self.visit_expr(diverge);
+        }
+    }
+
+    fn visit_expr_if(&mut self, expr_if: &'ast syn::ExprIf) {
+        self.bump(ContributorKind::IfBranch, expr_if.if_token.span, 1);
+        self.visit_expr(&expr_if.cond);
+        self.visit_block(&expr_if.then_branch);
+        if let Some((_, else_branch)) = &expr_if.else_branch {
+            self.visit_expr(else_branch);
+        }
+    }
+
+    fn visit_expr_match(&mut self, expr_match: &'ast syn::ExprMatch) {
+        for arm in expr_match.arms.iter().skip(1) {
+            self.bump(ContributorKind::MatchArm, arm.pat.span(), 1);
+        }
+
+        self.visit_expr(&expr_match.expr);
+        for arm in &expr_match.arms {
+            self.visit_arm(arm);
+        }
+    }
+
+    fn visit_arm(&mut self, arm: &'ast syn::Arm) {
+        if let Some((_, guard)) = &arm.guard {
+            self.visit_expr(guard);
+        }
+        self.visit_expr(&arm.body);
+    }
+
+    fn visit_expr_while(&mut self, expr_while: &'ast syn::ExprWhile) {
+        self.bump(ContributorKind::WhileLoop, expr_while.while_token.span, 1);
+        self.visit_expr(&expr_while.cond);
+        self.visit_block(&expr_while.body);
+    }
+
+    fn visit_expr_for_loop(&mut self, expr_for: &'ast syn::ExprForLoop) {
+        self.bump(ContributorKind::ForLoop, expr_for.for_token.span, 1);
+        self.visit_expr(&expr_for.expr);
+        self.visit_block(&expr_for.body);
+    }
+
+    fn visit_expr_loop(&mut self, expr_loop: &'ast syn::ExprLoop) {
+        self.bump(ContributorKind::Loop, expr_loop.loop_token.span, 1);
+        self.visit_block(&expr_loop.body);
+    }
+
+    fn visit_expr_binary(&mut self, expr_binary: &'ast syn::ExprBinary) {
+        if matches!(expr_binary.op, syn::BinOp::And(_) | syn::BinOp::Or(_)) {
+            self.bump(
+                ContributorKind::LogicalOperator,
+                binop_span(&expr_binary.op),
                 1,
             );
-            let mut total = 1; // +1 for if
-            total += count_cyclomatic_expr(&expr_if.cond, contributors);
-            total += count_cyclomatic_block(&expr_if.then_branch, contributors);
-            if let Some((_, else_branch)) = &expr_if.else_branch {
-                total += count_cyclomatic_expr(else_branch, contributors);
-            }
-            total
         }
-        Expr::Match(expr_match) => {
-            // N-1 MatchArm contributors for N arms (arms beyond first)
-            let arm_count = expr_match.arms.len().saturating_sub(1) as u32;
-            for arm in expr_match.arms.iter().skip(1) {
-                add_contributor(contributors, ContributorKind::MatchArm, arm.pat.span(), 1);
-            }
-            let mut total = arm_count;
-            total += count_cyclomatic_expr(&expr_match.expr, contributors);
-            for arm in &expr_match.arms {
-                if let Some(guard) = &arm.guard {
-                    total += count_cyclomatic_expr(&guard.1, contributors);
-                }
-                total += count_cyclomatic_expr(&arm.body, contributors);
-            }
-            total
+        self.visit_expr(&expr_binary.left);
+        self.visit_expr(&expr_binary.right);
+    }
+
+    fn visit_expr_try(&mut self, expr_try: &'ast syn::ExprTry) {
+        self.bump(ContributorKind::Try, expr_try.question_token.span, 1);
+        self.visit_expr(&expr_try.expr);
+    }
+
+    fn visit_expr_break(&mut self, expr_break: &'ast syn::ExprBreak) {
+        self.bump(ContributorKind::Break, expr_break.break_token.span, 1);
+        if let Some(expr) = &expr_break.expr {
+            self.visit_expr(expr);
         }
-        Expr::While(expr_while) => {
-            add_contributor(
-                contributors,
-                ContributorKind::WhileLoop,
-                expr_while.while_token.span,
-                1,
-            );
-            let mut total = 1;
-            total += count_cyclomatic_expr(&expr_while.cond, contributors);
-            total += count_cyclomatic_block(&expr_while.body, contributors);
-            total
-        }
-        Expr::ForLoop(expr_for) => {
-            add_contributor(
-                contributors,
-                ContributorKind::ForLoop,
-                expr_for.for_token.span,
-                1,
-            );
-            let mut total = 1;
-            total += count_cyclomatic_expr(&expr_for.expr, contributors);
-            total += count_cyclomatic_block(&expr_for.body, contributors);
-            total
-        }
-        Expr::Loop(expr_loop) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Loop,
-                expr_loop.loop_token.span,
-                1,
-            );
-            1 + count_cyclomatic_block(&expr_loop.body, contributors)
-        }
-        Expr::Binary(bin) => {
-            let span = binop_span(&bin.op);
-            let inc = match bin.op {
-                syn::BinOp::And(_) | syn::BinOp::Or(_) => {
-                    add_contributor(contributors, ContributorKind::LogicalOperator, span, 1);
-                    1
-                }
-                _ => 0,
-            };
-            inc + count_cyclomatic_expr(&bin.left, contributors)
-                + count_cyclomatic_expr(&bin.right, contributors)
-        }
-        Expr::Try(expr_try) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Try,
-                expr_try.question_token.span,
-                1,
-            );
-            1 + count_cyclomatic_expr(&expr_try.expr, contributors)
-        }
-        Expr::Block(expr_block) => count_cyclomatic_block(&expr_block.block, contributors),
-        Expr::Return(ret) => {
-            if let Some(e) = &ret.expr {
-                count_cyclomatic_expr(e, contributors)
-            } else {
-                0
-            }
-        }
-        Expr::Closure(closure) => count_cyclomatic_expr(&closure.body, contributors),
-        Expr::Call(call) => {
-            let mut total = count_cyclomatic_expr(&call.func, contributors);
-            for arg in &call.args {
-                total += count_cyclomatic_expr(arg, contributors);
-            }
-            total
-        }
-        Expr::MethodCall(mc) => {
-            let mut total = count_cyclomatic_expr(&mc.receiver, contributors);
-            for arg in &mc.args {
-                total += count_cyclomatic_expr(arg, contributors);
-            }
-            total
-        }
-        Expr::Tuple(tuple) => {
-            let mut total = 0;
-            for elem in &tuple.elems {
-                total += count_cyclomatic_expr(elem, contributors);
-            }
-            total
-        }
-        Expr::Break(expr_break) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Break,
-                expr_break.break_token.span,
-                1,
-            );
-            1
-        }
-        Expr::Continue(expr_continue) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Continue,
-                expr_continue.continue_token.span,
-                1,
-            );
-            1
-        }
-        Expr::Reference(r) => count_cyclomatic_expr(&r.expr, contributors),
-        Expr::Unary(u) => count_cyclomatic_expr(&u.expr, contributors),
-        Expr::Paren(p) => count_cyclomatic_expr(&p.expr, contributors),
-        _ => 0,
+    }
+
+    fn visit_expr_continue(&mut self, expr_continue: &'ast syn::ExprContinue) {
+        self.bump(
+            ContributorKind::Continue,
+            expr_continue.continue_token.span,
+            1,
+        );
     }
 }
 

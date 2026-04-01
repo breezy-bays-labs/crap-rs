@@ -24,6 +24,16 @@ pub struct LcovParser {
     root_path: PathBuf,
 }
 
+#[derive(Default)]
+struct ParseState {
+    coverage: HashMap<String, Vec<LineCoverage>>,
+    raw_branches: RawBranches,
+    diagnostics: Vec<ParseDiagnostic>,
+    current_path: Option<String>,
+    current_lines: BTreeMap<usize, u64>,
+    current_branches: BTreeMap<BranchKey, Option<u64>>,
+}
+
 impl LcovParser {
     pub fn new(root_path: PathBuf) -> Self {
         Self { root_path }
@@ -43,106 +53,75 @@ impl LcovParser {
 
 impl CoveragePort for LcovParser {
     fn parse(&self, data: &str) -> Result<ParseOutput, CrapError> {
-        let mut coverage: HashMap<String, Vec<LineCoverage>> = HashMap::new();
-        let mut raw_branches: RawBranches = HashMap::new();
-        let mut diagnostics: Vec<ParseDiagnostic> = Vec::new();
-        let mut current_path: Option<String> = None;
-        let mut current_lines: BTreeMap<usize, u64> = BTreeMap::new();
-        let mut current_branches: BTreeMap<(usize, u32, u32), Option<u64>> = BTreeMap::new();
+        let mut state = ParseState::default();
 
         for (line, line_number) in data.lines().zip(1usize..) {
-            if let Some(path) = line.strip_prefix("SF:") {
-                flush_block(
-                    &mut coverage,
-                    &mut raw_branches,
-                    current_path.as_deref(),
-                    &mut current_lines,
-                    &mut current_branches,
-                );
-
-                if path.is_empty() {
-                    diagnostics.push(ParseDiagnostic::EmptySourceFile { line_number });
-                    current_path = None;
-                } else {
-                    current_path = Some(self.normalize_path(path));
-                }
-            } else if let Some(da_rest) = line.strip_prefix("DA:")
-                && current_path.is_some()
-            {
-                match parse_da(da_rest) {
-                    Ok((line_no, hits)) => {
-                        current_lines
-                            .entry(line_no)
-                            .and_modify(|h| *h = h.saturating_add(hits))
-                            .or_insert(hits);
-                    }
-                    Err(_) => {
-                        diagnostics.push(ParseDiagnostic::MalformedRecord {
-                            line_number,
-                            content: line.to_string(),
-                        });
-                    }
-                }
-            } else if let Some(brda_rest) = line.strip_prefix("BRDA:")
-                && current_path.is_some()
-            {
-                match parse_brda(brda_rest) {
-                    Ok((line_no, block, branch, taken)) => {
-                        let key = (line_no, block, branch);
-                        current_branches
-                            .entry(key)
-                            .and_modify(|existing| {
-                                *existing = match (*existing, taken) {
-                                    (Some(a), Some(b)) => Some(a.saturating_add(b)),
-                                    (Some(a), None) => Some(a),
-                                    (None, Some(b)) => Some(b),
-                                    (None, None) => None,
-                                };
-                            })
-                            .or_insert(taken);
-                    }
-                    Err(_) => {
-                        diagnostics.push(ParseDiagnostic::MalformedRecord {
-                            line_number,
-                            content: line.to_string(),
-                        });
-                    }
-                }
-            }
+            handle_parse_line(self, &mut state, line, line_number);
         }
 
-        flush_block(
-            &mut coverage,
-            &mut raw_branches,
-            current_path.as_deref(),
-            &mut current_lines,
-            &mut current_branches,
-        );
-
-        // Convert raw branch accumulator to domain types, dropping block/branch IDs
-        let branches = if raw_branches.is_empty() {
-            None
-        } else {
-            Some(
-                raw_branches
-                    .into_iter()
-                    .map(|(file, entries)| {
-                        let vec = entries
-                            .into_iter()
-                            .map(|((line, _, _), taken)| BranchCoverage { line, taken })
-                            .collect();
-                        (file, vec)
-                    })
-                    .collect(),
-            )
-        };
-
-        Ok(ParseOutput {
-            coverage,
-            branches,
-            diagnostics,
-        })
+        flush_block(&mut state);
+        Ok(build_parse_output(state))
     }
+}
+
+fn handle_parse_line(parser: &LcovParser, state: &mut ParseState, line: &str, line_number: usize) {
+    if let Some(path) = line.strip_prefix("SF:") {
+        start_source_file(parser, state, path, line_number);
+        return;
+    }
+
+    if let Some(da_rest) = line.strip_prefix("DA:") {
+        record_da(state, da_rest, line, line_number);
+        return;
+    }
+
+    if let Some(brda_rest) = line.strip_prefix("BRDA:") {
+        record_brda(state, brda_rest, line, line_number);
+    }
+}
+
+fn start_source_file(parser: &LcovParser, state: &mut ParseState, path: &str, line_number: usize) {
+    flush_block(state);
+
+    if path.is_empty() {
+        state
+            .diagnostics
+            .push(ParseDiagnostic::EmptySourceFile { line_number });
+        state.current_path = None;
+    } else {
+        state.current_path = Some(parser.normalize_path(path));
+    }
+}
+
+fn record_da(state: &mut ParseState, da_rest: &str, line: &str, line_number: usize) {
+    if state.current_path.is_none() {
+        return;
+    }
+
+    match parse_da(da_rest) {
+        Ok((line_no, hits)) => merge_hits(&mut state.current_lines, line_no, hits),
+        Err(_) => push_malformed_record(state, line_number, line),
+    }
+}
+
+fn record_brda(state: &mut ParseState, brda_rest: &str, line: &str, line_number: usize) {
+    if state.current_path.is_none() {
+        return;
+    }
+
+    match parse_brda(brda_rest) {
+        Ok((line_no, block, branch, taken)) => {
+            merge_branch_value(&mut state.current_branches, (line_no, block, branch), taken);
+        }
+        Err(_) => push_malformed_record(state, line_number, line),
+    }
+}
+
+fn push_malformed_record(state: &mut ParseState, line_number: usize, line: &str) {
+    state.diagnostics.push(ParseDiagnostic::MalformedRecord {
+        line_number,
+        content: line.to_string(),
+    });
 }
 
 /// Parse a DA record value (after "DA:" prefix).
@@ -184,55 +163,104 @@ fn parse_brda(brda: &str) -> Result<(usize, u32, u32, Option<u64>), ()> {
     Ok((line_no, block, branch, taken))
 }
 
-fn flush_block(
-    coverage: &mut HashMap<String, Vec<LineCoverage>>,
-    raw_branches: &mut RawBranches,
-    current_path: Option<&str>,
-    current_lines: &mut BTreeMap<usize, u64>,
-    current_branches: &mut BTreeMap<(usize, u32, u32), Option<u64>>,
-) {
-    if let Some(path) = current_path {
-        if !current_lines.is_empty() {
-            // Merge with any existing coverage for this file (handles repeated
-            // SF blocks from concatenated tracefiles or TN: sections).
-            let existing = coverage.entry(path.to_owned()).or_default();
-            let mut merged: BTreeMap<usize, u64> = BTreeMap::new();
-            for lc in existing.iter() {
-                merged.insert(lc.line, lc.hits);
-            }
-            for (&line, &hits) in current_lines.iter() {
-                merged
-                    .entry(line)
-                    .and_modify(|h| *h = h.saturating_add(hits))
-                    .or_insert(hits);
-            }
-            *existing = merged
-                .into_iter()
-                .map(|(line, hits)| LineCoverage { line, hits })
-                .collect();
-        }
+fn flush_block(state: &mut ParseState) {
+    let Some(path) = state.current_path.as_deref() else {
+        clear_current_block(state);
+        return;
+    };
 
-        if !current_branches.is_empty() {
-            // Merge with any existing branches for this file (handles repeated
-            // SF blocks from concatenated tracefiles — same merge as DA lines).
-            let file_branches = raw_branches.entry(path.to_owned()).or_default();
-            for (&key, &taken) in current_branches.iter() {
-                file_branches
-                    .entry(key)
-                    .and_modify(|existing| {
-                        *existing = match (*existing, taken) {
-                            (Some(a), Some(b)) => Some(a.saturating_add(b)),
-                            (Some(a), None) => Some(a),
-                            (None, Some(b)) => Some(b),
-                            (None, None) => None,
-                        };
-                    })
-                    .or_insert(taken);
-            }
-        }
+    merge_line_block(&mut state.coverage, path, &state.current_lines);
+    merge_branch_block(&mut state.raw_branches, path, &state.current_branches);
+    clear_current_block(state);
+}
+
+fn merge_line_block(
+    coverage: &mut HashMap<String, Vec<LineCoverage>>,
+    path: &str,
+    current_lines: &BTreeMap<usize, u64>,
+) {
+    if current_lines.is_empty() {
+        return;
     }
-    current_lines.clear();
-    current_branches.clear();
+
+    let existing = coverage.entry(path.to_owned()).or_default();
+    let mut merged: BTreeMap<usize, u64> = existing.iter().map(|lc| (lc.line, lc.hits)).collect();
+    for (&line, &hits) in current_lines {
+        merge_hits(&mut merged, line, hits);
+    }
+    *existing = merged
+        .into_iter()
+        .map(|(line, hits)| LineCoverage { line, hits })
+        .collect();
+}
+
+fn merge_branch_block(
+    raw_branches: &mut RawBranches,
+    path: &str,
+    current_branches: &BTreeMap<BranchKey, Option<u64>>,
+) {
+    if current_branches.is_empty() {
+        return;
+    }
+
+    let file_branches = raw_branches.entry(path.to_owned()).or_default();
+    for (&key, &taken) in current_branches {
+        merge_branch_value(file_branches, key, taken);
+    }
+}
+
+fn merge_hits(lines: &mut BTreeMap<usize, u64>, line_no: usize, hits: u64) {
+    lines
+        .entry(line_no)
+        .and_modify(|existing| *existing = existing.saturating_add(hits))
+        .or_insert(hits);
+}
+
+fn merge_branch_value(
+    branches: &mut BTreeMap<BranchKey, Option<u64>>,
+    key: BranchKey,
+    taken: Option<u64>,
+) {
+    branches
+        .entry(key)
+        .and_modify(|existing| *existing = merge_taken(*existing, taken))
+        .or_insert(taken);
+}
+
+fn merge_taken(existing: Option<u64>, taken: Option<u64>) -> Option<u64> {
+    match (existing, taken) {
+        (Some(a), Some(b)) => Some(a.saturating_add(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
+}
+
+fn clear_current_block(state: &mut ParseState) {
+    state.current_lines.clear();
+    state.current_branches.clear();
+}
+
+fn build_parse_output(state: ParseState) -> ParseOutput {
+    let branches = (!state.raw_branches.is_empty()).then(|| {
+        state
+            .raw_branches
+            .into_iter()
+            .map(|(file, entries)| {
+                let vec = entries
+                    .into_iter()
+                    .map(|((line, _, _), taken)| BranchCoverage { line, taken })
+                    .collect();
+                (file, vec)
+            })
+            .collect()
+    });
+
+    ParseOutput {
+        coverage: state.coverage,
+        branches,
+        diagnostics: state.diagnostics,
+    }
 }
 
 #[cfg(test)]
