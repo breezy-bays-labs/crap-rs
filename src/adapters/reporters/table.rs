@@ -12,6 +12,17 @@ use comfy_table::{ContentArrangement, Table};
 /// overrides), the summary shows "varied (default: N)" instead of a single
 /// number. Returns a ready-to-print `String`.
 pub fn format_table(result: &AnalysisResult, threshold: f64, breakdown: bool) -> String {
+    format_table_with_explain(result, threshold, breakdown, false)
+}
+
+/// Format an analysis result as a colored terminal table with optional
+/// breakdown explanation text.
+pub fn format_table_with_explain(
+    result: &AnalysisResult,
+    threshold: f64,
+    breakdown: bool,
+    explain: bool,
+) -> String {
     let mut output = String::new();
 
     // Header
@@ -62,6 +73,23 @@ pub fn format_table(result: &AnalysisResult, threshold: f64, breakdown: bool) ->
         output.push_str(&inject_breakdown_subrows(&table.to_string(), &sorted));
     } else {
         output.push_str(&table.to_string());
+    }
+
+    if breakdown
+        && explain
+        && sorted
+            .iter()
+            .filter(|verdict| verdict.exceeds)
+            .flat_map(|verdict| verdict.scored.contributors.iter())
+            .any(|contributor| contributor.increment > 1)
+    {
+        output.push('\n');
+        output.push_str("\nLegend: +1 = base structural increment.\n");
+        output.push_str("        +N (nested) = +1 base plus +(N-1) from active nesting depth.\n");
+        output.push_str(
+            "        Nesting depth increases inside if/else branches, match arms, \
+while/for/loop bodies, let-else diverging branches, and closures.\n",
+        );
     }
 
     output.push('\n');
@@ -551,6 +579,91 @@ mod tests {
             "increment > 1 should show '(nested)': {output}"
         );
         assert!(output.contains("+3"), "Should show +3 increment: {output}");
+    }
+
+    #[test]
+    fn test_explain_adds_legend_for_nested_breakdown() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "nested_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            make_nested_contributor(),
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table_with_explain(&result, 8.0, true, true);
+        assert!(output.contains("Legend: +1 = base structural increment."));
+        assert!(output.contains("+N (nested) = +1 base plus +(N-1)"));
+        assert!(output.contains("if/else branches, match arms"));
+        assert!(output.contains("while/for/loop bodies"));
+        assert!(output.contains("let-else diverging branches, and closures"));
+    }
+
+    #[test]
+    fn test_explain_without_breakdown_is_inert() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "nested_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            make_nested_contributor(),
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table_with_explain(&result, 8.0, false, true);
+        assert!(!output.contains("Legend:"));
+        assert!(!output.contains("line 3: match (+3 (nested))"));
+    }
+
+    #[test]
+    fn test_explain_suppressed_without_nested_contributors() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "plain_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            vec![crate::domain::types::ComplexityContributor {
+                kind: crate::domain::types::ContributorKind::Match,
+                line: 3,
+                column: Some(4),
+                increment: 1,
+            }],
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict],
+            summary: make_multi_function_result().summary,
+            passed: false,
+        };
+        let output = format_table_with_explain(&result, 8.0, true, true);
+        assert!(!output.contains("Legend:"));
     }
 
     #[test]

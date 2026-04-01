@@ -153,6 +153,12 @@ pub struct DisplayArgs {
     /// JSON output always includes contributors regardless of this flag.
     #[arg(long)]
     pub breakdown: bool,
+
+    /// Explain nested breakdown increments in table output.
+    ///
+    /// Only affects table output, and only when `--breakdown` is enabled.
+    #[arg(long)]
+    pub explain: bool,
 }
 
 // ── Top-level CLI ───────────────────────────────────────────────────
@@ -206,6 +212,8 @@ pub fn run() -> ExitCode {
 
 fn run_inner() -> Result<bool> {
     let cli = Cli::parse();
+
+    validate_display_flags(&cli)?;
 
     apply_color(cli.display.color);
 
@@ -268,9 +276,12 @@ fn run_inner() -> Result<bool> {
 
     if !cli.display.quiet {
         let output = match cli.output.format {
-            FormatArg::Table => {
-                reporters::format_table(&result, effective_threshold, cli.display.breakdown)
-            }
+            FormatArg::Table => reporters::format_table_with_explain(
+                &result,
+                effective_threshold,
+                cli.display.breakdown,
+                cli.display.explain,
+            ),
             FormatArg::Json => {
                 let config = reporters::json::JsonConfig {
                     tool_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -287,6 +298,16 @@ fn run_inner() -> Result<bool> {
     }
 
     Ok(passed)
+}
+
+fn validate_display_flags(cli: &Cli) -> Result<()> {
+    if cli.display.explain
+        && matches!(cli.output.format, FormatArg::Table)
+        && !cli.display.breakdown
+    {
+        bail!("--explain requires --breakdown for table output");
+    }
+    Ok(())
 }
 
 // ── Config loading & merging ───────────────────────────────────────
@@ -979,6 +1000,33 @@ mod tests {
     fn breakdown_flag_default_false() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         assert!(!cli.display.breakdown);
+    }
+
+    #[test]
+    fn explain_flag_parsed() {
+        let cli = parse(&["--coverage", "lcov.info", "--explain"]).unwrap();
+        assert!(cli.display.explain);
+    }
+
+    #[test]
+    fn explain_flag_default_false() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert!(!cli.display.explain);
+    }
+
+    #[test]
+    fn explain_requires_breakdown_for_table_output() {
+        let cli = parse(&["--coverage", "lcov.info", "--explain"]).unwrap();
+        let err = validate_display_flags(&cli).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("--breakdown"));
+        assert!(msg.contains("--explain"));
+    }
+
+    #[test]
+    fn explain_allowed_for_json_output() {
+        let cli = parse(&["--coverage", "lcov.info", "--format", "json", "--explain"]).unwrap();
+        assert!(validate_display_flags(&cli).is_ok());
     }
 
     #[test]
