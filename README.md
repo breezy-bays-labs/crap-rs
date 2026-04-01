@@ -44,6 +44,8 @@ crap4rs --src src/ --coverage lcov.info
 | `--format <type>` | table | Output format: `table` or `json` |
 | `--exclude <glob>` | — | Exclude paths matching glob (repeatable) |
 | `--verbose` | — | Print analysis diagnostics to stderr |
+| `--breakdown` | — | Show per-contributor complexity breakdown for failing functions in table output |
+| `--explain` | — | With `--breakdown`, explain nested cognitive increments in table output |
 
 ### Why cognitive by default?
 
