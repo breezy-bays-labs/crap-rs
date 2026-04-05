@@ -12,7 +12,7 @@ categories = ["development-tools::testing", "command-line-utilities"]
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
 pkg-fmt = "tgz"
-bin-dir = "{ bin }{ binary-ext }"
+bin-dir = "."
 
 [lib]
 name = "crap4rs"
