@@ -9,6 +9,11 @@ repository = "https://github.com/breezy-bays-labs/crap4rs"
 keywords = ["crap", "complexity", "coverage", "testing", "quality"]
 categories = ["development-tools::testing", "command-line-utilities"]
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
+
 [lib]
 name = "crap4rs"
 path = "src/lib.rs"
