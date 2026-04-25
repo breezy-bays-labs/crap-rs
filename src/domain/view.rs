@@ -126,8 +126,9 @@ pub fn apply<'a>(result: &'a AnalysisResult, spec: ViewSpec) -> AnalysisView<'a>
     sort_in_place(&mut shown, spec.sort);
     let truncated = truncate_to(&mut shown, spec.limit);
 
-    let shown_owned: Vec<FunctionVerdict> = shown.iter().map(|&v| v.clone()).collect();
-    let shown_summary = compute_summary(&shown_owned);
+    // `compute_summary` accepts any `IntoIterator<Item = &FunctionVerdict>`,
+    // so we feed it the borrowed `shown` directly — no per-`apply()` clone.
+    let shown_summary = compute_summary(shown.iter().copied());
 
     AnalysisView {
         full: result,
@@ -142,8 +143,10 @@ pub fn apply<'a>(result: &'a AnalysisResult, spec: ViewSpec) -> AnalysisView<'a>
 /// Filter pass — returns a vector of references that match every active filter.
 ///
 /// AND-composes filters: a verdict is eligible iff every active filter
-/// admits it. Coverage-range branch uses `is_finite()` so NaN coverage
-/// is excluded explicitly (BDD: view.feature:231).
+/// admits it. The coverage-range branch uses `is_finite()` so non-finite
+/// coverage is excluded — NaN in practice (BDD: view.feature:231), and
+/// also ±∞ defensively. LCOV-derived percentages should never be infinite,
+/// but the wider check costs nothing and keeps the comparator total.
 fn apply_filters<'a>(
     verdicts: &'a [FunctionVerdict],
     filters: &Filters,
@@ -1172,19 +1175,18 @@ mod proptests {
 
         /// Invariant 1 (Order): `apply(r, ViewSpec::default()).shown` matches
         /// the legacy sort: CRAP descending, stable on ties.
+        ///
+        /// Both sides borrow from `result.functions`, so pointer equality is
+        /// the strictest possible witness of stable-sort agreement and is
+        /// immune to any duplicate `qualified_name` the strategy might
+        /// produce (CodeRabbit CR-N7).
         #[test]
         fn prop_default_spec_order_matches_legacy_sort(result in arb_analysis_result()) {
             let view = apply(&result, ViewSpec::default());
             let legacy = legacy_sort_order(&result);
-            let view_names: Vec<&String> =
-                view.shown.iter().map(|v| &v.scored.identity.qualified_name).collect();
-            let legacy_names: Vec<&String> =
-                legacy.iter().map(|v| &v.scored.identity.qualified_name).collect();
-            // Compare by (name, file) to disambiguate duplicates in the strategy.
-            // proptest generates unique enough fixtures that names typically suffice.
-            prop_assert_eq!(view_names.len(), legacy_names.len());
-            for (vname, lname) in view_names.iter().zip(legacy_names.iter()) {
-                prop_assert_eq!(vname, lname);
+            prop_assert_eq!(view.shown.len(), legacy.len());
+            for (a, b) in view.shown.iter().zip(legacy.iter()) {
+                prop_assert!(std::ptr::eq(*a, *b));
             }
         }
 

@@ -1,9 +1,16 @@
 use super::types::{AnalysisSummary, FunctionVerdict, RiskDistribution, RiskLevel};
 
-pub fn compute_summary(verdicts: &[FunctionVerdict]) -> AnalysisSummary {
-    let total_functions = verdicts.len();
-    let exceeding = verdicts.iter().filter(|v| v.exceeds).count();
-
+/// Compute an `AnalysisSummary` from any iterable of `&FunctionVerdict`.
+///
+/// Accepting an `IntoIterator` instead of a slice lets callers pass either
+/// `&[FunctionVerdict]` (the typical core path) or `&[&FunctionVerdict]`
+/// (the `view::apply` path, where `shown` is already a vec of borrows).
+/// This avoids the deep clone that would otherwise be required to
+/// materialise an owned slice on every `view::apply` invocation.
+pub fn compute_summary<'a, I>(verdicts: I) -> AnalysisSummary
+where
+    I: IntoIterator<Item = &'a FunctionVerdict>,
+{
     let mut distribution = RiskDistribution {
         low: 0,
         acceptable: 0,
@@ -11,8 +18,9 @@ pub fn compute_summary(verdicts: &[FunctionVerdict]) -> AnalysisSummary {
         high: 0,
     };
 
-    let mut scores: Vec<f64> = Vec::with_capacity(total_functions);
-    let mut files = std::collections::HashSet::new();
+    let mut scores: Vec<f64> = Vec::new();
+    let mut files: std::collections::HashSet<&'a String> = std::collections::HashSet::new();
+    let mut exceeding: usize = 0;
     let mut max_crap = None;
     let mut worst_function = None;
 
@@ -20,6 +28,10 @@ pub fn compute_summary(verdicts: &[FunctionVerdict]) -> AnalysisSummary {
         let score = v.scored.crap.value;
         scores.push(score);
         files.insert(&v.scored.identity.file_path);
+
+        if v.exceeds {
+            exceeding += 1;
+        }
 
         match v.scored.crap.risk_level {
             RiskLevel::Low => distribution.low += 1,
@@ -34,6 +46,7 @@ pub fn compute_summary(verdicts: &[FunctionVerdict]) -> AnalysisSummary {
         }
     }
 
+    let total_functions = scores.len();
     scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let average_crap = if total_functions > 0 {

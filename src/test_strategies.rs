@@ -9,9 +9,10 @@
 //! shape) here, with the analysis-result vec bound widened to `0..50`
 //! so property tests probe empty + small-N + N>limit cases.
 
+use crate::domain::summary::compute_summary;
 use crate::domain::types::{
-    AnalysisResult, AnalysisSummary, ComplexityMetric, CrapScore, FunctionIdentity,
-    FunctionVerdict, RiskDistribution, RiskLevel, ScoredFunction, SourceSpan,
+    AnalysisResult, ComplexityMetric, CrapScore, FunctionIdentity, FunctionVerdict, RiskLevel,
+    ScoredFunction, SourceSpan,
 };
 use proptest::prelude::*;
 
@@ -103,50 +104,21 @@ pub fn arb_verdict_with_nan_coverage() -> impl Strategy<Value = FunctionVerdict>
         )
 }
 
-/// Build an `AnalysisResult` with a hand-constructed summary.
+/// Build an `AnalysisResult` with a faithful summary derived from the
+/// generated verdicts via `domain::summary::compute_summary`.
 ///
-/// Summary values are structurally valid but not guaranteed semantically
-/// precise — call sites that need a faithful summary should pass the
-/// vector through `domain::summary::compute_summary` instead.
+/// Faithful means `summary.worst_function`, `summary.distribution`, and
+/// `summary.total_files` are consistent with the `functions` vector —
+/// not the previous skewed hand-rolled defaults (CR-N1).
 ///
 /// Vec bound is `0..50` so tests probe empty, small-N, and N>typical-limit.
 pub fn arb_analysis_result() -> impl Strategy<Value = AnalysisResult> {
     prop::collection::vec(arb_verdict(), 0..50).prop_map(|verdicts| {
-        let total = verdicts.len();
-        let exceeding = verdicts.iter().filter(|v| v.exceeds).count();
-        let passed = exceeding == 0;
-        let max_crap = verdicts
-            .iter()
-            .max_by(|a, b| {
-                a.scored
-                    .crap
-                    .value
-                    .partial_cmp(&b.scored.crap.value)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .map(|v| v.scored.crap);
-        let avg = if total > 0 {
-            verdicts.iter().map(|v| v.scored.crap.value).sum::<f64>() / total as f64
-        } else {
-            0.0
-        };
+        let passed = !verdicts.iter().any(|v| v.exceeds);
+        let summary = compute_summary(&verdicts);
         AnalysisResult {
             functions: verdicts,
-            summary: AnalysisSummary {
-                total_functions: total,
-                total_files: total,
-                exceeding_threshold: exceeding,
-                average_crap: avg,
-                median_crap: avg,
-                max_crap,
-                worst_function: None,
-                distribution: RiskDistribution {
-                    low: 0,
-                    acceptable: 0,
-                    moderate: 0,
-                    high: 0,
-                },
-            },
+            summary,
             passed,
         }
     })
