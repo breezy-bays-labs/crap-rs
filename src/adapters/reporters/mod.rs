@@ -1,9 +1,13 @@
 //! Output reporters — terminal table and JSON.
 
+pub mod csv;
 pub mod json;
+pub mod markdown;
 pub mod table;
 
+pub use csv::format_csv;
 pub use json::{JsonConfig, format_json};
+pub use markdown::format_markdown;
 pub use table::{format_table, format_table_with_explain};
 
 #[cfg(test)]

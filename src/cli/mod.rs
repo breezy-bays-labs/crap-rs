@@ -8,7 +8,8 @@ use std::process::ExitCode;
 use std::time::SystemTime;
 
 use anyhow::{Result, bail};
-use clap::{Args, Parser, ValueEnum, ValueHint};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
+use clap_complete::Shell as ClapShell;
 
 use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
@@ -48,6 +49,10 @@ pub enum FormatArg {
     Table,
     /// Nested JSON envelope (pipe to jq for filtering)
     Json,
+    /// GitHub-flavored Markdown — paste into PR comments or issues
+    Markdown,
+    /// RFC 4180 CSV — one row per function, no summary
+    Csv,
 }
 
 /// Sort key for the displayed view (issue #68).
@@ -92,12 +97,35 @@ pub enum ColorArg {
 
 // ── Arg groups ──────────────────────────────────────────────────────
 
+/// Shell name for completion script generation (#69).
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ShellArg {
+    Bash,
+    Zsh,
+    Fish,
+    Powershell,
+    Elvish,
+    Nushell,
+}
+
+/// Top-level subcommands. Optional — when absent, crap4rs runs the
+/// default analysis path that requires `--coverage`.
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// Generate a shell completion script to stdout.
+    Completions {
+        #[arg(value_enum)]
+        shell: ShellArg,
+    },
+}
+
 #[derive(Debug, Args)]
 #[command(next_help_heading = "Input")]
 pub struct InputArgs {
-    /// Path to LCOV coverage file (from `cargo llvm-cov --lcov`)
+    /// Path to LCOV coverage file (from `cargo llvm-cov --lcov`).
+    /// Required for analysis; not required for `crap4rs completions`.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
-    pub coverage: PathBuf,
+    pub coverage: Option<PathBuf>,
 
     /// Root directory of Rust source files to analyze [default: src]
     #[arg(long, value_name = "DIR", value_hint = ValueHint::DirPath)]
@@ -295,6 +323,9 @@ pub struct Cli {
 
     #[command(flatten)]
     pub display: DisplayArgs,
+
+    #[command(subcommand)]
+    pub command: Option<Command>,
 }
 
 // ── Entry point ─────────────────────────────────────────────────────
@@ -312,6 +343,11 @@ pub fn run() -> ExitCode {
 
 fn run_inner() -> Result<bool> {
     let cli = Cli::parse();
+
+    if let Some(Command::Completions { shell }) = cli.command {
+        emit_completions(shell);
+        return Ok(true);
+    }
 
     validate_display_flags(&cli)?;
     view_args::validate_view_args(&cli)?;
@@ -337,9 +373,18 @@ fn run_inner() -> Result<bool> {
     let (threshold_config, effective_threshold) = merge_threshold(&cli, &file_config);
     let effective_exclude = merge_exclude(&cli, &file_config);
 
+    // `--coverage` is required on the analysis path; subcommands like
+    // `completions` skip this branch. Clap can't express "required
+    // unless subcommand X" in derive, so we enforce it here.
+    let Some(coverage_path) = cli.input.coverage.as_ref() else {
+        bail!(
+            "--coverage <FILE> is required (run `crap4rs --help` for usage, or `crap4rs completions <SHELL>` for shell completion scripts)"
+        );
+    };
+
     // Validate effective values (after merging)
-    validate_inputs(&cli.input.coverage, &effective_src, effective_threshold)?;
-    preflight_checks(&cli.input.coverage, &effective_src)?;
+    validate_inputs(coverage_path, &effective_src, effective_threshold)?;
+    preflight_checks(coverage_path, &effective_src)?;
 
     // Validate --diff ref if provided
     if let Some(ref diff_ref) = cli.filter.diff {
@@ -349,7 +394,7 @@ fn run_inner() -> Result<bool> {
 
     let options = AnalyzeOptions {
         src: effective_src,
-        coverage: cli.input.coverage.clone(),
+        coverage: coverage_path.clone(),
         threshold_config,
         metric: effective_metric,
         exclude: effective_exclude,
@@ -397,6 +442,13 @@ fn run_inner() -> Result<bool> {
                 };
                 reporters::format_json(&view, &config)?
             }
+            FormatArg::Markdown => reporters::format_markdown(
+                &view,
+                effective_threshold,
+                cli.display.breakdown,
+                cli.display.explain,
+            ),
+            FormatArg::Csv => reporters::format_csv(&view, effective_metric),
         };
         print!("{output}");
     }
@@ -703,6 +755,29 @@ fn print_diagnostics(diag: &AnalysisDiagnostics) {
     }
 }
 
+// ── Shell completions ───────────────────────────────────────────────
+
+/// Print a shell completion script to stdout for the given shell.
+/// `clap_complete::generate` covers POSIX shells + PowerShell + Elvish;
+/// nushell uses the separate `clap_complete_nushell` crate.
+fn emit_completions(shell: ShellArg) {
+    let mut cmd = Cli::command();
+    let bin = "crap4rs";
+    let stdout = &mut std::io::stdout();
+    match shell {
+        ShellArg::Bash => clap_complete::generate(ClapShell::Bash, &mut cmd, bin, stdout),
+        ShellArg::Zsh => clap_complete::generate(ClapShell::Zsh, &mut cmd, bin, stdout),
+        ShellArg::Fish => clap_complete::generate(ClapShell::Fish, &mut cmd, bin, stdout),
+        ShellArg::Powershell => {
+            clap_complete::generate(ClapShell::PowerShell, &mut cmd, bin, stdout)
+        }
+        ShellArg::Elvish => clap_complete::generate(ClapShell::Elvish, &mut cmd, bin, stdout),
+        ShellArg::Nushell => {
+            clap_complete::generate(clap_complete_nushell::Nushell, &mut cmd, bin, stdout)
+        }
+    }
+}
+
 // ── Color wiring ────────────────────────────────────────────────────
 
 fn apply_color(choice: ColorArg) {
@@ -727,16 +802,33 @@ mod tests {
     }
 
     #[test]
-    fn required_coverage_arg() {
-        let err = parse(&[]).unwrap_err();
-        assert!(err.to_string().contains("--coverage"));
+    fn no_args_parses_with_coverage_none() {
+        // `--coverage` is enforced at runtime via run_inner (so that
+        // the `completions` subcommand can skip it), not at clap parse
+        // time. Bare `crap4rs` therefore parses successfully here but
+        // would `bail!` once dispatched.
+        let cli = parse(&[]).unwrap();
+        assert!(cli.input.coverage.is_none());
+        assert!(cli.command.is_none());
     }
 
     #[test]
     fn minimal_valid_args() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        assert_eq!(cli.input.coverage, PathBuf::from("lcov.info"));
+        assert_eq!(cli.input.coverage.as_deref(), Some(Path::new("lcov.info")));
         assert_eq!(cli.input.src, None);
+    }
+
+    #[test]
+    fn completions_subcommand_does_not_require_coverage() {
+        let cli = parse(&["completions", "bash"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Completions {
+                shell: ShellArg::Bash
+            })
+        ));
+        assert!(cli.input.coverage.is_none());
     }
 
     #[test]

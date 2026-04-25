@@ -41,7 +41,7 @@ crap4rs --src src/ --coverage lcov.info
 | `--coverage <path>` | required | Path to LCOV coverage file |
 | `--threshold <n>` | 25 | CRAP score threshold (exit 1 if exceeded) |
 | `--metric <type>` | cognitive | Complexity metric: `cognitive` or `cyclomatic` |
-| `--format <type>` | table | Output format: `table` or `json` |
+| `--format <type>` | table | Output format: `table`, `json`, `markdown`, or `csv` |
 | `--exclude <glob>` | — | Exclude paths matching glob (repeatable) |
 | `--verbose` | — | Print analysis diagnostics to stderr |
 | `--breakdown` | — | Show per-contributor complexity breakdown for failing functions in table output |
@@ -82,6 +82,36 @@ crap4rs --coverage lcov.info \
 ```
 
 The JSON envelope reflects the same separation: `result.*` always describes the full analysis (gate); `view.*` describes what the operator chose to see (display). An agent or dashboard can act on `result.passed`, `result.summary`, and `result.functions` while rendering only `view.shown`.
+
+## Output formats
+
+`--format markdown` produces GitHub-flavored Markdown (pipe-syntax table plus a Summary block) — paste it into a PR comment, an issue body, or a doc page. `--format csv` produces RFC 4180 CSV with a fixed header row, suitable for piping into spreadsheets, BI tools, or `awk`/`jq` pipelines that prefer tabular input. Both honor every shaping flag (`--top`, `--sort-by`, `--only-failing`, `--min-coverage` / `--max-coverage`).
+
+## Shell completions
+
+Print a completion script for your shell to stdout — the subcommand does no file I/O, so redirect it wherever your shell expects completions:
+
+```bash
+# bash
+crap4rs completions bash > /usr/local/etc/bash_completion.d/crap4rs
+
+# zsh — adjust to a directory in your $fpath
+crap4rs completions zsh > ~/.zsh/completions/_crap4rs
+
+# fish
+crap4rs completions fish > ~/.config/fish/completions/crap4rs.fish
+
+# nushell — append the printed module to your config
+crap4rs completions nushell >> ~/.config/nushell/config.nu
+
+# powershell
+crap4rs completions powershell | Out-String | Invoke-Expression
+
+# elvish
+crap4rs completions elvish > ~/.config/elvish/lib/crap4rs.elv
+```
+
+`crap4rs completions <SHELL>` does not need `--coverage`. Unknown shell names exit `2`.
 
 ## Coverage notes
 

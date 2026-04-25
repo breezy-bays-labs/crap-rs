@@ -1,0 +1,22 @@
+---
+source: src/adapters/reporters/markdown.rs
+expression: out
+---
+# crap4rs v0.1.1 — CRAP Score Analysis
+
+| File | Function | CC | Cov% | CRAP | Risk |
+|------|----------|----|------|------|------|
+| src/lib.rs | risky_fn | 5 | 30.0 | 45.00 | high |
+  - L5 if-branch +1
+  - L10 for-loop +2
+
+_Legend: +1 = base structural increment. +N (nested) = +1 base plus +(N-1) from active nesting depth (if/else, match arms, while/for/loop, let-else diverging branches, closures)._
+
+## Summary
+
+- **Result:** FAIL
+- **Functions:** 3 (2 above threshold 8)
+- **Worst CRAP:** 45.2
+- **Average CRAP:** 21.1
+- **Median CRAP:** 15.0
+- **Distribution:** low 1 · acceptable 0 · moderate 1 · high 1
