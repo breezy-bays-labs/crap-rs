@@ -1,0 +1,8 @@
+---
+source: src/adapters/reporters/csv.rs
+expression: out
+---
+file,function,start_line,end_line,complexity,complexity_metric,coverage_percent,crap_score,risk_level,exceeds_threshold
+src/domain/crap.rs,complex_fn,1,10,20,cognitive,30.0,45.20,high,true
+src/adapters/coverage/mod.rs,parse_record,1,10,6,cognitive,72.5,15.00,moderate,true
+src/lib.rs,simple_fn,1,10,2,cognitive,95.0,3.00,low,false
