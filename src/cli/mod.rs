@@ -17,7 +17,7 @@ use crap4rs::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
 use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
-use crap4rs::domain::view;
+use crap4rs::domain::view::{self, SortKey};
 
 mod view_args;
 
@@ -48,6 +48,34 @@ pub enum FormatArg {
     Table,
     /// Nested JSON envelope (pipe to jq for filtering)
     Json,
+}
+
+/// Sort key for the displayed view (issue #68).
+///
+/// CLI-side wrapper that keeps `clap::ValueEnum` out of the domain.
+/// `From<SortKeyArg> for SortKey` is the boundary; `build_view_spec`
+/// translates at the edge so `domain::view::SortKey` stays clap-free.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum SortKeyArg {
+    /// CRAP score descending (default — investigator's first cut)
+    Crap,
+    /// Coverage percent ascending (lowest coverage first)
+    Coverage,
+    /// Complexity descending (most complex first)
+    Complexity,
+    /// Alphabetical by file_path, then CRAP descending within file
+    Path,
+}
+
+impl From<SortKeyArg> for SortKey {
+    fn from(arg: SortKeyArg) -> Self {
+        match arg {
+            SortKeyArg::Crap => SortKey::Crap,
+            SortKeyArg::Coverage => SortKey::Coverage,
+            SortKeyArg::Complexity => SortKey::Complexity,
+            SortKeyArg::Path => SortKey::Path,
+        }
+    }
 }
 
 /// When to colorize output.
@@ -152,6 +180,18 @@ pub struct FilterArgs {
     /// Upper bound (inclusive) on coverage_percent for the displayed view.
     #[arg(long, allow_hyphen_values = true, value_name = "PCT")]
     pub max_coverage: Option<f64>,
+
+    /// Sort key for the displayed view (default: crap descending).
+    ///
+    /// `crap` (default) — CRAP score descending; `coverage` — coverage
+    /// percent ascending (lowest first); `complexity` — complexity
+    /// descending; `path` — alphabetical by file, then CRAP descending
+    /// within file. Sorting reorders without reducing rows, so the gate
+    /// (exit code) is unaffected. Unknown values are rejected by clap
+    /// at parse time with an `invalid value` error attributed to
+    /// `--sort-by`, so no custom validation is needed here.
+    #[arg(long, value_enum, value_name = "KEY")]
+    pub sort_by: Option<SortKeyArg>,
 
     /// Truncate the displayed view to the top N highest-CRAP rows.
     ///
