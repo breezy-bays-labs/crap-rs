@@ -142,6 +142,16 @@ pub struct OutputArgs {
     /// `--quiet` for silent success in CI.
     #[arg(long)]
     pub no_fail: bool,
+
+    /// Omit the denormalized `view.shown` row array from JSON output.
+    ///
+    /// Payload-size escape hatch for very large codebases. The
+    /// envelope's `result` block (the gate) is unaffected; `view.spec`,
+    /// `view.eligible_count`, `view.truncated`, and `view.shown_summary`
+    /// remain so consumers retain full scope context. Only meaningful
+    /// with `--format json`.
+    #[arg(long)]
+    pub minimal_view: bool,
 }
 
 #[derive(Debug, Args)]
@@ -383,6 +393,7 @@ fn run_inner() -> Result<bool> {
                     timestamp: now_unix_epoch(),
                     diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
                     diff_ref: cli.filter.diff.as_deref(),
+                    minimal_view: cli.output.minimal_view,
                 };
                 reporters::format_json(&view, &config)?
             }
