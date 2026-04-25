@@ -152,6 +152,17 @@ pub struct FilterArgs {
     /// Upper bound (inclusive) on coverage_percent for the displayed view.
     #[arg(long, allow_hyphen_values = true, value_name = "PCT")]
     pub max_coverage: Option<f64>,
+
+    /// Truncate the displayed view to the top N highest-CRAP rows.
+    ///
+    /// `--top 0` means "no limit" — equivalent to omitting the flag.
+    /// The full unfiltered analysis still drives the gate (exit code),
+    /// so truncating violations out of the view does not change the outcome.
+    ///
+    /// `allow_hyphen_values`: lets clap parse `--top -3` as a value (not an
+    /// unknown flag) so the resulting error message is attributed to `--top`.
+    #[arg(long, allow_hyphen_values = true, value_name = "N")]
+    pub top: Option<u32>,
 }
 
 #[derive(Debug, Args)]
