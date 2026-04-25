@@ -64,7 +64,6 @@ pub fn arb_verdict() -> impl Strategy<Value = FunctionVerdict> {
 ///
 /// Used to exercise NaN-aware filter and sort paths in `domain::view`.
 /// Roughly half the verdicts will have `coverage_percent = NaN`.
-#[allow(dead_code)] // Exercised by domain::view proptests; kept allowed for callers added later.
 pub fn arb_verdict_with_nan_coverage() -> impl Strategy<Value = FunctionVerdict> {
     (
         "[a-z_]{1,20}",
