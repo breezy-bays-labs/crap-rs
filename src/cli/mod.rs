@@ -104,10 +104,6 @@ pub struct OutputArgs {
     /// Use lenient threshold (40) — for legacy or transitional code
     #[arg(long, group = "threshold_select")]
     pub lenient: bool,
-
-    /// Only show functions that exceed the threshold
-    #[arg(long)]
-    pub only_failing: bool,
 }
 
 #[derive(Debug, Args)]
@@ -134,6 +130,16 @@ pub struct FilterArgs {
     /// Useful for CI PR gating: `crap4rs --coverage lcov.info --diff main`
     #[arg(long, value_name = "REF")]
     pub diff: Option<String>,
+
+    /// Only show functions that exceed the threshold
+    ///
+    /// Display-only filter: the underlying analysis (the gate) and its
+    /// summary remain over the full unfiltered set, so the exit code and
+    /// every aggregate (`average_crap`, `median_crap`, `distribution`,
+    /// etc.) reflect the whole codebase. Only the row list and
+    /// `view.shown_summary` are reduced.
+    #[arg(long)]
+    pub only_failing: bool,
 }
 
 #[derive(Debug, Args)]
@@ -261,7 +267,7 @@ fn run_inner() -> Result<bool> {
     };
 
     let analysis = crap4rs::core::analyze(&options)?;
-    let mut result = analysis.result;
+    let result = analysis.result;
     let passed = result.passed;
 
     // Always warn about non-fatal issues (details require --verbose)
@@ -272,21 +278,10 @@ fn run_inner() -> Result<bool> {
         print_diagnostics(&analysis.diagnostics);
     }
 
-    // Filter to only failing functions if requested (summary stays unfiltered).
-    //
-    // NOTE (V1a): this `retain` is the legacy, behavior-preserving path
-    // for `--only-failing`. V1b relocates the flag to `FilterArgs` and
-    // routes it through `view::Filters::only_failing` so the row reduction
-    // is consistent with the View pipeline. Until then the V1a wiring
-    // continues to mutate `result.functions` here to keep this PR strictly
-    // behavior-preserving.
-    if cli.output.only_failing {
-        result.functions.retain(|v| v.exceeds);
-    }
-
     // Build the spec, then shape the result through the View pipeline.
-    // V1a: spec is always `ViewSpec::default()`. W1/W2 surface `--top`,
-    // `--min/max-coverage`, `--sort-by` via `view_args::build_view_spec`.
+    // V1b: `--only-failing` flows through `Filters::only_failing` here.
+    // W2 fills in `--top`, `--min/max-coverage`, `--sort-by`. The
+    // underlying `result` is never mutated — the gate is unshapeable.
     let spec = view_args::build_view_spec(&cli);
     let view = view::apply(&result, spec);
 
@@ -720,7 +715,7 @@ mod tests {
     #[test]
     fn only_failing_flag() {
         let cli = parse(&["--coverage", "lcov.info", "--only-failing"]).unwrap();
-        assert!(cli.output.only_failing);
+        assert!(cli.filter.only_failing);
     }
 
     #[test]

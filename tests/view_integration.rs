@@ -230,3 +230,127 @@ fn schema_version_remains_one_with_additive_view() {
         "View block was added per ADR D2 additive rule; schema_version stays at 1"
     );
 }
+
+// ── V1b: --only-failing routes through the View, summary stays unfiltered ──
+
+/// 6-function fixture: 3 simple (CC=1, fully covered) and 3 branching
+/// (uncovered). Threshold 5 puts 3 functions over the edge.
+const ONLY_FAILING_SRC: &str = "\
+pub fn passing_a() -> i32 { 1 }
+pub fn passing_b() -> i32 { 2 }
+pub fn passing_c() -> i32 { 3 }
+pub fn failing_a(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+pub fn failing_b(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+pub fn failing_c(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+";
+
+const ONLY_FAILING_LCOV: &str = "\
+SF:lib.rs
+DA:1,1
+DA:2,1
+DA:3,1
+DA:4,0
+DA:5,0
+DA:6,0
+end_of_record
+";
+
+#[test]
+fn only_failing_summary_is_self_consistent() {
+    // V1b regression: `--only-failing` must NOT mutate `result.functions`
+    // or any field of `result.summary`. The full unfiltered analysis is
+    // the unshapeable gate; only `view.shown` reflects the filter.
+    //
+    // CQO-C3: enumerate every summary field (total_functions,
+    // exceeding_threshold, average_crap, median_crap, max_crap.value,
+    // and all four distribution buckets) and assert each one matches
+    // the baseline (no-filter) run.
+    let dir = tempfile::tempdir().unwrap();
+    setup_dir(dir.path(), ONLY_FAILING_SRC, ONLY_FAILING_LCOV);
+
+    // Threshold violations are expected → exit code 1, but stdout still
+    // carries the JSON envelope. Only exit 2 (validation error) would be
+    // a fatal failure here.
+    let baseline = run(
+        dir.path(),
+        &["--threshold", "5", "--format", "json", "--no-gitignore"],
+    );
+    assert_ne!(
+        baseline.status.code(),
+        Some(2),
+        "baseline run must not error: stderr:\n{}",
+        stderr_str(&baseline)
+    );
+    let base = parse_json(&baseline);
+
+    // Sanity: 6 total functions, 3 exceed at threshold 5.
+    assert_eq!(
+        base["result"]["summary"]["total_functions"], 6,
+        "fixture sanity: expected 6 functions"
+    );
+    assert_eq!(
+        base["result"]["summary"]["exceeding_threshold"], 3,
+        "fixture sanity: expected 3 to exceed threshold 5"
+    );
+
+    let filtered = run(
+        dir.path(),
+        &[
+            "--threshold",
+            "5",
+            "--format",
+            "json",
+            "--no-gitignore",
+            "--only-failing",
+        ],
+    );
+    assert_ne!(
+        filtered.status.code(),
+        Some(2),
+        "--only-failing run must not error: stderr:\n{}",
+        stderr_str(&filtered)
+    );
+    let v = parse_json(&filtered);
+
+    // Key: V1b leaves result.functions untouched. Under V1a this would
+    // be 3 (the legacy retain). Under V1b it stays at 6.
+    let funcs = v["result"]["functions"].as_array().expect("array");
+    assert_eq!(
+        funcs.len(),
+        6,
+        "result.functions must NOT be mutated by --only-failing under V1b"
+    );
+
+    // CQO-C3: every summary field equals the baseline.
+    let s = &v["result"]["summary"];
+    let bs = &base["result"]["summary"];
+    assert_eq!(s["total_functions"], bs["total_functions"]);
+    assert_eq!(s["total_files"], bs["total_files"]);
+    assert_eq!(s["exceeding_threshold"], bs["exceeding_threshold"]);
+    assert_eq!(s["average_crap"], bs["average_crap"]);
+    assert_eq!(s["median_crap"], bs["median_crap"]);
+    assert_eq!(s["max_crap"], bs["max_crap"]);
+    assert_eq!(s["worst_function"], bs["worst_function"]);
+    assert_eq!(s["distribution"]["low"], bs["distribution"]["low"]);
+    assert_eq!(
+        s["distribution"]["acceptable"],
+        bs["distribution"]["acceptable"]
+    );
+    assert_eq!(
+        s["distribution"]["moderate"],
+        bs["distribution"]["moderate"]
+    );
+    assert_eq!(s["distribution"]["high"], bs["distribution"]["high"]);
+
+    // The View carries the filtered subset.
+    let shown = v["view"]["shown"].as_array().expect("view.shown array");
+    assert_eq!(shown.len(), 3, "view.shown must reflect the filter");
+    assert_eq!(
+        v["view"]["shown_summary"]["total_functions"], 3,
+        "view.shown_summary derives from the filtered subset"
+    );
+    assert_eq!(
+        v["view"]["spec"]["filters"]["only_failing"], true,
+        "ViewSpec must record the filter that was applied"
+    );
+}

@@ -1,19 +1,21 @@
 //! CLI → ViewSpec adapter.
 //!
-//! V1a stub: every CLI invocation maps to `ViewSpec::default()`. Wave 1
-//! (V1b: `--only-failing` relocation) and Wave 2 (`--top`,
-//! `--min/max-coverage`, `--sort-by`) flesh this out without further
-//! changes to `cli/mod.rs::run_inner`.
+//! V1b wires `--only-failing` through `Filters::only_failing`. Wave 2
+//! (`--top`, `--min/max-coverage`, `--sort-by`) extends this without
+//! further changes to `cli/mod.rs::run_inner`.
 
 use super::Cli;
 use crap4rs::domain::view::ViewSpec;
 
-/// Build a `ViewSpec` from the parsed CLI. V1a returns the default
-/// spec unconditionally — `apply()` is a no-op shape-preserving pass
-/// over the analysis. Subsequent waves pull `top`, `coverage_range`,
-/// `sort_by`, and `only_failing` off the CLI struct here.
-pub(super) fn build_view_spec(_cli: &Cli) -> ViewSpec {
-    ViewSpec::default()
+/// Build a `ViewSpec` from the parsed CLI.
+///
+/// `Filters` and `ViewSpec` are `#[non_exhaustive]` (per ADR D3 — they
+/// reserve namespace for future filters/sort keys), so we mutate fields
+/// on a default rather than using a struct literal.
+pub(super) fn build_view_spec(cli: &Cli) -> ViewSpec {
+    let mut spec = ViewSpec::default();
+    spec.filters.only_failing = cli.filter.only_failing;
+    spec
 }
 
 /// Validation hook for view-specific args. V1a: vacuously OK. W2's
