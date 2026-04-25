@@ -140,6 +140,18 @@ pub struct FilterArgs {
     /// `view.shown_summary` are reduced.
     #[arg(long)]
     pub only_failing: bool,
+
+    /// Lower bound (inclusive) on coverage_percent for the displayed view.
+    ///
+    /// `allow_hyphen_values`: lets clap parse `--min-coverage -5` as a
+    /// value (not an unknown flag) so `validate_view_args` can report
+    /// the right error.
+    #[arg(long, allow_hyphen_values = true, value_name = "PCT")]
+    pub min_coverage: Option<f64>,
+
+    /// Upper bound (inclusive) on coverage_percent for the displayed view.
+    #[arg(long, allow_hyphen_values = true, value_name = "PCT")]
+    pub max_coverage: Option<f64>,
 }
 
 #[derive(Debug, Args)]
@@ -223,6 +235,7 @@ fn run_inner() -> Result<bool> {
     let cli = Cli::parse();
 
     validate_display_flags(&cli)?;
+    view_args::validate_view_args(&cli)?;
 
     apply_color(cli.display.color);
 
