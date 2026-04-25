@@ -46,6 +46,12 @@ crap4rs --src src/ --coverage lcov.info
 | `--verbose` | — | Print analysis diagnostics to stderr |
 | `--breakdown` | — | Show per-contributor complexity breakdown for failing functions in table output |
 | `--explain` | — | With `--breakdown`, explain nested cognitive increments in table output |
+| `--only-failing` | — | Display only functions exceeding the threshold (full analysis still drives the gate) |
+| `--top <n>` | — | Truncate the report to the top `n` highest-CRAP rows (`--top 0` means no limit) |
+| `--min-coverage <pct>` | — | Drop functions whose `coverage_percent` falls below the bound |
+| `--max-coverage <pct>` | — | Drop functions whose `coverage_percent` exceeds the bound |
+| `--sort-by <key>` | `crap` | Reorder rows by `crap`, `coverage`, `complexity`, or `path` |
+| `--no-fail` | — | Always exit `0`; `result.passed` in JSON still reflects the truthful state |
 
 Threshold presets are Rust-specific:
 
@@ -58,6 +64,24 @@ These do not match `crap4ts` exactly. The long-term goal is shared CRAP math and
 ### Why cognitive by default?
 
 Rust's `match` expressions with many arms inflate cyclomatic complexity without adding real risk. A flat 20-arm match is cyclomatic 20 but cognitive 1. Cognitive complexity better reflects actual Rust code risk.
+
+## Investigation patterns
+
+The shaping flags (`--only-failing`, `--top`, `--min-coverage`, `--max-coverage`, `--sort-by`) reorder, filter, and truncate the **displayed report** without ever touching the **underlying analysis**. The gate is unshapeable: `result.passed` and the exit code always reflect the full unfiltered codebase, so a filter that hides every violation does not change the outcome. `--no-fail` overrides only the gate-to-exit-code translation; `result.passed` in JSON still tells the truth, so consumers can detect "would have failed" even when the process exits `0`.
+
+```bash
+# First-run scan: keep the report short
+crap4rs --coverage lcov.info --top 20
+
+# Worst partially-covered functions, sorted by coverage ascending,
+# never fail the build — useful when investigating an untested codebase
+crap4rs --coverage lcov.info \
+  --min-coverage 1 --max-coverage 90 \
+  --sort-by coverage --top 10 \
+  --no-fail
+```
+
+The JSON envelope reflects the same separation: `result.*` always describes the full analysis (gate); `view.*` describes what the operator chose to see (display). An agent or dashboard can act on `result.passed`, `result.summary`, and `result.functions` while rendering only `view.shown`.
 
 ## Coverage notes
 

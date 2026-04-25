@@ -263,7 +263,15 @@ EXAMPLES:
   crap4rs --coverage lcov.info --threshold 15 --metric cyclomatic
   crap4rs --coverage lcov.info --format json | jq '.functions[] | select(.exceeds)'
   crap4rs --coverage lcov.info --only-failing
-  crap4rs --coverage lcov.info --exclude \"tests/**\" --exclude \"benches/**\""
+  crap4rs --coverage lcov.info --exclude \"tests/**\" --exclude \"benches/**\"
+
+INVESTIGATION PATTERNS:
+  # First-run scan: keep the report short
+  crap4rs --coverage lcov.info --top 20
+
+  # Worst partially-covered functions, sorted by coverage ascending,
+  # never fail the build — useful when investigating an untested codebase
+  crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail"
 )]
 pub struct Cli {
     #[command(flatten)]
