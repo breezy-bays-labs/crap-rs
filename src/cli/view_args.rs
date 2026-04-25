@@ -28,6 +28,7 @@ pub(super) fn build_view_spec(cli: &Cli) -> ViewSpec {
     // canonicalise at the boundary so JSON consumers see effective behaviour
     // rather than the user's literal input.
     spec.limit = cli.filter.top.and_then(|n| (n > 0).then_some(n as usize));
+    spec.sort = cli.filter.sort_by.map(Into::into).unwrap_or_default();
     spec
 }
 
