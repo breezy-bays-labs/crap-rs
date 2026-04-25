@@ -898,6 +898,23 @@ mod tests {
         assert!(!view.truncated);
     }
 
+    #[test]
+    fn limit_equal_to_eligible_does_not_mark_truncated() {
+        // Boundary: shown.len() == limit. Mutation-killer for `>` vs `>=`
+        // in `truncate_to`. The data is unchanged either way, but
+        // `truncated` MUST stay false when nothing was actually dropped.
+        let r = background_fixture();
+        assert_eq!(r.functions.len(), 6, "background fixture sanity");
+        let spec = ViewSpec {
+            limit: Some(6),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert_eq!(view.shown.len(), 6);
+        assert_eq!(view.eligible_count, 6);
+        assert!(!view.truncated, "limit == eligible must NOT mark truncated");
+    }
+
     // ── Order of operations ────────────────────────────────────────
 
     #[test]
