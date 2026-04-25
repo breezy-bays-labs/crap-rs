@@ -24,6 +24,10 @@ pub(super) fn build_view_spec(cli: &Cli) -> ViewSpec {
     if let Some((lo, hi)) = resolve_coverage_bounds(cli) {
         spec.filters.coverage_range = CoverageRange::new(lo, hi).ok();
     }
+    // `Some(0)` and `None` are both "no limit" (per `domain::view::truncate_to`);
+    // canonicalise at the boundary so JSON consumers see effective behaviour
+    // rather than the user's literal input.
+    spec.limit = cli.filter.top.and_then(|n| (n > 0).then_some(n as usize));
     spec
 }
 
