@@ -5,7 +5,7 @@ use std::fmt;
 
 /// Line range in source coordinates.
 /// `start_line` is 1-based inclusive, `end_line` is inclusive.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
@@ -114,7 +114,7 @@ impl fmt::Display for ComplexityMetric {
 // ── Function Identity & Metrics ─────────────────────────────────────
 
 /// Identifies a function in the source code.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct FunctionIdentity {
     /// Project-relative file path, forward-slash normalized.
     pub file_path: String,
