@@ -1002,6 +1002,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(mutants, ignore = "cargo-mutants copies the source tree without .git, so this in-cwd assertion fails baseline")]
     fn preflight_git_worktree_passes_in_git_repo() {
         // We're running tests from inside a git repo
         let cwd = std::env::current_dir().unwrap();
