@@ -146,11 +146,15 @@ fn json_envelope_key_declaration_order() {
         "result",
         "view",
     ];
+    // Top-level keys in serde_json's pretty printer sit at indent 2.
+    // Anchor the substring search to `\n  "<key>"` so future nested
+    // fields with the same name (e.g. a per-verdict `threshold`)
+    // can't shadow the top-level position (CodeRabbit CR-N5).
     let positions: Vec<usize> = keys
         .iter()
         .map(|k| {
-            raw.find(&format!("\"{k}\""))
-                .unwrap_or_else(|| panic!("envelope missing key {k}\nstdout:\n{raw}"))
+            raw.find(&format!("\n  \"{k}\""))
+                .unwrap_or_else(|| panic!("envelope missing top-level key {k}\nstdout:\n{raw}"))
         })
         .collect();
     for (pair, w) in keys.windows(2).zip(positions.windows(2)) {

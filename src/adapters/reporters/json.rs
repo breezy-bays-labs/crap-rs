@@ -290,12 +290,16 @@ mod tests {
             "result",
             "view",
         ];
+        // Top-level keys in serde_json's pretty printer sit at indent 2.
+        // Anchor the substring search to `\n  "<key>"` so future nested
+        // fields with the same name can't shadow the top-level
+        // position (CodeRabbit CR-N5).
         let positions: Vec<usize> = keys
             .iter()
             .map(|k| {
                 json_str
-                    .find(&format!("\"{k}\""))
-                    .unwrap_or_else(|| panic!("missing key {k} in:\n{json_str}"))
+                    .find(&format!("\n  \"{k}\""))
+                    .unwrap_or_else(|| panic!("missing top-level key {k} in:\n{json_str}"))
             })
             .collect();
         for (k_prev, w) in keys.windows(2).zip(positions.windows(2)) {
