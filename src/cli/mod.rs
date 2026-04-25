@@ -132,6 +132,16 @@ pub struct OutputArgs {
     /// Use lenient threshold (40) — for legacy or transitional code
     #[arg(long, group = "threshold_select")]
     pub lenient: bool,
+
+    /// Always exit 0, even when threshold violations exist.
+    ///
+    /// Overrides only the exit-code translation; the underlying analysis
+    /// is untouched and `result.passed` in JSON output still reflects
+    /// the truthful pass/fail state, so consumers can detect "would
+    /// have failed" even when the process exits 0. Composes with
+    /// `--quiet` for silent success in CI.
+    #[arg(long)]
+    pub no_fail: bool,
 }
 
 #[derive(Debug, Args)]
@@ -373,8 +383,10 @@ fn run_inner() -> Result<bool> {
     }
 
     // Exit code derives from `view.full.passed` — i.e., the underlying
-    // analysis. The View shapes the display, never the gate.
-    Ok(passed)
+    // analysis. The View shapes the display, never the gate. `--no-fail`
+    // overrides only the gate-to-exit-code translation; `result.passed`
+    // in JSON output still reflects the truthful pass/fail state.
+    Ok(passed || cli.output.no_fail)
 }
 
 fn validate_display_flags(cli: &Cli) -> Result<()> {
