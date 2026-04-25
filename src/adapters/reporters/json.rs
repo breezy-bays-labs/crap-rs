@@ -6,8 +6,10 @@
 //! reported rows were filtered, sorted, and truncated. `view.full` is
 //! `#[serde(skip)]` so the analysis is emitted exactly once.
 
-use crate::domain::types::{AnalysisDiagnostics, AnalysisResult, ComplexityMetric};
-use crate::domain::view::AnalysisView;
+use crate::domain::types::{
+    AnalysisDiagnostics, AnalysisResult, AnalysisSummary, ComplexityMetric, FunctionVerdict,
+};
+use crate::domain::view::{AnalysisView, ViewSpec};
 use serde::Serialize;
 
 /// Configuration for the JSON envelope metadata.
@@ -21,6 +23,10 @@ pub struct JsonConfig<'a> {
     pub diagnostics: Option<&'a AnalysisDiagnostics>,
     /// Git ref used for diff filtering (`--diff <ref>`). `None` when not in diff mode.
     pub diff_ref: Option<&'a str>,
+    /// When true, the per-row `view.shown` array is omitted (`--minimal-view`).
+    /// All other view metadata (`spec`, `eligible_count`, `truncated`,
+    /// `shown_summary`) is preserved so consumers retain scope context.
+    pub minimal_view: bool,
 }
 
 /// JSON envelope. Field order is **load-bearing** —
@@ -40,9 +46,40 @@ struct JsonEnvelope<'a> {
     threshold: f64,
     diff_ref: Option<&'a str>,
     result: &'a AnalysisResult,
-    view: &'a AnalysisView<'a>,
+    view: ViewWire<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     diagnostics: Option<&'a AnalysisDiagnostics>,
+}
+
+/// On-the-wire view representation. Mirrors `AnalysisView`'s serialized
+/// shape exactly when `shown` is `Some`, so the default JSON output is
+/// byte-identical to the prior `view: &AnalysisView` serialization.
+/// `--minimal-view` sets `shown = None`, which `skip_serializing_if`
+/// elides — every other key remains for scope context.
+#[derive(Serialize)]
+struct ViewWire<'a> {
+    spec: &'a ViewSpec,
+    eligible_count: usize,
+    truncated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shown: Option<&'a [&'a FunctionVerdict]>,
+    shown_summary: &'a AnalysisSummary,
+}
+
+impl<'a> ViewWire<'a> {
+    fn from_view(view: &'a AnalysisView<'a>, minimal: bool) -> Self {
+        ViewWire {
+            spec: &view.spec,
+            eligible_count: view.eligible_count,
+            truncated: view.truncated,
+            shown: if minimal {
+                None
+            } else {
+                Some(view.shown.as_slice())
+            },
+            shown_summary: &view.shown_summary,
+        }
+    }
 }
 
 // Note: per-function thresholds are already visible in each FunctionVerdict's
@@ -67,7 +104,7 @@ pub fn format_json(
         threshold: config.threshold,
         diff_ref: config.diff_ref,
         result: view.full,
-        view,
+        view: ViewWire::from_view(view, config.minimal_view),
         diagnostics: config.diagnostics,
     };
     serde_json::to_string_pretty(&envelope)
@@ -87,6 +124,7 @@ mod tests {
             timestamp: "2026-03-28T12:00:00Z".to_string(),
             diagnostics: None,
             diff_ref: None,
+            minimal_view: false,
         }
     }
 
@@ -427,6 +465,7 @@ mod proptests {
             timestamp: "2026-01-01T00:00:00Z".to_string(),
             diagnostics: None,
             diff_ref: None,
+            minimal_view: false,
         })
     }
 
