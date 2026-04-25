@@ -208,7 +208,7 @@ Feature: CLI ergonomics — shaping the report from the command line
     And `view.eligible_count` equals `result.summary.total_functions`
     And `view.truncated` is false
     And `view.shown` is an array
-    And `view.shown_summary` contains `total_functions`, `exceeding_threshold`, `average_crap`, `median_crap`, `max_crap`, and `distribution`
+    And `view.shown_summary` contains every field of `AnalysisSummary` — `total_functions`, `total_files`, `exceeding_threshold`, `average_crap`, `median_crap`, `max_crap`, `worst_function`, and `distribution` — so a future field accidentally dropped from the serialized payload fails the assertion
 
   Scenario: default invocation has shown_summary equal to result.summary
     When the operator runs `crap4rs --coverage lcov.info --format json`

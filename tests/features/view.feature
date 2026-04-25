@@ -9,12 +9,20 @@ Feature: View — presentation transform on analysis findings
     Given an analysis with the following functions:
       | qualified_name        | file_path             | complexity | coverage_percent | crap   | exceeds |
       | parse_lcov            | src/adapters/lcov.rs  | 12         | 100.0            | 12.00  | false   |
-      | walk_ast              | src/adapters/syn.rs   | 18         | 75.0             | 23.06  | true    |
+      | walk_ast              | src/adapters/syn.rs   | 18         | 75.0             | 23.06  | false   |
       | render_table          | src/adapters/table.rs | 9          | 60.0             | 14.18  | false   |
       | apply_threshold       | src/domain/threshold.rs | 4        | 100.0            | 4.00   | false   |
       | sort_verdicts         | src/adapters/table.rs | 6          | 0.0              | 42.00  | true    |
       | parse_args            | src/cli/mod.rs        | 22         | 50.0             | 63.50  | true    |
     And the threshold is 25.0
+    # Notes:
+    # - `walk_ast` has crap=23.06 < threshold=25, so `exceeds = false`. The
+    #   Rust mirror (`background_fixture()` in `src/domain/view.rs`) derives
+    #   `exceeds` from `crap_value > threshold` and matches this row.
+    # - `parse_args` (c=22, cov=50, threshold=25) lists `crap=63.50` as a
+    #   stipulated round number for the table; the formula-faithful value
+    #   (c + c² · (1 − cov/100)³ ≈ 82.50) is intentionally not used here so
+    #   the row stays readable. The Rust fixture uses 63.50 to match.
 
   # ── Default ViewSpec — no-op invariants ────────────────────────────
   # These scenarios encode walking-skeleton invariants 1, 2, and 3

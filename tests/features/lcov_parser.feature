@@ -122,10 +122,22 @@ Feature: LCOV coverage parsing
     And no coverage entry is created for the empty path
 
   Scenario: Non-coverage LCOV records are ignored
-    Given LCOV data containing FN, FNDA, BRDA, LF, and LH records
+    Given LCOV data containing FN, FNDA, LF, and LH records
     When the coverage is parsed
-    Then only SF and DA records affect the result
+    Then only SF, DA, and BRDA records affect the result
     And no diagnostics are reported for ignored record types
+
+  Scenario: BRDA records are parsed into the branches map
+    Given LCOV data containing well-formed BRDA records under an SF block
+    When the coverage is parsed
+    Then `ParseOutput.branches` reflects each BRDA entry
+    And no diagnostics are reported for well-formed BRDA lines
+
+  Scenario: Malformed BRDA records emit a MalformedRecord diagnostic
+    Given LCOV data containing an unparseable BRDA record under an SF block
+    When the coverage is parsed
+    Then a MalformedRecord diagnostic is reported for the offending line
+    And the SF block continues to parse without halting
 
   # --- Property invariants (from CLAUDE.md) ---
 
