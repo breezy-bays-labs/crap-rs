@@ -12,6 +12,14 @@ pub(crate) mod test_fixtures {
         AnalysisResult, AnalysisSummary, ComplexityContributor, CrapScore, FunctionIdentity,
         FunctionVerdict, RiskDistribution, RiskLevel, ScoredFunction, SourceSpan,
     };
+    use crate::domain::view::{self, AnalysisView, ViewSpec};
+
+    /// Build a default-spec view from the given analysis. Convenience for
+    /// reporter tests that just want to assert on the default-spec output
+    /// (the V1a walking-skeleton invariant).
+    pub fn make_view_default(result: &AnalysisResult) -> AnalysisView<'_> {
+        view::apply(result, ViewSpec::default())
+    }
 
     pub fn make_verdict(
         name: &str,

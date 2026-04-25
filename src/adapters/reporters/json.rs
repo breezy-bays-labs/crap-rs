@@ -1,7 +1,13 @@
-//! JSON reporter — formats `AnalysisResult` as structured JSON
+//! JSON reporter — formats an `AnalysisView` as structured JSON
 //! with a versioned envelope for CI pipelines and tooling consumption.
+//!
+//! The envelope carries both the unshapeable underlying analysis
+//! (`result`) and the View metadata (`view`) describing how the
+//! reported rows were filtered, sorted, and truncated. `view.full` is
+//! `#[serde(skip)]` so the analysis is emitted exactly once.
 
 use crate::domain::types::{AnalysisDiagnostics, AnalysisResult, ComplexityMetric};
+use crate::domain::view::AnalysisView;
 use serde::Serialize;
 
 /// Configuration for the JSON envelope metadata.
@@ -17,6 +23,13 @@ pub struct JsonConfig<'a> {
     pub diff_ref: Option<&'a str>,
 }
 
+/// JSON envelope. Field order is **load-bearing** —
+/// `tests/features/cli_ergonomics.feature:243-246` asserts the
+/// declaration order is exactly:
+///   schema_version, tool_version, language, timestamp, metric,
+///   threshold, diff_ref, result, view
+/// Per ADR D2 the schema is additive: adding `view` keeps
+/// `schema_version` at 1.
 #[derive(Serialize)]
 struct JsonEnvelope<'a> {
     schema_version: u32,
@@ -27,6 +40,7 @@ struct JsonEnvelope<'a> {
     threshold: f64,
     diff_ref: Option<&'a str>,
     result: &'a AnalysisResult,
+    view: &'a AnalysisView<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     diagnostics: Option<&'a AnalysisDiagnostics>,
 }
@@ -35,9 +49,13 @@ struct JsonEnvelope<'a> {
 // `threshold` field. Consumers can compare individual function thresholds
 // against the envelope's global `threshold` to detect overrides.
 
-/// Format an analysis result as pretty-printed JSON with a versioned envelope.
+/// Format a view as pretty-printed JSON with a versioned envelope.
+///
+/// `view.full` is the canonical analysis (gate); the envelope's
+/// `result` field serializes it. The additive `view` field carries
+/// the spec, eligible/truncated metadata, and the shaped row list.
 pub fn format_json(
-    result: &AnalysisResult,
+    view: &AnalysisView<'_>,
     config: &JsonConfig<'_>,
 ) -> Result<String, serde_json::Error> {
     let envelope = JsonEnvelope {
@@ -48,7 +66,8 @@ pub fn format_json(
         metric: &config.metric,
         threshold: config.threshold,
         diff_ref: config.diff_ref,
-        result,
+        result: view.full,
+        view,
         diagnostics: config.diagnostics,
     };
     serde_json::to_string_pretty(&envelope)
@@ -72,7 +91,8 @@ mod tests {
     }
 
     fn parse_json(result: &AnalysisResult, config: &JsonConfig) -> serde_json::Value {
-        let json_str = format_json(result, config).expect("format_json should succeed");
+        let view = make_view_default(result);
+        let json_str = format_json(&view, config).expect("format_json should succeed");
         serde_json::from_str(&json_str).expect("output should be valid JSON")
     }
 
@@ -243,9 +263,81 @@ mod tests {
             RiskLevel::Acceptable,
             8.0,
         );
-        let json_str = format_json(&result, &default_config()).unwrap();
+        let view = make_view_default(&result);
+        let json_str = format_json(&view, &default_config()).unwrap();
         let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
         insta::assert_json_snapshot!(v);
+    }
+
+    #[test]
+    fn test_envelope_field_declaration_order() {
+        // cli_ergonomics.feature:243-246: the envelope key declaration
+        // order is exactly schema_version, tool_version, language,
+        // timestamp, metric, threshold, diff_ref, result, view.
+        // Asserted on the raw `format_json` string (NOT the parsed
+        // serde_json::Value, which alphabetizes via BTreeMap).
+        let result = make_empty_result();
+        let view = make_view_default(&result);
+        let json_str = format_json(&view, &default_config()).unwrap();
+        let keys = [
+            "schema_version",
+            "tool_version",
+            "language",
+            "timestamp",
+            "metric",
+            "threshold",
+            "diff_ref",
+            "result",
+            "view",
+        ];
+        // Top-level keys in serde_json's pretty printer sit at indent 2.
+        // Anchor the substring search to `\n  "<key>"` so future nested
+        // fields with the same name can't shadow the top-level
+        // position (CodeRabbit CR-N5).
+        let positions: Vec<usize> = keys
+            .iter()
+            .map(|k| {
+                json_str
+                    .find(&format!("\n  \"{k}\""))
+                    .unwrap_or_else(|| panic!("missing top-level key {k} in:\n{json_str}"))
+            })
+            .collect();
+        for (k_prev, w) in keys.windows(2).zip(positions.windows(2)) {
+            assert!(
+                w[0] < w[1],
+                "envelope key order: expected {} before {}, got positions {} and {}",
+                k_prev[0],
+                k_prev[1],
+                w[0],
+                w[1],
+            );
+        }
+    }
+
+    #[test]
+    fn test_view_block_present_in_envelope() {
+        // The envelope unconditionally carries a `view` block; defaults
+        // are echoed (filters empty, sort=crap, limit absent).
+        let result = make_multi_function_result();
+        let view = make_view_default(&result);
+        let json_str = format_json(&view, &default_config()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        let view_block = v.get("view").expect("envelope missing view block");
+        assert!(view_block.get("spec").is_some());
+        assert!(view_block.get("eligible_count").is_some());
+        assert!(view_block.get("truncated").is_some());
+        assert!(view_block.get("shown").is_some());
+        assert!(view_block.get("shown_summary").is_some());
+        // view.full is `#[serde(skip)]` — it must NOT appear.
+        assert!(
+            view_block.get("full").is_none(),
+            "view.full should be elided from JSON (envelope's `result` already serializes it)"
+        );
+        // Default spec echoed
+        let spec = view_block.get("spec").unwrap();
+        assert_eq!(spec["sort"], "crap");
+        assert_eq!(spec["limit"], serde_json::Value::Null);
+        assert_eq!(spec["filters"]["only_failing"], false);
     }
 
     #[test]
@@ -323,101 +415,9 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use crate::domain::types::{
-        AnalysisSummary, CrapScore, FunctionIdentity, FunctionVerdict, RiskDistribution, RiskLevel,
-        ScoredFunction, SourceSpan,
-    };
+    use crate::adapters::reporters::test_fixtures::make_view_default;
+    use crate::test_strategies::arb_analysis_result;
     use proptest::prelude::*;
-
-    fn arb_risk_level() -> impl Strategy<Value = RiskLevel> {
-        prop_oneof![
-            Just(RiskLevel::Low),
-            Just(RiskLevel::Acceptable),
-            Just(RiskLevel::Moderate),
-            Just(RiskLevel::High),
-        ]
-    }
-
-    fn arb_verdict() -> impl Strategy<Value = FunctionVerdict> {
-        (
-            "[a-z_]{1,20}",
-            "src/[a-z/]{1,30}\\.rs",
-            1..100u32,
-            0.0..=100.0f64,
-            1.0..200.0f64,
-            arb_risk_level(),
-            1.0..100.0f64,
-        )
-            .prop_map(
-                |(name, file, complexity, coverage, crap_value, risk, threshold)| FunctionVerdict {
-                    scored: ScoredFunction {
-                        identity: FunctionIdentity {
-                            file_path: file,
-                            qualified_name: name,
-                            span: SourceSpan {
-                                start_line: 1,
-                                end_line: 10,
-                            },
-                        },
-                        complexity,
-                        complexity_metric: ComplexityMetric::Cognitive,
-                        coverage_percent: coverage,
-                        crap: CrapScore {
-                            value: crap_value,
-                            risk_level: risk,
-                        },
-                        contributors: vec![],
-                    },
-                    threshold,
-                    exceeds: crap_value > threshold,
-                },
-            )
-    }
-
-    /// Build an AnalysisResult with a hand-constructed summary.
-    /// Summary values are structurally valid but not semantically precise —
-    /// reporters only format what they receive, so accuracy doesn't matter.
-    fn arb_analysis_result() -> impl Strategy<Value = crate::domain::types::AnalysisResult> {
-        prop::collection::vec(arb_verdict(), 0..10).prop_map(|verdicts| {
-            let total = verdicts.len();
-            let exceeding = verdicts.iter().filter(|v| v.exceeds).count();
-            let passed = exceeding == 0;
-            let max_crap = verdicts
-                .iter()
-                .max_by(|a, b| {
-                    a.scored
-                        .crap
-                        .value
-                        .partial_cmp(&b.scored.crap.value)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .map(|v| v.scored.crap);
-            let avg = if total > 0 {
-                verdicts.iter().map(|v| v.scored.crap.value).sum::<f64>() / total as f64
-            } else {
-                0.0
-            };
-            crate::domain::types::AnalysisResult {
-                functions: verdicts,
-                summary: AnalysisSummary {
-                    total_functions: total,
-                    total_files: total,
-                    exceeding_threshold: exceeding,
-                    average_crap: avg,
-                    median_crap: avg,
-                    max_crap,
-                    worst_function: None,
-                    distribution: RiskDistribution {
-                        low: 0,
-                        acceptable: 0,
-                        moderate: 0,
-                        high: 0,
-                    },
-                },
-                passed,
-            }
-        })
-    }
 
     fn arb_config() -> impl Strategy<Value = JsonConfig<'static>> {
         (1.0..100.0f64,).prop_map(|(threshold,)| JsonConfig {
@@ -438,7 +438,8 @@ mod proptests {
             result in arb_analysis_result(),
             config in arb_config(),
         ) {
-            let json_str = format_json(&result, &config)
+            let view = make_view_default(&result);
+            let json_str = format_json(&view, &config)
                 .expect("format_json should never fail on valid input");
             let _: serde_json::Value = serde_json::from_str(&json_str)
                 .expect("output should be valid JSON");
@@ -449,7 +450,8 @@ mod proptests {
             result in arb_analysis_result(),
             config in arb_config(),
         ) {
-            let json_str = format_json(&result, &config).unwrap();
+            let view = make_view_default(&result);
+            let json_str = format_json(&view, &config).unwrap();
             let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
             let funcs = v["result"]["functions"].as_array().unwrap();
             prop_assert_eq!(funcs.len(), result.functions.len());

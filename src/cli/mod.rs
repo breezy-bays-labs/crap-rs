@@ -17,6 +17,9 @@ use crap4rs::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
 use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
+use crap4rs::domain::view;
+
+mod view_args;
 
 // ── ValueEnum wrappers (keep domain types clap-free) ────────────────
 
@@ -269,15 +272,28 @@ fn run_inner() -> Result<bool> {
         print_diagnostics(&analysis.diagnostics);
     }
 
-    // Filter to only failing functions if requested (summary stays unfiltered)
+    // Filter to only failing functions if requested (summary stays unfiltered).
+    //
+    // NOTE (V1a): this `retain` is the legacy, behavior-preserving path
+    // for `--only-failing`. V1b relocates the flag to `FilterArgs` and
+    // routes it through `view::Filters::only_failing` so the row reduction
+    // is consistent with the View pipeline. Until then the V1a wiring
+    // continues to mutate `result.functions` here to keep this PR strictly
+    // behavior-preserving.
     if cli.output.only_failing {
         result.functions.retain(|v| v.exceeds);
     }
 
+    // Build the spec, then shape the result through the View pipeline.
+    // V1a: spec is always `ViewSpec::default()`. W1/W2 surface `--top`,
+    // `--min/max-coverage`, `--sort-by` via `view_args::build_view_spec`.
+    let spec = view_args::build_view_spec(&cli);
+    let view = view::apply(&result, spec);
+
     if !cli.display.quiet {
         let output = match cli.output.format {
             FormatArg::Table => reporters::format_table_with_explain(
-                &result,
+                &view,
                 effective_threshold,
                 cli.display.breakdown,
                 cli.display.explain,
@@ -291,12 +307,14 @@ fn run_inner() -> Result<bool> {
                     diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
                     diff_ref: cli.filter.diff.as_deref(),
                 };
-                reporters::format_json(&result, &config)?
+                reporters::format_json(&view, &config)?
             }
         };
         print!("{output}");
     }
 
+    // Exit code derives from `view.full.passed` — i.e., the underlying
+    // analysis. The View shapes the display, never the gate.
     Ok(passed)
 }
 
@@ -985,9 +1003,18 @@ mod tests {
 
     #[test]
     fn preflight_git_worktree_passes_in_git_repo() {
-        // We're running tests from inside a git repo
-        let cwd = std::env::current_dir().unwrap();
-        assert!(preflight_git_worktree(&cwd).is_ok());
+        // Initialize a fresh git repo in a temp dir so the test is self-contained
+        // and works under tools (e.g. cargo-mutants) that copy the source tree
+        // without `.git`.
+        let tmp = tempfile::tempdir().unwrap();
+        let status = std::process::Command::new("git")
+            .arg("init")
+            .arg("--quiet")
+            .current_dir(tmp.path())
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init failed");
+        assert!(preflight_git_worktree(tmp.path()).is_ok());
     }
 
     #[test]

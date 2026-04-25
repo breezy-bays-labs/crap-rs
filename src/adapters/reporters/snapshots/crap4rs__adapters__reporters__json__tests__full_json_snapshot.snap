@@ -61,5 +61,66 @@ expression: v
   "schema_version": 1,
   "threshold": 8.0,
   "timestamp": "2026-03-28T12:00:00Z",
-  "tool_version": "0.1.0"
+  "tool_version": "0.1.0",
+  "view": {
+    "eligible_count": 1,
+    "shown": [
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 80.0,
+          "crap": {
+            "risk_level": "acceptable",
+            "value": 5.16
+          },
+          "identity": {
+            "file_path": "src/domain/crap.rs",
+            "qualified_name": "compute_crap",
+            "span": {
+              "end_line": 10,
+              "start_line": 1
+            }
+          }
+        },
+        "threshold": 8.0
+      }
+    ],
+    "shown_summary": {
+      "average_crap": 5.16,
+      "distribution": {
+        "acceptable": 1,
+        "high": 0,
+        "low": 0,
+        "moderate": 0
+      },
+      "exceeding_threshold": 0,
+      "max_crap": {
+        "risk_level": "acceptable",
+        "value": 5.16
+      },
+      "median_crap": 5.16,
+      "total_files": 1,
+      "total_functions": 1,
+      "worst_function": {
+        "file_path": "src/domain/crap.rs",
+        "qualified_name": "compute_crap",
+        "span": {
+          "end_line": 10,
+          "start_line": 1
+        }
+      }
+    },
+    "spec": {
+      "filters": {
+        "coverage_range": null,
+        "only_failing": false
+      },
+      "limit": null,
+      "sort": "crap"
+    },
+    "truncated": false
+  }
 }

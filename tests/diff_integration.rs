@@ -573,7 +573,8 @@ fn json_envelope_contains_diff_ref() {
         diagnostics: None,
         diff_ref: Some("HEAD"),
     };
-    let json_str = reporters::format_json(&result, &config).unwrap();
+    let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
+    let json_str = reporters::format_json(&view, &config).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
 
     assert_eq!(v["diff_ref"], "HEAD");
@@ -605,7 +606,8 @@ fn json_envelope_diff_ref_null_without_flag() {
         diagnostics: None,
         diff_ref: None,
     };
-    let json_str = reporters::format_json(&result, &config).unwrap();
+    let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
+    let json_str = reporters::format_json(&view, &config).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
 
     assert!(v["diff_ref"].is_null());
