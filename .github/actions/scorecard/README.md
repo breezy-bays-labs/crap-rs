@@ -84,6 +84,23 @@ jobs:
           comment-header: 'crap-scorecard'
 ```
 
+### Sticky comments and fork PRs
+
+GitHub issues a **read-only `GITHUB_TOKEN`** for `pull_request` events
+triggered from forks, regardless of the job-level `permissions:` block. The
+`comment-mode: sticky` step will silently no-op (or fail to post) on those
+runs. Same-repo branches are unaffected.
+
+If you need fork-PR coverage, two well-trodden options:
+
+- Switch the trigger to `pull_request_target` with hardened checkout (don't
+  check out untrusted code in the same job that holds write tokens).
+- Move the comment step to a separate `workflow_run`-triggered workflow
+  that has its own writable token.
+
+Most projects pick "no fork-PR sticky comments" until they have a concrete
+need — same-repo coverage is sufficient for internal review.
+
 ## Aggregator pattern — one row of a richer metrics comment
 
 Mokumo's metrics-delta bot wants coverage + CRAP + mutation + module size in
@@ -156,6 +173,34 @@ When the action is folded into the future
 [crap monorepo](https://github.com/breezy-bays-labs/ops/issues/231) it'll get
 a Marketplace listing with proper version tags; for now `@main` is the only
 moving ref and SHA-pinning is the safe default.
+
+## Pre-installed binary (advanced)
+
+When `version: latest` (the default) and a `crap4rs` binary is already on
+`PATH` before the action runs, the install step is **skipped** and the
+action uses the pre-installed binary. This supports two use cases:
+
+- **`moonrepo/setup-rust` bins.** If a prior step already installed
+  `crap4rs` via setup-rust's `bins:` parameter, the action respects it
+  rather than reinstalling.
+- **End-to-end self-dogfooding.** A workflow that builds `crap4rs` from
+  source and copies it to `~/.cargo/bin/` before invoking the action gets
+  the action to render via that binary — useful for the project's own CI
+  to validate the renderer against itself.
+
+When `version` is pinned to a specific tag (e.g. `version: '0.2.2'`), the
+action **always reinstalls** that exact version, ignoring whatever happens
+to be on `PATH`. Pinned-version semantics override pre-installed semantics.
+
+```yaml
+# Example: dogfood a workspace-local build
+- run: cargo build --release
+- run: install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
+- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+  with:
+    coverage: lcov.info
+    # version defaults to 'latest' → install step short-circuits
+```
 
 ## Design notes
 
