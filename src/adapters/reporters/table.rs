@@ -5,6 +5,7 @@
 //! and derives its summary line from `view.full.summary` (the
 //! unshapeable gate). It does not sort, filter, or truncate.
 
+use crate::domain::delta::{DeltaView, FunctionChange};
 use crate::domain::types::RiskLevel;
 use crate::domain::view::AnalysisView;
 use colored::Colorize;
@@ -17,13 +18,19 @@ use comfy_table::{ContentArrangement, Table};
 /// "varied (default: N)" instead of a single number. Returns a
 /// ready-to-print `String`.
 pub fn format_table(view: &AnalysisView<'_>, threshold: f64, breakdown: bool) -> String {
-    format_table_with_explain(view, threshold, breakdown, false)
+    format_table_with_explain(view, None, threshold, breakdown, false)
 }
 
 /// Format an `AnalysisView` as a colored terminal table with optional
 /// breakdown explanation text.
+///
+/// When `delta` is `Some`, a "Delta vs baseline" block is appended
+/// below the analysis table — header line + per-change rows + a
+/// summary line. When `delta` is `None`, output is byte-identical to
+/// the pre-delta version.
 pub fn format_table_with_explain(
     view: &AnalysisView<'_>,
+    delta: Option<&DeltaView<'_>>,
     threshold: f64,
     breakdown: bool,
     explain: bool,
@@ -42,6 +49,9 @@ pub fn format_table_with_explain(
     // an actually-empty analysis does.
     if view.full.functions.is_empty() {
         output.push_str("\nNo functions analyzed\n");
+        if let Some(delta_view) = delta {
+            append_delta_block(&mut output, delta_view);
+        }
         return output;
     }
 
@@ -52,6 +62,9 @@ pub fn format_table_with_explain(
         output.push_str(&format_grouped_table(view));
         output.push('\n');
         append_summary_block(&mut output, view, threshold);
+        if let Some(delta_view) = delta {
+            append_delta_block(&mut output, delta_view);
+        }
         return output;
     }
 
@@ -106,7 +119,91 @@ while/for/loop bodies, let-else diverging branches, and closures.\n",
 
     append_summary_block(&mut output, view, threshold);
 
+    if let Some(delta_view) = delta {
+        append_delta_block(&mut output, delta_view);
+    }
+
     output
+}
+
+/// Append the delta block. Reads `view.full.summary` (the unshapeable
+/// delta-gate counts) for the header line and iterates `view.shown`
+/// for the per-change rows. The table mirrors the analysis table
+/// columns where applicable but adds Kind / Δ for delta semantics.
+fn append_delta_block(output: &mut String, view: &DeltaView<'_>) {
+    let summary = view.full.summary;
+    output.push_str("\nDelta vs baseline:\n");
+    output.push_str(&format!(
+        "  +{added} added, {removed} removed, {modified} modified · {regressions} regressions, {improvements} improvements, {new_violations} new violations\n",
+        added = summary.added,
+        removed = summary.removed,
+        modified = summary.modified,
+        regressions = summary.regressions,
+        improvements = summary.improvements,
+        new_violations = summary.new_violations,
+    ));
+
+    if view.shown.is_empty() {
+        output.push_str("  (no changes to display)\n");
+        return;
+    }
+
+    let mut table = Table::new();
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+    table.set_header(vec!["Kind", "File", "Function", "Baseline", "Current", "Δ"]);
+
+    for change in view.shown.iter() {
+        let kind_str = change.kind().as_str();
+        let baseline_str = change
+            .baseline_score()
+            .map(|s| format!("{s:.2}"))
+            .unwrap_or_else(|| "—".to_string());
+        let current_str = change
+            .current_score()
+            .map(|s| format!("{s:.2}"))
+            .unwrap_or_else(|| "—".to_string());
+        let delta_str = change
+            .score_delta()
+            .map(|d| {
+                let prefix = if d > 0.0 { "+" } else { "" };
+                format!("{prefix}{d:.2}")
+            })
+            .unwrap_or_else(|| "—".to_string());
+
+        let colored_delta = match change {
+            FunctionChange::Modified { .. } => delta_color(change.score_delta(), &delta_str),
+            _ => delta_str,
+        };
+
+        table.add_row(vec![
+            kind_str.to_string(),
+            change.file_path().to_string(),
+            change.qualified_name().to_string(),
+            baseline_str,
+            current_str,
+            colored_delta,
+        ]);
+    }
+
+    output.push('\n');
+    output.push_str(&table.to_string());
+    output.push('\n');
+
+    if view.truncated {
+        output.push_str(&format!(
+            "  (showing {} of {} changes — use --delta-top 0 to disable)\n",
+            view.shown.len(),
+            view.eligible_count
+        ));
+    }
+}
+
+fn delta_color(score_delta: Option<f64>, s: &str) -> String {
+    match score_delta {
+        Some(d) if d > 0.0 => s.red().bold().to_string(),
+        Some(d) if d < 0.0 => s.green().bold().to_string(),
+        _ => s.to_string(),
+    }
 }
 
 /// Append the two-line summary block. Always derives from
@@ -660,7 +757,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table_with_explain(&make_view_default(&result), 8.0, true, true);
+        let output = format_table_with_explain(&make_view_default(&result), None, 8.0, true, true);
         assert!(output.contains("Legend: +1 = base structural increment."));
         assert!(output.contains("+N (nested) = +1 base plus +(N-1)"));
         assert!(output.contains("if/else branches, match arms"));
@@ -689,7 +786,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table_with_explain(&make_view_default(&result), 8.0, false, true);
+        let output = format_table_with_explain(&make_view_default(&result), None, 8.0, false, true);
         assert!(!output.contains("Legend:"));
         assert!(!output.contains("line 3: match (+3 (nested))"));
     }
@@ -720,7 +817,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table_with_explain(&make_view_default(&result), 8.0, true, true);
+        let output = format_table_with_explain(&make_view_default(&result), None, 8.0, true, true);
         assert!(!output.contains("Legend:"));
     }
 
@@ -1068,6 +1165,84 @@ mod tests {
             },
         );
         let output = format_table(&view, 8.0, false);
+        insta::assert_snapshot!(output);
+    }
+
+    // ── Delta block (VS5) ─────────────────────────────────────────────
+
+    #[test]
+    fn delta_block_renders_header_and_summary_line() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let output = format_table_with_explain(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+        );
+        assert!(
+            output.contains("Delta vs baseline:"),
+            "missing delta header: {output}"
+        );
+        assert!(
+            output.contains("+1 added, 1 removed, 2 modified"),
+            "missing delta summary counts: {output}"
+        );
+        // new_fn is the only new violation; parse_record's baseline already exceeded.
+        assert!(
+            output.contains("1 new violations"),
+            "missing new violations: {output}"
+        );
+    }
+
+    #[test]
+    fn delta_block_includes_change_rows_with_kind_column() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let output = format_table_with_explain(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+        );
+        // Per-change rows present
+        assert!(output.contains("added"));
+        assert!(output.contains("removed"));
+        assert!(output.contains("modified"));
+        assert!(output.contains("new_fn"));
+        assert!(output.contains("complex_fn")); // removed
+        assert!(output.contains("parse_record")); // modified
+    }
+
+    #[test]
+    fn no_baseline_means_no_delta_block() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let output =
+            format_table_with_explain(&make_view_default(&result), None, 8.0, false, false);
+        assert!(!output.contains("Delta vs baseline"));
+    }
+
+    #[test]
+    fn delta_block_full_snapshot() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let output = format_table_with_explain(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+        );
         insta::assert_snapshot!(output);
     }
 }

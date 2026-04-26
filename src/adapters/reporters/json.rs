@@ -6,6 +6,7 @@
 //! reported rows were filtered, sorted, and truncated. `view.full` is
 //! `#[serde(skip)]` so the analysis is emitted exactly once.
 
+use crate::domain::delta::{DeltaSummary, DeltaView, DeltaViewSpec, FunctionChange};
 use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, AnalysisSummary, ComplexityMetric, FunctionVerdict,
 };
@@ -27,6 +28,23 @@ pub struct JsonConfig<'a> {
     /// All other view metadata (`spec`, `eligible_count`, `truncated`,
     /// `shown_summary`) is preserved so consumers retain scope context.
     pub minimal_view: bool,
+    /// When present, the envelope grows a top-level `delta` block
+    /// describing changes vs the baseline. None means no `--baseline`
+    /// was passed; the `delta` key is omitted entirely.
+    pub delta: Option<DeltaContext<'a>>,
+}
+
+/// Bundles everything the JSON reporter needs to render the `delta`
+/// block: the shaped view (post-filter / sort / truncate) plus the
+/// underlying delta and baseline metadata captured when the baseline
+/// envelope was loaded.
+#[derive(Debug)]
+pub struct DeltaContext<'a> {
+    /// Shaped view — drives `shown`, `spec`, `eligible_count`, `truncated`.
+    pub view: &'a DeltaView<'a>,
+    pub baseline_tool_version: &'a str,
+    pub baseline_timestamp: &'a str,
+    pub baseline_diagnostics: Option<&'a AnalysisDiagnostics>,
 }
 
 /// JSON envelope. Field order is **load-bearing** —
@@ -47,8 +65,56 @@ struct JsonEnvelope<'a> {
     diff_ref: Option<&'a str>,
     result: &'a AnalysisResult,
     view: ViewWire<'a>,
+    /// Delta block. Present iff `--baseline` was passed; absent (key
+    /// elided) otherwise so existing consumers see byte-identical
+    /// output for the no-delta case. Additive — `schema_version` stays
+    /// at 1 (ADR D2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delta: Option<DeltaWire<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     diagnostics: Option<&'a AnalysisDiagnostics>,
+}
+
+/// On-the-wire delta representation. Mirrors the `delta` envelope key
+/// shape documented in ADR D7 §DeltaView.
+#[derive(Serialize)]
+struct DeltaWire<'a> {
+    /// Aggregate counts over the *unshaped* change set. The gate
+    /// keystone — shaping never alters this.
+    summary: &'a DeltaSummary,
+    /// Echoes the resolved [`DeltaViewSpec`] so consumers can
+    /// reconstruct what filters / sort / limit produced `shown`.
+    spec: &'a DeltaViewSpec,
+    /// Post-filter, pre-truncate count. With `truncated`, lets
+    /// consumers render "Showing X of Y".
+    eligible_count: usize,
+    truncated: bool,
+    /// Reserved for a future `--baseline-ref <label>` flag (F2 follow-up).
+    /// Always `null` today.
+    baseline_ref: Option<&'a str>,
+    baseline_tool_version: &'a str,
+    baseline_timestamp: &'a str,
+    /// Per-change list, post-filter / sort / truncate. References
+    /// (the borrows hold for the envelope's lifetime via the View).
+    shown: Vec<&'a FunctionChange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    baseline_diagnostics: Option<&'a AnalysisDiagnostics>,
+}
+
+impl<'a> DeltaWire<'a> {
+    fn from_context(ctx: &'a DeltaContext<'a>) -> Self {
+        DeltaWire {
+            summary: &ctx.view.full.summary,
+            spec: &ctx.view.spec,
+            eligible_count: ctx.view.eligible_count,
+            truncated: ctx.view.truncated,
+            baseline_ref: None,
+            baseline_tool_version: ctx.baseline_tool_version,
+            baseline_timestamp: ctx.baseline_timestamp,
+            shown: ctx.view.shown.clone(),
+            baseline_diagnostics: ctx.baseline_diagnostics,
+        }
+    }
 }
 
 /// On-the-wire view representation. Mirrors `AnalysisView`'s serialized
@@ -100,6 +166,8 @@ pub fn format_json(
     view: &AnalysisView<'_>,
     config: &JsonConfig<'_>,
 ) -> Result<String, serde_json::Error> {
+    let delta_wire: Option<DeltaWire> = config.delta.as_ref().map(DeltaWire::from_context);
+
     let envelope = JsonEnvelope {
         schema_version: 1,
         tool_version: &config.tool_version,
@@ -110,6 +178,7 @@ pub fn format_json(
         diff_ref: config.diff_ref,
         result: view.full,
         view: ViewWire::from_view(view, config.minimal_view),
+        delta: delta_wire,
         diagnostics: config.diagnostics,
     };
     serde_json::to_string_pretty(&envelope)
@@ -130,6 +199,7 @@ mod tests {
             diagnostics: None,
             diff_ref: None,
             minimal_view: false,
+            delta: None,
         }
     }
 
@@ -511,6 +581,7 @@ mod proptests {
             diagnostics: None,
             diff_ref: None,
             minimal_view: false,
+            delta: None,
         })
     }
 

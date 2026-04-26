@@ -12,6 +12,7 @@ pub use table::{format_table, format_table_with_explain};
 
 #[cfg(test)]
 pub(crate) mod test_fixtures {
+    use crate::domain::delta::{self, AnalysisDelta, DeltaView, DeltaViewSpec};
     use crate::domain::types::{
         AnalysisResult, AnalysisSummary, ComplexityContributor, CrapScore, FunctionIdentity,
         FunctionVerdict, RiskDistribution, RiskLevel, ScoredFunction, SourceSpan,
@@ -23,6 +24,83 @@ pub(crate) mod test_fixtures {
     /// (the V1a walking-skeleton invariant).
     pub fn make_view_default(result: &AnalysisResult) -> AnalysisView<'_> {
         view::apply(result, ViewSpec::default())
+    }
+
+    /// Build a default-spec delta view. Mirrors `make_view_default` for
+    /// the delta sibling pipeline.
+    pub fn make_delta_view_default(delta: &AnalysisDelta) -> DeltaView<'_> {
+        delta::apply(delta, DeltaViewSpec::default())
+    }
+
+    /// Sample delta covering all three change kinds plus a regression
+    /// and a new violation. Used by reporter snapshot tests.
+    ///
+    /// Baseline → current edits:
+    /// - `simple_fn` (low) → unchanged identity, score 3.0 → 3.0 (Modified, zero delta)
+    /// - `parse_record` (moderate) → score 15.0 → 22.0 (Modified, regression)
+    /// - `complex_fn` (high) baseline only (Removed)
+    /// - `new_fn` (current only) score 30.0, exceeds threshold → Added + new violation
+    pub fn make_sample_delta() -> AnalysisDelta {
+        let baseline = {
+            let mut r = make_multi_function_result();
+            // Drop complex_fn from current, but keep in baseline; alter parse_record CRAP
+            r.functions[1].scored.crap.value = 15.0;
+            r
+        };
+        let current = {
+            let v_simple =
+                make_verdict("simple_fn", "src/lib.rs", 2, 95.0, 3.0, RiskLevel::Low, 8.0);
+            let mut v_parse = make_verdict(
+                "parse_record",
+                "src/adapters/coverage/mod.rs",
+                6,
+                60.0,
+                22.0,
+                RiskLevel::High,
+                8.0,
+            );
+            v_parse.exceeds = true;
+            let mut v_new = make_verdict(
+                "new_fn",
+                "src/adapters/baseline.rs",
+                10,
+                40.0,
+                30.0,
+                RiskLevel::High,
+                8.0,
+            );
+            v_new.exceeds = true;
+            AnalysisResult {
+                functions: vec![v_simple, v_parse, v_new],
+                summary: AnalysisSummary {
+                    total_functions: 3,
+                    total_files: 3,
+                    exceeding_threshold: 2,
+                    average_crap: 18.33,
+                    median_crap: 22.0,
+                    max_crap: Some(CrapScore {
+                        value: 30.0,
+                        risk_level: RiskLevel::High,
+                    }),
+                    worst_function: Some(FunctionIdentity {
+                        file_path: "src/adapters/baseline.rs".to_string(),
+                        qualified_name: "new_fn".to_string(),
+                        span: SourceSpan {
+                            start_line: 1,
+                            end_line: 10,
+                        },
+                    }),
+                    distribution: RiskDistribution {
+                        low: 1,
+                        acceptable: 0,
+                        moderate: 0,
+                        high: 2,
+                    },
+                },
+                passed: false,
+            }
+        };
+        delta::compute(baseline, current)
     }
 
     pub fn make_verdict(

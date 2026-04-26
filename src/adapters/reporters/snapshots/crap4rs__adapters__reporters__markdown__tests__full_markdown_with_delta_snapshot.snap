@@ -1,0 +1,38 @@
+---
+source: src/adapters/reporters/markdown.rs
+expression: out
+---
+# crap4rs v0.1.1 — CRAP Score Analysis
+
+| File | Function | CC | Cov% | CRAP | Risk |
+|------|----------|----|------|------|------|
+| src/adapters/baseline.rs | new_fn | 10 | 40.0 | 30.00 | high |
+| src/adapters/coverage/mod.rs | parse_record | 6 | 60.0 | 22.00 | high |
+| src/lib.rs | simple_fn | 2 | 95.0 | 3.00 | low |
+
+## Summary
+
+- **Result:** FAIL
+- **Functions:** 3 (2 above threshold 8)
+- **Worst CRAP:** 30.0
+- **Average CRAP:** 18.3
+- **Median CRAP:** 22.0
+- **Distribution:** low 1 · acceptable 0 · moderate 0 · high 2
+
+## CRAP Scorecard
+
+- **Delta status:** FAIL
+- **Changes:** +1 added, 1 removed, 2 modified
+- **Regressions:** 1 · **Improvements:** 0 · **New violations:** 1
+
+### Regressions
+
+| File | Function | Baseline CRAP | Current CRAP | Δ |
+|------|----------|--------------:|-------------:|--:|
+| src/adapters/coverage/mod.rs | parse_record | 15.00 | 22.00 | +7.00 |
+
+### New violations
+
+| File | Function | Current CRAP |
+|------|----------|-------------:|
+| src/adapters/baseline.rs | new_fn | 30.00 |

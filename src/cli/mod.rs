@@ -11,15 +11,19 @@ use anyhow::{Result, bail};
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
 use clap_complete::Shell as ClapShell;
 
+use crap4rs::adapters::baseline::{self, BaselineSnapshot};
 use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
+use crap4rs::adapters::reporters::json::DeltaContext;
 use crap4rs::core::AnalyzeOptions;
+use crap4rs::domain::delta::{self, AnalysisDelta, DeltaView};
 use crap4rs::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
 use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
 use crap4rs::domain::view::{self, GroupKey, SortKey};
 
+mod delta_args;
 mod view_args;
 
 // ── ValueEnum wrappers (keep domain types clap-free) ────────────────
@@ -135,6 +139,50 @@ impl From<GroupKey> for GroupByArg {
     }
 }
 
+/// Sort key for the delta block (issue #81).
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum DeltaSortKeyArg {
+    /// Magnitude of change descending — regressions first (default)
+    ScoreDelta,
+    /// Current CRAP score descending; `Removed` rows last
+    CurrentCrap,
+    /// Baseline CRAP score descending; `Added` rows last
+    BaselineCrap,
+    /// Alphabetical by file_path then qualified_name
+    Path,
+}
+
+impl From<DeltaSortKeyArg> for crap4rs::domain::delta::DeltaSortKey {
+    fn from(arg: DeltaSortKeyArg) -> Self {
+        use crap4rs::domain::delta::DeltaSortKey;
+        match arg {
+            DeltaSortKeyArg::ScoreDelta => DeltaSortKey::ScoreDelta,
+            DeltaSortKeyArg::CurrentCrap => DeltaSortKey::CurrentCrap,
+            DeltaSortKeyArg::BaselineCrap => DeltaSortKey::BaselineCrap,
+            DeltaSortKeyArg::Path => DeltaSortKey::Path,
+        }
+    }
+}
+
+/// Change-kind subset for `--delta-only` (issue #81).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum DeltaKindArg {
+    Added,
+    Removed,
+    Modified,
+}
+
+impl From<DeltaKindArg> for crap4rs::domain::delta::ChangeKind {
+    fn from(arg: DeltaKindArg) -> Self {
+        use crap4rs::domain::delta::ChangeKind;
+        match arg {
+            DeltaKindArg::Added => ChangeKind::Added,
+            DeltaKindArg::Removed => ChangeKind::Removed,
+            DeltaKindArg::Modified => ChangeKind::Modified,
+        }
+    }
+}
+
 /// When to colorize output.
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub enum ColorArg {
@@ -201,6 +249,21 @@ pub struct InputArgs {
     /// preset's value but cannot turn off `no_fail = true`).
     #[arg(long, value_name = "NAME")]
     pub view: Option<String>,
+
+    /// Path to a previously-emitted crap4rs JSON envelope, used as the
+    /// baseline for delta analysis.
+    ///
+    /// Crap4rs runs the current analysis as usual, then compares against
+    /// the baseline's `result` block to produce a `delta` block in the
+    /// output (see `--format json`, `--format markdown` for rendering).
+    /// Generate the baseline file by piping a previous run:
+    /// `crap4rs --coverage lcov.info --format json > baseline.json`.
+    ///
+    /// **Delta is informational by default.** Pass `--delta-gate` to
+    /// make the delta contribute to the exit code (fails on new
+    /// threshold violations introduced by this PR).
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
+    pub baseline: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -230,9 +293,24 @@ pub struct OutputArgs {
     /// is untouched and `result.passed` in JSON output still reflects
     /// the truthful pass/fail state, so consumers can detect "would
     /// have failed" even when the process exits 0. Composes with
-    /// `--quiet` for silent success in CI.
+    /// `--quiet` for silent success in CI. With `--delta-gate`, also
+    /// overrides the delta-gate exit-code translation (truth still in
+    /// `delta.summary.passed`).
     #[arg(long)]
     pub no_fail: bool,
+
+    /// Fail the build (exit 1) when the baseline comparison introduces
+    /// new threshold violations.
+    ///
+    /// Off by default — delta is informational unless this flag is set.
+    /// Drives off `delta.summary.passed`, which is true iff
+    /// `new_violations == 0`. Pre-existing violations (functions that
+    /// already exceeded threshold in the baseline) do NOT contribute,
+    /// so re-running with no code changes never trips the gate. Only
+    /// meaningful with `--baseline`. Composes with `--no-fail` (which
+    /// overrides BOTH gates).
+    #[arg(long, requires = "baseline")]
+    pub delta_gate: bool,
 
     /// Omit the denormalized `view.shown` row array from JSON output.
     ///
@@ -326,6 +404,31 @@ pub struct FilterArgs {
     /// gate (exit code) is unaffected.
     #[arg(long, value_enum, value_name = "KEY")]
     pub group_by: Option<GroupByArg>,
+
+    /// Truncate the delta block to the top N rows by `--delta-sort`.
+    /// `--delta-top 0` means "no limit". Independent of `--top`, which
+    /// truncates the analysis view (`view.shown`).
+    ///
+    /// `allow_hyphen_values`: parses `--delta-top -3` as a value (not
+    /// an unknown flag) so the error attribution to `--delta-top` is
+    /// readable.
+    #[arg(long, allow_hyphen_values = true, value_name = "N")]
+    pub delta_top: Option<u32>,
+
+    /// Sort key for the delta block.
+    ///
+    /// `score-delta` (default) — magnitude of change descending
+    /// (regressions first). `current-crap` — current CRAP descending,
+    /// `Removed` rows last. `baseline-crap` — baseline CRAP descending,
+    /// `Added` rows last. `path` — alphabetical by file then qualified
+    /// name.
+    #[arg(long, value_enum, value_name = "KEY")]
+    pub delta_sort: Option<DeltaSortKeyArg>,
+
+    /// Comma-separated list of change kinds to include in the delta
+    /// block: `added`, `removed`, `modified`. Default: all three.
+    #[arg(long, value_delimiter = ',', value_name = "KINDS")]
+    pub delta_only: Vec<DeltaKindArg>,
 }
 
 #[derive(Debug, Args)]
@@ -388,7 +491,20 @@ INVESTIGATION PATTERNS:
 
   # Saved view preset: bake a flag set under [views.ci] in crap4rs.toml,
   # then invoke it by name. CLI flags override preset values.
-  crap4rs --coverage lcov.info --view ci"
+  crap4rs --coverage lcov.info --view ci
+
+COMPARING TWO ANALYSES (issue #81):
+  # Capture a baseline (e.g., from main):
+  crap4rs --coverage lcov.info --format json > baseline.json
+
+  # Then compare the working tree to it (informational by default):
+  crap4rs --coverage lcov.info --baseline baseline.json
+
+  # CI usage: fail the build when new threshold violations land
+  crap4rs --coverage lcov.info --baseline baseline.json --delta-gate
+
+  # PR-comment scorecard (markdown — drop into the comment body verbatim)
+  crap4rs --coverage lcov.info --baseline baseline.json --format markdown"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -500,6 +616,12 @@ fn run_inner() -> Result<bool> {
         print_diagnostics(&analysis.diagnostics);
     }
 
+    // Resolve --baseline (issue #81): load a previously-emitted JSON
+    // envelope and compute the AnalysisDelta. None when --baseline is
+    // absent — the JSON envelope omits the `delta` block entirely so
+    // existing consumers see byte-identical output.
+    let delta_state: Option<DeltaState> = load_delta_state(&cli, &result)?;
+
     // Build the spec, then shape the result through the View pipeline.
     // V1b: `--only-failing` flows through `Filters::only_failing` here.
     // W2 fills in `--top`, `--min/max-coverage`, `--sort-by`. The
@@ -507,15 +629,34 @@ fn run_inner() -> Result<bool> {
     let spec = view_args::build_view_spec(&cli);
     let view = view::apply(&result, spec);
 
+    // Shape the delta. Spec is built from --delta-top / --delta-sort /
+    // --delta-only (VS4); defaults match the dominant scorecard use
+    // case (regressions first, all kinds, no truncation).
+    let delta_spec = delta_args::build_delta_view_spec(&cli);
+    let delta_view: Option<DeltaView<'_>> = delta_state
+        .as_ref()
+        .map(|s| delta::apply(&s.delta, delta_spec.clone()));
+    let _ = &delta_spec; // keep ownership for the shaped view
+
     if !cli.display.quiet {
         let output = match cli.output.format {
             FormatArg::Table => reporters::format_table_with_explain(
                 &view,
+                delta_view.as_ref(),
                 effective_threshold,
                 cli.display.breakdown,
                 cli.display.explain,
             ),
             FormatArg::Json => {
+                let delta_ctx = delta_state
+                    .as_ref()
+                    .zip(delta_view.as_ref())
+                    .map(|(s, dv)| DeltaContext {
+                        view: dv,
+                        baseline_tool_version: &s.snapshot.tool_version,
+                        baseline_timestamp: &s.snapshot.timestamp,
+                        baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
+                    });
                 let config = reporters::json::JsonConfig {
                     tool_version: env!("CARGO_PKG_VERSION").to_string(),
                     metric: effective_metric,
@@ -524,25 +665,62 @@ fn run_inner() -> Result<bool> {
                     diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
                     diff_ref: cli.filter.diff.as_deref(),
                     minimal_view: cli.output.minimal_view,
+                    delta: delta_ctx,
                 };
                 reporters::format_json(&view, &config)?
             }
             FormatArg::Markdown => reporters::format_markdown(
                 &view,
+                delta_view.as_ref(),
                 effective_threshold,
                 cli.display.breakdown,
                 cli.display.explain,
             ),
-            FormatArg::Csv => reporters::format_csv(&view, effective_metric),
+            FormatArg::Csv => reporters::format_csv(&view, delta_view.as_ref(), effective_metric),
         };
         print!("{output}");
     }
 
     // Exit code derives from `view.full.passed` — i.e., the underlying
-    // analysis. The View shapes the display, never the gate. `--no-fail`
-    // overrides only the gate-to-exit-code translation; `result.passed`
-    // in JSON output still reflects the truthful pass/fail state.
-    Ok(passed || cli.output.no_fail)
+    // analysis. The View shapes the display, never the gate.
+    //
+    // Delta is informational by default (issue #81 §gate semantics).
+    // `--delta-gate` opts in: a passing analysis with delta regressions
+    // that introduce new violations will exit 1 when `--delta-gate` is
+    // set. `--no-fail` overrides BOTH gates — truth lives in JSON
+    // (`result.passed` and `delta.summary.passed`) so consumers can
+    // still detect "would have failed."
+    let delta_passed = delta_state
+        .as_ref()
+        .map(|s| s.delta.summary.passed)
+        .unwrap_or(true);
+    let combined_passed = passed && (!cli.output.delta_gate || delta_passed);
+    Ok(combined_passed || cli.output.no_fail)
+}
+
+// ── Delta orchestration ─────────────────────────────────────────────
+
+/// In-flight delta state — owned baseline metadata + computed delta.
+/// `cli/mod.rs` keeps this for the lifetime of `run_inner` so reporters
+/// can borrow through it. Constructed once per invocation when
+/// `--baseline` is set; absent otherwise.
+struct DeltaState {
+    snapshot: BaselineSnapshot,
+    delta: AnalysisDelta,
+}
+
+fn load_delta_state(
+    cli: &Cli,
+    current: &crap4rs::domain::types::AnalysisResult,
+) -> Result<Option<DeltaState>> {
+    let Some(path) = cli.input.baseline.as_ref() else {
+        return Ok(None);
+    };
+    let snapshot = baseline::load(path).map_err(|e| anyhow::anyhow!("{e}"))?;
+    // delta::compute consumes both — we own snapshot.result, clone the
+    // current analysis so the surrounding pipeline keeps its handle.
+    let delta = delta::compute(snapshot.result.clone(), current.clone());
+    Ok(Some(DeltaState { snapshot, delta }))
 }
 
 fn validate_display_flags(cli: &Cli) -> Result<()> {
