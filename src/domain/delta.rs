@@ -607,6 +607,7 @@ mod tests {
                     moderate: 0,
                     high: 0,
                 },
+                ..Default::default()
             },
             passed: exceeding == 0,
         }

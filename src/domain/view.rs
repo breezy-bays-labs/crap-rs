@@ -481,6 +481,7 @@ mod tests {
                     moderate: 0,
                     high: 0,
                 },
+                ..Default::default()
             },
             passed: true,
         }
@@ -1665,6 +1666,7 @@ mod proptests {
                     distribution: crate::domain::types::RiskDistribution {
                         low: 0, acceptable: 0, moderate: 0, high: 0,
                     },
+                    ..Default::default()
                 },
                 passed: true,
             };

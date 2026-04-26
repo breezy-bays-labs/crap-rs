@@ -1341,6 +1341,7 @@ mod proptests {
                         moderate: 0,
                         high: 0,
                     },
+                    ..Default::default()
                 },
                 passed,
             }

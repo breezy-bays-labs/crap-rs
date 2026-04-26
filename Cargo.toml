@@ -1,6 +1,6 @@
 [package]
 name = "crap4rs"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
 description = "CRAP score analyzer for Rust — find complex, under-tested functions"
@@ -12,7 +12,11 @@ categories = ["development-tools::testing", "command-line-utilities"]
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
 pkg-fmt = "tgz"
-bin-dir = "."
+# Binary lives at the archive root (release.yml's `tar -C target/{target}/release crap4rs`).
+# `"."` resolves to an empty source path under cargo-binstall ≥ 1.x and forces fallback to
+# `cargo install`. `{ bin }{ binary-ext }` resolves to `crap4rs` on Linux/macOS, `crap4rs.exe`
+# on Windows. Closes #101.
+bin-dir = "{ bin }{ binary-ext }"
 
 [lib]
 name = "crap4rs"

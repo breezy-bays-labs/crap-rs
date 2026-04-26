@@ -96,6 +96,7 @@ pub(crate) mod test_fixtures {
                         moderate: 0,
                         high: 2,
                     },
+                    ..Default::default()
                 },
                 passed: false,
             }
@@ -162,6 +163,7 @@ pub(crate) mod test_fixtures {
                     moderate: 0,
                     high: 0,
                 },
+                ..Default::default()
             },
             passed: true,
         }
@@ -212,6 +214,7 @@ pub(crate) mod test_fixtures {
                     moderate: if risk == RiskLevel::Moderate { 1 } else { 0 },
                     high: if risk == RiskLevel::High { 1 } else { 0 },
                 },
+                ..Default::default()
             },
             passed: !exceeds,
         }
@@ -240,33 +243,11 @@ pub(crate) mod test_fixtures {
             8.0,
         );
 
+        let functions = vec![v1, v2, v3];
+        let summary = crate::domain::summary::compute_summary(&functions);
         AnalysisResult {
-            functions: vec![v1, v2, v3],
-            summary: AnalysisSummary {
-                total_functions: 3,
-                total_files: 3,
-                exceeding_threshold: 2,
-                average_crap: 21.07,
-                median_crap: 15.0,
-                max_crap: Some(CrapScore {
-                    value: 45.2,
-                    risk_level: RiskLevel::High,
-                }),
-                worst_function: Some(FunctionIdentity {
-                    file_path: "src/domain/crap.rs".to_string(),
-                    qualified_name: "complex_fn".to_string(),
-                    span: SourceSpan {
-                        start_line: 1,
-                        end_line: 10,
-                    },
-                }),
-                distribution: RiskDistribution {
-                    low: 1,
-                    acceptable: 0,
-                    moderate: 1,
-                    high: 1,
-                },
-            },
+            functions,
+            summary,
             passed: false,
         }
     }

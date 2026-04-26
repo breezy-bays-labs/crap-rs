@@ -457,6 +457,24 @@ pub struct DisplayArgs {
     /// Only affects table output, and only when `--breakdown` is enabled.
     #[arg(long)]
     pub explain: bool,
+
+    /// Render the full per-function table in markdown output.
+    ///
+    /// By default `--format markdown` produces a compact summary plus a
+    /// top-N table (failures if any exist, otherwise the worst by CRAP).
+    /// This flag appends the legacy row-per-function table — useful when
+    /// piping into a longer document instead of a PR comment. Has no
+    /// effect on other output formats.
+    #[arg(long)]
+    pub md_full_table: bool,
+
+    /// Number of rows in the markdown top-N table (default 10).
+    ///
+    /// Bounds the failures list (or worst-by-CRAP list when nothing
+    /// exceeds threshold). The summary block is unaffected — its stats
+    /// always reflect the full unshapeable analysis.
+    #[arg(long, value_name = "N", default_value_t = 10)]
+    pub md_top: usize,
 }
 
 // ── Top-level CLI ───────────────────────────────────────────────────
@@ -675,6 +693,8 @@ fn run_inner() -> Result<bool> {
                 effective_threshold,
                 cli.display.breakdown,
                 cli.display.explain,
+                cli.display.md_full_table,
+                cli.display.md_top,
             ),
             FormatArg::Csv => reporters::format_csv(&view, delta_view.as_ref(), effective_metric),
         };

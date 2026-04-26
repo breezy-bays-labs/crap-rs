@@ -23,14 +23,22 @@ where
     };
 
     let mut scores: Vec<f64> = Vec::new();
+    let mut complexities: Vec<u32> = Vec::new();
+    let mut finite_coverages: Vec<f64> = Vec::new();
     let mut files: std::collections::HashSet<&'a String> = std::collections::HashSet::new();
     let mut exceeding: usize = 0;
     let mut max_crap = None;
     let mut worst_function = None;
+    let mut max_complexity: u32 = 0;
 
     for v in verdicts {
         let score = v.scored.crap.value;
         scores.push(score);
+        complexities.push(v.scored.complexity);
+        let cov = v.scored.coverage_percent;
+        if cov.is_finite() {
+            finite_coverages.push(cov);
+        }
         files.insert(&v.scored.identity.file_path);
 
         if v.exceeds {
@@ -48,26 +56,25 @@ where
             max_crap = Some(score);
             worst_function = Some(v.scored.identity.clone());
         }
+        if v.scored.complexity > max_complexity {
+            max_complexity = v.scored.complexity;
+        }
     }
 
     let total_functions = scores.len();
     scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    complexities.sort_unstable();
+    finite_coverages.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-    let average_crap = if total_functions > 0 {
-        scores.iter().sum::<f64>() / total_functions as f64
-    } else {
-        0.0
-    };
+    let average_crap = mean_f64(&scores);
+    let median_crap = median_f64_sorted(&scores);
 
-    let median_crap = if total_functions > 0 {
-        if total_functions.is_multiple_of(2) {
-            (scores[total_functions / 2 - 1] + scores[total_functions / 2]) / 2.0
-        } else {
-            scores[total_functions / 2]
-        }
-    } else {
-        0.0
-    };
+    let average_complexity = mean_u32(&complexities);
+    let median_complexity = median_u32_sorted(&complexities);
+
+    let min_coverage = finite_coverages.first().copied().unwrap_or(0.0);
+    let average_coverage = mean_f64(&finite_coverages);
+    let median_coverage = median_f64_sorted(&finite_coverages);
 
     AnalysisSummary {
         total_functions,
@@ -83,6 +90,50 @@ where
         }),
         worst_function,
         distribution,
+        max_complexity,
+        average_complexity,
+        median_complexity,
+        min_coverage,
+        average_coverage,
+        median_coverage,
+    }
+}
+
+fn mean_f64(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().sum::<f64>() / values.len() as f64
+}
+
+fn mean_u32(values: &[u32]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().map(|v| *v as f64).sum::<f64>() / values.len() as f64
+}
+
+fn median_f64_sorted(sorted: &[f64]) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let n = sorted.len();
+    if n.is_multiple_of(2) {
+        (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
+    } else {
+        sorted[n / 2]
+    }
+}
+
+fn median_u32_sorted(sorted: &[u32]) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let n = sorted.len();
+    if n.is_multiple_of(2) {
+        (sorted[n / 2 - 1] as f64 + sorted[n / 2] as f64) / 2.0
+    } else {
+        sorted[n / 2] as f64
     }
 }
 
