@@ -1,0 +1,8 @@
+---
+source: src/adapters/reporters/csv.rs
+expression: out
+---
+file,function_count,exceeding_count,average_crap,max_crap,worst_function,distribution_low,distribution_acceptable,distribution_moderate,distribution_high
+src/domain/crap.rs,1,1,45.20,45.20,complex_fn,0,0,0,1
+src/adapters/coverage/mod.rs,1,1,15.00,15.00,parse_record,0,0,1,0
+src/lib.rs,1,0,3.00,3.00,simple_fn,1,0,0,0
