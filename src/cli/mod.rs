@@ -16,7 +16,7 @@ use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
 use crap4rs::adapters::reporters::json::DeltaContext;
 use crap4rs::core::AnalyzeOptions;
-use crap4rs::domain::delta::{self, AnalysisDelta};
+use crap4rs::domain::delta::{self, AnalysisDelta, DeltaView, DeltaViewSpec};
 use crap4rs::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
@@ -531,6 +531,13 @@ fn run_inner() -> Result<bool> {
     let spec = view_args::build_view_spec(&cli);
     let view = view::apply(&result, spec);
 
+    // VS3: shape the delta with a default DeltaViewSpec. VS4 will
+    // wire `--delta-top`, `--delta-sort`, `--delta-only` into the
+    // spec construction.
+    let delta_view: Option<DeltaView<'_>> = delta_state
+        .as_ref()
+        .map(|s| delta::apply(&s.delta, DeltaViewSpec::default()));
+
     if !cli.display.quiet {
         let output = match cli.output.format {
             FormatArg::Table => reporters::format_table_with_explain(
@@ -540,12 +547,15 @@ fn run_inner() -> Result<bool> {
                 cli.display.explain,
             ),
             FormatArg::Json => {
-                let delta_ctx = delta_state.as_ref().map(|s| DeltaContext {
-                    delta: &s.delta,
-                    baseline_tool_version: &s.snapshot.tool_version,
-                    baseline_timestamp: &s.snapshot.timestamp,
-                    baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
-                });
+                let delta_ctx = delta_state
+                    .as_ref()
+                    .zip(delta_view.as_ref())
+                    .map(|(s, dv)| DeltaContext {
+                        view: dv,
+                        baseline_tool_version: &s.snapshot.tool_version,
+                        baseline_timestamp: &s.snapshot.timestamp,
+                        baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
+                    });
                 let config = reporters::json::JsonConfig {
                     tool_version: env!("CARGO_PKG_VERSION").to_string(),
                     metric: effective_metric,

@@ -16,7 +16,8 @@
 
 use crate::domain::types::{AnalysisResult, FunctionIdentity, FunctionVerdict};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::cmp::Ordering;
+use std::collections::{BTreeSet, HashMap};
 
 // ── Change kinds ─────────────────────────────────────────────────────
 
@@ -235,6 +236,10 @@ pub struct AnalysisDelta {
     #[serde(skip)]
     pub current: AnalysisResult,
     pub changes: Vec<FunctionChange>,
+    /// Aggregate counts over `changes`. Computed once at construction
+    /// (in [`compute`]) so reporters and the delta gate share a
+    /// single source of truth — pre-shape, view-independent.
+    pub summary: DeltaSummary,
 }
 
 // ── compute: pair → classify ────────────────────────────────────────
@@ -261,10 +266,12 @@ fn identity_key(identity: &FunctionIdentity) -> IdentityKey<'_> {
 /// for testing.
 pub fn compute(baseline: AnalysisResult, current: AnalysisResult) -> AnalysisDelta {
     let changes = pair_identities(&baseline, &current);
+    let summary = DeltaSummary::compute(&changes);
     AnalysisDelta {
         baseline,
         current,
         changes,
+        summary,
     }
 }
 
@@ -311,6 +318,221 @@ fn pair_identities(baseline: &AnalysisResult, current: &AnalysisResult) -> Vec<F
     }
 
     changes
+}
+
+// ── DeltaView (filter / sort / truncate) ─────────────────────────────
+
+/// Spec describing how to shape the per-change row list for display.
+///
+/// Mirrors [`crate::domain::view::ViewSpec`] in structure but with
+/// delta-specific filter and sort dimensions. The summary on the
+/// underlying [`AnalysisDelta`] is *not* re-derived from the shaped
+/// row list — it always reflects the unshaped change set so the gate
+/// keystone holds.
+#[non_exhaustive]
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DeltaViewSpec {
+    pub filters: DeltaFilters,
+    pub sort: DeltaSortKey,
+    pub limit: Option<usize>,
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DeltaFilters {
+    /// When `Some`, retain only changes whose [`ChangeKind`] is in the
+    /// set. `None` means "all kinds." A `Some(empty)` set retains
+    /// nothing — that's a valid (if pointless) configuration the
+    /// shape pipeline doesn't second-guess.
+    pub change_kinds: Option<BTreeSet<ChangeKind>>,
+    /// Inclusive lower bound on `score_delta`. `None` = no bound.
+    /// Only applies to [`FunctionChange::Modified`] entries —
+    /// `Added` / `Removed` have no score_delta and pass the bound
+    /// check unconditionally.
+    pub min_score_delta: Option<f64>,
+    /// Inclusive upper bound on `score_delta`. Same conventions as
+    /// `min_score_delta`.
+    pub max_score_delta: Option<f64>,
+}
+
+/// Sort key for the displayed delta view.
+///
+/// `ScoreDelta` (default) ranks rows by *change magnitude* — the
+/// signed delta for `Modified`, the full current score for `Added`
+/// (treating absent baseline as zero), the full baseline score for
+/// `Removed` (treating absent current as zero), all with absolute
+/// value, descending. Biggest changes show first regardless of kind.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeltaSortKey {
+    /// Magnitude of change descending (regressions first).
+    #[default]
+    ScoreDelta,
+    /// Current CRAP score descending. `Removed` rows (no current
+    /// score) sort last.
+    CurrentCrap,
+    /// Baseline CRAP score descending. `Added` rows sort last.
+    BaselineCrap,
+    /// Alphabetical by `file_path`, then `qualified_name`.
+    Path,
+}
+
+/// Shaped view over an [`AnalysisDelta`].
+///
+/// `full` borrows the parent delta — the gate keystone: shaping never
+/// mutates the underlying delta, and the summary surfaced through
+/// reporters always derives from `full.summary`, not `shown`.
+#[non_exhaustive]
+#[derive(Debug, Serialize)]
+pub struct DeltaView<'a> {
+    /// Borrow of the parent. Skipped in serialization — the JSON
+    /// envelope already carries the summary + full change list under
+    /// the `delta` block.
+    #[serde(skip)]
+    pub full: &'a AnalysisDelta,
+    pub spec: DeltaViewSpec,
+    /// Post-filter, pre-truncate count. Combined with `truncated`,
+    /// lets consumers render "Showing N of M (filtered from K)".
+    pub eligible_count: usize,
+    pub truncated: bool,
+    pub shown: Vec<&'a FunctionChange>,
+}
+
+/// Shape an [`AnalysisDelta`] into a [`DeltaView`].
+///
+/// Order of operations: filter → sort → truncate. Mirrors the
+/// `view::apply` pattern. The full delta and its summary are
+/// untouched.
+pub fn apply<'a>(delta: &'a AnalysisDelta, spec: DeltaViewSpec) -> DeltaView<'a> {
+    let mut shown: Vec<&'a FunctionChange> = apply_filters(&delta.changes, &spec.filters);
+    let eligible_count = shown.len();
+    sort_in_place(&mut shown, spec.sort);
+    let truncated = truncate_to(&mut shown, spec.limit);
+    DeltaView {
+        full: delta,
+        spec,
+        eligible_count,
+        truncated,
+        shown,
+    }
+}
+
+fn apply_filters<'a>(
+    changes: &'a [FunctionChange],
+    filters: &DeltaFilters,
+) -> Vec<&'a FunctionChange> {
+    changes
+        .iter()
+        .filter(|c| {
+            filters
+                .change_kinds
+                .as_ref()
+                .is_none_or(|kinds| kinds.contains(&c.kind()))
+        })
+        .filter(|c| matches_score_delta_range(c, filters))
+        .collect()
+}
+
+fn matches_score_delta_range(change: &FunctionChange, filters: &DeltaFilters) -> bool {
+    let Some(delta) = change.score_delta() else {
+        // Added / Removed have no score_delta — pass through both
+        // bounds (filtering them out is the operator's job via
+        // `change_kinds`).
+        return true;
+    };
+    if !delta.is_finite() {
+        return false;
+    }
+    if filters.min_score_delta.is_some_and(|min| delta < min) {
+        return false;
+    }
+    if filters.max_score_delta.is_some_and(|max| delta > max) {
+        return false;
+    }
+    true
+}
+
+fn sort_in_place(shown: &mut [&FunctionChange], key: DeltaSortKey) {
+    match key {
+        DeltaSortKey::ScoreDelta => shown.sort_by(cmp_by_score_delta_desc),
+        DeltaSortKey::CurrentCrap => shown.sort_by(cmp_by_current_crap_desc),
+        DeltaSortKey::BaselineCrap => shown.sort_by(cmp_by_baseline_crap_desc),
+        DeltaSortKey::Path => shown.sort_by(cmp_by_path),
+    }
+}
+
+/// Magnitude ordering: `Modified` ranks by `|score_delta|`, `Added`
+/// by `|current.crap|`, `Removed` by `|baseline.crap|`. Descending.
+/// Implemented via `magnitude` so rank is a single comparable scalar.
+fn cmp_by_score_delta_desc(a: &&FunctionChange, b: &&FunctionChange) -> Ordering {
+    cmp_f64_desc(magnitude(a), magnitude(b))
+}
+
+fn magnitude(change: &FunctionChange) -> f64 {
+    match change {
+        FunctionChange::Modified { baseline, current } => {
+            (current.scored.crap.value - baseline.scored.crap.value).abs()
+        }
+        FunctionChange::Added { current } => current.scored.crap.value.abs(),
+        FunctionChange::Removed { baseline } => baseline.scored.crap.value.abs(),
+    }
+}
+
+fn cmp_by_current_crap_desc(a: &&FunctionChange, b: &&FunctionChange) -> Ordering {
+    // Removed entries (no current score) sort last under any
+    // current-crap ordering. `Option::None` < `Some(_)` ascending,
+    // so we invert by mapping Some → 0 (front) and None → 1 (back).
+    let (rank_a, score_a) = current_score_rank(a);
+    let (rank_b, score_b) = current_score_rank(b);
+    rank_a.cmp(&rank_b).then(cmp_f64_desc(score_a, score_b))
+}
+
+fn current_score_rank(change: &FunctionChange) -> (u8, f64) {
+    match change.current_score() {
+        Some(s) => (0, s),
+        None => (1, 0.0),
+    }
+}
+
+fn cmp_by_baseline_crap_desc(a: &&FunctionChange, b: &&FunctionChange) -> Ordering {
+    let (rank_a, score_a) = baseline_score_rank(a);
+    let (rank_b, score_b) = baseline_score_rank(b);
+    rank_a.cmp(&rank_b).then(cmp_f64_desc(score_a, score_b))
+}
+
+fn baseline_score_rank(change: &FunctionChange) -> (u8, f64) {
+    match change.baseline_score() {
+        Some(s) => (0, s),
+        None => (1, 0.0),
+    }
+}
+
+fn cmp_by_path(a: &&FunctionChange, b: &&FunctionChange) -> Ordering {
+    a.file_path()
+        .cmp(b.file_path())
+        .then_with(|| a.qualified_name().cmp(b.qualified_name()))
+}
+
+/// Total f64 ordering, descending. NaN sorts last so non-finite
+/// scores never break the comparator.
+fn cmp_f64_desc(a: f64, b: f64) -> Ordering {
+    match (a.is_nan(), b.is_nan()) {
+        (true, true) => Ordering::Equal,
+        (true, false) => Ordering::Greater,
+        (false, true) => Ordering::Less,
+        (false, false) => b.partial_cmp(&a).expect("non-NaN partial_cmp infallible"),
+    }
+}
+
+fn truncate_to(shown: &mut Vec<&FunctionChange>, limit: Option<usize>) -> bool {
+    match limit {
+        Some(n) if n > 0 && shown.len() > n => {
+            shown.truncate(n);
+            true
+        }
+        _ => false,
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -681,6 +903,223 @@ mod tests {
         assert_eq!(summary.modified, 0);
         assert!(summary.passed);
     }
+
+    // ── DeltaView / apply ──
+
+    fn delta_with_changes(changes: Vec<FunctionChange>) -> AnalysisDelta {
+        AnalysisDelta {
+            baseline: make_result(vec![]),
+            current: make_result(vec![]),
+            summary: DeltaSummary::compute(&changes),
+            changes,
+        }
+    }
+
+    #[test]
+    fn apply_default_spec_returns_all_changes() {
+        let delta = delta_with_changes(vec![
+            FunctionChange::Added {
+                current: make_verdict("a.rs", "x", 31.0, true),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "y", 5.0, false),
+                current: make_verdict("a.rs", "y", 10.0, false),
+            },
+        ]);
+        let view = apply(&delta, DeltaViewSpec::default());
+        assert_eq!(view.shown.len(), 2);
+        assert_eq!(view.eligible_count, 2);
+        assert!(!view.truncated);
+    }
+
+    #[test]
+    fn apply_default_sorts_by_magnitude_descending() {
+        // Magnitudes: small_mod=1, big_mod=20, big_added=31
+        let delta = delta_with_changes(vec![
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "small_mod", 5.0, false),
+                current: make_verdict("a.rs", "small_mod", 6.0, false),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "big_mod", 5.0, false),
+                current: make_verdict("a.rs", "big_mod", 25.0, false),
+            },
+            FunctionChange::Added {
+                current: make_verdict("a.rs", "big_added", 31.0, true),
+            },
+        ]);
+        let view = apply(&delta, DeltaViewSpec::default());
+        assert_eq!(view.shown[0].qualified_name(), "big_added");
+        assert_eq!(view.shown[1].qualified_name(), "big_mod");
+        assert_eq!(view.shown[2].qualified_name(), "small_mod");
+    }
+
+    #[test]
+    fn apply_filter_change_kinds_added_only() {
+        let delta = delta_with_changes(vec![
+            FunctionChange::Added {
+                current: make_verdict("a.rs", "added_one", 5.0, false),
+            },
+            FunctionChange::Removed {
+                baseline: make_verdict("a.rs", "removed_one", 5.0, false),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "mod_one", 5.0, false),
+                current: make_verdict("a.rs", "mod_one", 6.0, false),
+            },
+        ]);
+        let mut kinds = BTreeSet::new();
+        kinds.insert(ChangeKind::Added);
+        let spec = DeltaViewSpec {
+            filters: DeltaFilters {
+                change_kinds: Some(kinds),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let view = apply(&delta, spec);
+        assert_eq!(view.shown.len(), 1);
+        assert_eq!(view.shown[0].kind(), ChangeKind::Added);
+    }
+
+    #[test]
+    fn apply_filter_score_delta_min_excludes_below() {
+        let delta = delta_with_changes(vec![
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "tiny", 5.0, false),
+                current: make_verdict("a.rs", "tiny", 6.0, false),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "big", 5.0, false),
+                current: make_verdict("a.rs", "big", 25.0, false),
+            },
+        ]);
+        let spec = DeltaViewSpec {
+            filters: DeltaFilters {
+                min_score_delta: Some(10.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let view = apply(&delta, spec);
+        assert_eq!(view.shown.len(), 1);
+        assert_eq!(view.shown[0].qualified_name(), "big");
+    }
+
+    #[test]
+    fn apply_filter_score_delta_passes_added_and_removed() {
+        // Added/Removed have no score_delta — bound check shouldn't drop them
+        let delta = delta_with_changes(vec![
+            FunctionChange::Added {
+                current: make_verdict("a.rs", "added_one", 5.0, false),
+            },
+            FunctionChange::Removed {
+                baseline: make_verdict("a.rs", "removed_one", 5.0, false),
+            },
+        ]);
+        let spec = DeltaViewSpec {
+            filters: DeltaFilters {
+                min_score_delta: Some(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let view = apply(&delta, spec);
+        assert_eq!(view.shown.len(), 2);
+    }
+
+    #[test]
+    fn apply_sort_current_crap_descending_removed_last() {
+        let delta = delta_with_changes(vec![
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "modlow", 50.0, true),
+                current: make_verdict("a.rs", "modlow", 5.0, false),
+            },
+            FunctionChange::Removed {
+                baseline: make_verdict("a.rs", "removed_top", 999.0, true),
+            },
+            FunctionChange::Added {
+                current: make_verdict("a.rs", "added_high", 47.0, true),
+            },
+        ]);
+        let spec = DeltaViewSpec {
+            sort: DeltaSortKey::CurrentCrap,
+            ..Default::default()
+        };
+        let view = apply(&delta, spec);
+        assert_eq!(view.shown[0].qualified_name(), "added_high"); // 47 (current)
+        assert_eq!(view.shown[1].qualified_name(), "modlow"); // 5 (current)
+        assert_eq!(view.shown[2].qualified_name(), "removed_top"); // None — last
+    }
+
+    #[test]
+    fn apply_sort_path_alphabetical() {
+        let delta = delta_with_changes(vec![
+            FunctionChange::Modified {
+                baseline: make_verdict("zzz.rs", "z", 5.0, false),
+                current: make_verdict("zzz.rs", "z", 6.0, false),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("aaa.rs", "a", 5.0, false),
+                current: make_verdict("aaa.rs", "a", 6.0, false),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("mmm.rs", "m", 5.0, false),
+                current: make_verdict("mmm.rs", "m", 6.0, false),
+            },
+        ]);
+        let spec = DeltaViewSpec {
+            sort: DeltaSortKey::Path,
+            ..Default::default()
+        };
+        let view = apply(&delta, spec);
+        assert_eq!(view.shown[0].file_path(), "aaa.rs");
+        assert_eq!(view.shown[1].file_path(), "mmm.rs");
+        assert_eq!(view.shown[2].file_path(), "zzz.rs");
+    }
+
+    #[test]
+    fn apply_truncate_marks_truncated_true() {
+        let changes: Vec<FunctionChange> = (0..10)
+            .map(|i| FunctionChange::Modified {
+                baseline: make_verdict("a.rs", &format!("fn_{i}"), 5.0, false),
+                current: make_verdict("a.rs", &format!("fn_{i}"), 5.0 + i as f64, false),
+            })
+            .collect();
+        let delta = delta_with_changes(changes);
+        let spec = DeltaViewSpec {
+            limit: Some(3),
+            ..Default::default()
+        };
+        let view = apply(&delta, spec);
+        assert_eq!(view.shown.len(), 3);
+        assert_eq!(view.eligible_count, 10);
+        assert!(view.truncated);
+    }
+
+    #[test]
+    fn apply_truncate_zero_means_no_limit() {
+        let changes: Vec<FunctionChange> = (0..3)
+            .map(|i| FunctionChange::Added {
+                current: make_verdict("a.rs", &format!("fn_{i}"), 5.0, false),
+            })
+            .collect();
+        let delta = delta_with_changes(changes);
+        let spec = DeltaViewSpec {
+            limit: Some(0),
+            ..Default::default()
+        };
+        let view = apply(&delta, spec);
+        assert_eq!(view.shown.len(), 3);
+        assert!(!view.truncated);
+    }
+
+    #[test]
+    fn apply_view_full_borrows_underlying_delta() {
+        let delta = delta_with_changes(vec![]);
+        let view = apply(&delta, DeltaViewSpec::default());
+        assert!(std::ptr::eq(view.full, &delta));
+    }
 }
 
 // ── Property tests ───────────────────────────────────────────────────
@@ -751,6 +1190,34 @@ mod proptests {
             let summary = DeltaSummary::compute(&delta.changes);
             prop_assert!(summary.new_violations <= summary.added + summary.modified);
             prop_assert_eq!(summary.passed, summary.new_violations == 0);
+        }
+
+        /// View shaping never adds rows. `view.shown.len() <= eligible_count
+        /// <= delta.changes.len()`. Truncation flag is true iff
+        /// `shown.len() < eligible_count`.
+        #[test]
+        fn prop_view_shown_subset_of_changes(
+            baseline in arb_analysis_result(),
+            current in arb_analysis_result(),
+        ) {
+            let delta = compute(baseline, current);
+            let view = apply(&delta, DeltaViewSpec::default());
+            prop_assert!(view.shown.len() <= view.eligible_count);
+            prop_assert!(view.eligible_count <= delta.changes.len());
+            prop_assert_eq!(view.shown.len() == view.eligible_count, !view.truncated);
+        }
+
+        /// Delta gate is unshapeable. `apply` does not mutate
+        /// `full.summary.passed`.
+        #[test]
+        fn prop_apply_does_not_mutate_summary(
+            baseline in arb_analysis_result(),
+            current in arb_analysis_result(),
+        ) {
+            let delta = compute(baseline, current);
+            let original_passed = delta.summary.passed;
+            let view = apply(&delta, DeltaViewSpec::default());
+            prop_assert_eq!(view.full.summary.passed, original_passed);
         }
     }
 }

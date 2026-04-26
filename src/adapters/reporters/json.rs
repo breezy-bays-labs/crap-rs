@@ -6,7 +6,7 @@
 //! reported rows were filtered, sorted, and truncated. `view.full` is
 //! `#[serde(skip)]` so the analysis is emitted exactly once.
 
-use crate::domain::delta::{AnalysisDelta, DeltaSummary, FunctionChange};
+use crate::domain::delta::{DeltaSummary, DeltaView, DeltaViewSpec, FunctionChange};
 use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, AnalysisSummary, ComplexityMetric, FunctionVerdict,
 };
@@ -35,11 +35,13 @@ pub struct JsonConfig<'a> {
 }
 
 /// Bundles everything the JSON reporter needs to render the `delta`
-/// block: the in-memory delta plus baseline metadata captured when
-/// the baseline envelope was loaded.
+/// block: the shaped view (post-filter / sort / truncate) plus the
+/// underlying delta and baseline metadata captured when the baseline
+/// envelope was loaded.
 #[derive(Debug)]
 pub struct DeltaContext<'a> {
-    pub delta: &'a AnalysisDelta,
+    /// Shaped view — drives `shown`, `spec`, `eligible_count`, `truncated`.
+    pub view: &'a DeltaView<'a>,
     pub baseline_tool_version: &'a str,
     pub baseline_timestamp: &'a str,
     pub baseline_diagnostics: Option<&'a AnalysisDiagnostics>,
@@ -74,34 +76,42 @@ struct JsonEnvelope<'a> {
 }
 
 /// On-the-wire delta representation. Mirrors the `delta` envelope key
-/// shape documented in ADR D7 §DeltaView. Reserves room for VS3+VS5
-/// to add `spec`, `eligible_count`, `truncated`, `shown` once the
-/// `DeltaView` type ships.
+/// shape documented in ADR D7 §DeltaView.
 #[derive(Serialize)]
 struct DeltaWire<'a> {
+    /// Aggregate counts over the *unshaped* change set. The gate
+    /// keystone — shaping never alters this.
     summary: &'a DeltaSummary,
+    /// Echoes the resolved [`DeltaViewSpec`] so consumers can
+    /// reconstruct what filters / sort / limit produced `shown`.
+    spec: &'a DeltaViewSpec,
+    /// Post-filter, pre-truncate count. With `truncated`, lets
+    /// consumers render "Showing X of Y".
+    eligible_count: usize,
+    truncated: bool,
     /// Reserved for a future `--baseline-ref <label>` flag (F2 follow-up).
     /// Always `null` today.
     baseline_ref: Option<&'a str>,
     baseline_tool_version: &'a str,
     baseline_timestamp: &'a str,
-    /// Per-change list. VS3+VS5 will replace this with the
-    /// `DeltaView::shown` after filter/sort/truncate. Today it's the
-    /// unshaped change list so the JSON consumer can inspect every
-    /// change vs the baseline.
-    changes: &'a [FunctionChange],
+    /// Per-change list, post-filter / sort / truncate. References
+    /// (the borrows hold for the envelope's lifetime via the View).
+    shown: Vec<&'a FunctionChange>,
     #[serde(skip_serializing_if = "Option::is_none")]
     baseline_diagnostics: Option<&'a AnalysisDiagnostics>,
 }
 
 impl<'a> DeltaWire<'a> {
-    fn from_context(ctx: &'a DeltaContext<'a>, summary: &'a DeltaSummary) -> Self {
+    fn from_context(ctx: &'a DeltaContext<'a>) -> Self {
         DeltaWire {
-            summary,
+            summary: &ctx.view.full.summary,
+            spec: &ctx.view.spec,
+            eligible_count: ctx.view.eligible_count,
+            truncated: ctx.view.truncated,
             baseline_ref: None,
             baseline_tool_version: ctx.baseline_tool_version,
             baseline_timestamp: ctx.baseline_timestamp,
-            changes: &ctx.delta.changes,
+            shown: ctx.view.shown.clone(),
             baseline_diagnostics: ctx.baseline_diagnostics,
         }
     }
@@ -156,18 +166,7 @@ pub fn format_json(
     view: &AnalysisView<'_>,
     config: &JsonConfig<'_>,
 ) -> Result<String, serde_json::Error> {
-    // Compute delta summary lazily — only when --baseline was passed.
-    // Owned here so DeltaWire can borrow it through the envelope's
-    // serialization lifetime.
-    let delta_summary: Option<DeltaSummary> = config
-        .delta
-        .as_ref()
-        .map(|ctx| DeltaSummary::compute(&ctx.delta.changes));
-    let delta_wire: Option<DeltaWire> = config
-        .delta
-        .as_ref()
-        .zip(delta_summary.as_ref())
-        .map(|(ctx, summary)| DeltaWire::from_context(ctx, summary));
+    let delta_wire: Option<DeltaWire> = config.delta.as_ref().map(DeltaWire::from_context);
 
     let envelope = JsonEnvelope {
         schema_version: 1,
