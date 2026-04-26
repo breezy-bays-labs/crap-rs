@@ -25,8 +25,24 @@ pub fn format_markdown(
     breakdown: bool,
     explain: bool,
 ) -> String {
-    let mut out = String::new();
+    let mut out = format_markdown_body(view, threshold, breakdown, explain);
+    if let Some(delta_view) = delta {
+        out.push('\n');
+        out.push_str(&format_markdown_delta(delta_view));
+    }
+    out
+}
 
+/// Render the analysis-only body (no delta block). Branches on
+/// empty / grouped / per-function paths; the delta block is appended
+/// once by the caller.
+fn format_markdown_body(
+    view: &AnalysisView<'_>,
+    threshold: f64,
+    breakdown: bool,
+    explain: bool,
+) -> String {
+    let mut out = String::new();
     out.push_str(&format!(
         "# crap4rs v{} — CRAP Score Analysis\n\n",
         env!("CARGO_PKG_VERSION")
@@ -34,47 +50,25 @@ pub fn format_markdown(
 
     if view.full.functions.is_empty() {
         out.push_str("No functions analyzed.\n");
-        if let Some(delta_view) = delta {
-            out.push('\n');
-            out.push_str(&format_markdown_delta(delta_view));
-        }
         return out;
     }
 
-    // --group-by file: per-file rows. Summary block unchanged (gate keystone).
     if view.grouped.is_some() {
         out.push_str(&format_grouped_table_md(view));
         out.push('\n');
         out.push_str(&summary_block(view, threshold));
-        if let Some(delta_view) = delta {
-            out.push('\n');
-            out.push_str(&format_markdown_delta(delta_view));
-        }
         return out;
     }
 
     out.push_str("| File | Function | CC | Cov% | CRAP | Risk |\n");
     out.push_str("|------|----------|----|------|------|------|\n");
-
     for verdict in view.shown.iter() {
         out.push_str(&row_for(verdict));
         out.push('\n');
-        if breakdown && verdict.exceeds && !verdict.scored.contributors.is_empty() {
-            for c in verdict.scored.contributors.iter() {
-                out.push_str(&format!("  - L{} {} +{}\n", c.line, c.kind, c.increment));
-            }
-        }
+        append_breakdown_bullets(&mut out, verdict, breakdown);
     }
 
-    if breakdown
-        && explain
-        && view
-            .shown
-            .iter()
-            .filter(|v| v.exceeds)
-            .flat_map(|v| v.scored.contributors.iter())
-            .any(|c| c.increment > 1)
-    {
+    if breakdown && explain && needs_legend(view) {
         out.push_str(
             "\n_Legend: +1 = base structural increment. +N (nested) = +1 base plus +(N-1) from active nesting depth (if/else, match arms, while/for/loop, let-else diverging branches, closures)._\n",
         );
@@ -82,13 +76,24 @@ pub fn format_markdown(
 
     out.push('\n');
     out.push_str(&summary_block(view, threshold));
-
-    if let Some(delta_view) = delta {
-        out.push('\n');
-        out.push_str(&format_markdown_delta(delta_view));
-    }
-
     out
+}
+
+fn append_breakdown_bullets(out: &mut String, verdict: &FunctionVerdict, breakdown: bool) {
+    if !breakdown || !verdict.exceeds || verdict.scored.contributors.is_empty() {
+        return;
+    }
+    for c in verdict.scored.contributors.iter() {
+        out.push_str(&format!("  - L{} {} +{}\n", c.line, c.kind, c.increment));
+    }
+}
+
+fn needs_legend(view: &AnalysisView<'_>) -> bool {
+    view.shown
+        .iter()
+        .filter(|v| v.exceeds)
+        .flat_map(|v| v.scored.contributors.iter())
+        .any(|c| c.increment > 1)
 }
 
 /// Render the delta scorecard block. Format is stable enough to drop
