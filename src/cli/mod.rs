@@ -614,6 +614,7 @@ fn run_inner() -> Result<bool> {
         let output = match cli.output.format {
             FormatArg::Table => reporters::format_table_with_explain(
                 &view,
+                delta_view.as_ref(),
                 effective_threshold,
                 cli.display.breakdown,
                 cli.display.explain,
@@ -642,11 +643,12 @@ fn run_inner() -> Result<bool> {
             }
             FormatArg::Markdown => reporters::format_markdown(
                 &view,
+                delta_view.as_ref(),
                 effective_threshold,
                 cli.display.breakdown,
                 cli.display.explain,
             ),
-            FormatArg::Csv => reporters::format_csv(&view, effective_metric),
+            FormatArg::Csv => reporters::format_csv(&view, delta_view.as_ref(), effective_metric),
         };
         print!("{output}");
     }

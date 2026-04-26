@@ -5,6 +5,7 @@
 
 use std::borrow::Cow;
 
+use crate::domain::delta::{DeltaView, FunctionChange};
 use crate::domain::summary::FileSummary;
 use crate::domain::types::{ComplexityMetric, FunctionVerdict};
 use crate::domain::view::AnalysisView;
@@ -14,7 +15,21 @@ use crate::domain::view::AnalysisView;
 /// Header row is fixed and stable for downstream tools. The
 /// `complexity_metric` column reflects the analysis-wide metric, not
 /// per-function — every row carries the same value.
-pub fn format_csv(view: &AnalysisView<'_>, metric: ComplexityMetric) -> String {
+///
+/// When `delta` is `Some`, the schema mode-switches to row-per-change
+/// (one row per `FunctionChange`) with a `change_kind` column. The
+/// per-function schema is unchanged when `delta` is `None`. CSV
+/// consumers must pin their expected schema based on whether
+/// `--baseline` was passed.
+pub fn format_csv(
+    view: &AnalysisView<'_>,
+    delta: Option<&DeltaView<'_>>,
+    metric: ComplexityMetric,
+) -> String {
+    if let Some(delta_view) = delta {
+        return format_csv_delta(delta_view, metric);
+    }
+
     if let Some(grouped) = view.grouped.as_ref() {
         return format_csv_grouped(&grouped.files);
     }
@@ -30,6 +45,60 @@ pub fn format_csv(view: &AnalysisView<'_>, metric: ComplexityMetric) -> String {
     }
 
     out
+}
+
+/// Per-change CSV. Header carries side-by-side baseline / current
+/// scores so downstream renderers can sort or filter without re-pairing
+/// against the original analyses. Empty cells signal "not applicable"
+/// for the change's kind (Added has no baseline_*; Removed has no
+/// current_*).
+fn format_csv_delta(view: &DeltaView<'_>, metric: ComplexityMetric) -> String {
+    let mut out = String::new();
+    out.push_str(
+        "change_kind,file,function,baseline_complexity,baseline_coverage_percent,baseline_crap,current_complexity,current_coverage_percent,current_crap,score_delta,complexity_metric\n",
+    );
+    for change in view.shown.iter() {
+        out.push_str(&row_for_change(change, metric));
+        out.push('\n');
+    }
+    out
+}
+
+fn row_for_change(change: &FunctionChange, metric: ComplexityMetric) -> String {
+    let baseline_cells = match change {
+        FunctionChange::Removed { baseline } | FunctionChange::Modified { baseline, .. } => {
+            let s = &baseline.scored;
+            format!(
+                "{},{:.1},{:.2}",
+                s.complexity, s.coverage_percent, s.crap.value
+            )
+        }
+        FunctionChange::Added { .. } => ",,".to_string(),
+    };
+    let current_cells = match change {
+        FunctionChange::Added { current } | FunctionChange::Modified { current, .. } => {
+            let s = &current.scored;
+            format!(
+                "{},{:.1},{:.2}",
+                s.complexity, s.coverage_percent, s.crap.value
+            )
+        }
+        FunctionChange::Removed { .. } => ",,".to_string(),
+    };
+    let delta_cell = change
+        .score_delta()
+        .map(|d| format!("{d:.2}"))
+        .unwrap_or_default();
+    format!(
+        "{},{},{},{},{},{},{}",
+        change.kind().as_str(),
+        quote_csv_field(change.file_path()),
+        quote_csv_field(change.qualified_name()),
+        baseline_cells,
+        current_cells,
+        delta_cell,
+        metric,
+    )
 }
 
 /// Per-file CSV output. The header schema differs from the
@@ -126,7 +195,11 @@ mod tests {
     #[test]
     fn header_is_exact() {
         let result = make_empty_result();
-        let out = format_csv(&make_view_default(&result), ComplexityMetric::Cognitive);
+        let out = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cognitive,
+        );
         assert_eq!(
             out,
             "file,function,start_line,end_line,complexity,complexity_metric,coverage_percent,crap_score,risk_level,exceeds_threshold\n"
@@ -136,7 +209,11 @@ mod tests {
     #[test]
     fn one_row_per_function() {
         let result = make_multi_function_result();
-        let out = format_csv(&make_view_default(&result), ComplexityMetric::Cognitive);
+        let out = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cognitive,
+        );
         // 1 header + 3 data rows + trailing newline → 4 lines
         assert_eq!(out.lines().count(), 4);
     }
@@ -152,7 +229,11 @@ mod tests {
             RiskLevel::Low,
             8.0,
         );
-        let out = format_csv(&make_view_default(&result), ComplexityMetric::Cognitive);
+        let out = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cognitive,
+        );
         assert!(
             out.contains("\"weird,name\""),
             "expected quoted comma: {out}"
@@ -170,7 +251,11 @@ mod tests {
             RiskLevel::Low,
             8.0,
         );
-        let out = format_csv(&make_view_default(&result), ComplexityMetric::Cognitive);
+        let out = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cognitive,
+        );
         assert!(
             out.contains("\"say\"\"hi\""),
             "expected doubled quote: {out}"
@@ -188,7 +273,11 @@ mod tests {
             RiskLevel::Low,
             8.0,
         );
-        let out = format_csv(&make_view_default(&result), ComplexityMetric::Cognitive);
+        let out = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cognitive,
+        );
         assert!(
             out.contains("\"two\nlines\""),
             "expected quoted newline: {out}"
@@ -199,8 +288,16 @@ mod tests {
     fn metric_column_reflects_arg() {
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let out_cog = format_csv(&make_view_default(&result), ComplexityMetric::Cognitive);
-        let out_cyc = format_csv(&make_view_default(&result), ComplexityMetric::Cyclomatic);
+        let out_cog = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cognitive,
+        );
+        let out_cyc = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cyclomatic,
+        );
         assert!(out_cog.contains(",cognitive,"));
         assert!(out_cyc.contains(",cyclomatic,"));
     }
@@ -208,7 +305,11 @@ mod tests {
     #[test]
     fn full_csv_snapshot() {
         let result = make_multi_function_result();
-        let out = format_csv(&make_view_default(&result), ComplexityMetric::Cognitive);
+        let out = format_csv(
+            &make_view_default(&result),
+            None,
+            ComplexityMetric::Cognitive,
+        );
         insta::assert_snapshot!(out);
     }
 
@@ -223,7 +324,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_csv(&view, ComplexityMetric::Cognitive);
+        let out = format_csv(&view, None, ComplexityMetric::Cognitive);
         // 10-column per-file header
         let expected_header = "file,function_count,exceeding_count,average_crap,max_crap,worst_function,distribution_low,distribution_acceptable,distribution_moderate,distribution_high";
         let first_line = out.lines().next().unwrap();
@@ -277,7 +378,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_csv(&view, ComplexityMetric::Cognitive);
+        let out = format_csv(&view, None, ComplexityMetric::Cognitive);
         assert!(
             out.contains("\"src/weird,path.rs\""),
             "expected quoted path: {out}"
@@ -295,7 +396,98 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_csv(&view, ComplexityMetric::Cognitive);
+        let out = format_csv(&view, None, ComplexityMetric::Cognitive);
+        insta::assert_snapshot!(out);
+    }
+
+    // ── Delta CSV (VS5) ─────────────────────────────────────────────
+
+    #[test]
+    fn delta_csv_header_carries_change_kind_and_side_by_side_columns() {
+        let delta = make_sample_delta();
+        let view = make_delta_view_default(&delta);
+        let out = format_csv(
+            &make_view_default(&delta.current),
+            Some(&view),
+            ComplexityMetric::Cognitive,
+        );
+        let header = out.lines().next().expect("at least header");
+        assert_eq!(
+            header,
+            "change_kind,file,function,baseline_complexity,baseline_coverage_percent,baseline_crap,current_complexity,current_coverage_percent,current_crap,score_delta,complexity_metric"
+        );
+    }
+
+    #[test]
+    fn delta_csv_added_row_has_empty_baseline_columns() {
+        let delta = make_sample_delta();
+        let view = make_delta_view_default(&delta);
+        let out = format_csv(
+            &make_view_default(&delta.current),
+            Some(&view),
+            ComplexityMetric::Cognitive,
+        );
+        let added_line = out
+            .lines()
+            .find(|l| l.starts_with("added,"))
+            .expect("added row present");
+        // Columns: change_kind,file,function,baseline_complexity,baseline_coverage,baseline_crap,...
+        let cells: Vec<&str> = added_line.split(',').collect();
+        assert_eq!(cells[3], ""); // baseline_complexity empty
+        assert_eq!(cells[4], ""); // baseline_coverage empty
+        assert_eq!(cells[5], ""); // baseline_crap empty
+        assert_eq!(cells[9], ""); // score_delta empty for Added
+    }
+
+    #[test]
+    fn delta_csv_removed_row_has_empty_current_columns() {
+        let delta = make_sample_delta();
+        let view = make_delta_view_default(&delta);
+        let out = format_csv(
+            &make_view_default(&delta.current),
+            Some(&view),
+            ComplexityMetric::Cognitive,
+        );
+        let removed_line = out
+            .lines()
+            .find(|l| l.starts_with("removed,"))
+            .expect("removed row present");
+        let cells: Vec<&str> = removed_line.split(',').collect();
+        assert_eq!(cells[6], ""); // current_complexity empty
+        assert_eq!(cells[7], ""); // current_coverage empty
+        assert_eq!(cells[8], ""); // current_crap empty
+        assert_eq!(cells[9], ""); // score_delta empty for Removed
+    }
+
+    #[test]
+    fn delta_csv_modified_row_carries_score_delta() {
+        let delta = make_sample_delta();
+        let view = make_delta_view_default(&delta);
+        let out = format_csv(
+            &make_view_default(&delta.current),
+            Some(&view),
+            ComplexityMetric::Cognitive,
+        );
+        // parse_record went 15.0 → 22.0, score_delta = 7.00
+        let modified_line = out
+            .lines()
+            .find(|l| l.starts_with("modified,") && l.contains("parse_record"))
+            .expect("modified parse_record row");
+        assert!(
+            modified_line.contains(",7.00,"),
+            "score_delta column missing: {modified_line}"
+        );
+    }
+
+    #[test]
+    fn delta_csv_full_snapshot() {
+        let delta = make_sample_delta();
+        let view = make_delta_view_default(&delta);
+        let out = format_csv(
+            &make_view_default(&delta.current),
+            Some(&view),
+            ComplexityMetric::Cognitive,
+        );
         insta::assert_snapshot!(out);
     }
 }

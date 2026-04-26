@@ -4,6 +4,7 @@
 //! No ANSI. Suitable for piping into PR comments, issue bodies, or
 //! documentation.
 
+use crate::domain::delta::{DeltaView, FunctionChange};
 use crate::domain::types::FunctionVerdict;
 use crate::domain::view::AnalysisView;
 
@@ -13,8 +14,13 @@ use crate::domain::view::AnalysisView;
 /// contributors under each exceeding function. `explain` adds a
 /// trailing legend describing increment semantics (only meaningful
 /// when `breakdown` is set).
+///
+/// When `delta` is `Some`, a `## CRAP Scorecard` section is appended
+/// after the analysis summary — designed for PR-comment rendering.
+/// When `delta` is `None`, output is byte-identical to today.
 pub fn format_markdown(
     view: &AnalysisView<'_>,
+    delta: Option<&DeltaView<'_>>,
     threshold: f64,
     breakdown: bool,
     explain: bool,
@@ -28,6 +34,10 @@ pub fn format_markdown(
 
     if view.full.functions.is_empty() {
         out.push_str("No functions analyzed.\n");
+        if let Some(delta_view) = delta {
+            out.push('\n');
+            out.push_str(&format_markdown_delta(delta_view));
+        }
         return out;
     }
 
@@ -36,6 +46,10 @@ pub fn format_markdown(
         out.push_str(&format_grouped_table_md(view));
         out.push('\n');
         out.push_str(&summary_block(view, threshold));
+        if let Some(delta_view) = delta {
+            out.push('\n');
+            out.push_str(&format_markdown_delta(delta_view));
+        }
         return out;
     }
 
@@ -68,6 +82,91 @@ pub fn format_markdown(
 
     out.push('\n');
     out.push_str(&summary_block(view, threshold));
+
+    if let Some(delta_view) = delta {
+        out.push('\n');
+        out.push_str(&format_markdown_delta(delta_view));
+    }
+
+    out
+}
+
+/// Render the delta scorecard block. Format is stable enough to drop
+/// into PR comments verbatim. Counts come from `view.full.summary`
+/// (the unshapeable gate); regression / new-violation tables iterate
+/// `view.shown` so `--delta-top` / `--delta-only` shape the rendered
+/// rows but not the counts.
+fn format_markdown_delta(view: &DeltaView<'_>) -> String {
+    let summary = &view.full.summary;
+    let status = if summary.passed { "PASS" } else { "FAIL" };
+
+    let mut out = String::new();
+    out.push_str("## CRAP Scorecard\n\n");
+    out.push_str(&format!("- **Delta status:** {status}\n"));
+    out.push_str(&format!(
+        "- **Changes:** +{added} added, {removed} removed, {modified} modified\n",
+        added = summary.added,
+        removed = summary.removed,
+        modified = summary.modified,
+    ));
+    out.push_str(&format!(
+        "- **Regressions:** {regressions} · **Improvements:** {improvements} · **New violations:** {new_violations}\n",
+        regressions = summary.regressions,
+        improvements = summary.improvements,
+        new_violations = summary.new_violations,
+    ));
+
+    let regressions: Vec<&FunctionChange> = view
+        .shown
+        .iter()
+        .copied()
+        .filter(|c| {
+            matches!(c, FunctionChange::Modified { .. }) && c.score_delta().unwrap_or(0.0) > 0.0
+        })
+        .collect();
+    if !regressions.is_empty() {
+        out.push_str("\n### Regressions\n\n");
+        out.push_str("| File | Function | Baseline CRAP | Current CRAP | Δ |\n");
+        out.push_str("|------|----------|--------------:|-------------:|--:|\n");
+        for change in regressions {
+            let baseline = change.baseline_score().unwrap_or(0.0);
+            let current = change.current_score().unwrap_or(0.0);
+            let delta = change.score_delta().unwrap_or(0.0);
+            out.push_str(&format!(
+                "| {} | {} | {:.2} | {:.2} | +{:.2} |\n",
+                escape_cell(change.file_path()),
+                escape_cell(change.qualified_name()),
+                baseline,
+                current,
+                delta,
+            ));
+        }
+    }
+
+    let new_violations: Vec<&FunctionChange> = view
+        .shown
+        .iter()
+        .copied()
+        .filter(|c| match c {
+            FunctionChange::Added { current } => current.exceeds,
+            FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
+            FunctionChange::Removed { .. } => false,
+        })
+        .collect();
+    if !new_violations.is_empty() {
+        out.push_str("\n### New violations\n\n");
+        out.push_str("| File | Function | Current CRAP |\n");
+        out.push_str("|------|----------|-------------:|\n");
+        for change in new_violations {
+            let current = change.current_score().unwrap_or(0.0);
+            out.push_str(&format!(
+                "| {} | {} | {:.2} |\n",
+                escape_cell(change.file_path()),
+                escape_cell(change.qualified_name()),
+                current,
+            ));
+        }
+    }
 
     out
 }
@@ -185,7 +284,7 @@ mod tests {
     #[test]
     fn header_row_pipes_and_columns() {
         let result = make_multi_function_result();
-        let out = format_markdown(&make_view_default(&result), 8.0, false, false);
+        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
         assert!(out.contains("| File | Function | CC | Cov% | CRAP | Risk |"));
         assert!(out.contains("|------|"));
     }
@@ -193,7 +292,7 @@ mod tests {
     #[test]
     fn empty_analysis_says_no_functions() {
         let result = make_empty_result();
-        let out = format_markdown(&make_view_default(&result), 8.0, false, false);
+        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
         assert!(out.contains("No functions analyzed"));
         assert!(!out.contains("| File |"));
     }
@@ -202,7 +301,7 @@ mod tests {
     fn pipe_in_function_name_is_escaped() {
         let result =
             make_single_function_result("a|b", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let out = format_markdown(&make_view_default(&result), 8.0, false, false);
+        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
         assert!(out.contains("a\\|b"), "expected escaped pipe in: {out}");
     }
 
@@ -211,7 +310,7 @@ mod tests {
         // Even if the view is filtered, summary derives from view.full
         // (the gate keystone).
         let result = make_multi_function_result();
-        let out = format_markdown(&make_view_default(&result), 8.0, false, false);
+        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
         assert!(out.contains("- **Result:** FAIL"));
         assert!(out.contains("3 (2 above threshold 8)"));
     }
@@ -219,7 +318,7 @@ mod tests {
     #[test]
     fn full_markdown_snapshot() {
         let result = make_multi_function_result();
-        let out = format_markdown(&make_view_default(&result), 8.0, false, false);
+        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
         insta::assert_snapshot!(out);
     }
 
@@ -256,7 +355,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let out = format_markdown(&make_view_default(&result), 8.0, true, true);
+        let out = format_markdown(&make_view_default(&result), None, 8.0, true, true);
         insta::assert_snapshot!(out);
     }
 
@@ -273,7 +372,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_markdown(&view, 8.0, false, false);
+        let out = format_markdown(&view, None, 8.0, false, false);
         assert!(out.contains("| File | Functions | Failing | Avg CRAP | Worst CRAP | Worst Fn |"));
         // Per-function CC/Cov% absent
         assert!(!out.contains("| CC |"));
@@ -293,7 +392,82 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_markdown(&view, 8.0, false, false);
+        let out = format_markdown(&view, None, 8.0, false, false);
+        insta::assert_snapshot!(out);
+    }
+
+    // ── Delta scorecard (VS5) ───────────────────────────────────────
+
+    #[test]
+    fn delta_scorecard_includes_status_and_counts() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = format_markdown(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+        );
+        assert!(out.contains("## CRAP Scorecard"));
+        // Status reflects the delta gate (new_violations > 0 → FAIL)
+        assert!(out.contains("- **Delta status:** FAIL"));
+        assert!(out.contains("+1 added, 1 removed, 2 modified"));
+        // new_fn is the only new violation; parse_record's baseline already exceeded.
+        assert!(out.contains("**New violations:** 1"));
+    }
+
+    #[test]
+    fn delta_scorecard_renders_regressions_table_when_present() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = format_markdown(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+        );
+        assert!(out.contains("### Regressions"));
+        // parse_record went 15.0 → 22.0
+        assert!(out.contains("parse_record"));
+        assert!(out.contains("+7.00"));
+    }
+
+    #[test]
+    fn delta_scorecard_renders_new_violations_table() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = format_markdown(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+        );
+        assert!(out.contains("### New violations"));
+        assert!(out.contains("new_fn"));
+    }
+
+    #[test]
+    fn no_baseline_means_no_scorecard_block() {
+        let result = make_multi_function_result();
+        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
+        assert!(!out.contains("CRAP Scorecard"));
+        assert!(!out.contains("Delta status"));
+    }
+
+    #[test]
+    fn full_markdown_with_delta_snapshot() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = format_markdown(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+        );
         insta::assert_snapshot!(out);
     }
 }

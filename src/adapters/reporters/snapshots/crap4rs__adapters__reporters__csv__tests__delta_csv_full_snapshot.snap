@@ -1,0 +1,9 @@
+---
+source: src/adapters/reporters/csv.rs
+expression: out
+---
+change_kind,file,function,baseline_complexity,baseline_coverage_percent,baseline_crap,current_complexity,current_coverage_percent,current_crap,score_delta,complexity_metric
+removed,src/domain/crap.rs,complex_fn,20,30.0,45.20,,,,,cognitive
+added,src/adapters/baseline.rs,new_fn,,,,10,40.0,30.00,,cognitive
+modified,src/adapters/coverage/mod.rs,parse_record,6,72.5,15.00,6,60.0,22.00,7.00,cognitive
+modified,src/lib.rs,simple_fn,2,95.0,3.00,2,95.0,3.00,0.00,cognitive
