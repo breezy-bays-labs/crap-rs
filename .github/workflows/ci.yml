@@ -192,7 +192,16 @@ jobs:
           # Sanity: the rendered scorecard always opens with an h1 carrying
           # the tool version. The action consumes the whole string verbatim,
           # so a regression here means consumers get garbage.
-          printf '%s\n' "$md" | head -1 | grep -q "^# crap4rs"
+          # Pure-bash prefix match (no `head -1` pipe, which would race
+          # SIGPIPE under `pipefail`).
+          case "$md" in
+            '# crap4rs'*) ;;
+            *)
+              echo "::error::markdown reporter output did not begin with '# crap4rs' header"
+              echo "First 80 chars: ${md:0:80}"
+              exit 1
+              ;;
+          esac
 
       # Layer (2): exercise the composite action's plumbing.
       - name: Dogfood the scorecard action
