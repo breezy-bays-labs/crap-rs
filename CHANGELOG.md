@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-26
+
+### Changed
+- **Markdown reporter is now summary-first.** `--format markdown` renders a compact title + multi-metric summary block (CRAP / Complexity / Coverage stats with worst, average, median + risk distribution) followed by a top-N spotlight: failures sorted CRAP-desc when violations exist, otherwise the worst-by-CRAP slice on a clean run. Designed to fit in a PR comment regardless of codebase size — a 1099-function self-analysis renders in ~1.4 KB (down from ~92 KB). The legacy row-per-function table is preserved behind `--md-full-table`.
+
+### Added
+- `--md-full-table` flag in the Display group: append the legacy row-per-function table after the summary. Useful when piping `--format markdown` into a longer document instead of a PR comment.
+- `--md-top N` flag: bound the markdown spotlight table size (default 10). The summary block is unaffected — its stats always reflect the full unshapeable analysis.
+- `AnalysisSummary` now carries Complexity stats (`max_complexity`, `average_complexity`, `median_complexity`) and Coverage stats (`min_coverage`, `average_coverage`, `median_coverage`) alongside the existing CRAP stats. JSON envelope additions are non-breaking; `schema_version` stays at `1`. Older baseline JSON deserializes cleanly via `#[serde(default)]`.
+
+### Fixed
+- **`cargo binstall crap4rs`** now extracts the pre-built binary instead of falling back to source build. The `[package.metadata.binstall]` `bin-dir` template was `"."`, which resolves to an empty source path under cargo-binstall ≥ 1.x; corrected to `"{ bin }{ binary-ext }"`. Closes #101.
+
 ## [0.2.1] - 2026-04-26
 
 Patch release addressing CodeRabbit review feedback on the v0.2.0

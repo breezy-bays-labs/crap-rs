@@ -248,7 +248,7 @@ pub struct FunctionVerdict {
 
 // ── Analysis Results ────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RiskDistribution {
     pub low: usize,
     pub acceptable: usize,
@@ -256,7 +256,7 @@ pub struct RiskDistribution {
     pub high: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AnalysisSummary {
     pub total_functions: usize,
     pub total_files: usize,
@@ -266,6 +266,27 @@ pub struct AnalysisSummary {
     pub max_crap: Option<CrapScore>,
     pub worst_function: Option<FunctionIdentity>,
     pub distribution: RiskDistribution,
+    /// Highest complexity across analyzed functions. `0` when input is empty.
+    #[serde(default)]
+    pub max_complexity: u32,
+    /// Mean complexity across analyzed functions. `0.0` when input is empty.
+    #[serde(default)]
+    pub average_complexity: f64,
+    /// Median complexity across analyzed functions. `0.0` when input is empty.
+    #[serde(default)]
+    pub median_complexity: f64,
+    /// Minimum of finite `coverage_percent` values. `0.0` when no finite
+    /// values exist (NaN-only input or empty).
+    #[serde(default)]
+    pub min_coverage: f64,
+    /// Mean of finite `coverage_percent` values; NaN inputs excluded from
+    /// both numerator and denominator. `0.0` when no finite values exist.
+    #[serde(default)]
+    pub average_coverage: f64,
+    /// Median of finite `coverage_percent` values. `0.0` when no finite
+    /// values exist.
+    #[serde(default)]
+    pub median_coverage: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

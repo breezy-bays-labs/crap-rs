@@ -10,22 +10,36 @@ use crate::domain::view::AnalysisView;
 
 /// Format an `AnalysisView` as GitHub-flavored Markdown.
 ///
+/// Default body shape: title + summary block (multi-metric stats +
+/// risk distribution) + a top-N spotlight (failures if any exceed
+/// threshold, otherwise the worst by CRAP). Designed to fit comfortably
+/// in a PR comment — bounded output regardless of codebase size.
+///
 /// `breakdown` injects an indented bullet list of complexity
-/// contributors under each exceeding function. `explain` adds a
-/// trailing legend describing increment semantics (only meaningful
-/// when `breakdown` is set).
+/// contributors under each exceeding function in the spotlight (or
+/// the full table when `full_table` is set). `explain` adds a trailing
+/// legend describing increment semantics (only meaningful when
+/// `breakdown` is set).
+///
+/// `full_table` switches the body to the legacy row-per-function table
+/// rendered after the summary — useful when piping into a longer
+/// document instead of a PR comment. Off by default.
+///
+/// `top_n` bounds the spotlight table size. The summary block is
+/// always full-fidelity (computed from `view.full.summary`).
 ///
 /// When `delta` is `Some`, a `## CRAP Scorecard` section is appended
-/// after the analysis summary — designed for PR-comment rendering.
-/// When `delta` is `None`, output is byte-identical to today.
+/// after the analysis body — designed for PR-comment rendering.
 pub fn format_markdown(
     view: &AnalysisView<'_>,
     delta: Option<&DeltaView<'_>>,
     threshold: f64,
     breakdown: bool,
     explain: bool,
+    full_table: bool,
+    top_n: usize,
 ) -> String {
-    let mut out = format_markdown_body(view, threshold, breakdown, explain);
+    let mut out = format_markdown_body(view, threshold, breakdown, explain, full_table, top_n);
     if let Some(delta_view) = delta {
         out.push('\n');
         out.push_str(&format_markdown_delta(delta_view));
@@ -34,13 +48,15 @@ pub fn format_markdown(
 }
 
 /// Render the analysis-only body (no delta block). Branches on
-/// empty / grouped / per-function paths; the delta block is appended
-/// once by the caller.
+/// empty / grouped / spotlight / full-table paths; the delta block is
+/// appended once by the caller.
 fn format_markdown_body(
     view: &AnalysisView<'_>,
     threshold: f64,
     breakdown: bool,
     explain: bool,
+    full_table: bool,
+    top_n: usize,
 ) -> String {
     let mut out = String::new();
     out.push_str(&format!(
@@ -53,13 +69,97 @@ fn format_markdown_body(
         return out;
     }
 
+    out.push_str(&summary_block(view, threshold));
+
     if view.grouped.is_some() {
+        out.push_str("\n## Per-file aggregates\n\n");
         out.push_str(&format_grouped_table_md(view));
-        out.push('\n');
-        out.push_str(&summary_block(view, threshold));
         return out;
     }
 
+    out.push('\n');
+    if full_table {
+        out.push_str(&full_table_block(view, breakdown, explain));
+    } else {
+        out.push_str(&spotlight_block(view, threshold, top_n));
+    }
+
+    out
+}
+
+/// Default body section: top-N failures when violations exist,
+/// otherwise the worst-by-CRAP slice. Bounded to `top_n` rows.
+fn spotlight_block(view: &AnalysisView<'_>, threshold: f64, top_n: usize) -> String {
+    let mut out = String::new();
+    let summary = &view.full.summary;
+
+    if summary.exceeding_threshold == 0 {
+        // Clean run — show the hot spots so reviewers see what's
+        // approaching threshold.
+        let worst = top_n_by_crap(view.shown.iter().copied(), top_n);
+        if worst.is_empty() {
+            return out;
+        }
+        out.push_str(&format!("## Top {} worst by CRAP\n\n", worst.len()));
+        out.push_str(&function_table(&worst));
+        out.push_str("\n_All functions are within threshold._\n");
+        return out;
+    }
+
+    // Failure path. Render up to `top_n` failures sorted CRAP-desc.
+    let failing: Vec<&FunctionVerdict> = view.shown.iter().copied().filter(|v| v.exceeds).collect();
+    let shown_failures = top_n_by_crap(failing.iter().copied(), top_n);
+
+    let header = if summary.exceeding_threshold > shown_failures.len() {
+        format!(
+            "## Failures (top {} of {} above threshold {})\n\n",
+            shown_failures.len(),
+            summary.exceeding_threshold,
+            format_threshold(view, threshold),
+        )
+    } else {
+        format!(
+            "## Failures ({} above threshold {})\n\n",
+            summary.exceeding_threshold,
+            format_threshold(view, threshold),
+        )
+    };
+    out.push_str(&header);
+    out.push_str(&function_table(&shown_failures));
+    out
+}
+
+fn top_n_by_crap<'a, I>(iter: I, n: usize) -> Vec<&'a FunctionVerdict>
+where
+    I: IntoIterator<Item = &'a FunctionVerdict>,
+{
+    let mut v: Vec<&FunctionVerdict> = iter.into_iter().collect();
+    v.sort_by(|a, b| {
+        b.scored
+            .crap
+            .value
+            .partial_cmp(&a.scored.crap.value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    v.truncate(n);
+    v
+}
+
+fn function_table(verdicts: &[&FunctionVerdict]) -> String {
+    let mut out = String::new();
+    out.push_str("| File | Function | CC | Cov% | CRAP | Risk |\n");
+    out.push_str("|------|----------|----|------|------|------|\n");
+    for v in verdicts {
+        out.push_str(&row_for(v));
+        out.push('\n');
+    }
+    out
+}
+
+/// Legacy row-per-function table (preserved behind `--md-full-table`).
+fn full_table_block(view: &AnalysisView<'_>, breakdown: bool, explain: bool) -> String {
+    let mut out = String::new();
+    out.push_str("## All functions\n\n");
     out.push_str("| File | Function | CC | Cov% | CRAP | Risk |\n");
     out.push_str("|------|----------|----|------|------|------|\n");
     for verdict in view.shown.iter() {
@@ -67,16 +167,20 @@ fn format_markdown_body(
         out.push('\n');
         append_breakdown_bullets(&mut out, verdict, breakdown);
     }
-
     if breakdown && explain && needs_legend(view) {
         out.push_str(
             "\n_Legend: +1 = base structural increment. +N (nested) = +1 base plus +(N-1) from active nesting depth (if/else, match arms, while/for/loop, let-else diverging branches, closures)._\n",
         );
     }
-
-    out.push('\n');
-    out.push_str(&summary_block(view, threshold));
     out
+}
+
+fn format_threshold(view: &AnalysisView<'_>, threshold: f64) -> String {
+    if has_varied_thresholds(&view.full.functions) {
+        format!("varied (default: {})", threshold)
+    } else {
+        format!("{}", threshold)
+    }
 }
 
 fn append_breakdown_bullets(out: &mut String, verdict: &FunctionVerdict, breakdown: bool) {
@@ -216,36 +320,41 @@ fn escape_cell(s: &str) -> String {
 fn summary_block(view: &AnalysisView<'_>, threshold: f64) -> String {
     let summary = &view.full.summary;
     let pass_fail = if view.full.passed { "PASS" } else { "FAIL" };
-    let worst = summary
+    let crap_max = summary
         .max_crap
-        .map(|c| format!("{:.1}", c.value))
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let threshold_display = if has_varied_thresholds(&view.full.functions) {
-        format!("varied (default: {})", threshold)
-    } else {
-        format!("{}", threshold)
-    };
-
+        .as_ref()
+        .map(|c| format!("{:.2}", c.value))
+        .unwrap_or_else(|| "—".to_string());
+    let threshold_display = format_threshold(view, threshold);
     let d = &summary.distribution;
-    format!(
-        "## Summary\n\n\
-         - **Result:** {pass_fail}\n\
-         - **Functions:** {} ({} above threshold {})\n\
-         - **Worst CRAP:** {worst}\n\
-         - **Average CRAP:** {:.1}\n\
-         - **Median CRAP:** {:.1}\n\
-         - **Distribution:** low {} · acceptable {} · moderate {} · high {}\n",
-        summary.total_functions,
-        summary.exceeding_threshold,
-        threshold_display,
-        summary.average_crap,
-        summary.median_crap,
-        d.low,
-        d.acceptable,
-        d.moderate,
-        d.high,
-    )
+
+    let mut out = String::new();
+    out.push_str("## Summary\n\n");
+    out.push_str(&format!(
+        "**Result:** {pass_fail} · **Functions:** {} · **Above threshold ({threshold_display}):** {}\n\n",
+        summary.total_functions, summary.exceeding_threshold,
+    ));
+    out.push_str("| Metric     | Worst | Average | Median |\n");
+    out.push_str("|------------|------:|--------:|-------:|\n");
+    out.push_str(&format!(
+        "| CRAP       | {crap_max} | {:>7.2} | {:>6.2} |\n",
+        summary.average_crap, summary.median_crap,
+    ));
+    out.push_str(&format!(
+        "| Complexity | {:>5} | {:>7.1} | {:>6.1} |\n",
+        summary.max_complexity, summary.average_complexity, summary.median_complexity,
+    ));
+    out.push_str(&format!(
+        "| Coverage   | {min:>4.1}% | {avg:>6.1}% | {median:>5.1}% |\n",
+        min = summary.min_coverage,
+        avg = summary.average_coverage,
+        median = summary.median_coverage,
+    ));
+    out.push_str(&format!(
+        "\n**Risk distribution:** low {} · acceptable {} · moderate {} · high {}\n",
+        d.low, d.acceptable, d.moderate, d.high,
+    ));
+    out
 }
 
 fn format_grouped_table_md(view: &AnalysisView<'_>) -> String {
@@ -296,7 +405,15 @@ mod tests {
     #[test]
     fn header_row_pipes_and_columns() {
         let result = make_multi_function_result();
-        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+        );
         assert!(out.contains("| File | Function | CC | Cov% | CRAP | Risk |"));
         assert!(out.contains("|------|"));
     }
@@ -304,7 +421,15 @@ mod tests {
     #[test]
     fn empty_analysis_says_no_functions() {
         let result = make_empty_result();
-        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+        );
         assert!(out.contains("No functions analyzed"));
         assert!(!out.contains("| File |"));
     }
@@ -313,7 +438,15 @@ mod tests {
     fn pipe_in_function_name_is_escaped() {
         let result =
             make_single_function_result("a|b", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+        );
         assert!(out.contains("a\\|b"), "expected escaped pipe in: {out}");
     }
 
@@ -322,15 +455,32 @@ mod tests {
         // Even if the view is filtered, summary derives from view.full
         // (the gate keystone).
         let result = make_multi_function_result();
-        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
-        assert!(out.contains("- **Result:** FAIL"));
-        assert!(out.contains("3 (2 above threshold 8)"));
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+        );
+        assert!(out.contains("**Result:** FAIL"));
+        assert!(out.contains("**Functions:** 3"));
+        assert!(out.contains("**Above threshold (8):** 2"));
     }
 
     #[test]
     fn full_markdown_snapshot() {
         let result = make_multi_function_result();
-        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+        );
         insta::assert_snapshot!(out);
     }
 
@@ -367,7 +517,15 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let out = format_markdown(&make_view_default(&result), None, 8.0, true, true);
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            true,
+            true,
+            false,
+            10,
+        );
         insta::assert_snapshot!(out);
     }
 
@@ -384,13 +542,13 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_markdown(&view, None, 8.0, false, false);
+        let out = format_markdown(&view, None, 8.0, false, false, false, 10);
         assert!(out.contains("| File | Functions | Failing | Avg CRAP | Worst CRAP | Worst Fn |"));
-        // Per-function CC/Cov% absent
-        assert!(!out.contains("| CC |"));
-        assert!(!out.contains("| Cov% |"));
-        // Summary block intact (3 functions, 2 above threshold)
-        assert!(out.contains("3 (2 above threshold 8)"));
+        // Per-function CC/Cov% headers absent in the per-file aggregate table
+        assert!(!out.contains("| File | Function | CC |"));
+        // Summary block intact (3 functions, 2 above threshold 8)
+        assert!(out.contains("**Functions:** 3"));
+        assert!(out.contains("**Above threshold (8):** 2"));
     }
 
     #[test]
@@ -404,7 +562,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_markdown(&view, None, 8.0, false, false);
+        let out = format_markdown(&view, None, 8.0, false, false, false, 10);
         insta::assert_snapshot!(out);
     }
 
@@ -420,6 +578,8 @@ mod tests {
             8.0,
             false,
             false,
+            false,
+            10,
         );
         assert!(out.contains("## CRAP Scorecard"));
         // Status reflects the delta gate (new_violations > 0 → FAIL)
@@ -439,6 +599,8 @@ mod tests {
             8.0,
             false,
             false,
+            false,
+            10,
         );
         assert!(out.contains("### Regressions"));
         // parse_record went 15.0 → 22.0
@@ -456,6 +618,8 @@ mod tests {
             8.0,
             false,
             false,
+            false,
+            10,
         );
         assert!(out.contains("### New violations"));
         assert!(out.contains("new_fn"));
@@ -464,7 +628,15 @@ mod tests {
     #[test]
     fn no_baseline_means_no_scorecard_block() {
         let result = make_multi_function_result();
-        let out = format_markdown(&make_view_default(&result), None, 8.0, false, false);
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+        );
         assert!(!out.contains("CRAP Scorecard"));
         assert!(!out.contains("Delta status"));
     }
@@ -479,6 +651,8 @@ mod tests {
             8.0,
             false,
             false,
+            false,
+            10,
         );
         insta::assert_snapshot!(out);
     }

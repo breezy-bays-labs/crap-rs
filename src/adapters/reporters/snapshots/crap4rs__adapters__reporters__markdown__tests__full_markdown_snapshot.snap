@@ -2,19 +2,23 @@
 source: src/adapters/reporters/markdown.rs
 expression: out
 ---
-# crap4rs v0.2.1 — CRAP Score Analysis
+# crap4rs v0.2.2 — CRAP Score Analysis
+
+## Summary
+
+**Result:** FAIL · **Functions:** 3 · **Above threshold (8):** 2
+
+| Metric     | Worst | Average | Median |
+|------------|------:|--------:|-------:|
+| CRAP       | 45.20 |   21.07 |  15.00 |
+| Complexity |    20 |     9.3 |    6.0 |
+| Coverage   | 30.0% |   65.8% |  72.5% |
+
+**Risk distribution:** low 1 · acceptable 0 · moderate 1 · high 1
+
+## Failures (2 above threshold 8)
 
 | File | Function | CC | Cov% | CRAP | Risk |
 |------|----------|----|------|------|------|
 | src/domain/crap.rs | complex_fn | 20 | 30.0 | 45.20 | high |
 | src/adapters/coverage/mod.rs | parse_record | 6 | 72.5 | 15.00 | moderate |
-| src/lib.rs | simple_fn | 2 | 95.0 | 3.00 | low |
-
-## Summary
-
-- **Result:** FAIL
-- **Functions:** 3 (2 above threshold 8)
-- **Worst CRAP:** 45.2
-- **Average CRAP:** 21.1
-- **Median CRAP:** 15.0
-- **Distribution:** low 1 · acceptable 0 · moderate 1 · high 1
