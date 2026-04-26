@@ -119,6 +119,40 @@ crap4rs --coverage lcov.info --view investigate --top 25
 
 The JSON envelope reflects the same separation: `result.*` always describes the full analysis (gate); `view.*` describes what the operator chose to see (display). An agent or dashboard can act on `result.passed`, `result.summary`, and `result.functions` while rendering only `view.shown`.
 
+### Comparing two analyses (`--baseline <FILE>`)
+
+To track regressions across runs, capture a baseline JSON envelope (typically from `main`) and compare your working tree to it:
+
+```bash
+# Capture the baseline (CI: cache or upload as an artifact)
+crap4rs --coverage lcov.info --format json > baseline.json
+
+# Compare working tree to baseline (informational by default)
+crap4rs --coverage lcov.info --baseline baseline.json
+```
+
+The output adds a "Delta vs baseline" block under the analysis table — per-change rows with kind (added/removed/modified), baseline/current scores, and signed delta. Functions are paired by `(file_path, qualified_name)`; line shifts don't disrupt matching. Renames across files surface as Add+Remove pairs until rename detection ships.
+
+By default, delta is **informational** — the exit code follows the analysis gate alone. Add `--delta-gate` to fail (exit 1) when the comparison introduces new threshold violations:
+
+```bash
+# CI usage: fail the build on new violations only (pre-existing ones don't trip it)
+crap4rs --coverage lcov.info --baseline baseline.json --delta-gate
+```
+
+`new_violations` counts threshold breaches *introduced* by this change — `Added` rows that exceed threshold, plus `Modified` rows where baseline was passing and current isn't. Pre-existing violations (Modified rows where the baseline already exceeded) never contribute, so re-running on unchanged code never trips the gate.
+
+`--no-fail` overrides BOTH gates (analysis + delta), but truth still lives in JSON: consumers see `result.passed` and `delta.summary.passed` regardless of the exit code, so a CI job can post a "would have failed" comment while still exiting 0.
+
+For PR-comment scorecards, pipe the markdown reporter:
+
+```bash
+# Drop into a PR comment body verbatim (status, counts, regressions table, new-violations table)
+crap4rs --coverage lcov.info --baseline baseline.json --format markdown
+```
+
+The shaping flags `--delta-top`, `--delta-sort` (`score-delta` (default) | `current-crap` | `baseline-crap` | `path`), and `--delta-only` (`added,removed,modified`) drive a sibling `DeltaViewSpec` independent of the View shaping. The JSON envelope's additive `delta` block carries the full summary plus `delta.shown` for renderer drill-down — the gate keystone holds for delta as it does for the analysis.
+
 ## Output formats
 
 `--format markdown` produces GitHub-flavored Markdown (pipe-syntax table plus a Summary block) — paste it into a PR comment, an issue body, or a doc page. `--format csv` produces RFC 4180 CSV with a fixed header row, suitable for piping into spreadsheets, BI tools, or `awk`/`jq` pipelines that prefer tabular input. Both honor every shaping flag (`--top`, `--sort-by`, `--only-failing`, `--min-coverage` / `--max-coverage`).
