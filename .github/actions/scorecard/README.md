@@ -22,7 +22,7 @@ for a future release of this action — see ops
 [#231](https://github.com/breezy-bays-labs/ops/issues/231).
 
 ```yaml
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@v0.3.0
+- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
   with:
     language: auto                 # rust | typescript | auto (infers from extension)
     coverage: lcov.info
@@ -33,7 +33,7 @@ for a future release of this action — see ops
 ```yaml
 - uses: actions/checkout@v4
 - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@v0.3.0
+- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
   id: crap
   with:
     coverage: lcov.info
@@ -74,7 +74,7 @@ jobs:
         run: cargo llvm-cov --workspace --lcov --output-path /tmp/head.lcov
 
       # 3. Render the scorecard, post sticky comment.
-      - uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@v0.3.0
+      - uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
         with:
           coverage: /tmp/head.lcov
           baseline: /tmp/baseline.json
@@ -91,7 +91,7 @@ one sticky comment. This action contributes the CRAP rows; the aggregator
 owns the comment.
 
 ```yaml
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@v0.3.0
+- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
   id: crap
   with:
     coverage: /tmp/head.lcov
@@ -141,6 +141,21 @@ owns the comment.
 | `delta-passed` | `true` / `false`, or empty string when no baseline |
 | `new-violations` | Count of functions exceeding threshold but not in baseline |
 | `regressions` | Count of modified functions whose CRAP increased above rendering precision |
+
+## Pinning
+
+Examples above use `@main` for clarity. **Pin to a commit SHA in production
+workflows** so a regression in the action can't break your CI without you
+noticing:
+
+```yaml
+uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@<sha>
+```
+
+When the action is folded into the future
+[crap monorepo](https://github.com/breezy-bays-labs/ops/issues/231) it'll get
+a Marketplace listing with proper version tags; for now `@main` is the only
+moving ref and SHA-pinning is the safe default.
 
 ## Design notes
 

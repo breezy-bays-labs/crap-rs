@@ -141,14 +141,60 @@ jobs:
         run: cargo mutants --package crap4rs --file src/domain/view.rs --no-shuffle --in-place
 
   scorecard-smoke:
+    # Two-layer smoke for the composite action:
+    #   (1) Run the PR's locally-built crap4rs directly against lcov.info
+    #       in JSON + markdown modes. Catches any regression in the
+    #       analyzer/renderer/envelope shape introduced by THIS PR before
+    #       it can mask itself by being installed-from-crates.io later.
+    #   (2) Exercise the composite action's wiring (input plumbing,
+    #       output emission). The action installs crap4rs via `cargo
+    #       binstall` — that path resolves to the latest published
+    #       version, so layer (1) is what guards against PR regressions
+    #       in the binary itself.
     name: Scorecard action smoke (analysis-only)
     runs-on: ubuntu-latest
     needs: [coverage]
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/download-artifact@v4
         with:
           name: lcov
+
+      # Layer (1): exercise the PR's binary directly.
+      - name: Build PR binary
+        run: cargo build --release
+      - name: Direct smoke — JSON envelope shape
+        env:
+          BIN: ./target/release/crap4rs
+        run: |
+          set -euo pipefail
+          envelope=$("$BIN" --coverage lcov.info --src src --threshold 25 --format json --no-fail)
+          # Required fields the action's jq queries depend on.
+          for field in '.schema_version' '.tool_version' '.result.passed' '.result.functions'; do
+            value=$(printf '%s' "$envelope" | jq -e "$field" >/dev/null && echo ok || echo missing)
+            if [ "$value" = "missing" ]; then
+              echo "::error::JSON envelope missing $field — action's output parsing would break"
+              exit 1
+            fi
+          done
+      - name: Direct smoke — markdown render
+        env:
+          BIN: ./target/release/crap4rs
+        run: |
+          set -euo pipefail
+          md=$("$BIN" --coverage lcov.info --src src --threshold 25 --format markdown --no-fail)
+          if [ -z "$md" ]; then
+            echo "::error::markdown reporter produced empty output"
+            exit 1
+          fi
+          # Sanity: the rendered scorecard always opens with an h1 carrying
+          # the tool version. The action consumes the whole string verbatim,
+          # so a regression here means consumers get garbage.
+          printf '%s\n' "$md" | head -1 | grep -q "^# crap4rs"
+
+      # Layer (2): exercise the composite action's plumbing.
       - name: Dogfood the scorecard action
         id: crap
         uses: ./.github/actions/scorecard
@@ -156,7 +202,7 @@ jobs:
           coverage: lcov.info
           src: src
           threshold: '25'
-      - name: Assert outputs are populated
+      - name: Assert action outputs are populated
         env:
           MARKDOWN: ${{ steps.crap.outputs.markdown }}
           ENVELOPE_PATH: ${{ steps.crap.outputs.json-envelope-path }}

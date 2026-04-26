@@ -126,7 +126,7 @@ runs:
 
     - name: Install cargo-binstall
       if: steps.lang.outputs.language == 'rust'
-      uses: cargo-bins/cargo-binstall@main
+      uses: cargo-bins/cargo-binstall@v1.18.1
 
     - name: Install crap4rs
       if: steps.lang.outputs.language == 'rust'
@@ -135,10 +135,14 @@ runs:
         VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
+        # No `--force`: skip reinstall if a matching version is already on
+        # PATH (e.g., from `moonrepo/setup-rust` bins or a user-supplied
+        # pre-step that prepends a workspace-local build of crap4rs onto
+        # PATH for end-to-end dogfooding).
         if [ "$VERSION" = "latest" ]; then
-          cargo binstall --no-confirm --force crap4rs
+          cargo binstall --no-confirm crap4rs
         else
-          cargo binstall --no-confirm --force "crap4rs@$VERSION"
+          cargo binstall --no-confirm "crap4rs@$VERSION"
         fi
         crap4rs --version
 
@@ -168,6 +172,13 @@ runs:
         # green so we can surface counts/passed status via outputs even when
         # gates would have tripped. The hard gating happens in the dedicated
         # gate step below, gated by the analysis-gate / delta-gate inputs.
+        #
+        # Two-pass note: we run crap4rs twice — once for JSON, once for
+        # markdown — because the analyzer doesn't yet support multi-format
+        # output in a single invocation. The cost is one extra LCOV parse +
+        # CRAP recompute (cheap relative to runner setup); the user-visible
+        # latency is dominated by `cargo binstall crap4rs` upstream. Tracked
+        # in https://github.com/breezy-bays-labs/crap4rs/issues/100.
         crap4rs "${common[@]}" --format json --no-fail > "$envelope"
         crap4rs "${common[@]}" --format markdown --no-fail > "$markdown_file"
 
