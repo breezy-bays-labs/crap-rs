@@ -1,0 +1,20 @@
+---
+source: src/adapters/reporters/markdown.rs
+expression: out
+---
+# crap4rs v0.1.1 — CRAP Score Analysis
+
+| File | Functions | Failing | Avg CRAP | Worst CRAP | Worst Fn |
+|------|-----------|---------|----------|------------|----------|
+| src/domain/crap.rs | 1 | 1 | 45.20 | 45.20 | complex_fn |
+| src/adapters/coverage/mod.rs | 1 | 1 | 15.00 | 15.00 | parse_record |
+| src/lib.rs | 1 | 0 | 3.00 | 3.00 | simple_fn |
+
+## Summary
+
+- **Result:** FAIL
+- **Functions:** 3 (2 above threshold 8)
+- **Worst CRAP:** 45.2
+- **Average CRAP:** 21.1
+- **Median CRAP:** 15.0
+- **Distribution:** low 1 · acceptable 0 · moderate 1 · high 1
