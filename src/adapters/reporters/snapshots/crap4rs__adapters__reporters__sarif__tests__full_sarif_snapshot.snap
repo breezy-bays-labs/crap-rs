@@ -1,0 +1,81 @@
+---
+source: src/adapters/reporters/sarif.rs
+assertion_line: 322
+expression: out
+---
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "crap4rs",
+          "version": "0.2.2",
+          "informationUri": "https://github.com/breezy-bays-labs/crap4rs",
+          "rules": [
+            {
+              "id": "crap/threshold-exceeded",
+              "name": "ThresholdExceeded",
+              "shortDescription": {
+                "text": "Function CRAP score exceeds the configured threshold."
+              },
+              "fullDescription": {
+                "text": "Functions whose CRAP score (complexity * complexity * (1 - coverage)^3 + complexity) exceeds the threshold are change-risk hot spots: cover them first, then extract sub-functions if complexity remains the driver."
+              },
+              "helpUri": "https://github.com/breezy-bays-labs/crap4rs#crap-formula"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "crap/threshold-exceeded",
+          "level": "warning",
+          "message": {
+            "text": "Function `parse_record` has CRAP 15.00 (complexity=6, coverage=72.5%) which exceeds threshold 8.0"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/adapters/coverage/mod.rs"
+                },
+                "region": {
+                  "startLine": 1,
+                  "endLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "functionIdentity": "src/adapters/coverage/mod.rs:parse_record"
+          }
+        },
+        {
+          "ruleId": "crap/threshold-exceeded",
+          "level": "error",
+          "message": {
+            "text": "Function `complex_fn` has CRAP 45.20 (complexity=20, coverage=30.0%) which exceeds threshold 8.0"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/domain/crap.rs"
+                },
+                "region": {
+                  "startLine": 1,
+                  "endLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "functionIdentity": "src/domain/crap.rs:complex_fn"
+          }
+        }
+      ]
+    }
+  ]
+}

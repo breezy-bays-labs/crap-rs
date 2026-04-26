@@ -290,4 +290,99 @@ mod tests {
             "src/lib.rs:MyType::method"
         );
     }
+
+    #[test]
+    fn schema_uri_and_top_level_shape() {
+        let result = make_multi_function_result();
+        let view = make_view_default(&result);
+        let v = parse(&format_sarif(&view, "0.2.2"));
+        assert_eq!(
+            v["$schema"],
+            "https://json.schemastore.org/sarif-2.1.0.json"
+        );
+        assert_eq!(v["version"], "2.1.0");
+        assert_eq!(v["runs"][0]["tool"]["driver"]["name"], "crap4rs");
+        assert_eq!(v["runs"][0]["tool"]["driver"]["version"], "0.2.2");
+    }
+
+    #[test]
+    fn rule_definition_present_on_every_run() {
+        // The rule must be defined on the run regardless of whether any
+        // result references it, so consumers can introspect the schema.
+        let empty = make_empty_result();
+        let v = parse(&format_sarif(&make_view_default(&empty), "0.2.2"));
+        let rules = v["runs"][0]["tool"]["driver"]["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0]["id"], "crap/threshold-exceeded");
+        assert_eq!(rules[0]["name"], "ThresholdExceeded");
+    }
+
+    #[test]
+    fn full_sarif_snapshot() {
+        let result = make_multi_function_result();
+        let view = make_view_default(&result);
+        let out = format_sarif(&view, "0.2.2");
+        insta::assert_snapshot!(out);
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::adapters::reporters::test_fixtures::make_view_default;
+    use crate::test_strategies::arb_analysis_result;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn prop_format_sarif_always_valid_json(result in arb_analysis_result()) {
+            let view = make_view_default(&result);
+            let out = format_sarif(&view, "0.2.2");
+            let _: serde_json::Value = serde_json::from_str(&out)
+                .expect("format_sarif must produce parseable JSON");
+        }
+
+        #[test]
+        fn prop_sarif_results_count_matches_exceeders(result in arb_analysis_result()) {
+            let view = make_view_default(&result);
+            let out = format_sarif(&view, "0.2.2");
+            let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+            let results = v["runs"][0]["results"].as_array().unwrap();
+            let expected = result.functions.iter().filter(|fv| fv.exceeds).count();
+            prop_assert_eq!(results.len(), expected);
+        }
+
+        #[test]
+        fn prop_every_result_has_mandatory_sarif_fields(result in arb_analysis_result()) {
+            let view = make_view_default(&result);
+            let out = format_sarif(&view, "0.2.2");
+            let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+            for r in v["runs"][0]["results"].as_array().unwrap() {
+                prop_assert!(r["ruleId"].is_string());
+                prop_assert!(r["level"].is_string());
+                prop_assert!(r["message"]["text"].is_string());
+                prop_assert!(r["locations"].is_array());
+                prop_assert!(r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].is_string());
+                prop_assert!(r["locations"][0]["physicalLocation"]["region"]["startLine"].is_u64());
+                prop_assert!(r["locations"][0]["physicalLocation"]["region"]["endLine"].is_u64());
+                prop_assert!(r["partialFingerprints"]["functionIdentity"].is_string());
+            }
+        }
+
+        #[test]
+        fn prop_severity_is_one_of_three_values(result in arb_analysis_result()) {
+            let view = make_view_default(&result);
+            let out = format_sarif(&view, "0.2.2");
+            let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+            for r in v["runs"][0]["results"].as_array().unwrap() {
+                let level = r["level"].as_str().unwrap();
+                prop_assert!(
+                    matches!(level, "error" | "warning" | "note"),
+                    "unexpected level: {}", level
+                );
+            }
+        }
+    }
 }
