@@ -121,12 +121,19 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
         new_violations = summary.new_violations,
     ));
 
+    // Filter threshold matches the `{:.2}` cell-rendering precision:
+    // a delta below 0.005 rounds to "+0.00" in the table and looks
+    // like a falsely-flagged regression. Anything that rounds up to
+    // ≥ +0.01 is admitted. (CrapScore values are themselves
+    // 2-decimal rounded, so this gate rarely fires in practice — but
+    // float arithmetic can produce sub-0.005 noise on identity
+    // comparisons.)
     let regressions: Vec<&FunctionChange> = view
         .shown
         .iter()
         .copied()
         .filter(|c| {
-            matches!(c, FunctionChange::Modified { .. }) && c.score_delta().unwrap_or(0.0) > 0.0
+            matches!(c, FunctionChange::Modified { .. }) && c.score_delta().unwrap_or(0.0) >= 0.005
         })
         .collect();
     if !regressions.is_empty() {

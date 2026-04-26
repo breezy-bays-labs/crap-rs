@@ -114,6 +114,25 @@ pub fn arb_verdict_with_nan_coverage() -> impl Strategy<Value = FunctionVerdict>
 /// Vec bound is `0..50` so tests probe empty, small-N, and N>typical-limit.
 pub fn arb_analysis_result() -> impl Strategy<Value = AnalysisResult> {
     prop::collection::vec(arb_verdict(), 0..50).prop_map(|verdicts| {
+        // Real `AnalysisResult` instances have unique
+        // `(file_path, qualified_name)` per function — a syn walker can
+        // only emit one verdict per source location. The strategy can
+        // and does generate duplicates (low-cardinality regex), so dedup
+        // here to keep the generator faithful to the production
+        // invariant. Without this, delta tests collapse duplicate
+        // baseline entries via `HashMap` overwrite and produce
+        // pathological Added/Modified mixes that don't exist in real
+        // input.
+        let mut seen = std::collections::HashSet::new();
+        let verdicts: Vec<FunctionVerdict> = verdicts
+            .into_iter()
+            .filter(|v| {
+                seen.insert((
+                    v.scored.identity.file_path.clone(),
+                    v.scored.identity.qualified_name.clone(),
+                ))
+            })
+            .collect();
         let passed = !verdicts.iter().any(|v| v.exceeds);
         let summary = compute_summary(&verdicts);
         AnalysisResult {
