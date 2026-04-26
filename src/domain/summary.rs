@@ -151,91 +151,119 @@ where
         .collect()
 }
 
-fn file_summary_for(file_path: String, verdicts: &[&FunctionVerdict]) -> FileSummary {
-    let function_count = verdicts.len();
-    let mut distribution = RiskDistribution {
-        low: 0,
-        acceptable: 0,
-        moderate: 0,
-        high: 0,
-    };
-    let mut exceeding_count: usize = 0;
-    let mut sum_crap: f64 = 0.0;
-    let mut max_crap_value: Option<f64> = None;
-    let mut worst_function: Option<FunctionIdentity> = None;
-    let mut scores: Vec<f64> = Vec::with_capacity(function_count);
-    let mut sum_finite_coverage: f64 = 0.0;
-    let mut finite_coverage_count: usize = 0;
-    let mut max_complexity: u32 = 0;
+/// Per-verdict accumulator for `file_summary_for`.
+///
+/// Holds running totals so the per-verdict update is a single fold step
+/// without keeping the cognitive complexity of `file_summary_for` itself
+/// above the project's strict-CRAP gate (CC ≤ 15).
+struct FileAcc {
+    sum_crap: f64,
+    max_crap_value: Option<f64>,
+    worst_function: Option<FunctionIdentity>,
+    finite_scores: Vec<f64>,
+    sum_finite_coverage: f64,
+    finite_coverage_count: usize,
+    max_complexity: u32,
+    exceeding_count: usize,
+    distribution: RiskDistribution,
+}
 
-    for v in verdicts {
+impl FileAcc {
+    fn with_capacity(n: usize) -> Self {
+        Self {
+            sum_crap: 0.0,
+            max_crap_value: None,
+            worst_function: None,
+            finite_scores: Vec::with_capacity(n),
+            sum_finite_coverage: 0.0,
+            finite_coverage_count: 0,
+            max_complexity: 0,
+            exceeding_count: 0,
+            distribution: RiskDistribution {
+                low: 0,
+                acceptable: 0,
+                moderate: 0,
+                high: 0,
+            },
+        }
+    }
+
+    fn fold(&mut self, v: &FunctionVerdict) {
         let score = v.scored.crap.value;
-        scores.push(score);
-        sum_crap += score;
+        // Strip NaN from the median set so per-file median is deterministic
+        // (CodeRabbit observation on summary.rs:256 — `partial_cmp.unwrap_or(Equal)`
+        // can otherwise leave NaN at the middle index). NaN scores still
+        // contribute to `sum_crap` to mirror `compute_summary`'s aggregate
+        // behavior; in practice the CRAP formula is always finite, so this
+        // only matters as a defensive contract.
+        self.sum_crap += score;
+        if score.is_finite() {
+            self.finite_scores.push(score);
+        }
         if v.exceeds {
-            exceeding_count += 1;
+            self.exceeding_count += 1;
         }
-        match v.scored.crap.risk_level {
-            RiskLevel::Low => distribution.low += 1,
-            RiskLevel::Acceptable => distribution.acceptable += 1,
-            RiskLevel::Moderate => distribution.moderate += 1,
-            RiskLevel::High => distribution.high += 1,
+        bump_distribution(&mut self.distribution, v.scored.crap.risk_level);
+        if beats(self.max_crap_value, score) {
+            self.max_crap_value = Some(score);
+            self.worst_function = Some(v.scored.identity.clone());
         }
-        // Strict-greater: first verdict at the max wins (matches
-        // `compute_summary`'s "first wins" semantics on ties).
-        let beats = match max_crap_value {
-            None => true,
-            Some(curr) => score > curr,
-        };
-        if beats {
-            max_crap_value = Some(score);
-            worst_function = Some(v.scored.identity.clone());
-        }
-        // Coverage: skip NaN; `compute_summary` does not aggregate
-        // coverage at all, but file-level sort needs a finite mean.
         let cov = v.scored.coverage_percent;
         if cov.is_finite() {
-            sum_finite_coverage += cov;
-            finite_coverage_count += 1;
+            self.sum_finite_coverage += cov;
+            self.finite_coverage_count += 1;
         }
         // equivalent-mutant: `>` vs `>=` here is observationally identical —
         // re-assigning `max_complexity` to the same value is a no-op, so
         // cargo-mutants reports a survivor that does not represent a real bug.
-        if v.scored.complexity > max_complexity {
-            max_complexity = v.scored.complexity;
+        if v.scored.complexity > self.max_complexity {
+            self.max_complexity = v.scored.complexity;
         }
     }
+}
 
-    let average_crap = if function_count > 0 {
-        sum_crap / function_count as f64
-    } else {
-        0.0
-    };
+fn bump_distribution(d: &mut RiskDistribution, level: RiskLevel) {
+    match level {
+        RiskLevel::Low => d.low += 1,
+        RiskLevel::Acceptable => d.acceptable += 1,
+        RiskLevel::Moderate => d.moderate += 1,
+        RiskLevel::High => d.high += 1,
+    }
+}
 
-    let median_crap = median_of(&mut scores);
+/// Strict-greater: first verdict at the max wins (matches `compute_summary`'s
+/// "first wins" semantics on ties).
+fn beats(curr: Option<f64>, score: f64) -> bool {
+    match curr {
+        None => true,
+        Some(c) => score > c,
+    }
+}
 
-    let max_crap = max_crap_value.map(|value| CrapScore {
-        value,
-        risk_level: super::crap::classify_risk(value),
-    });
+fn safe_avg(sum: f64, count: usize) -> f64 {
+    if count > 0 { sum / count as f64 } else { 0.0 }
+}
 
-    let average_coverage = if finite_coverage_count > 0 {
-        sum_finite_coverage / finite_coverage_count as f64
-    } else {
-        0.0
-    };
-
+fn file_summary_for(file_path: String, verdicts: &[&FunctionVerdict]) -> FileSummary {
+    let function_count = verdicts.len();
+    let mut acc = FileAcc::with_capacity(function_count);
+    for v in verdicts {
+        acc.fold(v);
+    }
     FileSummary {
         file_path,
         function_count,
-        exceeding_count,
-        average_crap,
-        median_crap,
-        max_crap,
-        worst_function,
-        distribution,
-        average_coverage,
-        max_complexity,
+        exceeding_count: acc.exceeding_count,
+        average_crap: safe_avg(acc.sum_crap, function_count),
+        median_crap: median_of(&mut acc.finite_scores),
+        max_crap: acc.max_crap_value.map(|value| CrapScore {
+            value,
+            risk_level: super::crap::classify_risk(value),
+        }),
+        worst_function: acc.worst_function,
+        distribution: acc.distribution,
+        average_coverage: safe_avg(acc.sum_finite_coverage, acc.finite_coverage_count),
+        max_complexity: acc.max_complexity,
     }
 }
 

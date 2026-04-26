@@ -376,18 +376,7 @@ fn truncate_to(shown: &mut Vec<&FunctionVerdict>, limit: Option<usize>) -> bool 
 pub fn should_render_view_line(view: &AnalysisView<'_>) -> bool {
     view.eligible_count < view.full.functions.len()
         || view.truncated
-        || view
-            .grouped
-            .as_ref()
-            .is_some_and(|g| g.truncated || g.eligible_count < distinct_files(view.full))
-}
-
-fn distinct_files(result: &AnalysisResult) -> usize {
-    let mut set = std::collections::HashSet::new();
-    for v in &result.functions {
-        set.insert(&v.scored.identity.file_path);
-    }
-    set.len()
+        || view.grouped.as_ref().is_some_and(|g| g.truncated)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────

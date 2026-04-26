@@ -31,7 +31,7 @@ Feature: --group-by file (Bundle C, issue #64)
     And `view.grouped.eligible_count` is 3
     And `view.grouped.truncated` is false
     And `view.shown.length` is 6
-    And each file in `view.grouped.files` has `file_path`, `function_count`, `exceeding_count`, `average_crap`, `max_crap`, `worst_function`, and `distribution`
+    And each file in `view.grouped.files` has `file_path`, `function_count`, `exceeding_count`, `average_crap`, `median_crap`, `max_crap`, `worst_function`, `distribution`, `average_coverage`, and `max_complexity`
 
   # ── --top truncates files when grouped ─────────────────────────────
 
