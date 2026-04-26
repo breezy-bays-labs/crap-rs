@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-26
+
+Patch release addressing CodeRabbit review feedback on the v0.2.0
+baseline-comparison capstone (#97). No new features, no API changes —
+correctness, determinism, and test-fidelity fixes.
+
+### Fixed
+- **Markdown delta scorecard suppresses sub-cent regressions** — the Regressions table filter now matches the `{:.2}` cell-rendering precision (`>= 0.005`), so functions whose CRAP delta rounds to `+0.00` no longer leak into the human-facing scorecard. Programmatic consumers (JSON, CSV) are unaffected.
+- **Removed-row order is deterministic** — `domain::delta::compute` now sorts leftover baseline entries by `(file_path, qualified_name)` before emitting them as `Removed` changes. The previous code relied on `HashMap` iteration order, which is unspecified in Rust and produced run-to-run flakiness for consumers iterating `delta.changes` directly. Identity-key sort is cheap and gives a stable presentation order matching operator expectations.
+- **`min_score_delta` / `max_score_delta` filters tolerate non-finite values when no bound is set** — the finiteness check now only fires when at least one bound was specified, so unspecified-bound delta views no longer silently drop rows whose `score_delta` is `NaN` (e.g., `Added`/`Removed` changes).
+- **`delta_gate_passes_when_no_new_violations` actually exercises the delta gate** — the test previously combined `--no-fail` with `--threshold 5` (analysis-failing) so the assertion couldn't distinguish "gate passed" from "`--no-fail` masked the failure." Switched to `--threshold 1000` and dropped `--no-fail` so the green outcome is attributable to the delta gate alone.
+- **`baseline_path_not_found_exits_2_with_actionable_message` is portable** — replaced the hard-coded `/tmp` path with a temp-dir-relative path so the test runs unchanged on Windows.
+- **`baseline_unsupported_schema_version_exits_2` checks the specific error** — tightened the stderr assertion from a generic substring to the exact `unsupported baseline schema_version` message so a malformed-JSON failure that happens to mention "schema" can't silently satisfy the test.
+
+### Internal
+- **`arb_analysis_result` proptest strategy deduplicates by identity** — the strategy previously generated `(file_path, qualified_name)` collisions that violate a real invariant of `AnalysisResult` (real syn-walked output has unique identities per function). The dedup keeps the generator faithful to production data and unblocks the delta property tests.
+
 ## [0.2.0] - 2026-04-26
 
 The reporting milestone. Five bundles ship together: pipeline-closeout

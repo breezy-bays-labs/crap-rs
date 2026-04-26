@@ -147,26 +147,26 @@ fn delta_gate_fails_on_new_violations() {
 fn delta_gate_passes_when_no_new_violations() {
     let tmp = tempfile::tempdir().expect("tempdir");
     setup_dir(tmp.path(), CURRENT_SRC, CURRENT_LCOV);
-    let baseline = capture_baseline(tmp.path(), "5");
+    let baseline = capture_baseline(tmp.path(), "1000");
 
     // Re-run with the SAME source against itself — delta has no
-    // changes so summary.passed = true.
+    // changes so summary.passed = true. Threshold is high enough that
+    // the analysis gate is also passing, so exit 0 is attributable to
+    // the delta gate alone (no `--no-fail` masking).
     let output = run(
         tmp.path(),
         &[
             "--threshold",
-            "5",
+            "1000",
             "--baseline",
             baseline.to_str().unwrap(),
             "--delta-gate",
-            "--no-fail",
         ],
     );
-    // analysis gate would be 1, but --no-fail forces 0.
     assert_eq!(
         output.status.code(),
         Some(0),
-        "no new violations + --no-fail = exit 0"
+        "no new violations should keep the delta-gate green (analysis also passes)"
     );
 }
 

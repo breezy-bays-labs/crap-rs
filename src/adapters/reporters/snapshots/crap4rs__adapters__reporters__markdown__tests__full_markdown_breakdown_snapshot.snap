@@ -2,7 +2,7 @@
 source: src/adapters/reporters/markdown.rs
 expression: out
 ---
-# crap4rs v0.1.1 — CRAP Score Analysis
+# crap4rs v0.2.1 — CRAP Score Analysis
 
 | File | Function | CC | Cov% | CRAP | Risk |
 |------|----------|----|------|------|------|

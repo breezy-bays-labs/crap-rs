@@ -283,14 +283,13 @@ fn modified_function_matches_across_line_shift() {
 fn baseline_path_not_found_exits_2_with_actionable_message() {
     let tmp = tempfile::tempdir().expect("tempdir");
     setup_dir(tmp.path(), CURRENT_SRC, CURRENT_LCOV);
+    // Use a path under the existing tempdir — portable across
+    // platforms (Windows lacks `/tmp`) and race-free (the tempdir is
+    // unique to this test).
+    let missing = tmp.path().join("does-not-exist.json");
     let output = run(
         tmp.path(),
-        &[
-            "--threshold",
-            "5",
-            "--baseline",
-            "/tmp/definitely-does-not-exist-xyzzy.json",
-        ],
+        &["--threshold", "5", "--baseline", missing.to_str().unwrap()],
     );
     assert_eq!(
         output.status.code(),
@@ -299,8 +298,8 @@ fn baseline_path_not_found_exits_2_with_actionable_message() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("not found") || stderr.contains("baseline"),
-        "stderr should explain missing baseline: {stderr}"
+        stderr.contains("not found"),
+        "stderr should specifically explain missing baseline: {stderr}"
     );
 }
 
@@ -343,8 +342,12 @@ fn baseline_unsupported_schema_version_exits_2() {
         "schema_version mismatch must exit 2"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
+    // Tight match on the exact error message from
+    // `BaselineError::UnsupportedSchemaVersion` so a generic parse
+    // error (e.g. malformed JSON happening to mention "schema") can't
+    // silently satisfy this test.
     assert!(
-        stderr.contains("schema_version") || stderr.contains("schema"),
-        "stderr should explain version mismatch: {stderr}"
+        stderr.contains("unsupported baseline schema_version"),
+        "stderr should specifically signal version mismatch (not a parse error): {stderr}"
     );
 }

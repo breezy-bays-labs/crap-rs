@@ -287,31 +287,31 @@ fn pair_identities(baseline: &AnalysisResult, current: &AnalysisResult) -> Vec<F
 
     let mut changes: Vec<FunctionChange> =
         Vec::with_capacity(current.functions.len() + baseline.functions.len());
-    let mut matched_count = 0usize;
 
     for current_verdict in &current.functions {
         let key = identity_key(&current_verdict.scored.identity);
         match baseline_index.remove(&key) {
-            Some(baseline_verdict) => {
-                matched_count += 1;
-                changes.push(FunctionChange::Modified {
-                    baseline: baseline_verdict.clone(),
-                    current: current_verdict.clone(),
-                });
-            }
+            Some(baseline_verdict) => changes.push(FunctionChange::Modified {
+                baseline: baseline_verdict.clone(),
+                current: current_verdict.clone(),
+            }),
             None => changes.push(FunctionChange::Added {
                 current: current_verdict.clone(),
             }),
         }
     }
 
-    // Leftover baseline entries are Removed.
-    debug_assert_eq!(
-        baseline.functions.len() - matched_count,
-        baseline_index.len(),
-        "matched count + leftover should equal baseline size"
-    );
-    for (_, baseline_verdict) in baseline_index {
+    // Leftover baseline entries are Removed. `HashMap` iteration order
+    // is unspecified, so we sort by identity key before emission —
+    // otherwise consumers that iterate `delta.changes` directly (or
+    // apply a sort that doesn't break ties on identity) observe
+    // run-to-run flakiness. Identity-key sort is cheap, deterministic,
+    // and gives a stable presentation order that mirrors the lexical
+    // ordering most operators expect.
+    let mut leftover: Vec<&FunctionVerdict> = baseline_index.into_values().collect();
+    leftover
+        .sort_by(|a, b| identity_key(&a.scored.identity).cmp(&identity_key(&b.scored.identity)));
+    for baseline_verdict in leftover {
         changes.push(FunctionChange::Removed {
             baseline: baseline_verdict.clone(),
         });
@@ -443,7 +443,13 @@ fn matches_score_delta_range(change: &FunctionChange, filters: &DeltaFilters) ->
         // `change_kinds`).
         return true;
     };
-    if !delta.is_finite() {
+    let bounded = filters.min_score_delta.is_some() || filters.max_score_delta.is_some();
+    if bounded && !delta.is_finite() {
+        // Reject non-finite deltas only when a bound is in play —
+        // otherwise a corrupt baseline silently disappears from the
+        // delta view while still counting in the summary. Without
+        // bounds, pass everything through; with bounds, the
+        // comparison would be undefined anyway.
         return false;
     }
     if filters.min_score_delta.is_some_and(|min| delta < min) {
@@ -696,6 +702,30 @@ mod tests {
         let delta = compute(make_result(vec![baseline_v]), make_result(vec![current_v]));
         assert_eq!(delta.changes.len(), 1);
         assert!(matches!(delta.changes[0], FunctionChange::Modified { .. }));
+    }
+
+    #[test]
+    fn removed_rows_are_emitted_in_identity_key_order() {
+        // Removed-row determinism (CodeRabbit PR #97): pair_identities
+        // collects leftover baseline entries from a HashMap; iterating
+        // the map directly produces non-deterministic order. Sort by
+        // (file_path, qualified_name) before emission so consumers
+        // that don't apply a tie-breaking sort see a stable order.
+        let baseline = make_result(vec![
+            make_verdict("zeta.rs", "zeta_fn", 5.0, false),
+            make_verdict("alpha.rs", "alpha_fn", 5.0, false),
+            make_verdict("beta.rs", "beta_fn", 5.0, false),
+        ]);
+        // Empty current → all baseline entries are Removed.
+        let current = make_result(vec![]);
+        let delta = compute(baseline, current);
+
+        // Should be sorted by (file_path, qualified_name) ascending —
+        // alpha.rs < beta.rs < zeta.rs.
+        assert_eq!(delta.changes.len(), 3);
+        assert_eq!(delta.changes[0].file_path(), "alpha.rs");
+        assert_eq!(delta.changes[1].file_path(), "beta.rs");
+        assert_eq!(delta.changes[2].file_path(), "zeta.rs");
     }
 
     // ── summary counts ──
