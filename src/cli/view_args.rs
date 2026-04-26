@@ -9,6 +9,7 @@ use anyhow::{Result, bail};
 
 use super::Cli;
 use crap4rs::domain::view::{CoverageRange, CoverageRangeError, ViewSpec};
+// `GroupKey` flows from CLI to `ViewSpec` via `cli::GroupByArg::Into<GroupKey>`.
 
 /// Build a `ViewSpec` from the parsed CLI.
 ///
@@ -29,6 +30,7 @@ pub(super) fn build_view_spec(cli: &Cli) -> ViewSpec {
     // rather than the user's literal input.
     spec.limit = cli.filter.top.and_then(|n| (n > 0).then_some(n as usize));
     spec.sort = cli.filter.sort_by.map(Into::into).unwrap_or_default();
+    spec.group_by = cli.filter.group_by.map(Into::into);
     spec
 }
 

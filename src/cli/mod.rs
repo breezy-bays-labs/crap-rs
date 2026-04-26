@@ -18,7 +18,7 @@ use crap4rs::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
 use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
-use crap4rs::domain::view::{self, SortKey};
+use crap4rs::domain::view::{self, GroupKey, SortKey};
 
 mod view_args;
 
@@ -79,6 +79,24 @@ impl From<SortKeyArg> for SortKey {
             SortKeyArg::Coverage => SortKey::Coverage,
             SortKeyArg::Complexity => SortKey::Complexity,
             SortKeyArg::Path => SortKey::Path,
+        }
+    }
+}
+
+/// Group key for the displayed view (issue #64).
+///
+/// Today only `file` is supported. The wrapper keeps `clap::ValueEnum`
+/// out of the domain; `From<GroupByArg> for GroupKey` is the boundary.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum GroupByArg {
+    /// Aggregate by source file path
+    File,
+}
+
+impl From<GroupByArg> for GroupKey {
+    fn from(arg: GroupByArg) -> Self {
+        match arg {
+            GroupByArg::File => GroupKey::File,
         }
     }
 }
@@ -251,6 +269,18 @@ pub struct FilterArgs {
     /// unknown flag) so the resulting error message is attributed to `--top`.
     #[arg(long, allow_hyphen_values = true, value_name = "N")]
     pub top: Option<u32>,
+
+    /// Aggregate the displayed view by a key. Today: `file` only.
+    ///
+    /// When set, the report shifts to per-file rows. `--top N` truncates
+    /// to the top N **files** (not functions); `--sort-by` keys at the
+    /// file level (`crap` → average CRAP descending; `coverage` →
+    /// average coverage ascending; `complexity` → max complexity
+    /// descending; `path` → alphabetical). The full per-function row
+    /// list still appears in JSON `view.shown` for drill-down. The
+    /// gate (exit code) is unaffected.
+    #[arg(long, value_enum, value_name = "KEY")]
+    pub group_by: Option<GroupByArg>,
 }
 
 #[derive(Debug, Args)]
@@ -903,6 +933,35 @@ mod tests {
     fn only_failing_flag() {
         let cli = parse(&["--coverage", "lcov.info", "--only-failing"]).unwrap();
         assert!(cli.filter.only_failing);
+    }
+
+    #[test]
+    fn group_by_file_parses() {
+        let cli = parse(&["--coverage", "lcov.info", "--group-by", "file"]).unwrap();
+        assert!(matches!(cli.filter.group_by, Some(GroupByArg::File)));
+    }
+
+    #[test]
+    fn group_by_absence_is_none() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert!(cli.filter.group_by.is_none());
+    }
+
+    #[test]
+    fn group_by_invalid_value_rejected() {
+        let err = parse(&["--coverage", "lcov.info", "--group-by", "module"]).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("invalid value"), "expected clap error: {msg}");
+        assert!(
+            msg.contains("--group-by") || msg.contains("module"),
+            "error should attribute to --group-by: {msg}"
+        );
+    }
+
+    #[test]
+    fn group_by_arg_to_domain_file() {
+        let domain: GroupKey = GroupByArg::File.into();
+        assert_eq!(domain, GroupKey::File);
     }
 
     #[test]
