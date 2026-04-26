@@ -15,6 +15,8 @@
 
 use crate::domain::types::{AnalysisDiagnostics, AnalysisResult};
 use serde::Deserialize;
+use std::fs::File;
+use std::io::{BufReader, ErrorKind};
 use std::path::Path;
 
 /// Currently-supported envelope schema version. Lockstep with
@@ -75,23 +77,25 @@ pub enum BaselineError {
 }
 
 /// Load a crap4rs JSON envelope from disk and return the baseline
-/// snapshot. The file is read in full (envelopes are bounded — they
-/// represent one analysis run; even a 50K-function envelope is well
-/// under 100MB).
+/// snapshot. Streams the file through a `BufReader` rather than
+/// reading the whole envelope into memory — large codebases produce
+/// envelopes in the multi-MB range and there's no reason to allocate
+/// that twice.
 pub fn load(path: &Path) -> Result<BaselineSnapshot, BaselineError> {
     let path_str = path.display().to_string();
 
-    if !path.exists() {
-        return Err(BaselineError::NotFound { path: path_str });
-    }
-
-    let raw = std::fs::read_to_string(path).map_err(|source| BaselineError::Io {
-        path: path_str.clone(),
-        source,
+    let file = File::open(path).map_err(|source| match source.kind() {
+        ErrorKind::NotFound => BaselineError::NotFound {
+            path: path_str.clone(),
+        },
+        _ => BaselineError::Io {
+            path: path_str.clone(),
+            source,
+        },
     })?;
 
     let envelope: BaselineEnvelope =
-        serde_json::from_str(&raw).map_err(|source| BaselineError::Parse {
+        serde_json::from_reader(BufReader::new(file)).map_err(|source| BaselineError::Parse {
             path: path_str.clone(),
             source,
         })?;

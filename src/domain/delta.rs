@@ -357,11 +357,13 @@ pub struct DeltaFilters {
 
 /// Sort key for the displayed delta view.
 ///
-/// `ScoreDelta` (default) ranks rows by *change magnitude* — the
-/// signed delta for `Modified`, the full current score for `Added`
-/// (treating absent baseline as zero), the full baseline score for
-/// `Removed` (treating absent current as zero), all with absolute
-/// value, descending. Biggest changes show first regardless of kind.
+/// `ScoreDelta` (default) ranks rows by *signed impact*, descending —
+/// regressions first. `Modified` uses `current - baseline`; `Added`
+/// uses `+current.crap` (a new function exists where there was none —
+/// pure load); `Removed` uses `-baseline.crap` (a function went
+/// away — pure relief). Sort descending: regressions and risky
+/// additions land at the top of the scorecard, improvements and
+/// benign removals at the bottom.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -462,20 +464,22 @@ fn sort_in_place(shown: &mut [&FunctionChange], key: DeltaSortKey) {
     }
 }
 
-/// Magnitude ordering: `Modified` ranks by `|score_delta|`, `Added`
-/// by `|current.crap|`, `Removed` by `|baseline.crap|`. Descending.
-/// Implemented via `magnitude` so rank is a single comparable scalar.
+/// Signed-impact ordering: regressions and risky additions sort to the
+/// top, improvements and benign removals to the bottom. `Modified`
+/// uses `current - baseline`; `Added` is treated as `+current.crap`
+/// (introducing load); `Removed` is treated as `-baseline.crap`
+/// (shedding load).
 fn cmp_by_score_delta_desc(a: &&FunctionChange, b: &&FunctionChange) -> Ordering {
-    cmp_f64_desc(magnitude(a), magnitude(b))
+    cmp_f64_desc(signed_impact(a), signed_impact(b))
 }
 
-fn magnitude(change: &FunctionChange) -> f64 {
+fn signed_impact(change: &FunctionChange) -> f64 {
     match change {
         FunctionChange::Modified { baseline, current } => {
-            (current.scored.crap.value - baseline.scored.crap.value).abs()
+            current.scored.crap.value - baseline.scored.crap.value
         }
-        FunctionChange::Added { current } => current.scored.crap.value.abs(),
-        FunctionChange::Removed { baseline } => baseline.scored.crap.value.abs(),
+        FunctionChange::Added { current } => current.scored.crap.value,
+        FunctionChange::Removed { baseline } => -baseline.scored.crap.value,
     }
 }
 
@@ -933,8 +937,8 @@ mod tests {
     }
 
     #[test]
-    fn apply_default_sorts_by_magnitude_descending() {
-        // Magnitudes: small_mod=1, big_mod=20, big_added=31
+    fn apply_default_sorts_by_signed_impact_descending() {
+        // Signed impacts: small_mod=+1, big_mod=+20, big_added=+31
         let delta = delta_with_changes(vec![
             FunctionChange::Modified {
                 baseline: make_verdict("a.rs", "small_mod", 5.0, false),
@@ -952,6 +956,37 @@ mod tests {
         assert_eq!(view.shown[0].qualified_name(), "big_added");
         assert_eq!(view.shown[1].qualified_name(), "big_mod");
         assert_eq!(view.shown[2].qualified_name(), "small_mod");
+    }
+
+    #[test]
+    fn apply_default_sort_puts_regressions_above_improvements() {
+        // Signed impacts: big_improvement=-25, small_regression=+5,
+        // big_removed=-30 (Removed is treated as -baseline.crap),
+        // big_added=+10. Ranking descending must be:
+        //   small_regression (+5) > big_added (+10? no, +10 > +5)
+        // Wait: +10 > +5, so big_added first, then small_regression,
+        // then big_improvement (-25), then big_removed (-30).
+        let delta = delta_with_changes(vec![
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "big_improvement", 30.0, true),
+                current: make_verdict("a.rs", "big_improvement", 5.0, false),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "small_regression", 5.0, false),
+                current: make_verdict("a.rs", "small_regression", 10.0, false),
+            },
+            FunctionChange::Removed {
+                baseline: make_verdict("a.rs", "big_removed", 30.0, true),
+            },
+            FunctionChange::Added {
+                current: make_verdict("a.rs", "big_added", 10.0, false),
+            },
+        ]);
+        let view = apply(&delta, DeltaViewSpec::default());
+        assert_eq!(view.shown[0].qualified_name(), "big_added"); // +10
+        assert_eq!(view.shown[1].qualified_name(), "small_regression"); // +5
+        assert_eq!(view.shown[2].qualified_name(), "big_improvement"); // -25
+        assert_eq!(view.shown[3].qualified_name(), "big_removed"); // -30
     }
 
     #[test]
