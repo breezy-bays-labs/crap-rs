@@ -66,14 +66,14 @@ where
     complexities.sort_unstable();
     finite_coverages.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-    let average_crap = mean_f64(&scores, total_functions);
+    let average_crap = mean_f64(&scores);
     let median_crap = median_f64_sorted(&scores);
 
-    let average_complexity = mean_u32(&complexities, total_functions);
+    let average_complexity = mean_u32(&complexities);
     let median_complexity = median_u32_sorted(&complexities);
 
     let min_coverage = finite_coverages.first().copied().unwrap_or(0.0);
-    let average_coverage = mean_f64(&finite_coverages, finite_coverages.len());
+    let average_coverage = mean_f64(&finite_coverages);
     let median_coverage = median_f64_sorted(&finite_coverages);
 
     AnalysisSummary {
@@ -99,18 +99,18 @@ where
     }
 }
 
-fn mean_f64(values: &[f64], count: usize) -> f64 {
-    if count == 0 {
+fn mean_f64(values: &[f64]) -> f64 {
+    if values.is_empty() {
         return 0.0;
     }
-    values.iter().sum::<f64>() / count as f64
+    values.iter().sum::<f64>() / values.len() as f64
 }
 
-fn mean_u32(values: &[u32], count: usize) -> f64 {
-    if count == 0 {
+fn mean_u32(values: &[u32]) -> f64 {
+    if values.is_empty() {
         return 0.0;
     }
-    values.iter().map(|v| *v as f64).sum::<f64>() / count as f64
+    values.iter().map(|v| *v as f64).sum::<f64>() / values.len() as f64
 }
 
 fn median_f64_sorted(sorted: &[f64]) -> f64 {

@@ -81,7 +81,7 @@ fn format_markdown_body(
     if full_table {
         out.push_str(&full_table_block(view, breakdown, explain));
     } else {
-        out.push_str(&spotlight_block(view, threshold, top_n));
+        out.push_str(&spotlight_block(view, threshold, top_n, breakdown, explain));
     }
 
     out
@@ -89,7 +89,15 @@ fn format_markdown_body(
 
 /// Default body section: top-N failures when violations exist,
 /// otherwise the worst-by-CRAP slice. Bounded to `top_n` rows.
-fn spotlight_block(view: &AnalysisView<'_>, threshold: f64, top_n: usize) -> String {
+/// Honors `--breakdown` and `--explain` so the spotlight matches the
+/// legacy full-table format's level of detail.
+fn spotlight_block(
+    view: &AnalysisView<'_>,
+    threshold: f64,
+    top_n: usize,
+    breakdown: bool,
+    explain: bool,
+) -> String {
     let mut out = String::new();
     let summary = &view.full.summary;
 
@@ -101,14 +109,16 @@ fn spotlight_block(view: &AnalysisView<'_>, threshold: f64, top_n: usize) -> Str
             return out;
         }
         out.push_str(&format!("## Top {} worst by CRAP\n\n", worst.len()));
-        out.push_str(&function_table(&worst));
+        out.push_str(&function_table(&worst, breakdown));
+        if breakdown && explain && needs_legend(view) {
+            out.push_str(LEGEND);
+        }
         out.push_str("\n_All functions are within threshold._\n");
         return out;
     }
 
     // Failure path. Render up to `top_n` failures sorted CRAP-desc.
-    let failing: Vec<&FunctionVerdict> = view.shown.iter().copied().filter(|v| v.exceeds).collect();
-    let shown_failures = top_n_by_crap(failing.iter().copied(), top_n);
+    let shown_failures = top_n_by_crap(view.shown.iter().copied().filter(|v| v.exceeds), top_n);
 
     let header = if summary.exceeding_threshold > shown_failures.len() {
         format!(
@@ -125,7 +135,10 @@ fn spotlight_block(view: &AnalysisView<'_>, threshold: f64, top_n: usize) -> Str
         )
     };
     out.push_str(&header);
-    out.push_str(&function_table(&shown_failures));
+    out.push_str(&function_table(&shown_failures, breakdown));
+    if breakdown && explain && needs_legend(view) {
+        out.push_str(LEGEND);
+    }
     out
 }
 
@@ -145,32 +158,27 @@ where
     v
 }
 
-fn function_table(verdicts: &[&FunctionVerdict]) -> String {
+fn function_table(verdicts: &[&FunctionVerdict], breakdown: bool) -> String {
     let mut out = String::new();
     out.push_str("| File | Function | CC | Cov% | CRAP | Risk |\n");
     out.push_str("|------|----------|----|------|------|------|\n");
     for v in verdicts {
         out.push_str(&row_for(v));
         out.push('\n');
+        append_breakdown_bullets(&mut out, v, breakdown);
     }
     out
 }
+
+const LEGEND: &str = "\n_Legend: +1 = base structural increment. +N (nested) = +1 base plus +(N-1) from active nesting depth (if/else, match arms, while/for/loop, let-else diverging branches, closures)._\n";
 
 /// Legacy row-per-function table (preserved behind `--md-full-table`).
 fn full_table_block(view: &AnalysisView<'_>, breakdown: bool, explain: bool) -> String {
     let mut out = String::new();
     out.push_str("## All functions\n\n");
-    out.push_str("| File | Function | CC | Cov% | CRAP | Risk |\n");
-    out.push_str("|------|----------|----|------|------|------|\n");
-    for verdict in view.shown.iter() {
-        out.push_str(&row_for(verdict));
-        out.push('\n');
-        append_breakdown_bullets(&mut out, verdict, breakdown);
-    }
+    out.push_str(&function_table(view.shown.as_slice(), breakdown));
     if breakdown && explain && needs_legend(view) {
-        out.push_str(
-            "\n_Legend: +1 = base structural increment. +N (nested) = +1 base plus +(N-1) from active nesting depth (if/else, match arms, while/for/loop, let-else diverging branches, closures)._\n",
-        );
+        out.push_str(LEGEND);
     }
     out
 }
@@ -482,6 +490,81 @@ mod tests {
             10,
         );
         insta::assert_snapshot!(out);
+    }
+
+    #[test]
+    fn md_full_table_renders_all_functions_section() {
+        let result = make_multi_function_result();
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            true, // --md-full-table
+            10,
+        );
+        // Summary block still leads.
+        assert!(out.contains("## Summary"));
+        // Full-table escape hatch renders the legacy section.
+        assert!(out.contains("## All functions"));
+        // Every function row is present (3 in the fixture).
+        assert!(out.contains("complex_fn"));
+        assert!(out.contains("parse_record"));
+        assert!(out.contains("simple_fn"));
+        // No spotlight section when full-table is requested.
+        assert!(!out.contains("## Failures"));
+        assert!(!out.contains("## Top "));
+    }
+
+    #[test]
+    fn md_full_table_with_breakdown_includes_contributors_and_legend() {
+        use crate::domain::types::{AnalysisResult, ComplexityContributor, ContributorKind};
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "risky_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            vec![
+                ComplexityContributor {
+                    kind: ContributorKind::IfBranch,
+                    line: 12,
+                    column: None,
+                    increment: 1,
+                },
+                ComplexityContributor {
+                    kind: ContributorKind::Match,
+                    line: 18,
+                    column: None,
+                    increment: 2, // nested → triggers legend
+                },
+            ],
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict.clone()],
+            summary: crate::domain::summary::compute_summary(std::slice::from_ref(&verdict)),
+            passed: false,
+        };
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            true, // --breakdown
+            true, // --explain
+            true, // --md-full-table
+            10,
+        );
+        assert!(out.contains("## All functions"));
+        // Breakdown bullets rendered for the exceeding row.
+        assert!(out.contains("L12 if-branch +1"));
+        assert!(out.contains("L18 match +2"));
+        // Explain legend present (any nested increment > 1).
+        assert!(out.contains("Legend:"));
     }
 
     #[test]
