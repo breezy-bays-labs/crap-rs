@@ -384,7 +384,11 @@ INVESTIGATION PATTERNS:
 
   # Worst partially-covered functions, sorted by coverage ascending,
   # never fail the build — useful when investigating an untested codebase
-  crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail"
+  crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail
+
+  # Saved view preset: bake a flag set under [views.ci] in crap4rs.toml,
+  # then invoke it by name. CLI flags override preset values.
+  crap4rs --coverage lcov.info --view ci"
 )]
 pub struct Cli {
     #[command(flatten)]
