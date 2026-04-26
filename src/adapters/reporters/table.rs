@@ -45,6 +45,16 @@ pub fn format_table_with_explain(
         return output;
     }
 
+    // --group-by file: render per-file rows instead of per-function.
+    // Summary line still derives from `view.full.summary` (gate keystone).
+    if view.grouped.is_some() {
+        output.push('\n');
+        output.push_str(&format_grouped_table(view));
+        output.push('\n');
+        append_summary_block(&mut output, view, threshold);
+        return output;
+    }
+
     let shown: &[&crate::domain::types::FunctionVerdict] = &view.shown;
 
     // Build table
@@ -94,8 +104,14 @@ while/for/loop bodies, let-else diverging branches, and closures.\n",
 
     output.push('\n');
 
-    // Summary line 1 — keystone: the gate is unshapeable. Always derive
-    // from `view.full.summary`, never from `view.shown_summary`.
+    append_summary_block(&mut output, view, threshold);
+
+    output
+}
+
+/// Append the two-line summary block. Always derives from
+/// `view.full.summary` (gate keystone — unshapeable).
+fn append_summary_block(output: &mut String, view: &AnalysisView<'_>, threshold: f64) {
     let summary = &view.full.summary;
     let pass_fail = if view.full.passed {
         "PASS".green().bold().to_string()
@@ -117,8 +133,6 @@ while/for/loop bodies, let-else diverging branches, and closures.\n",
         "\nSummary: {} functions | {} above threshold ({}) | worst: {} | {}\n",
         summary.total_functions, summary.exceeding_threshold, threshold_display, worst, pass_fail,
     ));
-
-    // Summary line 2
     let d = &summary.distribution;
     output.push_str(&format!(
         "         avg: {:.1} | median: {:.1} | low: {} | acceptable: {} | moderate: {} | high: {}\n",
@@ -129,8 +143,55 @@ while/for/loop bodies, let-else diverging branches, and closures.\n",
         d.moderate,
         d.high,
     ));
+}
 
-    output
+/// Build the per-file grouped table body. Caller appends the summary
+/// block. Coloring matches the per-function table for visual continuity:
+/// `Worst CRAP` is colored by risk_level via `risk_color`.
+fn format_grouped_table(view: &AnalysisView<'_>) -> String {
+    let grouped = view
+        .grouped
+        .as_ref()
+        .expect("format_grouped_table called without grouped block");
+
+    let mut table = Table::new();
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+    table.set_header(vec![
+        "File",
+        "Functions",
+        "Failing",
+        "Avg CRAP",
+        "Worst CRAP",
+        "Worst Fn",
+    ]);
+
+    for f in &grouped.files {
+        let avg_str = format!("{:.2}", f.average_crap);
+        let worst_str = f
+            .max_crap
+            .as_ref()
+            .map(|c| {
+                let s = format!("{:.2}", c.value);
+                risk_color(&c.risk_level, &s)
+            })
+            .unwrap_or_else(|| "N/A".to_string());
+        let worst_fn = f
+            .worst_function
+            .as_ref()
+            .map(|id| id.qualified_name.clone())
+            .unwrap_or_else(|| "—".to_string());
+
+        table.add_row(vec![
+            f.file_path.clone(),
+            f.function_count.to_string(),
+            f.exceeding_count.to_string(),
+            avg_str,
+            worst_str,
+            worst_fn,
+        ]);
+    }
+
+    table.to_string()
 }
 
 /// Inject contributor sub-rows into the table string after each exceeding function's row.
@@ -954,6 +1015,59 @@ mod tests {
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(&make_view_default(&result), 8.0, false);
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn grouped_table_has_per_file_header() {
+        use crate::domain::view::{self, GroupKey, ViewSpec};
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let view = view::apply(
+            &result,
+            ViewSpec {
+                group_by: Some(GroupKey::File),
+                ..Default::default()
+            },
+        );
+        let output = format_table(&view, 8.0, false);
+        // Per-file column header
+        assert!(output.contains("File"));
+        assert!(output.contains("Functions"));
+        assert!(output.contains("Failing"));
+        assert!(output.contains("Avg CRAP"));
+        assert!(output.contains("Worst CRAP"));
+        assert!(output.contains("Worst Fn"));
+        // The per-function `CC` and `Cov%` columns are absent — those
+        // are function-level fields and the grouped table shifts to
+        // per-file rows.
+        assert!(
+            !output.contains("Cov%"),
+            "per-function Cov% header leaked: {output}"
+        );
+        assert!(
+            !output.contains(" CC "),
+            "per-function CC header leaked: {output}"
+        );
+        // Summary line still derives from view.full
+        assert!(output.contains("Summary: 3 functions"));
+    }
+
+    #[test]
+    fn grouped_table_snapshot() {
+        use crate::domain::view::{self, GroupKey, ViewSpec};
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let view = view::apply(
+            &result,
+            ViewSpec {
+                group_by: Some(GroupKey::File),
+                ..Default::default()
+            },
+        );
+        let output = format_table(&view, 8.0, false);
         insta::assert_snapshot!(output);
     }
 }
