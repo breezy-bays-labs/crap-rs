@@ -1,4 +1,5 @@
 pub mod crap;
+pub mod delta;
 pub mod matching;
 pub mod summary;
 pub mod threshold;
