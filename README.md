@@ -157,6 +157,43 @@ The shaping flags `--delta-top`, `--delta-sort` (`score-delta` (default) | `curr
 
 `--format markdown` produces GitHub-flavored Markdown (pipe-syntax table plus a Summary block) — paste it into a PR comment, an issue body, or a doc page. `--format csv` produces RFC 4180 CSV with a fixed header row, suitable for piping into spreadsheets, BI tools, or `awk`/`jq` pipelines that prefer tabular input. Both honor every shaping flag (`--top`, `--sort-by`, `--only-failing`, `--min-coverage` / `--max-coverage`).
 
+### SARIF for GitHub Code Scanning (`--format sarif`)
+
+`--format sarif` emits SARIF v2.1.0 JSON. Pipe it into a `.sarif` file and upload via `github/codeql-action/upload-sarif@v3` — every function whose CRAP score exceeds the threshold becomes an inline annotation on the exact line range in the PR diff. Reviewers see the findings without running crap4rs themselves.
+
+| Risk level     | SARIF `level` |
+| -------------- | ------------- |
+| `high`         | `error`       |
+| `moderate`     | `warning`     |
+| `acceptable`   | `note`        |
+| `low`          | `note`        |
+
+Unlike the table / JSON / Markdown / CSV reporters, SARIF is a **gate translation**, not a display: it iterates the unshapeable analysis. `--top`, `--sort-by`, `--only-failing`, and `--baseline` do **not** alter SARIF output — PR annotations must reflect truth, not a presentation choice. `--no-fail` overrides the exit code only; the `results[]` array still lists every finding.
+
+```yaml
+# .github/workflows/crap-scan.yml
+name: crap-scan
+on: pull_request
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # required for upload-sarif
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - run: cargo llvm-cov --lcov --output-path lcov.info
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall -y crap4rs
+      # Always emit SARIF, even on failure, so annotations land on the PR.
+      - run: crap4rs --coverage lcov.info --format sarif --no-fail > crap.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: crap.sarif
+```
+
 ## Shell completions
 
 Print a completion script for your shell to stdout — the subcommand does no file I/O, so redirect it wherever your shell expects completions:

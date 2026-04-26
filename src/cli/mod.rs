@@ -513,6 +513,11 @@ INVESTIGATION PATTERNS:
   # then invoke it by name. CLI flags override preset values.
   crap4rs --coverage lcov.info --view ci
 
+  # GitHub Code Scanning: emit SARIF and let upload-sarif annotate the PR
+  # diff inline. Use --no-fail so the gate exit code doesn't skip the
+  # upload step on regressions.
+  crap4rs --coverage lcov.info --format sarif --no-fail > crap.sarif
+
 COMPARING TWO ANALYSES (issue #81):
   # Capture a baseline (e.g., from main):
   crap4rs --coverage lcov.info --format json > baseline.json
