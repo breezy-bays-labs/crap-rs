@@ -110,7 +110,10 @@ fn view_ci_applies_every_preset_field() {
     );
     let json = parse_json(&output);
     assert_eq!(json["view"]["spec"]["limit"], 20);
-    assert_eq!(json["view"]["spec"]["filters"]["coverage_range"]["min"], 0.0);
+    assert_eq!(
+        json["view"]["spec"]["filters"]["coverage_range"]["min"],
+        0.0
+    );
     assert_eq!(
         json["view"]["spec"]["filters"]["coverage_range"]["max"],
         90.0
