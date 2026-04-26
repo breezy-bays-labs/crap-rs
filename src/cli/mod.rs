@@ -16,13 +16,14 @@ use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
 use crap4rs::adapters::reporters::json::DeltaContext;
 use crap4rs::core::AnalyzeOptions;
-use crap4rs::domain::delta::{self, AnalysisDelta, DeltaView, DeltaViewSpec};
+use crap4rs::domain::delta::{self, AnalysisDelta, DeltaView};
 use crap4rs::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
 use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
 use crap4rs::domain::view::{self, GroupKey, SortKey};
 
+mod delta_args;
 mod view_args;
 
 // ── ValueEnum wrappers (keep domain types clap-free) ────────────────
@@ -134,6 +135,50 @@ impl From<GroupKey> for GroupByArg {
             other => unreachable!(
                 "domain::view::GroupKey::{other:?} has no CLI mapping; add a GroupByArg variant"
             ),
+        }
+    }
+}
+
+/// Sort key for the delta block (issue #81).
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum DeltaSortKeyArg {
+    /// Magnitude of change descending — regressions first (default)
+    ScoreDelta,
+    /// Current CRAP score descending; `Removed` rows last
+    CurrentCrap,
+    /// Baseline CRAP score descending; `Added` rows last
+    BaselineCrap,
+    /// Alphabetical by file_path then qualified_name
+    Path,
+}
+
+impl From<DeltaSortKeyArg> for crap4rs::domain::delta::DeltaSortKey {
+    fn from(arg: DeltaSortKeyArg) -> Self {
+        use crap4rs::domain::delta::DeltaSortKey;
+        match arg {
+            DeltaSortKeyArg::ScoreDelta => DeltaSortKey::ScoreDelta,
+            DeltaSortKeyArg::CurrentCrap => DeltaSortKey::CurrentCrap,
+            DeltaSortKeyArg::BaselineCrap => DeltaSortKey::BaselineCrap,
+            DeltaSortKeyArg::Path => DeltaSortKey::Path,
+        }
+    }
+}
+
+/// Change-kind subset for `--delta-only` (issue #81).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum DeltaKindArg {
+    Added,
+    Removed,
+    Modified,
+}
+
+impl From<DeltaKindArg> for crap4rs::domain::delta::ChangeKind {
+    fn from(arg: DeltaKindArg) -> Self {
+        use crap4rs::domain::delta::ChangeKind;
+        match arg {
+            DeltaKindArg::Added => ChangeKind::Added,
+            DeltaKindArg::Removed => ChangeKind::Removed,
+            DeltaKindArg::Modified => ChangeKind::Modified,
         }
     }
 }
@@ -344,6 +389,31 @@ pub struct FilterArgs {
     /// gate (exit code) is unaffected.
     #[arg(long, value_enum, value_name = "KEY")]
     pub group_by: Option<GroupByArg>,
+
+    /// Truncate the delta block to the top N rows by `--delta-sort`.
+    /// `--delta-top 0` means "no limit". Independent of `--top`, which
+    /// truncates the analysis view (`view.shown`).
+    ///
+    /// `allow_hyphen_values`: parses `--delta-top -3` as a value (not
+    /// an unknown flag) so the error attribution to `--delta-top` is
+    /// readable.
+    #[arg(long, allow_hyphen_values = true, value_name = "N")]
+    pub delta_top: Option<u32>,
+
+    /// Sort key for the delta block.
+    ///
+    /// `score-delta` (default) — magnitude of change descending
+    /// (regressions first). `current-crap` — current CRAP descending,
+    /// `Removed` rows last. `baseline-crap` — baseline CRAP descending,
+    /// `Added` rows last. `path` — alphabetical by file then qualified
+    /// name.
+    #[arg(long, value_enum, value_name = "KEY")]
+    pub delta_sort: Option<DeltaSortKeyArg>,
+
+    /// Comma-separated list of change kinds to include in the delta
+    /// block: `added`, `removed`, `modified`. Default: all three.
+    #[arg(long, value_delimiter = ',', value_name = "KINDS")]
+    pub delta_only: Vec<DeltaKindArg>,
 }
 
 #[derive(Debug, Args)]
@@ -531,12 +601,14 @@ fn run_inner() -> Result<bool> {
     let spec = view_args::build_view_spec(&cli);
     let view = view::apply(&result, spec);
 
-    // VS3: shape the delta with a default DeltaViewSpec. VS4 will
-    // wire `--delta-top`, `--delta-sort`, `--delta-only` into the
-    // spec construction.
+    // Shape the delta. Spec is built from --delta-top / --delta-sort /
+    // --delta-only (VS4); defaults match the dominant scorecard use
+    // case (regressions first, all kinds, no truncation).
+    let delta_spec = delta_args::build_delta_view_spec(&cli);
     let delta_view: Option<DeltaView<'_>> = delta_state
         .as_ref()
-        .map(|s| delta::apply(&s.delta, DeltaViewSpec::default()));
+        .map(|s| delta::apply(&s.delta, delta_spec.clone()));
+    let _ = &delta_spec; // keep ownership for the shaped view
 
     if !cli.display.quiet {
         let output = match cli.output.format {
