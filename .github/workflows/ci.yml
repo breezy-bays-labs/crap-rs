@@ -154,6 +154,9 @@ jobs:
     name: Scorecard action smoke (analysis-only)
     runs-on: ubuntu-latest
     needs: [coverage]
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -204,6 +207,9 @@ jobs:
           esac
 
       # Layer (2): exercise the composite action's plumbing.
+      # On pull_request runs we post a sticky comment so the rendered
+      # scorecard is reviewable on the PR itself; push runs to main fall
+      # back to `none` (no PR to comment on).
       - name: Dogfood the scorecard action
         id: crap
         uses: ./.github/actions/scorecard
@@ -211,6 +217,8 @@ jobs:
           coverage: lcov.info
           src: src
           threshold: '25'
+          comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
+          comment-header: 'crap-scorecard-self'
       - name: Assert action outputs are populated
         env:
           MARKDOWN: ${{ steps.crap.outputs.markdown }}
