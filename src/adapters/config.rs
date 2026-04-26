@@ -218,9 +218,9 @@ fn parse_sort_key(preset_name: &str, s: &str) -> Result<SortKey> {
 fn parse_group_key(preset_name: &str, s: &str) -> Result<GroupKey> {
     match s {
         "file" => Ok(GroupKey::File),
-        other => anyhow::bail!(
-            "preset `{preset_name}`: unknown group_by: {other}\n  valid values: file"
-        ),
+        other => {
+            anyhow::bail!("preset `{preset_name}`: unknown group_by: {other}\n  valid values: file")
+        }
     }
 }
 
