@@ -51,6 +51,7 @@ crap4rs --src src/ --coverage lcov.info
 | `--min-coverage <pct>` | — | Drop functions whose `coverage_percent` falls below the bound |
 | `--max-coverage <pct>` | — | Drop functions whose `coverage_percent` exceeds the bound |
 | `--sort-by <key>` | `crap` | Reorder rows by `crap`, `coverage`, `complexity`, or `path` |
+| `--group-by <key>` | — | Aggregate the displayed view by a key. Today: `file` (per-file summaries). Under grouping, `--top` and `--sort-by` key at the file level. |
 | `--no-fail` | — | Always exit `0`; `result.passed` in JSON still reflects the truthful state |
 
 Threshold presets are Rust-specific:
@@ -79,7 +80,12 @@ crap4rs --coverage lcov.info \
   --min-coverage 1 --max-coverage 90 \
   --sort-by coverage --top 10 \
   --no-fail
+
+# Top 10 worst files by average CRAP — find which files to refactor first
+crap4rs --coverage lcov.info --group-by file --top 10
 ```
+
+Under `--group-by file`, `--top N` truncates to the top N **files** (not functions) and `--sort-by` keys at the file level: `crap` orders by average CRAP descending, `coverage` by average coverage ascending, `complexity` by max complexity descending, `path` alphabetically. The full per-function row list still appears in JSON `view.shown` for drill-down (`jq '.view.shown[] | select(.scored.identity.file_path == "src/blob.rs")'`); pair with `--minimal-view` to drop it for size-sensitive consumers. CSV's column schema shifts under grouping — pin your flags if you script on column position.
 
 The JSON envelope reflects the same separation: `result.*` always describes the full analysis (gate); `view.*` describes what the operator chose to see (display). An agent or dashboard can act on `result.passed`, `result.summary`, and `result.functions` while rendering only `view.shown`.
 

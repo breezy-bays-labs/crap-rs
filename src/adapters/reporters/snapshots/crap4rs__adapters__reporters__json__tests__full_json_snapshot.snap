@@ -64,6 +64,7 @@ expression: v
   "tool_version": "0.1.0",
   "view": {
     "eligible_count": 1,
+    "grouped": null,
     "shown": [
       {
         "exceeds": false,
@@ -118,6 +119,7 @@ expression: v
         "coverage_range": null,
         "only_failing": false
       },
+      "group_by": null,
       "limit": null,
       "sort": "crap"
     },

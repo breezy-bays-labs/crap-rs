@@ -15,7 +15,7 @@
 //! `thiserror` (mirrors `domain::types`). Future `crap-core` extraction
 //! takes this module whole.
 
-use crate::domain::summary::compute_summary;
+use crate::domain::summary::{FileSummary, compute_file_summaries, compute_summary};
 use crate::domain::types::{AnalysisResult, AnalysisSummary, FunctionVerdict};
 use serde::Serialize;
 
@@ -27,6 +27,27 @@ pub struct ViewSpec {
     pub filters: Filters,
     pub sort: SortKey,
     pub limit: Option<usize>,
+    /// When set, the View carries a parallel per-key aggregation
+    /// (`AnalysisView::grouped`). The function-level row list
+    /// (`shown`) is *not* truncated under grouping — `limit` shifts to
+    /// the file level and applies to `grouped.files`. Today only
+    /// `Some(GroupKey::File)` is supported; `#[non_exhaustive]`
+    /// reserves namespace for `Risk` / `Module`.
+    pub group_by: Option<GroupKey>,
+}
+
+/// Aggregation key for the optional grouped block of an
+/// `AnalysisView`.
+///
+/// Only `File` is supported today (issue #64). `#[non_exhaustive]`
+/// reserves namespace for `Risk` and `Module` as listed in the
+/// shaping doc — adding variants is additive on `crap-core`.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GroupKey {
+    /// Aggregate by `FunctionIdentity::file_path`.
+    File,
 }
 
 #[non_exhaustive]
@@ -114,6 +135,28 @@ pub struct AnalysisView<'a> {
     pub truncated: bool,
     pub shown: Vec<&'a FunctionVerdict>,
     pub shown_summary: AnalysisSummary,
+    /// Optional parallel grouping. Present iff `spec.group_by.is_some()`.
+    /// When set, `shown` retains the *un-truncated* eligible function
+    /// rows (drill-down ergonomics) and `grouped.files` carries the
+    /// post-sort, post-truncate file list.
+    pub grouped: Option<GroupedView>,
+}
+
+/// File-level shaping over a `--group-by` view.
+///
+/// `eligible_count` and `truncated` mirror the function-level analogs
+/// but at the file level so consumers can render headers like
+/// "Showing 10 of 45 files" without recomputing.
+#[non_exhaustive]
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupedView {
+    pub key: GroupKey,
+    /// Distinct files surviving the function-level filter pass —
+    /// before `limit` truncates the file list.
+    pub eligible_count: usize,
+    /// True iff `limit` reduced the file list.
+    pub truncated: bool,
+    pub files: Vec<FileSummary>,
 }
 
 // ── apply: filter → sort → truncate ──────────────────────────────────
@@ -122,9 +165,25 @@ pub fn apply<'a>(result: &'a AnalysisResult, spec: ViewSpec) -> AnalysisView<'a>
     let eligible: Vec<&'a FunctionVerdict> = apply_filters(&result.functions, &spec.filters);
     let eligible_count = eligible.len();
 
-    let mut shown = eligible;
-    sort_in_place(&mut shown, spec.sort);
-    let truncated = truncate_to(&mut shown, spec.limit);
+    // Order of ops:
+    //   filter → group? → sort+truncate (function-level OR file-level)
+    //
+    // When grouping is active, `shown` carries the *un-truncated*
+    // eligible function rows for drill-down (the JSON consumer's
+    // `view.shown[] | select(...)` flow), and the function-level
+    // `truncated` flag is forced false because no function-level
+    // truncation took place. The file list carries its own
+    // `truncated` flag inside `GroupedView`.
+    let grouped = apply_grouping(&eligible, &spec);
+
+    let (shown, truncated) = if grouped.is_some() {
+        (eligible, false)
+    } else {
+        let mut shown = eligible;
+        sort_in_place(&mut shown, spec.sort);
+        let truncated = truncate_to(&mut shown, spec.limit);
+        (shown, truncated)
+    };
 
     // `compute_summary` accepts any `IntoIterator<Item = &FunctionVerdict>`,
     // so we feed it the borrowed `shown` directly — no per-`apply()` clone.
@@ -137,6 +196,77 @@ pub fn apply<'a>(result: &'a AnalysisResult, spec: ViewSpec) -> AnalysisView<'a>
         truncated,
         shown,
         shown_summary,
+        grouped,
+    }
+}
+
+/// Build the optional `GroupedView` from the eligible (post-filter) row set.
+///
+/// Returns `None` iff `spec.group_by.is_none()` — the biconditional that
+/// keeps reporters' branching decisions simple. The returned files are
+/// sorted by the `spec.sort` key at the *file* level and truncated to
+/// `spec.limit` (if any). The function-level row list and gate are
+/// untouched: `view.shown` and `view.full.passed` still describe the
+/// underlying analysis.
+fn apply_grouping(eligible: &[&FunctionVerdict], spec: &ViewSpec) -> Option<GroupedView> {
+    let key = spec.group_by?;
+    let mut files = compute_file_summaries(eligible.iter().copied());
+    let eligible_count = files.len();
+    sort_files_in_place(&mut files, spec.sort);
+    let truncated = truncate_files_to(&mut files, spec.limit);
+    Some(GroupedView {
+        key,
+        eligible_count,
+        truncated,
+        files,
+    })
+}
+
+/// File-level sort. Mirrors the function-level `SortKey` semantics but
+/// applied to per-file aggregates:
+///
+/// | SortKey    | File-level interpretation                     |
+/// |------------|-----------------------------------------------|
+/// | `Crap`     | `average_crap` descending                     |
+/// | `Coverage` | `average_coverage` ascending                  |
+/// | `Complexity` | `max_complexity` descending                 |
+/// | `Path`     | `file_path` ascending                         |
+fn sort_files_in_place(files: &mut [FileSummary], key: SortKey) {
+    match key {
+        SortKey::Crap => files.sort_by(cmp_files_by_avg_crap),
+        SortKey::Coverage => files.sort_by(cmp_files_by_avg_coverage),
+        SortKey::Complexity => files.sort_by_key(|f| std::cmp::Reverse(f.max_complexity)),
+        SortKey::Path => files.sort_by(|a, b| a.file_path.cmp(&b.file_path)),
+    }
+}
+
+fn cmp_files_by_avg_crap(a: &FileSummary, b: &FileSummary) -> std::cmp::Ordering {
+    let (ax, bx) = (a.average_crap, b.average_crap);
+    match (ax.is_nan(), bx.is_nan()) {
+        (true, true) => std::cmp::Ordering::Equal,
+        (true, false) => std::cmp::Ordering::Greater,
+        (false, true) => std::cmp::Ordering::Less,
+        (false, false) => bx.partial_cmp(&ax).expect("non-NaN partial_cmp infallible"),
+    }
+}
+
+fn cmp_files_by_avg_coverage(a: &FileSummary, b: &FileSummary) -> std::cmp::Ordering {
+    let (ax, bx) = (a.average_coverage, b.average_coverage);
+    match (ax.is_nan(), bx.is_nan()) {
+        (true, true) => std::cmp::Ordering::Equal,
+        (true, false) => std::cmp::Ordering::Greater,
+        (false, true) => std::cmp::Ordering::Less,
+        (false, false) => ax.partial_cmp(&bx).expect("non-NaN partial_cmp infallible"),
+    }
+}
+
+fn truncate_files_to(files: &mut Vec<FileSummary>, limit: Option<usize>) -> bool {
+    match limit {
+        Some(n) if n > 0 && files.len() > n => {
+            files.truncate(n);
+            true
+        }
+        _ => false,
     }
 }
 
@@ -244,7 +374,9 @@ fn truncate_to(shown: &mut Vec<&FunctionVerdict>, limit: Option<usize>) -> bool 
 /// Default `ViewSpec` over a non-empty result returns `false` — the
 /// walking-skeleton invariant.
 pub fn should_render_view_line(view: &AnalysisView<'_>) -> bool {
-    view.eligible_count < view.full.functions.len() || view.truncated
+    view.eligible_count < view.full.functions.len()
+        || view.truncated
+        || view.grouped.as_ref().is_some_and(|g| g.truncated)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -932,6 +1064,7 @@ mod tests {
             },
             sort: SortKey::Coverage,
             limit: Some(2),
+            ..Default::default()
         };
         let view = apply(&r, spec);
         assert_eq!(view.shown.len(), 2);
@@ -1148,6 +1281,297 @@ mod tests {
         let view = apply(&r, spec);
         assert!(should_render_view_line(&view));
     }
+
+    // ── Grouping (issue #64 — `--group-by file`) ────────────────────
+
+    #[test]
+    fn no_group_by_means_no_grouped_block() {
+        // Biconditional half: spec.group_by.is_none() ⇒ view.grouped.is_none()
+        let r = background_fixture();
+        let view = apply(&r, ViewSpec::default());
+        assert!(view.grouped.is_none());
+    }
+
+    #[test]
+    fn group_by_file_populates_grouped_block() {
+        // Biconditional half: spec.group_by.is_some() ⇒ view.grouped.is_some()
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().expect("grouped block expected");
+        assert_eq!(grouped.key, GroupKey::File);
+        // Background fixture: 5 distinct files (parse_args is in cli/mod.rs;
+        // table.rs has two functions; lcov, syn, threshold one each).
+        assert_eq!(grouped.files.len(), 5);
+        assert_eq!(grouped.eligible_count, 5);
+        assert!(!grouped.truncated);
+    }
+
+    #[test]
+    fn group_by_file_does_not_truncate_function_shown() {
+        // Function-level shown is the un-truncated eligible set under grouping.
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(2),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        // limit=2 truncates files, not functions.
+        assert_eq!(view.shown.len(), r.functions.len());
+        assert!(!view.truncated);
+        let grouped = view.grouped.as_ref().unwrap();
+        assert_eq!(grouped.files.len(), 2);
+        assert!(grouped.truncated);
+        assert_eq!(grouped.eligible_count, 5);
+    }
+
+    #[test]
+    fn group_by_file_keeps_gate_unchanged() {
+        // P6 (gate-vs-display): grouping does not change view.full.passed
+        // or view.full.summary.
+        let r = background_fixture();
+        let baseline_passed = r.passed;
+        let baseline_total = r.summary.total_functions;
+        let baseline_exceeding = r.summary.exceeding_threshold;
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(1),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert_eq!(view.full.passed, baseline_passed);
+        assert_eq!(view.full.summary.total_functions, baseline_total);
+        assert_eq!(view.full.summary.exceeding_threshold, baseline_exceeding);
+    }
+
+    #[test]
+    fn group_by_file_default_sort_is_avg_crap_desc() {
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let files = &view.grouped.as_ref().unwrap().files;
+        for w in files.windows(2) {
+            assert!(
+                w[0].average_crap >= w[1].average_crap,
+                "files not in average_crap descending order"
+            );
+        }
+    }
+
+    #[test]
+    fn group_by_file_sort_by_coverage_ascending() {
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            sort: SortKey::Coverage,
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let files = &view.grouped.as_ref().unwrap().files;
+        for w in files.windows(2) {
+            assert!(w[0].average_coverage <= w[1].average_coverage);
+        }
+    }
+
+    #[test]
+    fn group_by_file_sort_by_complexity_descending() {
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            sort: SortKey::Complexity,
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let files = &view.grouped.as_ref().unwrap().files;
+        for w in files.windows(2) {
+            assert!(w[0].max_complexity >= w[1].max_complexity);
+        }
+    }
+
+    #[test]
+    fn group_by_file_sort_by_path_alphabetical() {
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            sort: SortKey::Path,
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let files = &view.grouped.as_ref().unwrap().files;
+        for w in files.windows(2) {
+            assert!(w[0].file_path <= w[1].file_path);
+        }
+    }
+
+    #[test]
+    fn group_by_file_truncate_files() {
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(3),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().unwrap();
+        assert_eq!(grouped.files.len(), 3);
+        assert!(grouped.truncated);
+        assert_eq!(grouped.eligible_count, 5);
+    }
+
+    #[test]
+    fn group_by_file_filters_compose_before_grouping() {
+        // only_failing + group_by file: grouped.files reflect only files
+        // that have a failing function.
+        let r = background_fixture();
+        let spec = ViewSpec {
+            filters: Filters {
+                only_failing: true,
+                ..Default::default()
+            },
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().unwrap();
+        // Background fixture: failing functions are sort_verdicts (table.rs)
+        // CRAP=42 and parse_args (cli/mod.rs) CRAP=63.5 → 2 distinct files.
+        assert_eq!(grouped.files.len(), 2);
+        // Every file has at least one exceeding function.
+        for f in &grouped.files {
+            assert!(f.exceeding_count >= 1);
+        }
+    }
+
+    #[test]
+    fn group_by_file_empty_input_produces_empty_files() {
+        let r = empty_result();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().unwrap();
+        assert!(grouped.files.is_empty());
+        assert_eq!(grouped.eligible_count, 0);
+        assert!(!grouped.truncated);
+    }
+
+    #[test]
+    fn display_predicate_group_by_only_default_input_is_false() {
+        // Grouping without filtering or truncating: all distinct files
+        // appear in the grouped block, so the predicate returns false
+        // (no rows reduced, no files reduced).
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert!(!should_render_view_line(&view));
+    }
+
+    #[test]
+    fn display_predicate_group_by_truncating_files_is_true() {
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(2),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert!(should_render_view_line(&view));
+    }
+
+    // ── Mutation killers for truncate_files_to ─────────────────────
+    //
+    // truncate_files_to has a tight guard: `Some(n) if n > 0 && files.len() > n`.
+    // The three tests below pin each clause:
+    //  - L265:22 `n > 0`        — proven by `--top 0` non-empty case
+    //  - L265:41 `files.len() > n` — proven by `files.len() == n` case
+    //  - L265:26 `&&` operator   — proven by `--top 0` non-empty case
+    //  - L265:20 whole guard    — proven by both cases above
+
+    #[test]
+    fn group_by_file_top_zero_is_no_limit() {
+        // limit=Some(0) with non-empty files MUST NOT truncate; truncated=false.
+        // Mirrors the `--top 0` ergonomic where 0 means "no limit".
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(0),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().expect("grouping active");
+        assert!(!grouped.truncated);
+        // All 5 distinct files must be present.
+        assert_eq!(grouped.files.len(), 5);
+    }
+
+    #[test]
+    fn group_by_file_limit_equal_to_file_count_is_not_truncated() {
+        // When limit exactly matches file count, truncated MUST be false.
+        // Distinguishes `files.len() > n` (correct) from `files.len() >= n`
+        // (would set truncated=true for an effectively no-op truncate).
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(5),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().expect("grouping active");
+        assert!(!grouped.truncated);
+        assert_eq!(grouped.files.len(), 5);
+    }
+
+    // ── Mutation killers for distinct_files ────────────────────────
+    //
+    // `should_render_view_line` calls `distinct_files(view.full)` to decide
+    // whether grouping reduced the file count. Mutants replacing the body
+    // with `0` or `1` constants are killed by these tests:
+    //  - replace -> 0: filtering excludes some files; eligible_count < distinct
+    //                  must NOT trigger when all files survive (background = 5)
+    //  - replace -> 1: with 5 distinct files, predicate must reflect that
+
+    #[test]
+    fn display_predicate_full_grouping_no_reduction_is_false() {
+        // With grouping active but no filter/truncate, view line MUST NOT
+        // render. This requires distinct_files == eligible_count == 5
+        // (replace-with-0 would make distinct=0, predicate fires; killed.)
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert!(!should_render_view_line(&view));
+    }
+
+    #[test]
+    fn display_predicate_grouping_reduces_files_is_true() {
+        // Filter excludes 4 of 5 files; eligible_count=1 < distinct=5.
+        // Predicate must fire. Replace-with-1 would yield distinct=1=eligible
+        // and predicate would NOT fire — killed.
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            filters: Filters {
+                only_failing: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert!(should_render_view_line(&view));
+    }
 }
 
 #[cfg(test)]
@@ -1253,6 +1677,7 @@ mod proptests {
                     },
                     sort,
                     limit: Some(10),
+                    ..Default::default()
                 };
                 let _ = apply(&result, spec);
             }

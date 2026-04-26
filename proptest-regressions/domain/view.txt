@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 2c996c907d4e29cc6f8fd87ddf816a11f30330c9057de1fe908bdddaffc12f14 # shrinks to verdicts = [FunctionVerdict { scored: ScoredFunction { identity: FunctionIdentity { file_path: "src//.rs", qualified_name: "a", span: SourceSpan { start_line: 1, end_line: 10 } }, complexity: 1, complexity_metric: Cognitive, coverage_percent: 0.0, crap: CrapScore { value: 150.2892288365123, risk_level: Low }, contributors: [] }, threshold: 1.0, exceeds: true }]

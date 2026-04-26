@@ -9,7 +9,7 @@
 use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, AnalysisSummary, ComplexityMetric, FunctionVerdict,
 };
-use crate::domain::view::{AnalysisView, ViewSpec};
+use crate::domain::view::{AnalysisView, GroupedView, ViewSpec};
 use serde::Serialize;
 
 /// Configuration for the JSON envelope metadata.
@@ -64,6 +64,10 @@ struct ViewWire<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     shown: Option<&'a [&'a FunctionVerdict]>,
     shown_summary: &'a AnalysisSummary,
+    /// Per-key aggregation block. Always serialized (emits `null`
+    /// when grouping is inactive) so consumers can distinguish
+    /// "default invocation" from "schema doesn't carry grouping".
+    grouped: Option<&'a GroupedView>,
 }
 
 impl<'a> ViewWire<'a> {
@@ -78,6 +82,7 @@ impl<'a> ViewWire<'a> {
                 Some(view.shown.as_slice())
             },
             shown_summary: &view.shown_summary,
+            grouped: view.grouped.as_ref(),
         }
     }
 }
@@ -376,6 +381,46 @@ mod tests {
         assert_eq!(spec["sort"], "crap");
         assert_eq!(spec["limit"], serde_json::Value::Null);
         assert_eq!(spec["filters"]["only_failing"], false);
+    }
+
+    #[test]
+    fn test_view_grouped_null_by_default() {
+        // No --group-by ⇒ view.grouped is null, view.spec.group_by is null.
+        let result = make_multi_function_result();
+        let v = parse_json(&result, &default_config());
+        let view_block = &v["view"];
+        assert_eq!(view_block["grouped"], serde_json::Value::Null);
+        assert_eq!(view_block["spec"]["group_by"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn test_view_grouped_populated_under_group_by_file() {
+        use crate::domain::view::{self, GroupKey, ViewSpec};
+        let result = make_multi_function_result();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = view::apply(&result, spec);
+        let json_str = format_json(&view, &default_config()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        let grouped = &v["view"]["grouped"];
+        assert!(grouped.is_object(), "view.grouped must be populated");
+        assert_eq!(grouped["key"], "file");
+        assert!(grouped["files"].is_array());
+        let files = grouped["files"].as_array().unwrap();
+        assert_eq!(files.len(), 3); // 3 distinct files in fixture
+        // Spot-check first file structure carries all the FileSummary keys.
+        let f0 = &files[0];
+        assert!(f0["file_path"].is_string());
+        assert!(f0["function_count"].is_number());
+        assert!(f0["exceeding_count"].is_number());
+        assert!(f0["average_crap"].is_number());
+        assert!(f0["average_coverage"].is_number());
+        assert!(f0["max_complexity"].is_number());
+        assert!(f0["distribution"].is_object());
+        // spec.group_by echoed as "file"
+        assert_eq!(v["view"]["spec"]["group_by"], "file");
     }
 
     #[test]

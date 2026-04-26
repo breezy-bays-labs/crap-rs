@@ -31,6 +31,14 @@ pub fn format_markdown(
         return out;
     }
 
+    // --group-by file: per-file rows. Summary block unchanged (gate keystone).
+    if view.grouped.is_some() {
+        out.push_str(&format_grouped_table_md(view));
+        out.push('\n');
+        out.push_str(&summary_block(view, threshold));
+        return out;
+    }
+
     out.push_str("| File | Function | CC | Cov% | CRAP | Risk |\n");
     out.push_str("|------|----------|----|------|------|------|\n");
 
@@ -129,6 +137,38 @@ fn summary_block(view: &AnalysisView<'_>, threshold: f64) -> String {
     )
 }
 
+fn format_grouped_table_md(view: &AnalysisView<'_>) -> String {
+    let grouped = view
+        .grouped
+        .as_ref()
+        .expect("format_grouped_table_md called without grouped block");
+    let mut out = String::new();
+    out.push_str("| File | Functions | Failing | Avg CRAP | Worst CRAP | Worst Fn |\n");
+    out.push_str("|------|-----------|---------|----------|------------|----------|\n");
+    for f in &grouped.files {
+        let worst_crap = f
+            .max_crap
+            .as_ref()
+            .map(|c| format!("{:.2}", c.value))
+            .unwrap_or_else(|| "N/A".to_string());
+        let worst_fn = f
+            .worst_function
+            .as_ref()
+            .map(|id| escape_cell(&id.qualified_name))
+            .unwrap_or_else(|| "—".to_string());
+        out.push_str(&format!(
+            "| {} | {} | {} | {:.2} | {} | {} |\n",
+            escape_cell(&f.file_path),
+            f.function_count,
+            f.exceeding_count,
+            f.average_crap,
+            worst_crap,
+            worst_fn,
+        ));
+    }
+    out
+}
+
 fn has_varied_thresholds(functions: &[FunctionVerdict]) -> bool {
     let mut iter = functions.iter().map(|v| v.threshold);
     let Some(first) = iter.next() else {
@@ -221,4 +261,39 @@ mod tests {
     }
 
     use crate::domain::types::RiskLevel;
+
+    #[test]
+    fn grouped_markdown_has_per_file_header() {
+        use crate::domain::view::{self, GroupKey, ViewSpec};
+        let result = make_multi_function_result();
+        let view = view::apply(
+            &result,
+            ViewSpec {
+                group_by: Some(GroupKey::File),
+                ..Default::default()
+            },
+        );
+        let out = format_markdown(&view, 8.0, false, false);
+        assert!(out.contains("| File | Functions | Failing | Avg CRAP | Worst CRAP | Worst Fn |"));
+        // Per-function CC/Cov% absent
+        assert!(!out.contains("| CC |"));
+        assert!(!out.contains("| Cov% |"));
+        // Summary block intact (3 functions, 2 above threshold)
+        assert!(out.contains("3 (2 above threshold 8)"));
+    }
+
+    #[test]
+    fn grouped_markdown_snapshot() {
+        use crate::domain::view::{self, GroupKey, ViewSpec};
+        let result = make_multi_function_result();
+        let view = view::apply(
+            &result,
+            ViewSpec {
+                group_by: Some(GroupKey::File),
+                ..Default::default()
+            },
+        );
+        let out = format_markdown(&view, 8.0, false, false);
+        insta::assert_snapshot!(out);
+    }
 }
