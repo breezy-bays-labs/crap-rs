@@ -573,6 +573,7 @@ fn json_envelope_contains_diff_ref() {
         diagnostics: None,
         diff_ref: Some("HEAD"),
         minimal_view: false,
+        delta: None,
     };
     let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
     let json_str = reporters::format_json(&view, &config).unwrap();
@@ -607,6 +608,7 @@ fn json_envelope_diff_ref_null_without_flag() {
         diagnostics: None,
         diff_ref: None,
         minimal_view: false,
+        delta: None,
     };
     let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
     let json_str = reporters::format_json(&view, &config).unwrap();

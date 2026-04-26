@@ -225,7 +225,14 @@ fn tally_modified(
 #[non_exhaustive]
 #[derive(Debug, Clone, Serialize)]
 pub struct AnalysisDelta {
+    /// Owned baseline analysis. `#[serde(skip)]` because the JSON
+    /// envelope's `result_baseline` (future work) or the existing
+    /// `result` block carry the canonical baseline / current data;
+    /// double-emitting it inside `delta` would bloat the payload.
+    /// In-memory consumers (reporters) borrow it.
+    #[serde(skip)]
     pub baseline: AnalysisResult,
+    #[serde(skip)]
     pub current: AnalysisResult,
     pub changes: Vec<FunctionChange>,
 }

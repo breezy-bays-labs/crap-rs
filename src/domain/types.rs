@@ -1,11 +1,11 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // ── Source Location ──────────────────────────────────────────────────
 
 /// Line range in source coordinates.
 /// `start_line` is 1-based inclusive, `end_line` is inclusive.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
@@ -21,7 +21,7 @@ pub struct SourceSpan {
 ///
 /// `#[non_exhaustive]` ensures forward-compatibility as new languages
 /// are added to the unified crap monorepo.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum ContributorKind {
@@ -77,7 +77,7 @@ impl fmt::Display for ContributorKind {
 }
 
 /// A single construct that contributed to a function's complexity score.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComplexityContributor {
     pub kind: ContributorKind,
     /// 1-based line number of the construct.
@@ -92,7 +92,7 @@ pub struct ComplexityContributor {
 // ── Complexity Metric ────────────────────────────────────────────────
 
 /// Which complexity metric to use for CRAP score computation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ComplexityMetric {
     /// Counts nesting depth + structural complexity (default for Rust).
@@ -114,7 +114,7 @@ impl fmt::Display for ComplexityMetric {
 // ── Function Identity & Metrics ─────────────────────────────────────
 
 /// Identifies a function in the source code.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FunctionIdentity {
     /// Project-relative file path, forward-slash normalized.
     pub file_path: String,
@@ -197,7 +197,7 @@ pub struct FunctionCoverage {
 // ── CRAP Scoring ────────────────────────────────────────────────────
 
 /// Risk classification based on CRAP score.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RiskLevel {
     Low,
@@ -218,7 +218,7 @@ impl fmt::Display for RiskLevel {
 }
 
 /// Computed CRAP score with risk classification.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CrapScore {
     /// Rounded to 2 decimal places.
     pub value: f64,
@@ -226,7 +226,7 @@ pub struct CrapScore {
 }
 
 /// A function with all metrics computed.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoredFunction {
     pub identity: FunctionIdentity,
     pub complexity: u32,
@@ -239,7 +239,7 @@ pub struct ScoredFunction {
 }
 
 /// A scored function compared against a threshold.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionVerdict {
     pub scored: ScoredFunction,
     pub threshold: f64,
@@ -248,7 +248,7 @@ pub struct FunctionVerdict {
 
 // ── Analysis Results ────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskDistribution {
     pub low: usize,
     pub acceptable: usize,
@@ -256,7 +256,7 @@ pub struct RiskDistribution {
     pub high: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisSummary {
     pub total_functions: usize,
     pub total_files: usize,
@@ -268,7 +268,7 @@ pub struct AnalysisSummary {
     pub distribution: RiskDistribution,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisResult {
     pub functions: Vec<FunctionVerdict>,
     pub summary: AnalysisSummary,
@@ -278,7 +278,7 @@ pub struct AnalysisResult {
 // ── Parse Diagnostics ──────────────────────────────────────────────
 
 /// Non-fatal issues encountered during coverage parsing.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ParseDiagnostic {
     /// A DA record could not be parsed (bad format, missing fields, invalid values).
@@ -310,7 +310,7 @@ impl fmt::Display for ParseDiagnostic {
 }
 
 /// Statistics about the analysis process, surfaced by `--verbose`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisDiagnostics {
     /// Non-fatal parse issues from the LCOV coverage file.
     pub parse_diagnostics: Vec<ParseDiagnostic>,

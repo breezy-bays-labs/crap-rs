@@ -11,9 +11,12 @@ use anyhow::{Result, bail};
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
 use clap_complete::Shell as ClapShell;
 
+use crap4rs::adapters::baseline::{self, BaselineSnapshot};
 use crap4rs::adapters::config::{self, FileConfig};
 use crap4rs::adapters::reporters;
+use crap4rs::adapters::reporters::json::DeltaContext;
 use crap4rs::core::AnalyzeOptions;
+use crap4rs::domain::delta::{self, AnalysisDelta};
 use crap4rs::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
@@ -201,6 +204,21 @@ pub struct InputArgs {
     /// preset's value but cannot turn off `no_fail = true`).
     #[arg(long, value_name = "NAME")]
     pub view: Option<String>,
+
+    /// Path to a previously-emitted crap4rs JSON envelope, used as the
+    /// baseline for delta analysis.
+    ///
+    /// Crap4rs runs the current analysis as usual, then compares against
+    /// the baseline's `result` block to produce a `delta` block in the
+    /// output (see `--format json`, `--format markdown` for rendering).
+    /// Generate the baseline file by piping a previous run:
+    /// `crap4rs --coverage lcov.info --format json > baseline.json`.
+    ///
+    /// **Delta is informational by default.** Pass `--delta-gate` to
+    /// make the delta contribute to the exit code (fails on new
+    /// threshold violations introduced by this PR).
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
+    pub baseline: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -500,6 +518,12 @@ fn run_inner() -> Result<bool> {
         print_diagnostics(&analysis.diagnostics);
     }
 
+    // Resolve --baseline (issue #81): load a previously-emitted JSON
+    // envelope and compute the AnalysisDelta. None when --baseline is
+    // absent — the JSON envelope omits the `delta` block entirely so
+    // existing consumers see byte-identical output.
+    let delta_state: Option<DeltaState> = load_delta_state(&cli, &result)?;
+
     // Build the spec, then shape the result through the View pipeline.
     // V1b: `--only-failing` flows through `Filters::only_failing` here.
     // W2 fills in `--top`, `--min/max-coverage`, `--sort-by`. The
@@ -516,6 +540,12 @@ fn run_inner() -> Result<bool> {
                 cli.display.explain,
             ),
             FormatArg::Json => {
+                let delta_ctx = delta_state.as_ref().map(|s| DeltaContext {
+                    delta: &s.delta,
+                    baseline_tool_version: &s.snapshot.tool_version,
+                    baseline_timestamp: &s.snapshot.timestamp,
+                    baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
+                });
                 let config = reporters::json::JsonConfig {
                     tool_version: env!("CARGO_PKG_VERSION").to_string(),
                     metric: effective_metric,
@@ -524,6 +554,7 @@ fn run_inner() -> Result<bool> {
                     diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
                     diff_ref: cli.filter.diff.as_deref(),
                     minimal_view: cli.output.minimal_view,
+                    delta: delta_ctx,
                 };
                 reporters::format_json(&view, &config)?
             }
@@ -542,7 +573,36 @@ fn run_inner() -> Result<bool> {
     // analysis. The View shapes the display, never the gate. `--no-fail`
     // overrides only the gate-to-exit-code translation; `result.passed`
     // in JSON output still reflects the truthful pass/fail state.
+    //
+    // Delta is informational by default (issue #81 §gate semantics);
+    // VS6 will add the opt-in `--delta-gate` flag here.
+    let _ = &delta_state; // VS6 will read this for delta-gate
     Ok(passed || cli.output.no_fail)
+}
+
+// ── Delta orchestration ─────────────────────────────────────────────
+
+/// In-flight delta state — owned baseline metadata + computed delta.
+/// `cli/mod.rs` keeps this for the lifetime of `run_inner` so reporters
+/// can borrow through it. Constructed once per invocation when
+/// `--baseline` is set; absent otherwise.
+struct DeltaState {
+    snapshot: BaselineSnapshot,
+    delta: AnalysisDelta,
+}
+
+fn load_delta_state(
+    cli: &Cli,
+    current: &crap4rs::domain::types::AnalysisResult,
+) -> Result<Option<DeltaState>> {
+    let Some(path) = cli.input.baseline.as_ref() else {
+        return Ok(None);
+    };
+    let snapshot = baseline::load(path).map_err(|e| anyhow::anyhow!("{e}"))?;
+    // delta::compute consumes both — we own snapshot.result, clone the
+    // current analysis so the surrounding pipeline keeps its handle.
+    let delta = delta::compute(snapshot.result.clone(), current.clone());
+    Ok(Some(DeltaState { snapshot, delta }))
 }
 
 fn validate_display_flags(cli: &Cli) -> Result<()> {
