@@ -83,6 +83,27 @@ impl From<SortKeyArg> for SortKey {
     }
 }
 
+/// Reverse mapping for saved view presets (issue #80) — preset stores
+/// domain `SortKey`, but `FilterArgs.sort_by` is the clap-side wrapper.
+///
+/// `SortKey` is `#[non_exhaustive]` cross-crate, so the wildcard arm is
+/// required by the compiler. New domain variants must land with a paired
+/// CLI variant in the same PR — the panic surfaces a missed update
+/// during integration testing rather than masking it.
+impl From<SortKey> for SortKeyArg {
+    fn from(key: SortKey) -> Self {
+        match key {
+            SortKey::Crap => SortKeyArg::Crap,
+            SortKey::Coverage => SortKeyArg::Coverage,
+            SortKey::Complexity => SortKeyArg::Complexity,
+            SortKey::Path => SortKeyArg::Path,
+            other => unreachable!(
+                "domain::view::SortKey::{other:?} has no CLI mapping; add a SortKeyArg variant"
+            ),
+        }
+    }
+}
+
 /// Group key for the displayed view (issue #64).
 ///
 /// Today only `file` is supported. The wrapper keeps `clap::ValueEnum`
@@ -97,6 +118,19 @@ impl From<GroupByArg> for GroupKey {
     fn from(arg: GroupByArg) -> Self {
         match arg {
             GroupByArg::File => GroupKey::File,
+        }
+    }
+}
+
+/// Reverse mapping for saved view presets (issue #80). See `From<SortKey>`
+/// above for the wildcard-arm rationale.
+impl From<GroupKey> for GroupByArg {
+    fn from(key: GroupKey) -> Self {
+        match key {
+            GroupKey::File => GroupByArg::File,
+            other => unreachable!(
+                "domain::view::GroupKey::{other:?} has no CLI mapping; add a GroupByArg variant"
+            ),
         }
     }
 }
@@ -156,6 +190,17 @@ pub struct InputArgs {
     /// Path to config file (default: auto-discover crap4rs.toml)
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
     pub config: Option<PathBuf>,
+
+    /// Resolve and apply a saved view preset from `crap4rs.toml`.
+    ///
+    /// The preset's fields (`top`, `min_coverage`, `max_coverage`, `sort`,
+    /// `only_failing`, `no_fail`, `group_by`, `minimal_view`) are folded
+    /// into the parsed CLI before the report is shaped. CLI flags
+    /// override the preset's `Option<T>` fields. Bare-bool flags
+    /// OR-merge with the preset (an explicit `--no-fail` adds to a
+    /// preset's value but cannot turn off `no_fail = true`).
+    #[arg(long, value_name = "NAME")]
+    pub view: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -339,7 +384,11 @@ INVESTIGATION PATTERNS:
 
   # Worst partially-covered functions, sorted by coverage ascending,
   # never fail the build — useful when investigating an untested codebase
-  crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail"
+  crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail
+
+  # Saved view preset: bake a flag set under [views.ci] in crap4rs.toml,
+  # then invoke it by name. CLI flags override preset values.
+  crap4rs --coverage lcov.info --view ci"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -372,7 +421,7 @@ pub fn run() -> ExitCode {
 }
 
 fn run_inner() -> Result<bool> {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
 
     if let Some(Command::Completions { shell }) = cli.command {
         emit_completions(shell);
@@ -380,12 +429,18 @@ fn run_inner() -> Result<bool> {
     }
 
     validate_display_flags(&cli)?;
-    view_args::validate_view_args(&cli)?;
 
     apply_color(cli.display.color);
 
     // Load config file (explicit path or auto-discovered)
     let file_config = load_file_config(&cli)?;
+
+    // Resolve `--view <NAME>` (issue #80) before validate_view_args runs
+    // so preset fields participate in the same validation pass as CLI
+    // flags. `apply_preset_to_cli` mutates `cli` in place: CLI explicit
+    // values win on `Option<T>` fields, bools OR-merge.
+    view_args::resolve_view_preset(&mut cli, file_config.as_ref())?;
+    view_args::validate_view_args(&cli)?;
 
     // Merge: CLI explicit > config file > hardcoded defaults
     let effective_src = cli
@@ -1095,6 +1150,18 @@ mod tests {
     fn config_flag_defaults_to_none() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         assert_eq!(cli.input.config, None);
+    }
+
+    #[test]
+    fn view_flag_accepts_name() {
+        let cli = parse(&["--coverage", "lcov.info", "--view", "ci"]).unwrap();
+        assert_eq!(cli.input.view, Some("ci".to_string()));
+    }
+
+    #[test]
+    fn view_flag_defaults_to_none() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert_eq!(cli.input.view, None);
     }
 
     #[test]

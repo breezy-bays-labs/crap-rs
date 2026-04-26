@@ -87,6 +87,36 @@ crap4rs --coverage lcov.info --group-by file --top 10
 
 Under `--group-by file`, `--top N` truncates to the top N **files** (not functions) and `--sort-by` keys at the file level: `crap` orders by average CRAP descending, `coverage` by average coverage ascending, `complexity` by max complexity descending, `path` alphabetically. The full per-function row list still appears in JSON `view.shown` for drill-down (`jq '.view.shown[] | select(.scored.identity.file_path == "src/blob.rs")'`); pair with `--minimal-view` to drop it for size-sensitive consumers. CSV's column schema shifts under grouping — pin your flags if you script on column position.
 
+### Saved view presets (`--view <NAME>`)
+
+When the same flag set repeats across runs (CI, investigation, paste-into-issue), bake it into `crap4rs.toml` under a `[views.<name>]` block and invoke it with `crap4rs --view <NAME>`:
+
+```toml
+# crap4rs.toml
+[views.ci]
+top = 20
+min_coverage = 0
+max_coverage = 90
+sort = "coverage"
+only_failing = true
+group_by = "file"
+minimal_view = true
+
+[views.investigate]
+sort = "complexity"
+top = 10
+```
+
+```bash
+# CI invocation — exits 1 on violations, 0 otherwise; minimal JSON for log parsing
+crap4rs --coverage lcov.info --view ci --format json
+
+# Investigation — preset's top=10 + sort by complexity, override with --top 25 inline
+crap4rs --coverage lcov.info --view investigate --top 25
+```
+
+**Override priority:** defaults < preset < CLI flags. CLI explicit `Option<T>` values (`--top`, `--min-coverage`, `--sort-by`, `--group-by`) override the preset; bare bool flags (`--no-fail`, `--only-failing`, `--minimal-view`) OR-merge with the preset — an explicit CLI flag adds to the preset's `true` value but cannot turn off a preset's `true`. The gate keystone holds: a preset cannot change `result.passed`, only the displayed view. Unknown preset names exit `2` listing the available presets; invalid preset fields (out-of-range coverage, bad sort string, typos) fail fast at config load with the offending preset's name in the message.
+
 The JSON envelope reflects the same separation: `result.*` always describes the full analysis (gate); `view.*` describes what the operator chose to see (display). An agent or dashboard can act on `result.passed`, `result.summary`, and `result.functions` while rendering only `view.shown`.
 
 ## Output formats

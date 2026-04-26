@@ -3,6 +3,7 @@
 //! Handles TOML parsing and config file discovery. All CLI-representable
 //! options are supported. Per-path threshold overrides use glob patterns.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -10,6 +11,7 @@ use serde::Deserialize;
 
 use crate::domain::threshold::{ThresholdOverride, ThresholdPreset, is_valid_threshold};
 use crate::domain::types::ComplexityMetric;
+use crate::domain::view::{CoverageRange, CoverageRangeError, GroupKey, SortKey};
 
 // ── Public config type (adapter output) ────────────────────────────
 
@@ -25,6 +27,32 @@ pub struct FileConfig {
     pub src: Option<PathBuf>,
     pub exclude: Option<Vec<String>>,
     pub overrides: Vec<ThresholdOverride>,
+    /// Saved view presets keyed by preset name (issue #80).
+    ///
+    /// Each `[views.<name>]` block in TOML deserializes into a
+    /// [`ViewPreset`]; the CLI layer resolves `--view <name>` against
+    /// this map and folds preset values into `Cli` before
+    /// `build_view_spec`.
+    pub views: HashMap<String, ViewPreset>,
+}
+
+/// Saved view preset (issue #80).
+///
+/// All fields are optional — `None` means "preset does not assert this
+/// field, defer to CLI / defaults." Booleans are `Option<bool>` so the
+/// preset can distinguish "absent" from "explicitly false," which lets
+/// the CLI layer treat a CLI bool of `false` as "user didn't say"
+/// (OR-merge semantics — see `apply_preset_to_cli`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ViewPreset {
+    pub top: Option<u32>,
+    pub min_coverage: Option<f64>,
+    pub max_coverage: Option<f64>,
+    pub sort: Option<SortKey>,
+    pub only_failing: Option<bool>,
+    pub no_fail: Option<bool>,
+    pub group_by: Option<GroupKey>,
+    pub minimal_view: Option<bool>,
 }
 
 // ── TOML serde types (private) ─────────────────────────────────────
@@ -39,6 +67,8 @@ struct RawConfig {
     exclude: Option<Vec<String>>,
     #[serde(default)]
     overrides: Vec<RawOverride>,
+    #[serde(default)]
+    views: HashMap<String, RawViewPreset>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +76,19 @@ struct RawConfig {
 struct RawOverride {
     pattern: String,
     threshold: f64,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawViewPreset {
+    top: Option<u32>,
+    min_coverage: Option<f64>,
+    max_coverage: Option<f64>,
+    sort: Option<String>,
+    only_failing: Option<bool>,
+    no_fail: Option<bool>,
+    group_by: Option<String>,
+    minimal_view: Option<bool>,
 }
 
 // ── Public API ─────────────────────────────────────────────────────
@@ -95,6 +138,15 @@ fn parse_config(content: &str) -> Result<FileConfig> {
         })
         .collect();
 
+    let views = raw
+        .views
+        .into_iter()
+        .map(|(name, raw_preset)| {
+            let preset = parse_view_preset(&name, raw_preset)?;
+            Ok::<_, anyhow::Error>((name, preset))
+        })
+        .collect::<Result<HashMap<_, _>>>()?;
+
     Ok(FileConfig {
         threshold: raw.threshold,
         preset,
@@ -102,6 +154,7 @@ fn parse_config(content: &str) -> Result<FileConfig> {
         src: raw.src.map(PathBuf::from),
         exclude: raw.exclude,
         overrides,
+        views,
     })
 }
 
@@ -124,6 +177,81 @@ fn validate_raw_config(raw: &RawConfig) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn parse_view_preset(name: &str, raw: RawViewPreset) -> Result<ViewPreset> {
+    let sort = raw
+        .sort
+        .as_deref()
+        .map(|s| parse_sort_key(name, s))
+        .transpose()?;
+    let group_by = raw
+        .group_by
+        .as_deref()
+        .map(|s| parse_group_key(name, s))
+        .transpose()?;
+    validate_preset_coverage_range(name, raw.min_coverage, raw.max_coverage)?;
+    Ok(ViewPreset {
+        top: raw.top,
+        min_coverage: raw.min_coverage,
+        max_coverage: raw.max_coverage,
+        sort,
+        only_failing: raw.only_failing,
+        no_fail: raw.no_fail,
+        group_by,
+        minimal_view: raw.minimal_view,
+    })
+}
+
+fn parse_sort_key(preset_name: &str, s: &str) -> Result<SortKey> {
+    match s {
+        "crap" => Ok(SortKey::Crap),
+        "coverage" => Ok(SortKey::Coverage),
+        "complexity" => Ok(SortKey::Complexity),
+        "path" => Ok(SortKey::Path),
+        other => anyhow::bail!(
+            "preset `{preset_name}`: unknown sort: {other}\n  valid values: crap, coverage, complexity, path"
+        ),
+    }
+}
+
+fn parse_group_key(preset_name: &str, s: &str) -> Result<GroupKey> {
+    match s {
+        "file" => Ok(GroupKey::File),
+        other => {
+            anyhow::bail!("preset `{preset_name}`: unknown group_by: {other}\n  valid values: file")
+        }
+    }
+}
+
+/// Validate the preset's coverage bounds in isolation (fail-fast at config
+/// load per issue #80). Either-side-only is allowed and the absent side is
+/// defaulted to `0` / `100` for the relational check, mirroring CLI
+/// `validate_view_args` so a preset that would resolve to an invalid range
+/// is rejected at TOML parse time rather than at `--view` resolution.
+fn validate_preset_coverage_range(
+    preset_name: &str,
+    min: Option<f64>,
+    max: Option<f64>,
+) -> Result<()> {
+    if min.is_none() && max.is_none() {
+        return Ok(());
+    }
+    let lo = min.unwrap_or(0.0);
+    let hi = max.unwrap_or(100.0);
+    // Same-crate match: `CoverageRangeError`'s `#[non_exhaustive]`
+    // affects only out-of-crate consumers, so all variants are known
+    // here. New variants will surface as compile errors when added —
+    // intentional, the CLI prose must stay in sync with domain shape.
+    match CoverageRange::new(lo, hi) {
+        Ok(_) => Ok(()),
+        Err(CoverageRangeError::OutOfRange { value }) => anyhow::bail!(
+            "preset `{preset_name}`: coverage value out of range: {value}\n  valid range: [0, 100]"
+        ),
+        Err(CoverageRangeError::MinExceedsMax { min, max }) => anyhow::bail!(
+            "preset `{preset_name}`: min_coverage ({min}) must not exceed max_coverage ({max})"
+        ),
+    }
 }
 
 fn parse_preset(s: &str) -> Result<ThresholdPreset> {
@@ -344,5 +472,218 @@ threshold = 0.0
 
         let err = load_config(&path).unwrap_err();
         assert!(err.to_string().contains("failed to parse config file"));
+    }
+
+    // ── ViewPreset tests (issue #80) ───────────────────────────────────
+
+    #[test]
+    fn parse_no_views_table_yields_empty_map() {
+        // Back-compat: existing TOML with no `[views]` blocks must continue
+        // to parse with `views == HashMap::new()`.
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert_eq!(config.threshold, Some(10.0));
+        assert!(config.views.is_empty());
+    }
+
+    #[test]
+    fn parse_empty_view_block_yields_default_preset() {
+        let toml = "[views.ci]\n";
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.views.len(), 1);
+        let ci = config.views.get("ci").expect("preset `ci` parsed");
+        assert_eq!(*ci, ViewPreset::default());
+    }
+
+    #[test]
+    fn parse_full_view_block_parses_every_field() {
+        let toml = r#"
+[views.ci]
+top = 20
+min_coverage = 0
+max_coverage = 90
+sort = "coverage"
+only_failing = true
+no_fail = false
+group_by = "file"
+minimal_view = true
+"#;
+        let config = parse_config(toml).unwrap();
+        let ci = config.views.get("ci").expect("preset `ci` parsed");
+        assert_eq!(ci.top, Some(20));
+        assert_eq!(ci.min_coverage, Some(0.0));
+        assert_eq!(ci.max_coverage, Some(90.0));
+        assert_eq!(ci.sort, Some(SortKey::Coverage));
+        assert_eq!(ci.only_failing, Some(true));
+        assert_eq!(ci.no_fail, Some(false));
+        assert_eq!(ci.group_by, Some(GroupKey::File));
+        assert_eq!(ci.minimal_view, Some(true));
+    }
+
+    #[test]
+    fn parse_unknown_view_field_rejected() {
+        let toml = r#"
+[views.ci]
+top = 5
+diff_ref = "main"
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("unknown") || msg.contains("diff_ref"),
+            "expected deny_unknown_fields error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_bad_sort_string_rejected() {
+        let toml = r#"
+[views.ci]
+sort = "nonsense"
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("unknown sort"), "got: {msg}");
+        assert!(msg.contains("ci"), "error must name preset, got: {msg}");
+    }
+
+    #[test]
+    fn parse_bad_group_by_string_rejected() {
+        let toml = r#"
+[views.ci]
+group_by = "module"
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("unknown group_by"), "got: {msg}");
+        assert!(msg.contains("ci"), "error must name preset, got: {msg}");
+    }
+
+    #[test]
+    fn parse_multiple_view_presets_independent() {
+        let toml = r#"
+[views.ci]
+top = 20
+sort = "coverage"
+
+[views.investigate]
+top = 10
+sort = "complexity"
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.views.len(), 2);
+        let ci = config.views.get("ci").unwrap();
+        assert_eq!(ci.top, Some(20));
+        assert_eq!(ci.sort, Some(SortKey::Coverage));
+        let inv = config.views.get("investigate").unwrap();
+        assert_eq!(inv.top, Some(10));
+        assert_eq!(inv.sort, Some(SortKey::Complexity));
+    }
+
+    #[test]
+    fn parse_view_preset_top_zero_accepted() {
+        // `top = 0` is canonicalised to `None` by `build_view_spec` (per
+        // existing CLI semantic — see `cli/view_args.rs::build_view_spec`).
+        // Config-load must accept the value rather than reject it.
+        let toml = r#"
+[views.ci]
+top = 0
+"#;
+        let config = parse_config(toml).unwrap();
+        let ci = config.views.get("ci").unwrap();
+        assert_eq!(ci.top, Some(0));
+    }
+
+    #[test]
+    fn parse_view_preset_min_coverage_out_of_range_rejected() {
+        let toml = r#"
+[views.ci]
+min_coverage = -1
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("out of range"), "got: {msg}");
+        assert!(msg.contains("ci"), "error must name preset, got: {msg}");
+    }
+
+    #[test]
+    fn parse_view_preset_max_coverage_out_of_range_rejected() {
+        let toml = r#"
+[views.ci]
+max_coverage = 105
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("out of range"), "got: {msg}");
+    }
+
+    #[test]
+    fn parse_view_preset_min_exceeds_max_rejected() {
+        let toml = r#"
+[views.ci]
+min_coverage = 90
+max_coverage = 30
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("must not exceed") || msg.contains("exceeds"),
+            "got: {msg}"
+        );
+        assert!(msg.contains("ci"), "error must name preset, got: {msg}");
+    }
+
+    #[test]
+    fn parse_view_preset_min_only_resolves_to_full_upper_bound() {
+        // `min_coverage = 50` alone (no `max_coverage`) is valid because
+        // the absent side defaults to 100 — mirrors CLI semantics in
+        // `cli::view_args::resolve_coverage_bounds`.
+        let toml = r#"
+[views.ci]
+min_coverage = 50
+"#;
+        let config = parse_config(toml).unwrap();
+        let ci = config.views.get("ci").unwrap();
+        assert_eq!(ci.min_coverage, Some(50.0));
+        assert_eq!(ci.max_coverage, None);
+    }
+
+    #[test]
+    fn parse_view_preset_alongside_threshold() {
+        // Existing top-level fields and view presets coexist.
+        let toml = r#"
+threshold = 12.0
+
+[views.ci]
+top = 20
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.threshold, Some(12.0));
+        assert_eq!(config.views.len(), 1);
+        assert_eq!(config.views["ci"].top, Some(20));
+    }
+
+    #[test]
+    fn parse_view_preset_all_sort_variants() {
+        let toml = r#"
+[views.crap_sort]
+sort = "crap"
+
+[views.coverage_sort]
+sort = "coverage"
+
+[views.complexity_sort]
+sort = "complexity"
+
+[views.path_sort]
+sort = "path"
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.views["crap_sort"].sort, Some(SortKey::Crap));
+        assert_eq!(config.views["coverage_sort"].sort, Some(SortKey::Coverage));
+        assert_eq!(
+            config.views["complexity_sort"].sort,
+            Some(SortKey::Complexity)
+        );
+        assert_eq!(config.views["path_sort"].sort, Some(SortKey::Path));
     }
 }
