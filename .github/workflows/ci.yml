@@ -139,3 +139,37 @@ jobs:
           tool: cargo-mutants
       - name: Run cargo mutants on src/domain/view.rs
         run: cargo mutants --package crap4rs --file src/domain/view.rs --no-shuffle --in-place
+
+  scorecard-smoke:
+    name: Scorecard action smoke (analysis-only)
+    runs-on: ubuntu-latest
+    needs: [coverage]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lcov
+      - name: Dogfood the scorecard action
+        id: crap
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: src
+          threshold: '25'
+      - name: Assert outputs are populated
+        env:
+          MARKDOWN: ${{ steps.crap.outputs.markdown }}
+          ENVELOPE_PATH: ${{ steps.crap.outputs.json-envelope-path }}
+          ANALYSIS_PASSED: ${{ steps.crap.outputs.analysis-passed }}
+          REGRESSIONS: ${{ steps.crap.outputs.regressions }}
+          NEW_VIOLATIONS: ${{ steps.crap.outputs.new-violations }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MARKDOWN" ]; then
+            echo "::error::scorecard action emitted empty markdown output"
+            exit 1
+          fi
+          test -f "$ENVELOPE_PATH"
+          echo "analysis_passed=$ANALYSIS_PASSED"
+          echo "regressions=$REGRESSIONS"
+          echo "new_violations=$NEW_VIOLATIONS"

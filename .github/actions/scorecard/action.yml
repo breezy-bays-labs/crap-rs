@@ -1,0 +1,226 @@
+name: 'CRAP Scorecard'
+description: 'Run CRAP analysis with optional baseline delta and emit a markdown scorecard composable into PR-comment bots.'
+author: 'Breezy Bays Labs'
+branding:
+  icon: 'activity'
+  color: 'orange'
+
+inputs:
+  language:
+    description: |
+      Language to analyze. `rust` runs crap4rs over an LCOV file. `typescript`
+      is reserved for crap4ts integration (coming in a future release of this
+      action). `auto` (default) infers from the `coverage` file extension:
+      `.info` -> rust, `.json` (Istanbul) -> typescript.
+    required: false
+    default: 'auto'
+  coverage:
+    description: 'Path to the coverage file. LCOV (.info) for Rust, Istanbul JSON for TypeScript.'
+    required: true
+  src:
+    description: 'Source root directory passed to the analyzer.'
+    required: false
+    default: '.'
+  baseline:
+    description: |
+      Path to a previously-captured CRAP JSON envelope to compare against.
+      Leave empty to skip delta and emit an analysis-only scorecard. Producing
+      the baseline (typically a coverage run on the PR base) is the caller's
+      responsibility — this action does not auto-checkout, by design.
+    required: false
+    default: ''
+  threshold:
+    description: 'CRAP threshold — functions above this are violations.'
+    required: false
+    default: '15'
+  config:
+    description: 'Optional path to a crap4rs.toml config file.'
+    required: false
+    default: ''
+  delta-gate:
+    description: |
+      When `true` and a baseline is provided, the action exits non-zero if any
+      new threshold violations land. The markdown scorecard is still emitted as
+      an output. Independent of `analysis-gate`.
+    required: false
+    default: 'false'
+  analysis-gate:
+    description: |
+      When `true`, the action exits non-zero if the analysis itself fails the
+      threshold. Default `false` keeps the action measurement-only — callers
+      who want hard gates run a separate `crap4rs` step or set this true.
+    required: false
+    default: 'false'
+  comment-mode:
+    description: |
+      `none` (default): outputs only — composable into aggregator bots like
+      mokumo's metrics-delta comment.
+      `sticky`: post/update a sticky PR comment using
+      marocchino/sticky-pull-request-comment. Requires `pull-requests: write`
+      on the calling job.
+    required: false
+    default: 'none'
+  comment-header:
+    description: |
+      Sticky-comment identifier when `comment-mode: sticky`. Multiple actions
+      can post distinct sticky comments by varying this header.
+    required: false
+    default: 'crap-scorecard'
+  version:
+    description: |
+      `crap4rs` version to install. `latest` (default) resolves to the most
+      recent release. Pin to a tag (e.g. `0.2.1`) for reproducible CI.
+    required: false
+    default: 'latest'
+
+outputs:
+  markdown:
+    description: 'The rendered markdown scorecard. Consume directly in aggregator bots.'
+    value: ${{ steps.run.outputs.markdown }}
+  json-envelope-path:
+    description: 'Path to the full JSON envelope on the runner — pass to downstream tooling.'
+    value: ${{ steps.run.outputs.envelope_path }}
+  analysis-passed:
+    description: '`true` if the analysis itself passed the threshold.'
+    value: ${{ steps.run.outputs.analysis_passed }}
+  delta-passed:
+    description: '`true` if a baseline was supplied and no new violations landed. Empty string when no baseline was supplied.'
+    value: ${{ steps.run.outputs.delta_passed }}
+  new-violations:
+    description: 'Count of functions that exceed the threshold but did not in the baseline. `0` when no baseline.'
+    value: ${{ steps.run.outputs.new_violations }}
+  regressions:
+    description: 'Count of modified functions whose CRAP score increased above the rendering precision threshold. `0` when no baseline.'
+    value: ${{ steps.run.outputs.regressions }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Resolve language
+      id: lang
+      shell: bash
+      env:
+        LANGUAGE: ${{ inputs.language }}
+        COVERAGE: ${{ inputs.coverage }}
+      run: |
+        set -euo pipefail
+        resolved="$LANGUAGE"
+        if [ "$resolved" = "auto" ]; then
+          case "$COVERAGE" in
+            *.info|*.lcov) resolved="rust" ;;
+            *.json)        resolved="typescript" ;;
+            *) echo "::error::cannot infer language from coverage path '$COVERAGE'; set inputs.language explicitly"; exit 1 ;;
+          esac
+        fi
+        echo "language=$resolved" >> "$GITHUB_OUTPUT"
+        echo "Resolved language: $resolved"
+
+    - name: Reject TypeScript (not yet wired)
+      if: steps.lang.outputs.language == 'typescript'
+      shell: bash
+      run: |
+        echo "::error::TypeScript scoring is not yet wired in this action."
+        echo "::error::Track progress at https://github.com/breezy-bays-labs/ops/issues/231"
+        echo "::error::For now, run crap4ts directly and post the markdown yourself."
+        exit 1
+
+    - name: Install cargo-binstall
+      if: steps.lang.outputs.language == 'rust'
+      uses: cargo-bins/cargo-binstall@main
+
+    - name: Install crap4rs
+      if: steps.lang.outputs.language == 'rust'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        if [ "$VERSION" = "latest" ]; then
+          cargo binstall --no-confirm --force crap4rs
+        else
+          cargo binstall --no-confirm --force "crap4rs@$VERSION"
+        fi
+        crap4rs --version
+
+    - name: Run analysis + render scorecard
+      id: run
+      if: steps.lang.outputs.language == 'rust'
+      shell: bash
+      env:
+        COVERAGE: ${{ inputs.coverage }}
+        SRC: ${{ inputs.src }}
+        BASELINE: ${{ inputs.baseline }}
+        THRESHOLD: ${{ inputs.threshold }}
+        CONFIG: ${{ inputs.config }}
+        DELTA_GATE: ${{ inputs.delta-gate }}
+        ANALYSIS_GATE: ${{ inputs.analysis-gate }}
+      run: |
+        set -euo pipefail
+        envelope="$RUNNER_TEMP/crap4rs-envelope.json"
+        markdown_file="$RUNNER_TEMP/crap4rs-scorecard.md"
+        common=(--coverage "$COVERAGE" --src "$SRC" --threshold "$THRESHOLD")
+        [ -n "$CONFIG" ] && common+=(--config "$CONFIG")
+        if [ -n "$BASELINE" ]; then
+          common+=(--baseline "$BASELINE")
+        fi
+
+        # Always capture truth into the envelope; --no-fail keeps the step
+        # green so we can surface counts/passed status via outputs even when
+        # gates would have tripped. The hard gating happens in the dedicated
+        # gate step below, gated by the analysis-gate / delta-gate inputs.
+        crap4rs "${common[@]}" --format json --no-fail > "$envelope"
+        crap4rs "${common[@]}" --format markdown --no-fail > "$markdown_file"
+
+        # Parse the envelope. jq is preinstalled on GitHub-hosted runners.
+        analysis_passed=$(jq -r '.result.passed' "$envelope")
+        delta_passed=$(jq -r '.delta.summary.passed // ""' "$envelope")
+        new_violations=$(jq -r '.delta.summary.new_violations // 0' "$envelope")
+        regressions=$(jq -r '.delta.summary.regressions // 0' "$envelope")
+
+        echo "analysis_passed=$analysis_passed" >> "$GITHUB_OUTPUT"
+        echo "delta_passed=$delta_passed"       >> "$GITHUB_OUTPUT"
+        echo "new_violations=$new_violations"   >> "$GITHUB_OUTPUT"
+        echo "regressions=$regressions"         >> "$GITHUB_OUTPUT"
+        echo "envelope_path=$envelope"          >> "$GITHUB_OUTPUT"
+
+        # Multi-line output: file the markdown via the heredoc-delimited form.
+        {
+          echo "markdown<<__CRAP_SCORECARD_EOF__"
+          cat "$markdown_file"
+          echo "__CRAP_SCORECARD_EOF__"
+        } >> "$GITHUB_OUTPUT"
+
+        # Surface a compact summary in the job log so failures are obvious
+        # without scrolling.
+        echo "::group::CRAP scorecard"
+        cat "$markdown_file"
+        echo "::endgroup::"
+
+    - name: Post sticky PR comment
+      if: steps.lang.outputs.language == 'rust' && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: ${{ inputs.comment-header }}
+        message: ${{ steps.run.outputs.markdown }}
+
+    - name: Enforce gates
+      if: steps.lang.outputs.language == 'rust'
+      shell: bash
+      env:
+        ANALYSIS_GATE: ${{ inputs.analysis-gate }}
+        DELTA_GATE: ${{ inputs.delta-gate }}
+        ANALYSIS_PASSED: ${{ steps.run.outputs.analysis_passed }}
+        DELTA_PASSED: ${{ steps.run.outputs.delta_passed }}
+      run: |
+        set -euo pipefail
+        if [ "$ANALYSIS_GATE" = "true" ] && [ "$ANALYSIS_PASSED" != "true" ]; then
+          echo "::error::analysis-gate failed: result.passed=$ANALYSIS_PASSED"
+          exit 1
+        fi
+        # delta_passed is "" when no baseline supplied; only enforce when a
+        # boolean came back.
+        if [ "$DELTA_GATE" = "true" ] && [ "$DELTA_PASSED" = "false" ]; then
+          echo "::error::delta-gate failed: new threshold violations landed"
+          exit 1
+        fi
+        echo "Gates passed (analysis-gate=$ANALYSIS_GATE delta-gate=$DELTA_GATE)"
