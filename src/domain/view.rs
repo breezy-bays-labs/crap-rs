@@ -1499,6 +1499,90 @@ mod tests {
         let view = apply(&r, spec);
         assert!(should_render_view_line(&view));
     }
+
+    // ── Mutation killers for truncate_files_to ─────────────────────
+    //
+    // truncate_files_to has a tight guard: `Some(n) if n > 0 && files.len() > n`.
+    // The three tests below pin each clause:
+    //  - L265:22 `n > 0`        — proven by `--top 0` non-empty case
+    //  - L265:41 `files.len() > n` — proven by `files.len() == n` case
+    //  - L265:26 `&&` operator   — proven by `--top 0` non-empty case
+    //  - L265:20 whole guard    — proven by both cases above
+
+    #[test]
+    fn group_by_file_top_zero_is_no_limit() {
+        // limit=Some(0) with non-empty files MUST NOT truncate; truncated=false.
+        // Mirrors the `--top 0` ergonomic where 0 means "no limit".
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(0),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().expect("grouping active");
+        assert!(!grouped.truncated);
+        // All 5 distinct files must be present.
+        assert_eq!(grouped.files.len(), 5);
+    }
+
+    #[test]
+    fn group_by_file_limit_equal_to_file_count_is_not_truncated() {
+        // When limit exactly matches file count, truncated MUST be false.
+        // Distinguishes `files.len() > n` (correct) from `files.len() >= n`
+        // (would set truncated=true for an effectively no-op truncate).
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            limit: Some(5),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        let grouped = view.grouped.as_ref().expect("grouping active");
+        assert!(!grouped.truncated);
+        assert_eq!(grouped.files.len(), 5);
+    }
+
+    // ── Mutation killers for distinct_files ────────────────────────
+    //
+    // `should_render_view_line` calls `distinct_files(view.full)` to decide
+    // whether grouping reduced the file count. Mutants replacing the body
+    // with `0` or `1` constants are killed by these tests:
+    //  - replace -> 0: filtering excludes some files; eligible_count < distinct
+    //                  must NOT trigger when all files survive (background = 5)
+    //  - replace -> 1: with 5 distinct files, predicate must reflect that
+
+    #[test]
+    fn display_predicate_full_grouping_no_reduction_is_false() {
+        // With grouping active but no filter/truncate, view line MUST NOT
+        // render. This requires distinct_files == eligible_count == 5
+        // (replace-with-0 would make distinct=0, predicate fires; killed.)
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert!(!should_render_view_line(&view));
+    }
+
+    #[test]
+    fn display_predicate_grouping_reduces_files_is_true() {
+        // Filter excludes 4 of 5 files; eligible_count=1 < distinct=5.
+        // Predicate must fire. Replace-with-1 would yield distinct=1=eligible
+        // and predicate would NOT fire — killed.
+        let r = background_fixture();
+        let spec = ViewSpec {
+            group_by: Some(GroupKey::File),
+            filters: Filters {
+                only_failing: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let view = apply(&r, spec);
+        assert!(should_render_view_line(&view));
+    }
 }
 
 #[cfg(test)]

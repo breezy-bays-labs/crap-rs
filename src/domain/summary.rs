@@ -198,6 +198,9 @@ fn file_summary_for(file_path: String, verdicts: &[&FunctionVerdict]) -> FileSum
             sum_finite_coverage += cov;
             finite_coverage_count += 1;
         }
+        // equivalent-mutant: `>` vs `>=` here is observationally identical —
+        // re-assigning `max_complexity` to the same value is a no-op, so
+        // cargo-mutants reports a survivor that does not represent a real bug.
         if v.scored.complexity > max_complexity {
             max_complexity = v.scored.complexity;
         }
@@ -630,6 +633,25 @@ mod file_summary_tests {
         let summaries = compute_file_summaries(&[v]);
         assert_eq!(summaries.len(), 1);
         assert_eq!(summaries[0].function_count, 1);
+        // Defensive: all-NaN coverage produces 0 finite count; the guard
+        // in `file_summary_for` must keep `average_coverage` at 0.0 (not NaN).
+        assert_eq!(summaries[0].average_coverage, 0.0);
+        assert!(!summaries[0].average_coverage.is_nan());
+    }
+
+    #[test]
+    fn file_summary_for_empty_input_does_not_divide_by_zero() {
+        // `file_summary_for` is private and `compute_file_summaries` never
+        // calls it with empty input — but the defensive guards in the body
+        // (`function_count > 0`, `finite_coverage_count > 0`) lock the
+        // contract: an empty-bucket FileSummary has zeroed averages, never
+        // NaN. This test pins both guards by direct invocation.
+        let summary = super::file_summary_for("empty.rs".to_string(), &[]);
+        assert_eq!(summary.function_count, 0);
+        assert_eq!(summary.average_crap, 0.0);
+        assert_eq!(summary.average_coverage, 0.0);
+        assert!(!summary.average_crap.is_nan());
+        assert!(!summary.average_coverage.is_nan());
     }
 
     #[test]
