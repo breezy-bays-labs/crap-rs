@@ -293,9 +293,24 @@ pub struct OutputArgs {
     /// is untouched and `result.passed` in JSON output still reflects
     /// the truthful pass/fail state, so consumers can detect "would
     /// have failed" even when the process exits 0. Composes with
-    /// `--quiet` for silent success in CI.
+    /// `--quiet` for silent success in CI. With `--delta-gate`, also
+    /// overrides the delta-gate exit-code translation (truth still in
+    /// `delta.summary.passed`).
     #[arg(long)]
     pub no_fail: bool,
+
+    /// Fail the build (exit 1) when the baseline comparison introduces
+    /// new threshold violations.
+    ///
+    /// Off by default — delta is informational unless this flag is set.
+    /// Drives off `delta.summary.passed`, which is true iff
+    /// `new_violations == 0`. Pre-existing violations (functions that
+    /// already exceeded threshold in the baseline) do NOT contribute,
+    /// so re-running with no code changes never trips the gate. Only
+    /// meaningful with `--baseline`. Composes with `--no-fail` (which
+    /// overrides BOTH gates).
+    #[arg(long, requires = "baseline")]
+    pub delta_gate: bool,
 
     /// Omit the denormalized `view.shown` row array from JSON output.
     ///
@@ -476,7 +491,20 @@ INVESTIGATION PATTERNS:
 
   # Saved view preset: bake a flag set under [views.ci] in crap4rs.toml,
   # then invoke it by name. CLI flags override preset values.
-  crap4rs --coverage lcov.info --view ci"
+  crap4rs --coverage lcov.info --view ci
+
+COMPARING TWO ANALYSES (issue #81):
+  # Capture a baseline (e.g., from main):
+  crap4rs --coverage lcov.info --format json > baseline.json
+
+  # Then compare the working tree to it (informational by default):
+  crap4rs --coverage lcov.info --baseline baseline.json
+
+  # CI usage: fail the build when new threshold violations land
+  crap4rs --coverage lcov.info --baseline baseline.json --delta-gate
+
+  # PR-comment scorecard (markdown — drop into the comment body verbatim)
+  crap4rs --coverage lcov.info --baseline baseline.json --format markdown"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -654,14 +682,20 @@ fn run_inner() -> Result<bool> {
     }
 
     // Exit code derives from `view.full.passed` — i.e., the underlying
-    // analysis. The View shapes the display, never the gate. `--no-fail`
-    // overrides only the gate-to-exit-code translation; `result.passed`
-    // in JSON output still reflects the truthful pass/fail state.
+    // analysis. The View shapes the display, never the gate.
     //
-    // Delta is informational by default (issue #81 §gate semantics);
-    // VS6 will add the opt-in `--delta-gate` flag here.
-    let _ = &delta_state; // VS6 will read this for delta-gate
-    Ok(passed || cli.output.no_fail)
+    // Delta is informational by default (issue #81 §gate semantics).
+    // `--delta-gate` opts in: a passing analysis with delta regressions
+    // that introduce new violations will exit 1 when `--delta-gate` is
+    // set. `--no-fail` overrides BOTH gates — truth lives in JSON
+    // (`result.passed` and `delta.summary.passed`) so consumers can
+    // still detect "would have failed."
+    let delta_passed = delta_state
+        .as_ref()
+        .map(|s| s.delta.summary.passed)
+        .unwrap_or(true);
+    let combined_passed = passed && (!cli.output.delta_gate || delta_passed);
+    Ok(combined_passed || cli.output.no_fail)
 }
 
 // ── Delta orchestration ─────────────────────────────────────────────
