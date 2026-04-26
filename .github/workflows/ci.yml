@@ -210,6 +210,17 @@ jobs:
       # On pull_request runs we post a sticky comment so the rendered
       # scorecard is reviewable on the PR itself; push runs to main fall
       # back to `none` (no PR to comment on).
+      #
+      # Stage the PR binary as the pre-installed crap4rs so the action
+      # uses THIS PR's analyzer (not whatever crates.io publishes as
+      # latest). Without this, the smoke renders against the last
+      # released version and silently masks regressions in the binary.
+      - name: Stage PR binary as pre-installed crap4rs
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cargo/bin"
+          install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
+          "$HOME/.cargo/bin/crap4rs" --version
       - name: Dogfood the scorecard action
         id: crap
         uses: ./.github/actions/scorecard

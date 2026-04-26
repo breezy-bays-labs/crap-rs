@@ -135,14 +135,18 @@ runs:
         VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
-        # No `--force`: skip reinstall if a matching version is already on
-        # PATH (e.g., from `moonrepo/setup-rust` bins or a user-supplied
-        # pre-step that prepends a workspace-local build of crap4rs onto
-        # PATH for end-to-end dogfooding).
-        if [ "$VERSION" = "latest" ]; then
+        # When `version: latest` and a `crap4rs` binary is already on PATH
+        # (e.g., from `moonrepo/setup-rust` bins or a workspace-local build
+        # prepended by a pre-step for end-to-end dogfooding), skip binstall
+        # and use the pre-installed binary as-is. Pinned versions always
+        # reinstall — callers asking for a specific version expect that
+        # version to be honored even if a different one is on PATH.
+        if [ "$VERSION" = "latest" ] && command -v crap4rs >/dev/null 2>&1; then
+          echo "Pre-installed crap4rs detected ($(crap4rs --version)); skipping binstall."
+        elif [ "$VERSION" = "latest" ]; then
           cargo binstall --no-confirm crap4rs
         else
-          cargo binstall --no-confirm "crap4rs@$VERSION"
+          cargo binstall --no-confirm --force "crap4rs@$VERSION"
         fi
         crap4rs --version
 
