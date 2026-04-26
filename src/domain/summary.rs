@@ -103,6 +103,16 @@ pub struct FileSummary {
     pub max_crap: Option<CrapScore>,
     pub worst_function: Option<FunctionIdentity>,
     pub distribution: RiskDistribution,
+    /// Mean of finite `coverage_percent` values across the file's
+    /// functions. NaN inputs are excluded from both numerator and
+    /// denominator; if no finite values exist, this is `0.0`.
+    /// Drives file-level `--sort-by coverage`.
+    pub average_coverage: f64,
+    /// Highest `complexity` value across the file's functions.
+    /// `0` for an empty bucket (unreachable in practice — `function_count`
+    /// is always >= 1 for a returned summary). Drives file-level
+    /// `--sort-by complexity`.
+    pub max_complexity: u32,
 }
 
 /// Group `verdicts` by `file_path` and compute per-file aggregates.
@@ -154,6 +164,9 @@ fn file_summary_for(file_path: String, verdicts: &[&FunctionVerdict]) -> FileSum
     let mut max_crap_value: Option<f64> = None;
     let mut worst_function: Option<FunctionIdentity> = None;
     let mut scores: Vec<f64> = Vec::with_capacity(function_count);
+    let mut sum_finite_coverage: f64 = 0.0;
+    let mut finite_coverage_count: usize = 0;
+    let mut max_complexity: u32 = 0;
 
     for v in verdicts {
         let score = v.scored.crap.value;
@@ -178,6 +191,16 @@ fn file_summary_for(file_path: String, verdicts: &[&FunctionVerdict]) -> FileSum
             max_crap_value = Some(score);
             worst_function = Some(v.scored.identity.clone());
         }
+        // Coverage: skip NaN; `compute_summary` does not aggregate
+        // coverage at all, but file-level sort needs a finite mean.
+        let cov = v.scored.coverage_percent;
+        if cov.is_finite() {
+            sum_finite_coverage += cov;
+            finite_coverage_count += 1;
+        }
+        if v.scored.complexity > max_complexity {
+            max_complexity = v.scored.complexity;
+        }
     }
 
     let average_crap = if function_count > 0 {
@@ -193,6 +216,12 @@ fn file_summary_for(file_path: String, verdicts: &[&FunctionVerdict]) -> FileSum
         risk_level: super::crap::classify_risk(value),
     });
 
+    let average_coverage = if finite_coverage_count > 0 {
+        sum_finite_coverage / finite_coverage_count as f64
+    } else {
+        0.0
+    };
+
     FileSummary {
         file_path,
         function_count,
@@ -202,6 +231,8 @@ fn file_summary_for(file_path: String, verdicts: &[&FunctionVerdict]) -> FileSum
         max_crap,
         worst_function,
         distribution,
+        average_coverage,
+        max_complexity,
     }
 }
 
@@ -599,6 +630,30 @@ mod file_summary_tests {
         let summaries = compute_file_summaries(&[v]);
         assert_eq!(summaries.len(), 1);
         assert_eq!(summaries[0].function_count, 1);
+    }
+
+    #[test]
+    fn average_coverage_excludes_nan() {
+        // Two finite (50.0, 100.0) and one NaN → mean = 75.0
+        let v_finite_a = vrd("a.rs", "f1", 1.0, 25.0); // coverage 100.0 (default in vrd)
+        let mut v_finite_b = vrd("a.rs", "f2", 1.0, 25.0);
+        v_finite_b.scored.coverage_percent = 50.0;
+        let mut v_nan = vrd("a.rs", "f3", 1.0, 25.0);
+        v_nan.scored.coverage_percent = f64::NAN;
+        let summaries = compute_file_summaries(&[v_finite_a, v_finite_b, v_nan]);
+        assert!((summaries[0].average_coverage - 75.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn max_complexity_per_file() {
+        let mut v1 = vrd("a.rs", "small", 1.0, 25.0);
+        v1.scored.complexity = 3;
+        let mut v2 = vrd("a.rs", "big", 1.0, 25.0);
+        v2.scored.complexity = 17;
+        let mut v3 = vrd("a.rs", "med", 1.0, 25.0);
+        v3.scored.complexity = 8;
+        let summaries = compute_file_summaries(&[v1, v2, v3]);
+        assert_eq!(summaries[0].max_complexity, 17);
     }
 
     #[test]

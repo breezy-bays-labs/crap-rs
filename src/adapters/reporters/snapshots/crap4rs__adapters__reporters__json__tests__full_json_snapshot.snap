@@ -118,6 +118,7 @@ expression: v
         "coverage_range": null,
         "only_failing": false
       },
+      "group_by": null,
       "limit": null,
       "sort": "crap"
     },
