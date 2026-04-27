@@ -90,6 +90,8 @@ pub(crate) mod test_fixtures {
                         span: SourceSpan {
                             start_line: 1,
                             end_line: 10,
+                            start_column: 0,
+                            end_column: 0,
                         },
                     }),
                     distribution: RiskDistribution {
@@ -123,6 +125,8 @@ pub(crate) mod test_fixtures {
                     span: SourceSpan {
                         start_line: 1,
                         end_line: 10,
+                        start_column: 0,
+                        end_column: 0,
                     },
                 },
                 complexity,
@@ -208,6 +212,8 @@ pub(crate) mod test_fixtures {
                     span: SourceSpan {
                         start_line: 1,
                         end_line: 10,
+                        start_column: 0,
+                        end_column: 0,
                     },
                 }),
                 distribution: RiskDistribution {

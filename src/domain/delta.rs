@@ -564,6 +564,8 @@ mod tests {
                     span: SourceSpan {
                         start_line: 1,
                         end_line: 5,
+                        start_column: 0,
+                        end_column: 0,
                     },
                 },
                 complexity: 5,
@@ -694,11 +696,15 @@ mod tests {
         baseline_v.scored.identity.span = SourceSpan {
             start_line: 1,
             end_line: 5,
+            start_column: 0,
+            end_column: 0,
         };
         let mut current_v = make_verdict("a.rs", "fn_a", 5.0, false);
         current_v.scored.identity.span = SourceSpan {
             start_line: 100,
             end_line: 105,
+            start_column: 0,
+            end_column: 0,
         };
         let delta = compute(make_result(vec![baseline_v]), make_result(vec![current_v]));
         assert_eq!(delta.changes.len(), 1);

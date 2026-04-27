@@ -164,10 +164,15 @@ fn add_contributor(
 }
 
 fn span_of(item: &impl syn::spanned::Spanned) -> SourceSpan {
+    // proc_macro2::LineColumn::line is 1-indexed; column is 0-indexed in
+    // UTF-8 characters. Convert columns to 1-based for SARIF region
+    // semantics. The +1 is intentional and asymmetric with the line copy.
     let sp = item.span();
     SourceSpan {
         start_line: sp.start().line,
         end_line: sp.end().line,
+        start_column: sp.start().column + 1,
+        end_column: sp.end().column + 1,
     }
 }
 
@@ -775,6 +780,27 @@ mod tests {
             f.identity.span.end_line > f.identity.span.start_line
                 || span_text.contains('}')
                 || span_text.contains("{}")
+        );
+    }
+
+    #[test]
+    fn span_carries_one_based_columns() {
+        // proc_macro2::LineColumn columns are 0-based; SourceSpan must carry
+        // 1-based columns so SARIF region.startColumn / endColumn render
+        // correctly under GitHub Code Scanning. `pub fn empty_body() {}` is
+        // unindented in simple_functions.rs, so column 0 (0-based) maps to
+        // column 1 (1-based) on the wire — never 0.
+        let fns = extract_fixture("simple_functions.rs", ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "empty_body");
+        assert!(
+            f.identity.span.start_column >= 1,
+            "start_column should be 1-based and >=1, got {}",
+            f.identity.span.start_column
+        );
+        assert!(
+            f.identity.span.end_column >= 1,
+            "end_column should be 1-based and >=1, got {}",
+            f.identity.span.end_column
         );
     }
 

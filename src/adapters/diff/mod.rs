@@ -183,6 +183,10 @@ fn parse_hunk_header(line: &str) -> Option<SourceSpan> {
     Some(SourceSpan {
         start_line: start,
         end_line: start + count - 1,
+        // Diff hunks are line-based — no column data. `0` signals "unknown"
+        // so reporters that distinguish (e.g., SARIF) skip the column field.
+        start_column: 0,
+        end_column: 0,
     })
 }
 

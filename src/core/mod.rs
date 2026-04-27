@@ -595,6 +595,8 @@ pub fn with_branch(x: i32) -> &'static str {
                 span: SourceSpan {
                     start_line: 1,
                     end_line: 10,
+                    start_column: 0,
+                    end_column: 0,
                 },
             },
             complexity: 2,
@@ -606,6 +608,8 @@ pub fn with_branch(x: i32) -> &'static str {
             span: SourceSpan {
                 start_line: 1,
                 end_line: 10,
+                start_column: 0,
+                end_column: 0,
             },
             line_coverage: crate::domain::types::CoverageRatio {
                 covered: 10,

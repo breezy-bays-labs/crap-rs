@@ -5,10 +5,19 @@ use std::fmt;
 
 /// Line range in source coordinates.
 /// `start_line` is 1-based inclusive, `end_line` is inclusive.
+/// `start_column` and `end_column` are 1-based inclusive when known; `0`
+/// signals "column unknown" (e.g., diff hunks parse line ranges only and
+/// have no column data). Adapters that lack column information must emit
+/// `0` rather than fabricating a value, so reporters can decide whether
+/// to surface the columns (SARIF emits them only when both are nonzero).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
+    #[serde(default)]
+    pub start_column: usize,
+    #[serde(default)]
+    pub end_column: usize,
 }
 
 // ── Complexity Contributors ──────────────────────────────────────────
