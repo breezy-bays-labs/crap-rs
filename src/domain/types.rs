@@ -14,6 +14,7 @@ use std::fmt;
 /// SARIF reporters convert inclusive → exclusive end at serialization
 /// time; consumers of `SourceSpan` directly get the intuitive bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
@@ -90,6 +91,7 @@ impl fmt::Display for ContributorKind {
 
 /// A single construct that contributed to a function's complexity score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ComplexityContributor {
     pub kind: ContributorKind,
     /// 1-based line number of the construct.
@@ -127,6 +129,7 @@ impl fmt::Display for ComplexityMetric {
 
 /// Identifies a function in the source code.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct FunctionIdentity {
     /// Project-relative file path, forward-slash normalized.
     pub file_path: String,
@@ -231,6 +234,7 @@ impl fmt::Display for RiskLevel {
 
 /// Computed CRAP score with risk classification.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CrapScore {
     /// Rounded to 2 decimal places.
     pub value: f64,
@@ -239,6 +243,7 @@ pub struct CrapScore {
 
 /// A function with all metrics computed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ScoredFunction {
     pub identity: FunctionIdentity,
     pub complexity: u32,
@@ -252,15 +257,47 @@ pub struct ScoredFunction {
 
 /// A scored function compared against a threshold.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct FunctionVerdict {
     pub scored: ScoredFunction,
     pub threshold: f64,
     pub exceeds: bool,
+    /// Structured remediation hint, populated by `--format advice` (#76)
+    /// and consumed by the `/cut-the-crap` agent skill (#77). `None` for
+    /// default invocations; reporters render it when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagnostic: Option<Diagnostic>,
+}
+
+/// Structured remediation hint attached to a verdict.
+///
+/// Placeholder for #82 — populated by #76 (`--format advice`) and consumed
+/// by the `/cut-the-crap` reference skill (#77). Fields are intentionally
+/// minimal in v0.3.0; #76 widens them additively under `#[non_exhaustive]`.
+///
+/// Derives `Default` so external consumers can build a `Diagnostic` and
+/// spread it via the `..` rest pattern even though it is `#[non_exhaustive]`.
+/// The default `summary` is the empty string, matching the "no advice yet"
+/// shape that v0.3.0 ships with.
+///
+/// Carries type-level `#[serde(default)]` so deserialization stays
+/// forward-compatible as #76 grows the type: any new field added under
+/// `#[non_exhaustive]` will fall back to its `Default` value when missing
+/// from older JSON payloads, instead of failing the deserialize. This is
+/// the type-level analogue of the per-field `#[serde(default)]` discipline
+/// `AnalysisSummary` uses on its additive fields.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+#[non_exhaustive]
+pub struct Diagnostic {
+    /// Single-line headline (e.g., "complexity is the driver — extract decision branches").
+    pub summary: String,
 }
 
 // ── Analysis Results ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct RiskDistribution {
     pub low: usize,
     pub acceptable: usize,
@@ -269,6 +306,7 @@ pub struct RiskDistribution {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct AnalysisSummary {
     pub total_functions: usize,
     pub total_files: usize,
@@ -302,6 +340,7 @@ pub struct AnalysisSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct AnalysisResult {
     pub functions: Vec<FunctionVerdict>,
     pub summary: AnalysisSummary,
@@ -344,6 +383,7 @@ impl fmt::Display for ParseDiagnostic {
 
 /// Statistics about the analysis process, surfaced by `--verbose`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct AnalysisDiagnostics {
     /// Non-fatal parse issues from the LCOV coverage file.
     pub parse_diagnostics: Vec<ParseDiagnostic>,
@@ -533,5 +573,27 @@ mod tests {
     #[test]
     fn coverage_metric_default_is_line() {
         assert_eq!(CoverageMetric::default(), CoverageMetric::Line);
+    }
+
+    #[test]
+    fn diagnostic_deserializes_empty_object_to_default() {
+        // Pins the type-level `#[serde(default)]` convention: future
+        // additive fields must be tolerated as missing-from-payload, so
+        // `{}` round-trips through `Diagnostic::default()`. If a future
+        // diff drops the annotation or adds a non-Default field, this
+        // test fails before the regression reaches downstream consumers.
+        let parsed: Diagnostic = serde_json::from_str("{}").unwrap();
+        assert_eq!(parsed, Diagnostic::default());
+        assert_eq!(parsed.summary, "");
+    }
+
+    #[test]
+    fn diagnostic_round_trips_summary() {
+        let original = Diagnostic {
+            summary: "extract decision branches".to_string(),
+        };
+        let json = serde_json::to_string(&original).unwrap();
+        let parsed: Diagnostic = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, original);
     }
 }

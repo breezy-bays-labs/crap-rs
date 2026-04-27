@@ -383,6 +383,7 @@ fn score_and_summarize(
             },
             threshold,
             exceeds: crap.value > threshold,
+            diagnostic: None,
         });
     }
 

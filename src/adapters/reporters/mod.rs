@@ -140,6 +140,7 @@ pub(crate) mod test_fixtures {
             },
             threshold,
             exceeds: crap_value > threshold,
+            diagnostic: None,
         }
     }
 

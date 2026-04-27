@@ -366,6 +366,7 @@ mod tests {
             },
             threshold,
             exceeds: crap_value > threshold,
+            diagnostic: None,
         }
     }
 
@@ -535,6 +536,7 @@ mod file_summary_tests {
             },
             threshold,
             exceeds: crap_value > threshold,
+            diagnostic: None,
         }
     }
 
@@ -714,6 +716,7 @@ mod file_summary_tests {
             },
             threshold: 25.0,
             exceeds: false,
+            diagnostic: None,
         };
         let summaries = compute_file_summaries(&[v]);
         assert_eq!(summaries.len(), 1);
