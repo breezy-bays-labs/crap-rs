@@ -99,6 +99,22 @@ Feature: SARIF reporter (issue #70)
     And every region's `endLine` equals the function's `span.end_line`
       (inclusive)
 
+  Scenario: Region carries column data when known (issue #105)
+    Given the complexity adapter populates 1-based start/end columns
+      from `proc_macro2::Span`
+    When the operator runs `crap4rs --coverage lcov.info --format sarif`
+    Then every region includes a `startColumn` and `endColumn`, both >= 1
+    And GitHub Code Scanning underlines the exact function range in the
+      PR diff instead of highlighting the entire line
+
+  Scenario: Region omits column keys when columns are unknown
+    Given a span produced by an adapter that has no column data (e.g.,
+      diff hunks parsed line-only)
+    When the operator runs `crap4rs --coverage lcov.info --format sarif`
+    Then the region for that result does NOT contain `startColumn` or
+      `endColumn` keys
+    And consumers see line-only precision instead of a fabricated column
+
   # ── Fingerprints (GitHub dedup) ────────────────────────────────────
 
   Scenario: partialFingerprints stable across runs and rebases
