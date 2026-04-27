@@ -118,6 +118,38 @@ fn sarif_results_match_exceeders_in_full_analysis() {
     }
 }
 
+// ── Region column precision (#105) ─────────────────────────────────
+
+#[test]
+fn sarif_region_carries_columns_from_real_source() {
+    // End-to-end check: against a real Rust source file, the complexity
+    // adapter populates 1-based columns from `proc_macro2::Span`, and
+    // the SARIF reporter surfaces them as `region.startColumn` /
+    // `endColumn`. GitHub Code Scanning underlines the function range
+    // when these fields are present.
+    let dir = tempfile::tempdir().unwrap();
+    setup_dir(dir.path(), FIXTURE_SRC, FIXTURE_LCOV);
+    let output = run(dir.path(), &["--threshold", "8", "--format", "sarif"]);
+
+    let v = parse_json(&output);
+    let results = v["runs"][0]["results"].as_array().unwrap();
+    assert!(!results.is_empty(), "fixture must produce exceeders");
+    for r in results {
+        let region = &r["locations"][0]["physicalLocation"]["region"];
+        let start_col = region["startColumn"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("region must include startColumn, got {region}"));
+        let end_col = region["endColumn"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("region must include endColumn, got {region}"));
+        assert!(
+            start_col >= 1,
+            "startColumn must be 1-based, got {start_col}"
+        );
+        assert!(end_col >= 1, "endColumn must be 1-based, got {end_col}");
+    }
+}
+
 #[test]
 fn sarif_empty_results_when_nothing_exceeds() {
     let dir = tempfile::tempdir().unwrap();

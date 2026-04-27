@@ -88,15 +88,27 @@ fn result_for(verdict: &FunctionVerdict) -> SarifResult {
                 artifact_location: SarifArtifactLocation {
                     uri: s.identity.file_path.clone(),
                 },
-                region: SarifRegion {
-                    start_line: s.identity.span.start_line,
-                    end_line: s.identity.span.end_line,
-                },
+                region: region_for_span(&s.identity.span),
             },
         }],
         partial_fingerprints: SarifPartialFingerprints {
             function_identity: fingerprint,
         },
+    }
+}
+
+/// Build a SARIF region from a `SourceSpan`. Columns are emitted only
+/// when *both* `start_column` and `end_column` are nonzero — `0` means
+/// "unknown" per the `SourceSpan` contract, and a half-known span is
+/// strictly worse than no column data at all (consumers can't tell
+/// which side is bogus).
+fn region_for_span(span: &crate::domain::types::SourceSpan) -> SarifRegion {
+    let columns_known = span.start_column > 0 && span.end_column > 0;
+    SarifRegion {
+        start_line: span.start_line,
+        end_line: span.end_line,
+        start_column: columns_known.then_some(span.start_column),
+        end_column: columns_known.then_some(span.end_column),
     }
 }
 
@@ -195,6 +207,10 @@ struct SarifRegion {
     start_line: usize,
     #[serde(rename = "endLine")]
     end_line: usize,
+    #[serde(rename = "startColumn", skip_serializing_if = "Option::is_none")]
+    start_column: Option<usize>,
+    #[serde(rename = "endColumn", skip_serializing_if = "Option::is_none")]
+    end_column: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -323,6 +339,83 @@ mod tests {
         let view = make_view_default(&result);
         let out = format_sarif(&view, "0.2.2");
         insta::assert_snapshot!(out);
+    }
+
+    /// Build a verdict whose span carries known nonzero columns. Used to
+    /// drive the conditional `region.startColumn` / `endColumn` emission.
+    fn verdict_with_columns(start_column: usize, end_column: usize) -> FunctionVerdict {
+        let mut v = make_verdict(
+            "complex_fn",
+            "src/lib.rs",
+            10,
+            0.0,
+            30.0,
+            RiskLevel::High,
+            8.0,
+        );
+        v.scored.identity.span.start_column = start_column;
+        v.scored.identity.span.end_column = end_column;
+        v
+    }
+
+    fn result_with_single(verdict: FunctionVerdict) -> crate::domain::types::AnalysisResult {
+        use crate::domain::types::{AnalysisResult, AnalysisSummary};
+        AnalysisResult {
+            functions: vec![verdict],
+            summary: AnalysisSummary {
+                total_functions: 1,
+                ..Default::default()
+            },
+            passed: false,
+        }
+    }
+
+    #[test]
+    fn region_emits_columns_when_both_nonzero() {
+        let result = result_with_single(verdict_with_columns(5, 32));
+        let view = make_view_default(&result);
+        let v = parse(&format_sarif(&view, "test-version"));
+        let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+        assert_eq!(
+            region["startColumn"], 5,
+            "region.startColumn must echo span"
+        );
+        assert_eq!(region["endColumn"], 32, "region.endColumn must echo span");
+    }
+
+    #[test]
+    fn region_omits_columns_when_both_zero() {
+        // Default fixtures emit columns of 0 — meaning "unknown". SARIF
+        // must not surface meaningless columns to GitHub Code Scanning.
+        let result = result_with_single(verdict_with_columns(0, 0));
+        let view = make_view_default(&result);
+        let v = parse(&format_sarif(&view, "test-version"));
+        let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+        assert!(
+            region.get("startColumn").is_none(),
+            "startColumn key must be absent when span column is 0"
+        );
+        assert!(
+            region.get("endColumn").is_none(),
+            "endColumn key must be absent when span column is 0"
+        );
+    }
+
+    #[test]
+    fn region_omits_columns_when_only_one_known() {
+        // A half-known span (start known, end unknown or vice-versa) is
+        // worse than no columns at all — emit neither so consumers see
+        // "no column info" instead of a half-truth.
+        for (sc, ec) in [(5usize, 0usize), (0, 32)] {
+            let result = result_with_single(verdict_with_columns(sc, ec));
+            let view = make_view_default(&result);
+            let v = parse(&format_sarif(&view, "test-version"));
+            let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+            assert!(
+                region.get("startColumn").is_none() && region.get("endColumn").is_none(),
+                "half-known span ({sc}, {ec}) must omit both column keys"
+            );
+        }
     }
 }
 
