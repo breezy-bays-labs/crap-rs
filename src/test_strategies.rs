@@ -44,6 +44,8 @@ pub fn arb_verdict() -> impl Strategy<Value = FunctionVerdict> {
                         span: SourceSpan {
                             start_line: 1,
                             end_line: 10,
+                            start_column: 0,
+                            end_column: 0,
                         },
                     },
                     complexity,
@@ -86,6 +88,8 @@ pub fn arb_verdict_with_nan_coverage() -> impl Strategy<Value = FunctionVerdict>
                             span: SourceSpan {
                                 start_line: 1,
                                 end_line: 10,
+                                start_column: 0,
+                                end_column: 0,
                             },
                         },
                         complexity,

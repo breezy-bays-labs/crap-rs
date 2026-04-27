@@ -164,10 +164,25 @@ fn add_contributor(
 }
 
 fn span_of(item: &impl syn::spanned::Spanned) -> SourceSpan {
+    // `proc_macro2::LineColumn::line` is 1-indexed already; `column` is
+    // 0-indexed (UTF-8 chars). `Span::start()` is the first character of
+    // the span (inclusive); `Span::end()` is one past the last character
+    // (exclusive). `SourceSpan` stores 1-based inclusive columns, in
+    // parallel with the inclusive `end_line` convention:
+    //
+    //   start_column = start_col_0based + 1
+    //   end_column   = end_col_0based       (because 0-based exclusive
+    //                                        end equals 1-based inclusive
+    //                                        end of the same character)
+    //
+    // Reporters that want SARIF-style exclusive endColumn add 1 at emit
+    // time; everyone else gets the intuitive inclusive bound for free.
     let sp = item.span();
     SourceSpan {
         start_line: sp.start().line,
         end_line: sp.end().line,
+        start_column: sp.start().column + 1,
+        end_column: sp.end().column,
     }
 }
 
@@ -775,6 +790,82 @@ mod tests {
             f.identity.span.end_line > f.identity.span.start_line
                 || span_text.contains('}')
                 || span_text.contains("{}")
+        );
+    }
+
+    #[test]
+    fn span_carries_one_based_columns() {
+        // proc_macro2::LineColumn columns are 0-based; SourceSpan must carry
+        // 1-based columns so SARIF region.startColumn / endColumn render
+        // correctly under GitHub Code Scanning. `pub fn empty_body() {}` is
+        // unindented in simple_functions.rs, so column 0 (0-based) maps to
+        // column 1 (1-based) on the wire — never 0.
+        let fns = extract_fixture("simple_functions.rs", ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "empty_body");
+        assert!(
+            f.identity.span.start_column >= 1,
+            "start_column should be 1-based and >=1, got {}",
+            f.identity.span.start_column
+        );
+        assert!(
+            f.identity.span.end_column >= 1,
+            "end_column should be 1-based and >=1, got {}",
+            f.identity.span.end_column
+        );
+    }
+
+    #[test]
+    fn columns_are_exact_one_based_offsets_unindented() {
+        // Deterministic source: `fn foo() {}` on line 1 starts with `f`
+        // at column 0 (0-based) and the closing `}` is at column 10
+        // (0-based, last character). `SourceSpan` stores 1-based
+        // *inclusive* columns, mirroring `end_line`:
+        //
+        //   start_column = 1   (`f` at 0-based 0  → 1-based 1 inclusive)
+        //   end_column   = 11  (`}` at 0-based 10 → 1-based 11 inclusive)
+        //
+        // Pinning EXACT values is what kills the cargo-mutants survivors:
+        //   `start_col + 1` → `start_col - 1`: 0-1 wraps, ≠ 1
+        //   `start_col + 1` → `start_col * 1`: 0*1 = 0, ≠ 1
+        //   `end_col`        → any arithmetic mutant: ≠ 11
+        let source = "fn foo() {}\n";
+        let fns = adapter()
+            .extract(source, "probe.rs", ComplexityMetric::Cognitive)
+            .unwrap();
+        let f = &fns[0];
+        assert_eq!(f.identity.qualified_name, "foo");
+        assert_eq!(
+            f.identity.span.start_column, 1,
+            "`f` at column 0 (0-based) → 1 (1-based inclusive)"
+        );
+        assert_eq!(
+            f.identity.span.end_column, 11,
+            "`}}` at column 10 (0-based) → 11 (1-based inclusive)"
+        );
+    }
+
+    #[test]
+    fn columns_are_exact_one_based_offsets_indented() {
+        // Indented variant pins both columns to nonzero asymmetric values,
+        // so a `* 1` mutation on `start_column` can't accidentally
+        // produce the right answer either.
+        //   "    pub fn bar() {}"
+        //    0123456789012345678
+        //        ^ p at col 4 → start_column = 5
+        //                      ^ } at col 18 → end_column = 19
+        let source = "    pub fn bar() {}\n";
+        let fns = adapter()
+            .extract(source, "probe.rs", ComplexityMetric::Cognitive)
+            .unwrap();
+        let f = &fns[0];
+        assert_eq!(f.identity.qualified_name, "bar");
+        assert_eq!(
+            f.identity.span.start_column, 5,
+            "`p` at column 4 (0-based) → 5 (1-based inclusive)"
+        );
+        assert_eq!(
+            f.identity.span.end_column, 19,
+            "`}}` at column 18 (0-based) → 19 (1-based inclusive)"
         );
     }
 

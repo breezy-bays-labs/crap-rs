@@ -153,6 +153,8 @@ mod tests {
                 span: SourceSpan {
                     start_line: start,
                     end_line: end,
+                    start_column: 0,
+                    end_column: 0,
                 },
             },
             complexity: 1,
@@ -415,6 +417,8 @@ mod overlaps_any_tests {
         SourceSpan {
             start_line: start,
             end_line: end,
+            start_column: 0,
+            end_column: 0,
         }
     }
 
@@ -475,6 +479,8 @@ mod overlaps_any_proptests {
             SourceSpan {
                 start_line: start,
                 end_line: end,
+                start_column: 0,
+                end_column: 0,
             }
         })
     }
@@ -509,8 +515,8 @@ mod overlaps_any_proptests {
             let outer_end = outer_start + outer_len;
             let inner_start = outer_start + inner_offset.min(outer_len - 1);
             let inner_end = inner_start.min(outer_end);
-            let outer = SourceSpan { start_line: outer_start, end_line: outer_end };
-            let inner = SourceSpan { start_line: inner_start, end_line: inner_end };
+            let outer = SourceSpan { start_line: outer_start, end_line: outer_end, start_column: 0, end_column: 0 };
+            let inner = SourceSpan { start_line: inner_start, end_line: inner_end, start_column: 0, end_column: 0 };
             prop_assert!(overlaps_any(&inner, &[outer]));
         }
 
@@ -523,8 +529,8 @@ mod overlaps_any_proptests {
             let end1 = start + len1;
             let start2 = end1 + 1; // gap of 1
             let end2 = start2 + len2;
-            let a = SourceSpan { start_line: start, end_line: end1 };
-            let b = SourceSpan { start_line: start2, end_line: end2 };
+            let a = SourceSpan { start_line: start, end_line: end1, start_column: 0, end_column: 0 };
+            let b = SourceSpan { start_line: start2, end_line: end2, start_column: 0, end_column: 0 };
             prop_assert!(!overlaps_any(&a, &[b]));
         }
     }
@@ -546,6 +552,8 @@ mod proptests {
                     span: SourceSpan {
                         start_line: start,
                         end_line: end,
+                        start_column: 0,
+                        end_column: 0,
                     },
                 },
                 complexity: 1,
@@ -627,7 +635,7 @@ mod proptests {
                 identity: FunctionIdentity {
                     file_path: "a.rs".to_string(),
                     qualified_name: "foo".to_string(),
-                    span: SourceSpan { start_line: 1, end_line: 100 },
+                    span: SourceSpan { start_line: 1, end_line: 100, start_column: 0, end_column: 0 },
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
@@ -637,7 +645,7 @@ mod proptests {
                 identity: FunctionIdentity {
                     file_path: "b.rs".to_string(),
                     qualified_name: "bar".to_string(),
-                    span: SourceSpan { start_line: 200, end_line: 300 },
+                    span: SourceSpan { start_line: 200, end_line: 300, start_column: 0, end_column: 0 },
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
@@ -682,7 +690,7 @@ mod proptests {
                 identity: FunctionIdentity {
                     file_path: "test.rs".to_string(),
                     qualified_name: "fn_test".to_string(),
-                    span: SourceSpan { start_line: start, end_line: end },
+                    span: SourceSpan { start_line: start, end_line: end, start_column: 0, end_column: 0 },
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
@@ -747,7 +755,7 @@ mod proptests {
                 identity: FunctionIdentity {
                     file_path: "a.rs".to_string(),
                     qualified_name: "foo".to_string(),
-                    span: SourceSpan { start_line: 1, end_line: 100 },
+                    span: SourceSpan { start_line: 1, end_line: 100, start_column: 0, end_column: 0 },
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,
@@ -757,7 +765,7 @@ mod proptests {
                 identity: FunctionIdentity {
                     file_path: "b.rs".to_string(),
                     qualified_name: "bar".to_string(),
-                    span: SourceSpan { start_line: 200, end_line: 300 },
+                    span: SourceSpan { start_line: 200, end_line: 300, start_column: 0, end_column: 0 },
                 },
                 complexity: 1,
                 metric: ComplexityMetric::Cognitive,

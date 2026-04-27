@@ -23,7 +23,9 @@ expression: v
             "file_path": "src/domain/crap.rs",
             "qualified_name": "compute_crap",
             "span": {
+              "end_column": 0,
               "end_line": 10,
+              "start_column": 0,
               "start_line": 1
             }
           }
@@ -58,7 +60,9 @@ expression: v
         "file_path": "src/domain/crap.rs",
         "qualified_name": "compute_crap",
         "span": {
+          "end_column": 0,
           "end_line": 10,
+          "start_column": 0,
           "start_line": 1
         }
       }
@@ -87,7 +91,9 @@ expression: v
             "file_path": "src/domain/crap.rs",
             "qualified_name": "compute_crap",
             "span": {
+              "end_column": 0,
               "end_line": 10,
+              "start_column": 0,
               "start_line": 1
             }
           }
@@ -121,7 +127,9 @@ expression: v
         "file_path": "src/domain/crap.rs",
         "qualified_name": "compute_crap",
         "span": {
+          "end_column": 0,
           "end_line": 10,
+          "start_column": 0,
           "start_line": 1
         }
       }

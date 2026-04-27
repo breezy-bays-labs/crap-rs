@@ -351,6 +351,8 @@ mod tests {
                     span: SourceSpan {
                         start_line: 1,
                         end_line: 10,
+                        start_column: 0,
+                        end_column: 0,
                     },
                 },
                 complexity: 1,
@@ -518,6 +520,8 @@ mod file_summary_tests {
                     span: SourceSpan {
                         start_line: 1,
                         end_line: 10,
+                        start_column: 0,
+                        end_column: 0,
                     },
                 },
                 complexity: 1,
@@ -695,6 +699,8 @@ mod file_summary_tests {
                     span: SourceSpan {
                         start_line: 1,
                         end_line: 10,
+                        start_column: 0,
+                        end_column: 0,
                     },
                 },
                 complexity: 1,
