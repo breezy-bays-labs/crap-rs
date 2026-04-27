@@ -102,13 +102,18 @@ fn result_for(verdict: &FunctionVerdict) -> SarifResult {
 /// "unknown" per the `SourceSpan` contract, and a half-known span is
 /// strictly worse than no column data at all (consumers can't tell
 /// which side is bogus).
+///
+/// SARIF v2.1.0 §3.30.7 specifies `endColumn` as "one greater than the
+/// column number of the last character in the region" — i.e., exclusive
+/// end. `SourceSpan::end_column` is 1-based inclusive (parallel with
+/// `end_line`), so we add 1 here at the wire boundary.
 fn region_for_span(span: &crate::domain::types::SourceSpan) -> SarifRegion {
     let columns_known = span.start_column > 0 && span.end_column > 0;
     SarifRegion {
         start_line: span.start_line,
         end_line: span.end_line,
         start_column: columns_known.then_some(span.start_column),
-        end_column: columns_known.then_some(span.end_column),
+        end_column: columns_known.then_some(span.end_column + 1),
     }
 }
 
@@ -372,15 +377,22 @@ mod tests {
 
     #[test]
     fn region_emits_columns_when_both_nonzero() {
+        // `SourceSpan` columns are 1-based inclusive; SARIF endColumn is
+        // 1-based exclusive (one greater than the last character). The
+        // reporter adds 1 at the wire boundary, so a span ending at
+        // column 32 inclusive becomes SARIF endColumn 33.
         let result = result_with_single(verdict_with_columns(5, 32));
         let view = make_view_default(&result);
         let v = parse(&format_sarif(&view, "test-version"));
         let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
         assert_eq!(
             region["startColumn"], 5,
-            "region.startColumn must echo span"
+            "startColumn passes through (1-based inclusive == SARIF 1-based inclusive)"
         );
-        assert_eq!(region["endColumn"], 32, "region.endColumn must echo span");
+        assert_eq!(
+            region["endColumn"], 33,
+            "endColumn = span.end_column + 1 per SARIF v2.1.0 §3.30.7"
+        );
     }
 
     #[test]
