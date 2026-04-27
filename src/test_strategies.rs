@@ -59,6 +59,7 @@ pub fn arb_verdict() -> impl Strategy<Value = FunctionVerdict> {
                 },
                 threshold,
                 exceeds: crap_value > threshold,
+                diagnostic: None,
             },
         )
 }
@@ -103,6 +104,7 @@ pub fn arb_verdict_with_nan_coverage() -> impl Strategy<Value = FunctionVerdict>
                     },
                     threshold,
                     exceeds: crap_value > threshold,
+                    diagnostic: None,
                 }
             },
         )

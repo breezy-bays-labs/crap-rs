@@ -587,6 +587,7 @@ mod tests {
             },
             threshold: 25.0,
             exceeds,
+            diagnostic: None,
         }
     }
 

@@ -262,6 +262,23 @@ pub struct FunctionVerdict {
     pub scored: ScoredFunction,
     pub threshold: f64,
     pub exceeds: bool,
+    /// Structured remediation hint, populated by `--format advice` (#76)
+    /// and consumed by the `/cut-the-crap` agent skill (#77). `None` for
+    /// default invocations; reporters render it when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagnostic: Option<Diagnostic>,
+}
+
+/// Structured remediation hint attached to a verdict.
+///
+/// Placeholder for #82 — populated by #76 (`--format advice`) and consumed
+/// by the `/cut-the-crap` reference skill (#77). Fields are intentionally
+/// minimal in v0.3.0; #76 widens them additively under `#[non_exhaustive]`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct Diagnostic {
+    /// Single-line headline (e.g., "complexity is the driver — extract decision branches").
+    pub summary: String,
 }
 
 // ── Analysis Results ────────────────────────────────────────────────

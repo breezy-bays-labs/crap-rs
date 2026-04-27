@@ -1300,6 +1300,7 @@ mod proptests {
                     },
                     threshold,
                     exceeds: crap_value > threshold,
+                    diagnostic: None,
                 },
             )
     }
