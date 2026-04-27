@@ -147,6 +147,21 @@ fn sarif_region_carries_columns_from_real_source() {
             "startColumn must be 1-based, got {start_col}"
         );
         assert!(end_col >= 1, "endColumn must be 1-based, got {end_col}");
+        // FIXTURE_SRC failing functions are unindented and single-line:
+        // `pub fn failing_…` starts at column 1 (1-based inclusive); the
+        // closing `}` is well past the start, and the SARIF reporter
+        // adds 1 at the wire boundary for exclusive endColumn — so
+        // endColumn must strictly exceed startColumn. This pins the
+        // wire-level `+1` conversion even if the unit-level coverage in
+        // `sarif.rs` were ever removed.
+        assert_eq!(
+            start_col, 1,
+            "FIXTURE_SRC failing fns are unindented; startColumn must be 1, got {start_col}"
+        );
+        assert!(
+            end_col > start_col,
+            "endColumn ({end_col}) must exceed startColumn ({start_col}) on a single-line span"
+        );
     }
 }
 

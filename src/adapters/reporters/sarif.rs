@@ -7,7 +7,7 @@
 
 use serde::Serialize;
 
-use crate::domain::types::{FunctionVerdict, RiskLevel};
+use crate::domain::types::{FunctionVerdict, RiskLevel, SourceSpan};
 use crate::domain::view::AnalysisView;
 
 const SCHEMA_URI: &str = "https://json.schemastore.org/sarif-2.1.0.json";
@@ -107,7 +107,7 @@ fn result_for(verdict: &FunctionVerdict) -> SarifResult {
 /// column number of the last character in the region" — i.e., exclusive
 /// end. `SourceSpan::end_column` is 1-based inclusive (parallel with
 /// `end_line`), so we add 1 here at the wire boundary.
-fn region_for_span(span: &crate::domain::types::SourceSpan) -> SarifRegion {
+fn region_for_span(span: &SourceSpan) -> SarifRegion {
     let columns_known = span.start_column > 0 && span.end_column > 0;
     SarifRegion {
         start_line: span.start_line,
