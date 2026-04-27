@@ -14,6 +14,7 @@ use std::fmt;
 /// SARIF reporters convert inclusive → exclusive end at serialization
 /// time; consumers of `SourceSpan` directly get the intuitive bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
@@ -90,6 +91,7 @@ impl fmt::Display for ContributorKind {
 
 /// A single construct that contributed to a function's complexity score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ComplexityContributor {
     pub kind: ContributorKind,
     /// 1-based line number of the construct.
@@ -127,6 +129,7 @@ impl fmt::Display for ComplexityMetric {
 
 /// Identifies a function in the source code.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct FunctionIdentity {
     /// Project-relative file path, forward-slash normalized.
     pub file_path: String,
@@ -231,6 +234,7 @@ impl fmt::Display for RiskLevel {
 
 /// Computed CRAP score with risk classification.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CrapScore {
     /// Rounded to 2 decimal places.
     pub value: f64,
@@ -239,6 +243,7 @@ pub struct CrapScore {
 
 /// A function with all metrics computed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ScoredFunction {
     pub identity: FunctionIdentity,
     pub complexity: u32,
@@ -252,6 +257,7 @@ pub struct ScoredFunction {
 
 /// A scored function compared against a threshold.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct FunctionVerdict {
     pub scored: ScoredFunction,
     pub threshold: f64,
@@ -261,6 +267,7 @@ pub struct FunctionVerdict {
 // ── Analysis Results ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct RiskDistribution {
     pub low: usize,
     pub acceptable: usize,
@@ -269,6 +276,7 @@ pub struct RiskDistribution {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct AnalysisSummary {
     pub total_functions: usize,
     pub total_files: usize,
@@ -302,6 +310,7 @@ pub struct AnalysisSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct AnalysisResult {
     pub functions: Vec<FunctionVerdict>,
     pub summary: AnalysisSummary,
@@ -344,6 +353,7 @@ impl fmt::Display for ParseDiagnostic {
 
 /// Statistics about the analysis process, surfaced by `--verbose`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct AnalysisDiagnostics {
     /// Non-fatal parse issues from the LCOV coverage file.
     pub parse_diagnostics: Vec<ParseDiagnostic>,
