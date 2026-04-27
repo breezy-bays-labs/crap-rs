@@ -57,6 +57,8 @@ pub enum FormatArg {
     Markdown,
     /// RFC 4180 CSV — one row per function, no summary
     Csv,
+    /// SARIF v2.1.0 — for GitHub Code Scanning (upload-sarif@v3)
+    Sarif,
 }
 
 /// Sort key for the displayed view (issue #68).
@@ -511,6 +513,11 @@ INVESTIGATION PATTERNS:
   # then invoke it by name. CLI flags override preset values.
   crap4rs --coverage lcov.info --view ci
 
+  # GitHub Code Scanning: emit SARIF and let upload-sarif annotate the PR
+  # diff inline. Use --no-fail so the gate exit code doesn't skip the
+  # upload step on regressions.
+  crap4rs --coverage lcov.info --format sarif --no-fail > crap.sarif
+
 COMPARING TWO ANALYSES (issue #81):
   # Capture a baseline (e.g., from main):
   crap4rs --coverage lcov.info --format json > baseline.json
@@ -697,6 +704,12 @@ fn run_inner() -> Result<bool> {
                 cli.display.md_top,
             ),
             FormatArg::Csv => reporters::format_csv(&view, delta_view.as_ref(), effective_metric),
+            // SARIF is a gate translation, not a display: it iterates
+            // `view.full.functions` internally regardless of how the View
+            // was shaped. `--top`, `--sort-by`, `--only-failing`, and
+            // `--baseline` do NOT alter SARIF output — PR annotations
+            // must reflect truth.
+            FormatArg::Sarif => reporters::format_sarif(&view, env!("CARGO_PKG_VERSION")),
         };
         print!("{output}");
     }
@@ -1148,6 +1161,12 @@ mod tests {
     fn format_json() {
         let cli = parse(&["--coverage", "lcov.info", "--format", "json"]).unwrap();
         assert!(matches!(cli.output.format, FormatArg::Json));
+    }
+
+    #[test]
+    fn format_sarif() {
+        let cli = parse(&["--coverage", "lcov.info", "--format", "sarif"]).unwrap();
+        assert!(matches!(cli.output.format, FormatArg::Sarif));
     }
 
     #[test]

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--format sarif`** — emit SARIF v2.1.0 JSON for GitHub Code Scanning. Each function whose CRAP score exceeds the threshold becomes a SARIF `result` with `ruleId: "crap/threshold-exceeded"`, severity mapped from risk level (high → `error`, moderate → `warning`, acceptable & low → `note`), file path + start/end line, and a `partialFingerprints.functionIdentity` for cross-run dedup. SARIF output is a *gate translation*: results derive from the unshapeable analysis, so display flags (`--top`, `--sort-by`, `--only-failing`) do **not** alter SARIF output. `--no-fail` overrides the exit code only — the `results[]` array still reports every finding so PR annotations stay truthful. Pipe stdout into a `.sarif` file and upload via `github/codeql-action/upload-sarif@v3`. Closes #70.
+
 ## [0.2.2] - 2026-04-26
 
 ### Changed
