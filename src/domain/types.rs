@@ -274,7 +274,12 @@ pub struct FunctionVerdict {
 /// Placeholder for #82 — populated by #76 (`--format advice`) and consumed
 /// by the `/cut-the-crap` reference skill (#77). Fields are intentionally
 /// minimal in v0.3.0; #76 widens them additively under `#[non_exhaustive]`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Derives `Default` so external consumers can build a `Diagnostic` and
+/// spread it via the `..` rest pattern even though it is `#[non_exhaustive]`.
+/// The default `summary` is the empty string, matching the "no advice yet"
+/// shape that v0.3.0 ships with.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Diagnostic {
     /// Single-line headline (e.g., "complexity is the driver — extract decision branches").
