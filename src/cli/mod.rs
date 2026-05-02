@@ -59,6 +59,8 @@ pub enum FormatArg {
     Csv,
     /// SARIF v2.1.0 — for GitHub Code Scanning (upload-sarif@v3)
     Sarif,
+    /// Agent-oriented JSON with Diagnostic remediation hints (experimental — stable from v0.4.0)
+    Advice,
 }
 
 /// Sort key for the displayed view (issue #68).
@@ -626,6 +628,7 @@ fn run_inner() -> Result<bool> {
         exclude: effective_exclude,
         respect_gitignore: !cli.filter.no_gitignore,
         diff_ref: cli.filter.diff.clone(),
+        compute_diagnostics: matches!(cli.output.format, FormatArg::Advice | FormatArg::Sarif),
         ..AnalyzeOptions::default()
     };
 
@@ -672,7 +675,7 @@ fn run_inner() -> Result<bool> {
                 cli.display.breakdown,
                 cli.display.explain,
             ),
-            FormatArg::Json => {
+            FormatArg::Json | FormatArg::Advice => {
                 let delta_ctx = delta_state
                     .as_ref()
                     .zip(delta_view.as_ref())
