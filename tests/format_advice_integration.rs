@@ -413,6 +413,94 @@ fn same_input_produces_byte_identical_advice_json() {
     assert_eq!(first.stdout, second.stdout);
 }
 
+// ── Stderr summary (V5 / S-8) ───────────────────────────────────────
+
+#[test]
+fn advice_emits_stderr_summary_one_line_per_exceeding_function() {
+    let tmp = tempfile::tempdir().expect("create tempdir");
+    setup_dir(tmp.path(), FIXTURE_SRC, FIXTURE_LCOV);
+
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "advice",
+        ],
+    );
+    let stderr = String::from_utf8(output.stderr).expect("stderr utf-8");
+
+    let summary_lines: Vec<&str> = stderr.lines().filter(|l| l.starts_with("[crap=")).collect();
+    assert!(
+        !summary_lines.is_empty(),
+        "expected at least one summary line, got stderr:\n{stderr}"
+    );
+    for line in &summary_lines {
+        assert!(line.contains("[actions:"), "missing actions tag: {line}");
+        assert!(line.contains("lib.rs"), "expected lib.rs in path: {line}");
+        assert!(
+            line.contains(" branchy_fail "),
+            "expected qualified_name: {line}"
+        );
+    }
+}
+
+#[test]
+fn json_format_emits_no_advice_summary_on_stderr() {
+    let tmp = tempfile::tempdir().expect("create tempdir");
+    setup_dir(tmp.path(), FIXTURE_SRC, FIXTURE_LCOV);
+
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "json",
+        ],
+    );
+    let stderr = String::from_utf8(output.stderr).expect("stderr utf-8");
+    assert!(
+        !stderr.lines().any(|l| l.starts_with("[crap=")),
+        "no advice summary lines should appear under --format json; stderr:\n{stderr}"
+    );
+}
+
+#[test]
+fn advice_stderr_summary_is_byte_identical_across_runs() {
+    let tmp = tempfile::tempdir().expect("create tempdir");
+    setup_dir(tmp.path(), FIXTURE_SRC, FIXTURE_LCOV);
+
+    let first = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "advice",
+        ],
+    );
+    let second = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "advice",
+        ],
+    );
+    assert_eq!(first.stderr, second.stderr);
+}
+
 // ── R6.3 — branch_path is AST-only, no prose ────────────────────────
 
 #[test]

@@ -715,6 +715,14 @@ fn run_inner() -> Result<bool> {
             FormatArg::Sarif => reporters::format_sarif(&view, env!("CARGO_PKG_VERSION")),
         };
         print!("{output}");
+
+        // V5: stderr summary for `--format advice` only. SARIF's primary
+        // deliverable is the `.sarif` file uploaded to Code Scanning;
+        // adding a stderr line stream there would noise up CI logs (F4).
+        if matches!(cli.output.format, FormatArg::Advice) {
+            let mut stderr = std::io::stderr();
+            let _ = reporters::render_advice_summary(&view, &mut stderr);
+        }
     }
 
     // Exit code derives from `view.full.passed` — i.e., the underlying
