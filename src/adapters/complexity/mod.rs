@@ -153,6 +153,8 @@ fn add_contributor(
     contributors: &mut Vec<ComplexityContributor>,
     kind: ContributorKind,
     span: Span,
+    end_line: usize,
+    nesting_depth: u32,
     increment: u32,
 ) {
     contributors.push(ComplexityContributor {
@@ -160,7 +162,17 @@ fn add_contributor(
         line: span.start().line,
         column: Some(span.start().column as u32),
         increment,
+        end_line,
+        nesting_depth,
     });
+}
+
+/// 1-based inclusive end line of a construct's full span. Used by the
+/// walker to record `end_line` for compound contributors (`if`, `match`,
+/// loop variants) so domain helpers can ask "does this contributor cover
+/// line N" when building the nesting hierarchy.
+fn end_line_of(item: &impl Spanned) -> usize {
+    item.span().end().line
 }
 
 fn span_of(item: &impl syn::spanned::Spanned) -> SourceSpan {
@@ -243,6 +255,8 @@ fn count_cognitive_stmt(
                         contributors,
                         ContributorKind::LetElse,
                         else_token.span,
+                        end_line_of(diverge.as_ref()),
+                        nesting,
                         1 + nesting,
                     );
                     total += 1 + nesting;
@@ -267,6 +281,8 @@ fn count_cognitive_expr(
                 contributors,
                 ContributorKind::Match,
                 expr_match.match_token.span,
+                end_line_of(expr_match),
+                nesting,
                 1 + nesting,
             );
             let mut total = 1 + nesting; // +1 structural, +nesting
@@ -284,6 +300,8 @@ fn count_cognitive_expr(
                 contributors,
                 ContributorKind::WhileLoop,
                 expr_while.while_token.span,
+                end_line_of(expr_while),
+                nesting,
                 1 + nesting,
             );
             let mut total = 1 + nesting;
@@ -296,6 +314,8 @@ fn count_cognitive_expr(
                 contributors,
                 ContributorKind::ForLoop,
                 expr_for.for_token.span,
+                end_line_of(expr_for),
+                nesting,
                 1 + nesting,
             );
             let mut total = 1 + nesting;
@@ -308,6 +328,8 @@ fn count_cognitive_expr(
                 contributors,
                 ContributorKind::Loop,
                 expr_loop.loop_token.span,
+                end_line_of(expr_loop),
+                nesting,
                 1 + nesting,
             );
             let mut total = 1 + nesting;
@@ -318,7 +340,7 @@ fn count_cognitive_expr(
             // count_cognitive_binary_chain handles all &&/|| operators in the tree.
             // count_cognitive_binary_operands walks the non-binary leaves so that
             // constructs like `?`, `if`, etc. inside binary expressions are also counted.
-            count_cognitive_binary_chain(bin, contributors)
+            count_cognitive_binary_chain(bin, nesting, contributors)
                 + count_cognitive_binary_operands(&bin.left, nesting, contributors)
                 + count_cognitive_binary_operands(&bin.right, nesting, contributors)
         }
@@ -327,6 +349,8 @@ fn count_cognitive_expr(
                 contributors,
                 ContributorKind::Try,
                 expr_try.question_token.span,
+                expr_try.question_token.span.end().line,
+                nesting,
                 1,
             );
             1 + count_cognitive_expr(&expr_try.expr, nesting, contributors)
@@ -336,6 +360,8 @@ fn count_cognitive_expr(
                 contributors,
                 ContributorKind::Break,
                 expr_break.break_token.span,
+                expr_break.break_token.span.end().line,
+                nesting,
                 1,
             );
             1
@@ -345,6 +371,8 @@ fn count_cognitive_expr(
                 contributors,
                 ContributorKind::Continue,
                 expr_continue.continue_token.span,
+                expr_continue.continue_token.span.end().line,
+                nesting,
                 1,
             );
             1
@@ -399,6 +427,8 @@ fn count_cognitive_if(
         contributors,
         ContributorKind::IfBranch,
         expr_if.if_token.span,
+        end_line_of(expr_if),
+        nesting,
         1 + nesting,
     );
     let mut total = 1 + nesting;
@@ -418,6 +448,8 @@ fn count_cognitive_if(
                     contributors,
                     ContributorKind::IfBranch,
                     else_if.if_token.span,
+                    end_line_of(else_if),
+                    nesting,
                     1,
                 );
                 total += 1;
@@ -452,6 +484,8 @@ fn count_cognitive_else(
                 contributors,
                 ContributorKind::IfBranch,
                 else_if.if_token.span,
+                end_line_of(else_if),
+                nesting,
                 1,
             );
             let mut total = 1;
@@ -474,6 +508,7 @@ fn count_cognitive_else(
 /// Same-operator sequences count as +1 total; operator switches add +1 each.
 fn count_cognitive_binary_chain(
     bin: &ExprBinary,
+    nesting: u32,
     contributors: &mut Vec<ComplexityContributor>,
 ) -> u32 {
     let ops = flatten_binary_ops(bin);
@@ -488,7 +523,14 @@ fn count_cognitive_binary_chain(
         match op {
             BoolOp::And | BoolOp::Or => {
                 if last_is_logical != Some(*op) {
-                    add_contributor(contributors, ContributorKind::LogicalOperator, *span, 1);
+                    add_contributor(
+                        contributors,
+                        ContributorKind::LogicalOperator,
+                        *span,
+                        span.end().line,
+                        nesting,
+                        1,
+                    );
                     total += 1; // New sequence or operator switch
                 }
                 last_is_logical = Some(*op);
@@ -576,6 +618,7 @@ fn count_cyclomatic_block(
 struct CyclomaticCounter<'a> {
     contributors: &'a mut Vec<ComplexityContributor>,
     total: u32,
+    nesting: u32,
 }
 
 impl<'a> CyclomaticCounter<'a> {
@@ -583,14 +626,28 @@ impl<'a> CyclomaticCounter<'a> {
         let mut counter = Self {
             contributors,
             total: 0,
+            nesting: 0,
         };
         counter.visit_block(block);
         counter.total
     }
 
-    fn bump(&mut self, kind: ContributorKind, span: Span, increment: u32) {
-        add_contributor(self.contributors, kind, span, increment);
+    fn bump(&mut self, kind: ContributorKind, span: Span, end_line: usize, increment: u32) {
+        add_contributor(
+            self.contributors,
+            kind,
+            span,
+            end_line,
+            self.nesting,
+            increment,
+        );
         self.total += increment;
+    }
+
+    fn with_nesting<F: FnOnce(&mut Self)>(&mut self, f: F) {
+        self.nesting += 1;
+        f(self);
+        self.nesting -= 1;
     }
 }
 
@@ -610,28 +667,50 @@ impl<'ast> Visit<'ast> for CyclomaticCounter<'_> {
 
         self.visit_expr(&init.expr);
         if let Some((else_token, diverge)) = &init.diverge {
-            self.bump(ContributorKind::LetElse, else_token.span, 1);
-            self.visit_expr(diverge);
+            self.bump(
+                ContributorKind::LetElse,
+                else_token.span,
+                end_line_of(diverge.as_ref()),
+                1,
+            );
+            self.with_nesting(|s| s.visit_expr(diverge));
         }
     }
 
     fn visit_expr_if(&mut self, expr_if: &'ast syn::ExprIf) {
-        self.bump(ContributorKind::IfBranch, expr_if.if_token.span, 1);
+        self.bump(
+            ContributorKind::IfBranch,
+            expr_if.if_token.span,
+            end_line_of(expr_if),
+            1,
+        );
         self.visit_expr(&expr_if.cond);
-        self.visit_block(&expr_if.then_branch);
+        self.with_nesting(|s| s.visit_block(&expr_if.then_branch));
         if let Some((_, else_branch)) = &expr_if.else_branch {
-            self.visit_expr(else_branch);
+            match else_branch.as_ref() {
+                // `else if` continues the chain at the same nesting level (matches
+                // cognitive's `count_cognitive_else` which does not bump nesting
+                // for the else-if construct itself, only for its body).
+                Expr::If(_) => self.visit_expr(else_branch),
+                // `else { ... }` opens a new block at +1 nesting.
+                _ => self.with_nesting(|s| s.visit_expr(else_branch)),
+            }
         }
     }
 
     fn visit_expr_match(&mut self, expr_match: &'ast syn::ExprMatch) {
         for arm in expr_match.arms.iter().skip(1) {
-            self.bump(ContributorKind::MatchArm, arm.pat.span(), 1);
+            self.bump(
+                ContributorKind::MatchArm,
+                arm.pat.span(),
+                end_line_of(arm),
+                1,
+            );
         }
 
         self.visit_expr(&expr_match.expr);
         for arm in &expr_match.arms {
-            self.visit_arm(arm);
+            self.with_nesting(|s| s.visit_arm(arm));
         }
     }
 
@@ -643,41 +722,63 @@ impl<'ast> Visit<'ast> for CyclomaticCounter<'_> {
     }
 
     fn visit_expr_while(&mut self, expr_while: &'ast syn::ExprWhile) {
-        self.bump(ContributorKind::WhileLoop, expr_while.while_token.span, 1);
+        self.bump(
+            ContributorKind::WhileLoop,
+            expr_while.while_token.span,
+            end_line_of(expr_while),
+            1,
+        );
         self.visit_expr(&expr_while.cond);
-        self.visit_block(&expr_while.body);
+        self.with_nesting(|s| s.visit_block(&expr_while.body));
     }
 
     fn visit_expr_for_loop(&mut self, expr_for: &'ast syn::ExprForLoop) {
-        self.bump(ContributorKind::ForLoop, expr_for.for_token.span, 1);
+        self.bump(
+            ContributorKind::ForLoop,
+            expr_for.for_token.span,
+            end_line_of(expr_for),
+            1,
+        );
         self.visit_expr(&expr_for.expr);
-        self.visit_block(&expr_for.body);
+        self.with_nesting(|s| s.visit_block(&expr_for.body));
     }
 
     fn visit_expr_loop(&mut self, expr_loop: &'ast syn::ExprLoop) {
-        self.bump(ContributorKind::Loop, expr_loop.loop_token.span, 1);
-        self.visit_block(&expr_loop.body);
+        self.bump(
+            ContributorKind::Loop,
+            expr_loop.loop_token.span,
+            end_line_of(expr_loop),
+            1,
+        );
+        self.with_nesting(|s| s.visit_block(&expr_loop.body));
     }
 
     fn visit_expr_binary(&mut self, expr_binary: &'ast syn::ExprBinary) {
         if matches!(expr_binary.op, syn::BinOp::And(_) | syn::BinOp::Or(_)) {
-            self.bump(
-                ContributorKind::LogicalOperator,
-                binop_span(&expr_binary.op),
-                1,
-            );
+            let span = binop_span(&expr_binary.op);
+            self.bump(ContributorKind::LogicalOperator, span, span.end().line, 1);
         }
         self.visit_expr(&expr_binary.left);
         self.visit_expr(&expr_binary.right);
     }
 
     fn visit_expr_try(&mut self, expr_try: &'ast syn::ExprTry) {
-        self.bump(ContributorKind::Try, expr_try.question_token.span, 1);
+        self.bump(
+            ContributorKind::Try,
+            expr_try.question_token.span,
+            expr_try.question_token.span.end().line,
+            1,
+        );
         self.visit_expr(&expr_try.expr);
     }
 
     fn visit_expr_break(&mut self, expr_break: &'ast syn::ExprBreak) {
-        self.bump(ContributorKind::Break, expr_break.break_token.span, 1);
+        self.bump(
+            ContributorKind::Break,
+            expr_break.break_token.span,
+            expr_break.break_token.span.end().line,
+            1,
+        );
         if let Some(expr) = &expr_break.expr {
             self.visit_expr(expr);
         }
@@ -687,8 +788,16 @@ impl<'ast> Visit<'ast> for CyclomaticCounter<'_> {
         self.bump(
             ContributorKind::Continue,
             expr_continue.continue_token.span,
+            expr_continue.continue_token.span.end().line,
             1,
         );
+    }
+
+    fn visit_expr_closure(&mut self, expr_closure: &'ast syn::ExprClosure) {
+        // Closures count as deeper nesting for any constructs in their body
+        // (mirrors `count_cognitive_expr`'s `Expr::Closure` branch which
+        // recurses with `nesting + 1`).
+        self.with_nesting(|s| s.visit_expr(&expr_closure.body));
     }
 }
 
@@ -1416,6 +1525,133 @@ mod contributor_tests {
             f.contributors.is_empty(),
             "Closure with no branches should have no contributors, got: {:?}",
             f.contributors
+        );
+    }
+
+    // ── end_line + nesting_depth ───────────────────────────────────────
+
+    #[test]
+    fn nested_if_records_construct_end_line_and_nesting_depth_cognitive() {
+        // contributors_fixture.rs::nested_if_fn spans lines 16..26 (inclusive).
+        // Outer `if x > 0` opens at line 17, closes at line 25. Inner
+        // `if y > 0` opens at line 18, closes at line 22. The walker
+        // records `end_line` from the full construct span so
+        // `extract_split_candidates` can ask "does this contributor cover
+        // line N" when reconstructing the nesting hierarchy.
+        let cs = contributors_for("nested_if_fn", ComplexityMetric::Cognitive);
+        assert_eq!(cs.len(), 2, "two if-branches expected");
+        let outer = &cs[0]; // sorted ascending by line
+        let inner = &cs[1];
+
+        assert_eq!(outer.nesting_depth, 0, "outer `if` is top-level");
+        assert_eq!(inner.nesting_depth, 1, "inner `if` is nested under outer");
+        assert!(
+            outer.end_line > outer.line,
+            "outer `if` is multi-line: line={} end_line={}",
+            outer.line,
+            outer.end_line
+        );
+        assert!(
+            outer.end_line >= inner.end_line,
+            "outer's range [{}, {}] must enclose inner's [{}, {}]",
+            outer.line,
+            outer.end_line,
+            inner.line,
+            inner.end_line,
+        );
+    }
+
+    #[test]
+    fn try_records_token_span_for_atomic_contributor() {
+        // `?` is a single-token contributor — `end_line == line`.
+        let cs = contributors_for("try_fn", ComplexityMetric::Cognitive);
+        assert_eq!(cs.len(), 1);
+        let try_c = &cs[0];
+        assert_eq!(try_c.kind, ContributorKind::Try);
+        assert_eq!(
+            try_c.end_line, try_c.line,
+            "atomic constructs have end_line == line"
+        );
+        assert_eq!(try_c.nesting_depth, 0);
+    }
+
+    #[test]
+    fn for_with_continue_threads_nesting_depth_cognitive() {
+        // for(nesting=0) { if(nesting=1) { continue(nesting=2); } }
+        let cs = contributors_for("for_with_continue_fn", ComplexityMetric::Cognitive);
+        let for_c = cs
+            .iter()
+            .find(|c| c.kind == ContributorKind::ForLoop)
+            .expect("ForLoop contributor missing");
+        let if_c = cs
+            .iter()
+            .find(|c| c.kind == ContributorKind::IfBranch)
+            .expect("IfBranch contributor missing");
+        let cont_c = cs
+            .iter()
+            .find(|c| c.kind == ContributorKind::Continue)
+            .expect("Continue contributor missing");
+
+        assert_eq!(for_c.nesting_depth, 0);
+        assert_eq!(if_c.nesting_depth, 1);
+        assert_eq!(cont_c.nesting_depth, 2);
+    }
+
+    #[test]
+    fn nested_if_records_nesting_depth_cyclomatic() {
+        // Cyclomatic must thread nesting_depth identically to cognitive so
+        // domain helpers can run on either metric's contributor list.
+        let cs = contributors_for("nested_if_fn", ComplexityMetric::Cyclomatic);
+        let mut ifs: Vec<_> = cs
+            .iter()
+            .filter(|c| c.kind == ContributorKind::IfBranch)
+            .collect();
+        ifs.sort_by_key(|c| c.line);
+        assert_eq!(ifs.len(), 2);
+        assert_eq!(ifs[0].nesting_depth, 0);
+        assert_eq!(ifs[1].nesting_depth, 1);
+        assert!(
+            ifs[0].end_line > ifs[0].line,
+            "cyclomatic if also records full construct span"
+        );
+    }
+
+    #[test]
+    fn for_with_continue_records_nesting_depth_cyclomatic() {
+        let cs = contributors_for("for_with_continue_fn", ComplexityMetric::Cyclomatic);
+        let for_c = cs
+            .iter()
+            .find(|c| c.kind == ContributorKind::ForLoop)
+            .unwrap();
+        let if_c = cs
+            .iter()
+            .find(|c| c.kind == ContributorKind::IfBranch)
+            .unwrap();
+        let cont_c = cs
+            .iter()
+            .find(|c| c.kind == ContributorKind::Continue)
+            .unwrap();
+        assert_eq!(for_c.nesting_depth, 0);
+        assert_eq!(if_c.nesting_depth, 1);
+        assert_eq!(cont_c.nesting_depth, 2);
+    }
+
+    #[test]
+    fn match_records_end_line_covering_arms_cognitive() {
+        // contributors_fixture.rs::match_fn spans lines 28..35 — the Match
+        // contributor's end_line should reach the closing `}` of the
+        // match expression, not just the `match` keyword.
+        let cs = contributors_for("match_fn", ComplexityMetric::Cognitive);
+        let match_c = cs
+            .iter()
+            .find(|c| c.kind == ContributorKind::Match)
+            .expect("Match contributor missing");
+        assert_eq!(match_c.nesting_depth, 0);
+        assert!(
+            match_c.end_line > match_c.line,
+            "match end_line must cover arms: line={} end_line={}",
+            match_c.line,
+            match_c.end_line
         );
     }
 

@@ -12,12 +12,13 @@ use crate::adapters::complexity::SynComplexityAdapter;
 use crate::adapters::coverage::LcovParser;
 use crate::adapters::diff::GitDiffAdapter;
 use crate::domain::crap::compute_crap;
+use crate::domain::diagnostic::compute_diagnostic;
 use crate::domain::matching::{match_functions, overlaps_any};
 use crate::domain::summary::compute_summary;
 use crate::domain::threshold::ThresholdConfig;
 use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, ComplexityMetric, CoverageMetric, FileChangeKind,
-    FunctionComplexity, FunctionVerdict, ScoredFunction,
+    FunctionComplexity, FunctionVerdict, LineCoverage, ScoredFunction,
 };
 use crate::ports::{ComplexityPort, CoveragePort, DiffPort, ParseOutput};
 
@@ -40,6 +41,12 @@ pub struct AnalyzeOptions {
     pub respect_gitignore: bool,
     /// Git ref to diff against. When set, only changed functions are analyzed.
     pub diff_ref: Option<String>,
+    /// When `true`, populate `FunctionVerdict.diagnostic` for every
+    /// over-threshold verdict via `domain::diagnostic::compute_diagnostic`.
+    /// CLI sets this for `--format advice` and `--format sarif`. The
+    /// computation is pure-domain and bounded — runs only on exceeding
+    /// verdicts, so the cost scales with violations, not total functions.
+    pub compute_diagnostics: bool,
 }
 
 /// Full output from an analysis run, including both the scored results
@@ -71,6 +78,7 @@ impl Default for AnalyzeOptions {
             exclude: Vec::new(),
             respect_gitignore: true,
             diff_ref: None,
+            compute_diagnostics: false,
         }
     }
 }
@@ -130,7 +138,15 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     let resolver = ThresholdResolver::new(&options.threshold_config)?;
 
     // 6. Score each function, produce verdicts, and build result
-    let result = score_and_summarize(&matched, &resolver)?;
+    let mut result = score_and_summarize(&matched, &resolver)?;
+
+    // 7. Populate `Diagnostic` for over-threshold verdicts when the
+    //    caller opts in. Pure-domain, runs only on exceeding verdicts.
+    populate_diagnostics(
+        &mut result.functions,
+        &parse_output.coverage,
+        options.compute_diagnostics,
+    );
 
     let (files_analyzed, files_zero_coverage) = compute_file_coverage_stats(&result);
 
@@ -397,6 +413,30 @@ fn score_and_summarize(
     })
 }
 
+/// Populate `verdict.diagnostic` for every over-threshold verdict.
+/// `compute_diagnostic` returns `None` for passing verdicts, so the
+/// existing `skip_serializing_if = "Option::is_none"` keeps the JSON
+/// envelope clean for them.
+fn populate_diagnostics(
+    verdicts: &mut [FunctionVerdict],
+    coverage: &std::collections::HashMap<String, Vec<LineCoverage>>,
+    enabled: bool,
+) {
+    if !enabled {
+        return;
+    }
+    for verdict in verdicts.iter_mut() {
+        if !verdict.exceeds {
+            continue;
+        }
+        let lines = coverage
+            .get(&verdict.scored.identity.file_path)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        verdict.diagnostic = compute_diagnostic(verdict, lines).map(Box::new);
+    }
+}
+
 /// Find the git repository root by running `git rev-parse --show-toplevel`.
 /// Strip `src_root` prefix from a path, returning a forward-slash-normalised string.
 /// Panics if the path is not under `src_root` (a bug in the file walker).
@@ -588,6 +628,8 @@ pub fn with_branch(x: i32) -> &'static str {
             line: 5,
             column: Some(4),
             increment: 1,
+            end_line: 5,
+            nesting_depth: 0,
         };
         let comp = crate::domain::types::FunctionComplexity {
             identity: crate::domain::types::FunctionIdentity {

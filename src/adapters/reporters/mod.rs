@@ -1,11 +1,13 @@
 //! Output reporters — terminal table and JSON.
 
+pub mod advice_summary;
 pub mod csv;
 pub mod json;
 pub mod markdown;
 pub mod sarif;
 pub mod table;
 
+pub use advice_summary::render_summary as render_advice_summary;
 pub use csv::format_csv;
 pub use json::{JsonConfig, format_json};
 pub use markdown::format_markdown;

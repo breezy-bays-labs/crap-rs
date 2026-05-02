@@ -572,12 +572,16 @@ mod tests {
                 line: 5,
                 column: Some(4),
                 increment: 1,
+                end_line: 5,
+                nesting_depth: 0,
             },
             ComplexityContributor {
                 kind: ContributorKind::ForLoop,
                 line: 10,
                 column: Some(4),
                 increment: 2,
+                end_line: 10,
+                nesting_depth: 1,
             },
         ]
     }
@@ -589,6 +593,8 @@ mod tests {
             line: 3,
             column: Some(4),
             increment: 3,
+            end_line: 3,
+            nesting_depth: 2,
         }]
     }
 
@@ -810,6 +816,8 @@ mod tests {
                 line: 3,
                 column: Some(4),
                 increment: 1,
+                end_line: 3,
+                nesting_depth: 0,
             }],
         );
         let result = AnalysisResult {
@@ -843,12 +851,16 @@ mod tests {
                     line: 5,
                     column: Some(4),
                     increment: 1,
+                    end_line: 5,
+                    nesting_depth: 0,
                 },
                 ComplexityContributor {
                     kind: ContributorKind::ForLoop,
                     line: 20,
                     column: Some(4),
                     increment: 1,
+                    end_line: 20,
+                    nesting_depth: 0,
                 },
             ],
         );
@@ -882,6 +894,8 @@ mod tests {
                 line: 3,
                 column: Some(4),
                 increment: 1,
+                end_line: 3,
+                nesting_depth: 0,
             }],
         );
         let v2 = make_verdict_with_contributors(
@@ -899,6 +913,8 @@ mod tests {
                 line: 7,
                 column: Some(4),
                 increment: 1,
+                end_line: 7,
+                nesting_depth: 0,
             }],
         );
         let result = AnalysisResult {
@@ -947,6 +963,8 @@ mod tests {
                 line: 3,
                 column: Some(4),
                 increment: 1,
+                end_line: 3,
+                nesting_depth: 0,
             }],
         );
         let result = AnalysisResult {
@@ -1370,6 +1388,8 @@ mod proptests {
                 line,
                 column: None,
                 increment,
+                end_line: line,
+                nesting_depth: 0,
             })
     }
 

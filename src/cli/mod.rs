@@ -59,6 +59,8 @@ pub enum FormatArg {
     Csv,
     /// SARIF v2.1.0 — for GitHub Code Scanning (upload-sarif@v3)
     Sarif,
+    /// Agent-oriented JSON with Diagnostic remediation hints (experimental)
+    Advice,
 }
 
 /// Sort key for the displayed view (issue #68).
@@ -626,6 +628,7 @@ fn run_inner() -> Result<bool> {
         exclude: effective_exclude,
         respect_gitignore: !cli.filter.no_gitignore,
         diff_ref: cli.filter.diff.clone(),
+        compute_diagnostics: matches!(cli.output.format, FormatArg::Advice | FormatArg::Sarif),
         ..AnalyzeOptions::default()
     };
 
@@ -672,7 +675,7 @@ fn run_inner() -> Result<bool> {
                 cli.display.breakdown,
                 cli.display.explain,
             ),
-            FormatArg::Json => {
+            FormatArg::Json | FormatArg::Advice => {
                 let delta_ctx = delta_state
                     .as_ref()
                     .zip(delta_view.as_ref())
@@ -712,6 +715,13 @@ fn run_inner() -> Result<bool> {
             FormatArg::Sarif => reporters::format_sarif(&view, env!("CARGO_PKG_VERSION")),
         };
         print!("{output}");
+
+        // SARIF's primary deliverable is the `.sarif` file uploaded to
+        // Code Scanning; stderr lines would noise up CI logs.
+        if matches!(cli.output.format, FormatArg::Advice) {
+            let mut stderr = std::io::stderr();
+            let _ = reporters::render_advice_summary(&view, &mut stderr);
+        }
     }
 
     // Exit code derives from `view.full.passed` — i.e., the underlying

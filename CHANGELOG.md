@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--format advice`** (experimental, schema_version=1) emits AST-derived
+  remediation hints alongside the standard JSON envelope: a per-function
+  `Diagnostic` with `coverage_gaps`, `complexity_drivers`,
+  `suggested_actions` (`AddTestsForLines`, `ExtractFunction`,
+  `SimplifyBranching`, `AcceptInherentComplexity`), and a flat
+  `root_cause` scalar. A grep-friendly summary line per over-threshold
+  function is written to stderr. Schema stabilises at v0.4.0. Closes #76.
+- **SARIF `result.properties.diagnostic`** — when `--format sarif` is
+  used, every result for an over-threshold verdict carries the same
+  diagnostic shape as `--format advice` so GitHub Code Scanning
+  consumers and the `/cut-the-crap` agent skill (#77) can read identical
+  advice from either entry point. SARIF output stays byte-identical for
+  runs without diagnostics.
+
+### Changed
+- `domain::types::ComplexityContributor` now records `end_line` and
+  `nesting_depth` so domain helpers can answer span/nesting questions
+  without re-walking the AST. Both fields default to `0` for
+  forward-compat with older payloads.
+
 ## [0.3.0] - 2026-04-27
 
 The SARIF + API hardening milestone. Three breaking-but-paid-once changes

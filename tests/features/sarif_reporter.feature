@@ -123,3 +123,36 @@ Feature: SARIF reporter (issue #70)
       string "{file_path}:{qualified_name}"
     And running the same command twice produces byte-identical SARIF
       (no timestamp, no run-scoped IDs)
+
+  # ── Diagnostic enrichment (issue #76) ──────────────────────────────
+
+  Scenario: result.properties.diagnostic populated when Diagnostic is computed
+    Given exceeding functions exist
+    When the operator runs `crap4rs --coverage lcov.info --format sarif`
+    Then every `runs[0].results[].properties.diagnostic` carries the
+      same `coverage_gaps`, `complexity_drivers`, `suggested_actions`,
+      and `root_cause` fields the JSON envelope's
+      `view.shown[].diagnostic` would carry under
+      `crap4rs --format advice`
+
+  Scenario: properties.diagnostic mirrors the advice wire shape
+    Given an exceeding function whose `Diagnostic` contains an
+      `extract_function` action with two `candidates[]`
+    When the operator runs `crap4rs --coverage lcov.info --format sarif`
+    Then the SARIF result for that function has
+      `properties.diagnostic.suggested_actions[]` with `kind`
+      "extract_function" and a non-empty `candidates[]`
+    And exactly one `candidates[].recommended` is true
+
+  Scenario: --format sarif does NOT emit the stderr advice summary
+    Given exceeding functions exist
+    When the operator runs `crap4rs --coverage lcov.info --format sarif`
+    Then stderr contains no per-function summary lines
+      (the stderr summary fires only on `--format advice`)
+
+  Scenario: SARIF determinism preserved with diagnostic enrichment
+    Given the same coverage file across two runs
+    When the operator runs `crap4rs --coverage lcov.info --format sarif`
+      twice
+    Then both `.sarif` outputs are byte-identical, including the
+      `properties.diagnostic` block on every result
