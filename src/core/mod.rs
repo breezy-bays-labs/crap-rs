@@ -142,9 +142,11 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
 
     // 7. Populate `Diagnostic` for over-threshold verdicts when the
     //    caller opts in. Pure-domain, runs only on exceeding verdicts.
-    if options.compute_diagnostics {
-        populate_diagnostics(&mut result.functions, &parse_output.coverage);
-    }
+    populate_diagnostics(
+        &mut result.functions,
+        &parse_output.coverage,
+        options.compute_diagnostics,
+    );
 
     let (files_analyzed, files_zero_coverage) = compute_file_coverage_stats(&result);
 
@@ -418,7 +420,11 @@ fn score_and_summarize(
 fn populate_diagnostics(
     verdicts: &mut [FunctionVerdict],
     coverage: &std::collections::HashMap<String, Vec<LineCoverage>>,
+    enabled: bool,
 ) {
+    if !enabled {
+        return;
+    }
     for verdict in verdicts.iter_mut() {
         if !verdict.exceeds {
             continue;
