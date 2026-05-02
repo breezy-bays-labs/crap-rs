@@ -536,12 +536,16 @@ mod tests {
                     line: 12,
                     column: None,
                     increment: 1,
+                    end_line: 12,
+                    nesting_depth: 0,
                 },
                 ComplexityContributor {
                     kind: ContributorKind::Match,
                     line: 18,
                     column: None,
                     increment: 2, // nested → triggers legend
+                    end_line: 18,
+                    nesting_depth: 1,
                 },
             ],
         );
@@ -586,12 +590,16 @@ mod tests {
                     line: 5,
                     column: Some(4),
                     increment: 1,
+                    end_line: 5,
+                    nesting_depth: 0,
                 },
                 ComplexityContributor {
                     kind: ContributorKind::ForLoop,
                     line: 10,
                     column: Some(4),
                     increment: 2,
+                    end_line: 10,
+                    nesting_depth: 1,
                 },
             ],
         );

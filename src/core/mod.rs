@@ -588,6 +588,8 @@ pub fn with_branch(x: i32) -> &'static str {
             line: 5,
             column: Some(4),
             increment: 1,
+            end_line: 5,
+            nesting_depth: 0,
         };
         let comp = crate::domain::types::FunctionComplexity {
             identity: crate::domain::types::FunctionIdentity {

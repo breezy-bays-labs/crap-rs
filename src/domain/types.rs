@@ -90,17 +90,33 @@ impl fmt::Display for ContributorKind {
 }
 
 /// A single construct that contributed to a function's complexity score.
+///
+/// `end_line` and `nesting_depth` are populated by walkers that have access
+/// to AST structure; deserialization tolerates older payloads via
+/// `#[serde(default)]` (missing → `0`). Reporters and helpers that consume
+/// these fields treat `end_line == 0` as "use `line` instead", since a
+/// real source position is always >= 1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ComplexityContributor {
     pub kind: ContributorKind,
-    /// 1-based line number of the construct.
+    /// 1-based line number of the construct's start (or signal token).
     pub line: usize,
     /// 0-based column offset from syn Span, if available.
     pub column: Option<u32>,
     /// How much this contributor added to the total.
     /// Cognitive: `1 + nesting_depth`. Cyclomatic: always 1.
     pub increment: u32,
+    /// 1-based inclusive end line of the construct. For atomic constructs
+    /// (`?`, `break`, `continue`, single logical operator), equals `line`.
+    /// For compound constructs (`if`, `match`, `for`, etc.), covers the
+    /// full span including bodies.
+    #[serde(default)]
+    pub end_line: usize,
+    /// How deeply this construct is nested under other complexity-bearing
+    /// constructs (0 = top-level statement of the function body).
+    #[serde(default)]
+    pub nesting_depth: u32,
 }
 
 // ── Complexity Metric ────────────────────────────────────────────────
@@ -488,11 +504,15 @@ mod contributor_tests {
             line: 42,
             column: Some(4),
             increment: 2,
+            end_line: 50,
+            nesting_depth: 1,
         };
         assert_eq!(c.kind, ContributorKind::Match);
         assert_eq!(c.line, 42);
         assert_eq!(c.column, Some(4));
         assert_eq!(c.increment, 2);
+        assert_eq!(c.end_line, 50);
+        assert_eq!(c.nesting_depth, 1);
     }
 
     #[test]
@@ -502,9 +522,30 @@ mod contributor_tests {
             line: 10,
             column: None,
             increment: 1,
+            end_line: 10,
+            nesting_depth: 2,
         };
         assert!(c.column.is_none());
         assert_eq!(c.increment, 1);
+        assert_eq!(c.nesting_depth, 2);
+    }
+
+    #[test]
+    fn complexity_contributor_deserializes_without_new_fields() {
+        // Pins the additive convention: older v0.3.0 JSON payloads (which did
+        // not carry `end_line` / `nesting_depth`) must still deserialize so
+        // schema_version=1 stays compatible across the v0.3.x series.
+        let json = r#"{
+            "kind": "if-branch",
+            "line": 7,
+            "column": null,
+            "increment": 1
+        }"#;
+        let parsed: ComplexityContributor = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.kind, ContributorKind::IfBranch);
+        assert_eq!(parsed.line, 7);
+        assert_eq!(parsed.end_line, 0); // sentinel = "unknown / fall back to line"
+        assert_eq!(parsed.nesting_depth, 0);
     }
 }
 
