@@ -281,34 +281,20 @@ pub struct FunctionVerdict {
     /// Structured remediation hint, populated by `--format advice` (#76)
     /// and consumed by the `/cut-the-crap` agent skill (#77). `None` for
     /// default invocations; reporters render it when present.
+    ///
+    /// Boxed so that `FunctionVerdict` (and `FunctionChange::Modified`,
+    /// which carries two of them) stay small — most verdicts have no
+    /// diagnostic, and the boxed pointer keeps `Option<…>` at 8 bytes.
+    /// `Box<T>` is transparent to serde, so the JSON shape is unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub diagnostic: Option<Diagnostic>,
+    pub diagnostic: Option<Box<Diagnostic>>,
 }
 
-/// Structured remediation hint attached to a verdict.
-///
-/// Placeholder for #82 — populated by #76 (`--format advice`) and consumed
-/// by the `/cut-the-crap` reference skill (#77). Fields are intentionally
-/// minimal in v0.3.0; #76 widens them additively under `#[non_exhaustive]`.
-///
-/// Derives `Default` so external consumers can build a `Diagnostic` and
-/// spread it via the `..` rest pattern even though it is `#[non_exhaustive]`.
-/// The default `summary` is the empty string, matching the "no advice yet"
-/// shape that v0.3.0 ships with.
-///
-/// Carries type-level `#[serde(default)]` so deserialization stays
-/// forward-compatible as #76 grows the type: any new field added under
-/// `#[non_exhaustive]` will fall back to its `Default` value when missing
-/// from older JSON payloads, instead of failing the deserialize. This is
-/// the type-level analogue of the per-field `#[serde(default)]` discipline
-/// `AnalysisSummary` uses on its additive fields.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct Diagnostic {
-    /// Single-line headline (e.g., "complexity is the driver — extract decision branches").
-    pub summary: String,
-}
+// `Diagnostic` is defined in `crate::domain::diagnostic` (issue #76 V2).
+// Re-export here so existing imports of `domain::types::Diagnostic` keep
+// resolving — `FunctionVerdict.diagnostic` and reporter call sites continue
+// to compile unchanged.
+pub use crate::domain::diagnostic::Diagnostic;
 
 // ── Analysis Results ────────────────────────────────────────────────
 
@@ -616,25 +602,7 @@ mod tests {
         assert_eq!(CoverageMetric::default(), CoverageMetric::Line);
     }
 
-    #[test]
-    fn diagnostic_deserializes_empty_object_to_default() {
-        // Pins the type-level `#[serde(default)]` convention: future
-        // additive fields must be tolerated as missing-from-payload, so
-        // `{}` round-trips through `Diagnostic::default()`. If a future
-        // diff drops the annotation or adds a non-Default field, this
-        // test fails before the regression reaches downstream consumers.
-        let parsed: Diagnostic = serde_json::from_str("{}").unwrap();
-        assert_eq!(parsed, Diagnostic::default());
-        assert_eq!(parsed.summary, "");
-    }
-
-    #[test]
-    fn diagnostic_round_trips_summary() {
-        let original = Diagnostic {
-            summary: "extract decision branches".to_string(),
-        };
-        let json = serde_json::to_string(&original).unwrap();
-        let parsed: Diagnostic = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, original);
-    }
+    // The `Diagnostic` placeholder that lived here in v0.3.0 has moved to
+    // `crate::domain::diagnostic` (issue #76 V2). Round-trip + default tests
+    // for the full Shape C type live alongside that module.
 }
