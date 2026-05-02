@@ -188,7 +188,7 @@ The shaping flags `--delta-top`, `--delta-sort` (`score-delta` (default) | `curr
 
 A grep-friendly stderr summary streams alongside stdout — one line per over-threshold function in `view.shown[]` order:
 
-```
+```text
 [crap=56.00] src/lib.rs:5-21 branchy_fail [actions: add_tests_for_lines,extract_function]
 ```
 

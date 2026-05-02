@@ -381,11 +381,11 @@ fn sarif_properties_diagnostic_shape_matches_advice_format() {
 
     let mut sarif_diags: HashMap<String, serde_json::Value> = HashMap::new();
     for r in sarif["runs"][0]["results"].as_array().unwrap() {
-        let fp = r["partialFingerprints"]["functionIdentity"]
+        let key = r["partialFingerprints"]["functionIdentity"]
             .as_str()
-            .unwrap();
-        let qn = fp.split(':').next_back().unwrap().to_string();
-        sarif_diags.insert(qn, r["properties"]["diagnostic"].clone());
+            .unwrap()
+            .to_string();
+        sarif_diags.insert(key, r["properties"]["diagnostic"].clone());
     }
 
     let mut advice_diags: HashMap<String, serde_json::Value> = HashMap::new();
@@ -393,11 +393,9 @@ fn sarif_properties_diagnostic_shape_matches_advice_format() {
         if !v["exceeds"].as_bool().unwrap_or(false) {
             continue;
         }
-        let qn = v["scored"]["identity"]["qualified_name"]
-            .as_str()
-            .unwrap()
-            .to_string();
-        advice_diags.insert(qn, v["diagnostic"].clone());
+        let file = v["scored"]["identity"]["file_path"].as_str().unwrap();
+        let qn = v["scored"]["identity"]["qualified_name"].as_str().unwrap();
+        advice_diags.insert(format!("{file}:{qn}"), v["diagnostic"].clone());
     }
 
     assert!(!sarif_diags.is_empty());

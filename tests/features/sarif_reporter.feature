@@ -137,12 +137,12 @@ Feature: SARIF reporter (issue #70)
 
   Scenario: properties.diagnostic mirrors the advice wire shape
     Given an exceeding function whose `Diagnostic` contains an
-      `extract_function` action with two `proposed_splits[]`
+      `extract_function` action with two `candidates[]`
     When the operator runs `crap4rs --coverage lcov.info --format sarif`
     Then the SARIF result for that function has
       `properties.diagnostic.suggested_actions[]` with `kind`
-      "extract_function" and a non-empty `candidates: Vec<ProposedSplit>`
-    And exactly one `candidates[].recommended` is "true"
+      "extract_function" and a non-empty `candidates[]`
+    And exactly one `candidates[].recommended` is true
 
   Scenario: --format sarif does NOT emit the stderr advice summary
     Given exceeding functions exist

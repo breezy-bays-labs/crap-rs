@@ -703,7 +703,7 @@ impl<'ast> Visit<'ast> for CyclomaticCounter<'_> {
             self.bump(
                 ContributorKind::MatchArm,
                 arm.pat.span(),
-                arm.pat.span().end().line,
+                end_line_of(arm),
                 1,
             );
         }

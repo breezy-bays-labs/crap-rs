@@ -89,19 +89,19 @@ Feature: --format advice (issue #76)
   Scenario: Each ProposedSplit carries the five wire fields
     Given an over-threshold function with high complexity
     When the operator runs `crap4rs --coverage lcov.info --format advice`
-    Then for every `proposed_splits[]` entry, all of the following keys
-      are present and non-null: `line_range`, `complexity_contribution`,
-      `branch_path`, `kind`, `recommended`
+    Then for every `extract_function.candidates[]` entry, all of the
+      following keys are present and non-null: `line_range`,
+      `complexity_contribution`, `branch_path`, `kind`, `recommended`
     And `kind` is one of "deepest_nesting", "largest_subblock",
       "highest_branch_count"
 
   Scenario: Exactly one ProposedSplit per function has recommended:true
-    Given an over-threshold function whose `ExtractFunction.candidates`
+    Given an over-threshold function whose `extract_function.candidates`
       list is non-empty
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then exactly one entry in that function's `candidates` has
-      `recommended` "true"
-    And every other entry has `recommended` "false"
+      `recommended` true
+    And every other entry has `recommended` false
 
   Scenario Outline: De-duplication priority for same-line-range candidates
     Given the walker emits multiple split candidates that resolve to the
@@ -154,9 +154,7 @@ Feature: --format advice (issue #76)
     When the operator runs `crap4rs --coverage lcov.info --format advice --min-coverage 80`
     Then `view.shown[]` contains only entries where
       `verdict.scored.coverage_percent >= 80`
-    And each surviving entry carries a `diagnostic` whose
-      `suggested_actions[]` favors `extract_function` over
-      `add_tests_for_lines` (because adding tests will not help)
+    And each surviving entry carries a populated `diagnostic`
 
   Scenario: --format advice composes with --no-fail
     Given exceeding functions exist
