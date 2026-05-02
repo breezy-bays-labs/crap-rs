@@ -322,3 +322,125 @@ fn sarif_partial_fingerprint_format() {
         );
     }
 }
+
+// ── #76 V6: properties.diagnostic enrichment ────────────────────────
+//
+// Amendment scenarios from `tests/features/sarif_reporter.feature`.
+// Under `--format sarif`, every result for an over-threshold verdict
+// carries `properties.diagnostic` with the same shape as
+// `view.shown[].diagnostic` under `--format advice`.
+
+#[test]
+fn sarif_results_carry_properties_diagnostic_under_format_sarif() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_dir(dir.path(), FIXTURE_SRC, FIXTURE_LCOV);
+    let output = run(dir.path(), &["--threshold", "8", "--format", "sarif"]);
+    let v = parse_json(&output);
+    let results = v["runs"][0]["results"].as_array().unwrap();
+    assert!(!results.is_empty(), "fixture must produce findings");
+    for r in results {
+        let diag = r["properties"]["diagnostic"]
+            .as_object()
+            .unwrap_or_else(|| panic!("missing properties.diagnostic on result: {r}"));
+        for field in [
+            "coverage_gaps",
+            "complexity_drivers",
+            "suggested_actions",
+            "root_cause",
+        ] {
+            assert!(
+                diag.contains_key(field),
+                "properties.diagnostic missing field {field}: {diag:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn sarif_properties_diagnostic_shape_matches_advice_format() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_dir(dir.path(), FIXTURE_SRC, FIXTURE_LCOV);
+
+    let sarif = parse_json(&run(dir.path(), &["--threshold", "8", "--format", "sarif"]));
+    let advice = parse_json(&run(
+        dir.path(),
+        &[
+            "--threshold",
+            "8",
+            "--no-fail",
+            "--format",
+            "advice",
+            "--sort-by",
+            "path",
+        ],
+    ));
+
+    // Build (qualified_name → diagnostic) maps from each side, then
+    // assert byte-equal Diagnostic shapes for every overlapping fn.
+    use std::collections::HashMap;
+
+    let mut sarif_diags: HashMap<String, serde_json::Value> = HashMap::new();
+    for r in sarif["runs"][0]["results"].as_array().unwrap() {
+        let fp = r["partialFingerprints"]["functionIdentity"]
+            .as_str()
+            .unwrap();
+        let qn = fp.split(':').next_back().unwrap().to_string();
+        sarif_diags.insert(qn, r["properties"]["diagnostic"].clone());
+    }
+
+    let mut advice_diags: HashMap<String, serde_json::Value> = HashMap::new();
+    for v in advice["view"]["shown"].as_array().unwrap() {
+        if !v["exceeds"].as_bool().unwrap_or(false) {
+            continue;
+        }
+        let qn = v["scored"]["identity"]["qualified_name"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        advice_diags.insert(qn, v["diagnostic"].clone());
+    }
+
+    assert!(!sarif_diags.is_empty());
+    for (qn, advice_diag) in &advice_diags {
+        let sarif_diag = sarif_diags
+            .get(qn)
+            .unwrap_or_else(|| panic!("SARIF missing result for {qn}"));
+        assert_eq!(
+            sarif_diag, advice_diag,
+            "SARIF properties.diagnostic must match --format advice for {qn}"
+        );
+    }
+}
+
+#[test]
+fn sarif_omits_properties_when_no_diagnostic() {
+    // `--format sarif` always populates diagnostics for exceeding fns
+    // (compute_diagnostics flips on for both Advice and Sarif), so the
+    // skip path only fires when no result is over-threshold. This test
+    // pins the structural skip behavior with the all-passing fixture.
+    let dir = tempfile::tempdir().unwrap();
+    setup_dir(dir.path(), PASSING_SRC, PASSING_LCOV);
+    let v = parse_json(&run(dir.path(), &["--threshold", "8", "--format", "sarif"]));
+    let results = v["runs"][0]["results"].as_array().unwrap();
+    assert!(results.is_empty(), "no exceeding fns in passing fixture");
+}
+
+#[test]
+fn sarif_byte_identical_with_diagnostic_enrichment_across_runs() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_dir(dir.path(), FIXTURE_SRC, FIXTURE_LCOV);
+    let first = stdout_str(&run(dir.path(), &["--threshold", "8", "--format", "sarif"]));
+    let second = stdout_str(&run(dir.path(), &["--threshold", "8", "--format", "sarif"]));
+    assert_eq!(
+        first, second,
+        "SARIF with diagnostic enrichment must be byte-deterministic"
+    );
+    // Verify diagnostic actually present (otherwise this would pass
+    // trivially even if V6 broke).
+    let v: serde_json::Value = serde_json::from_str(&first).unwrap();
+    let results = v["runs"][0]["results"].as_array().unwrap();
+    assert!(!results.is_empty());
+    for r in results {
+        assert!(r["properties"]["diagnostic"].is_object());
+    }
+}
