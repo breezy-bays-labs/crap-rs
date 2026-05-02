@@ -157,6 +157,45 @@ The shaping flags `--delta-top`, `--delta-sort` (`score-delta` (default) | `curr
 
 `--format markdown` produces GitHub-flavored Markdown (pipe-syntax table plus a Summary block) — paste it into a PR comment, an issue body, or a doc page. `--format csv` produces RFC 4180 CSV with a fixed header row, suitable for piping into spreadsheets, BI tools, or `awk`/`jq` pipelines that prefer tabular input. Both honor every shaping flag (`--top`, `--sort-by`, `--only-failing`, `--min-coverage` / `--max-coverage`).
 
+### Agent advice (`--format advice`) — experimental
+
+`--format advice` emits the same JSON envelope as `--format json`, but with a populated `Diagnostic` on every over-threshold `view.shown[]` entry. The diagnostic is AST-derived — coverage gaps, complexity drivers, suggested actions, and a flat `root_cause` scalar — so coding agents can read findings and propose remediations without re-walking the source.
+
+```jsonc
+{
+  "schema_version": 1,
+  "view": {
+    "shown": [{
+      "scored": { "identity": { "qualified_name": "branchy_fail", ... } },
+      "exceeds": true,
+      "diagnostic": {
+        "coverage_gaps": [{ "start": 11, "end": 19 }],
+        "complexity_drivers": [{ "kind": "if-branch", "line": 12, "nesting_depth": 1, ... }],
+        "suggested_actions": [
+          { "kind": "add_tests_for_lines", "lines": [...], "applicability": "unspecified" },
+          { "kind": "extract_function", "candidates": [
+            { "line_range": { "start": 12, "end": 16 }, "complexity_contribution": 3,
+              "branch_path": "if-branch", "kind": "deepest_nesting", "recommended": true },
+            ...
+          ], "applicability": "unspecified" }
+        ],
+        "root_cause": "both"
+      }
+    }]
+  }
+}
+```
+
+A grep-friendly stderr summary streams alongside stdout — one line per over-threshold function in `view.shown[]` order:
+
+```
+[crap=56.00] src/lib.rs:5-21 branchy_fail [actions: add_tests_for_lines,extract_function]
+```
+
+`--format sarif` carries the same `Diagnostic` shape under `result.properties.diagnostic`, so SARIF consumers (and the future `/cut-the-crap` agent skill) read the same advice as `--format advice`.
+
+> **Stability:** `--format advice` is **experimental in v0.3.x**. The shape may grow additively (new fields, new `SuggestedAction` variants under `#[non_exhaustive]`), but `schema_version` stays at `1` and existing fields will not change meaning. The shape stabilises at v0.4.0 with `schema_version: 2`.
+
 ### SARIF for GitHub Code Scanning (`--format sarif`)
 
 `--format sarif` emits SARIF v2.1.0 JSON. Pipe it into a `.sarif` file and upload via `github/codeql-action/upload-sarif@v3` — every function whose CRAP score exceeds the threshold becomes an inline annotation on the exact line range in the PR diff. Reviewers see the findings without running crap4rs themselves.
