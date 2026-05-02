@@ -1,9 +1,6 @@
-//! Integration tests for `--format advice` (issue #76 V4).
-//!
-//! Each test transcribes one or more scenarios from
-//! `tests/features/format_advice.feature`. The behavior contract there
-//! is the spec; this file is the executable form (cucumber-rs not yet
-//! adopted — see crap4rs#115 follow-up).
+//! Integration tests for `--format advice`. Each test transcribes one
+//! or more scenarios from `tests/features/format_advice.feature` (the
+//! executable form pending cucumber-rs adoption).
 
 use std::path::Path;
 use std::process::Command;
@@ -410,7 +407,22 @@ fn same_input_produces_byte_identical_advice_json() {
             "advice",
         ],
     );
-    assert_eq!(first.stdout, second.stdout);
+    // The envelope `timestamp` field is a wall-clock seconds value; two
+    // sequential runs that straddle a second boundary diverge there
+    // without any change to the analysis content. Strip it before
+    // comparing so the determinism assertion is about the analysis.
+    let first_json = strip_envelope_timestamp(&first.stdout);
+    let second_json = strip_envelope_timestamp(&second.stdout);
+    assert_eq!(first_json, second_json);
+}
+
+fn strip_envelope_timestamp(stdout: &[u8]) -> serde_json::Value {
+    let raw = std::str::from_utf8(stdout).expect("stdout is utf-8");
+    let mut value: serde_json::Value = serde_json::from_str(raw).expect("stdout is valid JSON");
+    if let Some(obj) = value.as_object_mut() {
+        obj.remove("timestamp");
+    }
+    value
 }
 
 // ── Stderr summary (V5 / S-8) ───────────────────────────────────────
@@ -542,4 +554,142 @@ fn branch_path_is_kebab_case_kind_chain_no_prose() {
             }
         }
     }
+}
+
+// ── View composition (--top, --sort-by, --min-coverage with advice) ─
+
+const MULTI_FIXTURE_SRC: &str = "\
+pub fn passing_a() -> i32 { 1 }
+pub fn passing_b() -> i32 { 2 }
+pub fn failing_a(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+pub fn failing_b(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+pub fn failing_c(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+";
+
+const MULTI_FIXTURE_LCOV: &str = "\
+SF:lib.rs
+DA:1,1
+DA:2,1
+DA:3,0
+DA:4,0
+DA:5,0
+end_of_record
+";
+
+#[test]
+fn advice_composes_with_top_truncates_shown_and_keeps_diagnostics() {
+    let tmp = tempfile::tempdir().expect("create tempdir");
+    setup_dir(tmp.path(), MULTI_FIXTURE_SRC, MULTI_FIXTURE_LCOV);
+
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "advice",
+            "--top",
+            "2",
+        ],
+    );
+    let json = parse_json(&output);
+    let shown = json["view"]["shown"].as_array().expect("shown is array");
+    assert_eq!(shown.len(), 2, "--top 2 must truncate to 2 rows");
+    let exceeding: Vec<_> = shown
+        .iter()
+        .filter(|e| e["exceeds"].as_bool().unwrap_or(false))
+        .collect();
+    assert!(!exceeding.is_empty());
+    for entry in exceeding {
+        assert!(
+            entry.get("diagnostic").is_some(),
+            "exceeding entries under --top must still carry diagnostic: {entry}"
+        );
+    }
+}
+
+#[test]
+fn advice_composes_with_sort_by_coverage_orders_ascending() {
+    let tmp = tempfile::tempdir().expect("create tempdir");
+    setup_dir(tmp.path(), MULTI_FIXTURE_SRC, MULTI_FIXTURE_LCOV);
+
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "advice",
+            "--sort-by",
+            "coverage",
+        ],
+    );
+    let json = parse_json(&output);
+    let shown = json["view"]["shown"].as_array().expect("shown is array");
+    let coverages: Vec<f64> = shown
+        .iter()
+        .map(|e| e["scored"]["coverage_percent"].as_f64().unwrap())
+        .collect();
+    assert!(
+        coverages.windows(2).all(|w| w[0] <= w[1]),
+        "--sort-by coverage must order ascending: {coverages:?}"
+    );
+}
+
+#[test]
+fn advice_composes_with_min_coverage_filters_lower_rows() {
+    let tmp = tempfile::tempdir().expect("create tempdir");
+    setup_dir(tmp.path(), MULTI_FIXTURE_SRC, MULTI_FIXTURE_LCOV);
+
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "advice",
+            "--min-coverage",
+            "50",
+        ],
+    );
+    let json = parse_json(&output);
+    let shown = json["view"]["shown"].as_array().expect("shown is array");
+    for entry in shown {
+        let cov = entry["scored"]["coverage_percent"].as_f64().unwrap();
+        assert!(
+            cov >= 50.0,
+            "--min-coverage 50 must filter out rows below: got {cov}"
+        );
+    }
+}
+
+// ── --format sarif must NOT emit stderr advice summary ──────────────
+
+#[test]
+fn sarif_format_emits_no_advice_summary_on_stderr() {
+    let tmp = tempfile::tempdir().expect("create tempdir");
+    setup_dir(tmp.path(), FIXTURE_SRC, FIXTURE_LCOV);
+
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--no-gitignore",
+            "--no-fail",
+            "--format",
+            "sarif",
+        ],
+    );
+    let stderr = String::from_utf8(output.stderr).expect("stderr utf-8");
+    assert!(
+        !stderr.lines().any(|l| l.starts_with("[crap=")),
+        "no advice summary lines should appear under --format sarif; stderr:\n{stderr}"
+    );
 }

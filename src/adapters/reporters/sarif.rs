@@ -79,12 +79,11 @@ fn result_for(verdict: &FunctionVerdict) -> SarifResult {
     );
     let fingerprint = format!("{}:{}", s.identity.file_path, s.identity.qualified_name);
 
-    // V6: SARIF `result.properties` is a free-form bag; we expose the
-    // crap4rs `Diagnostic` shape under `properties.diagnostic` so Code
-    // Scanning consumers (and downstream agent skills like #77) can
-    // read the same advice they'd get under `--format advice`. The
-    // shape under `properties` is byte-identical to `view.shown[]
-    // .diagnostic` because both go through the same `Serialize` impl.
+    // SARIF `result.properties` is a free-form bag; we expose the
+    // `Diagnostic` shape under `properties.diagnostic` so Code Scanning
+    // consumers can read the same advice they'd get under `--format
+    // advice`. The shape is byte-identical because both formats route
+    // through the same `Serialize` impl.
     let properties = verdict.diagnostic.as_deref().map(|diag| SarifProperties {
         diagnostic: serde_json::to_value(diag)
             .expect("Diagnostic Serialize impl is total (only owned strings, ints, vecs)"),
@@ -198,9 +197,9 @@ struct SarifResult {
     locations: Vec<SarifLocation>,
     #[serde(rename = "partialFingerprints")]
     partial_fingerprints: SarifPartialFingerprints,
-    /// V6 (#76): SARIF v2.1.0 §3.27.6 — `properties` is a free-form
-    /// extension bag. We omit it when there's no diagnostic so existing
-    /// consumers see byte-identical SARIF.
+    /// SARIF v2.1.0 §3.27.6 — `properties` is a free-form extension
+    /// bag. Omitted when no diagnostic so SARIF stays byte-identical
+    /// for non-advice runs.
     #[serde(skip_serializing_if = "Option::is_none")]
     properties: Option<SarifProperties>,
 }

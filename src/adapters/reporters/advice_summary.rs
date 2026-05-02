@@ -1,6 +1,6 @@
-//! Stderr summary reporter for `--format advice` (#76 V5).
+//! Stderr summary reporter for `--format advice`.
 //!
-//! Format (S-8 locked):
+//! Format:
 //! `[crap=N.NN] file:line-line qualified::name [actions: <kinds>]`
 //!
 //! One line per over-threshold function in `view.shown[]` order so

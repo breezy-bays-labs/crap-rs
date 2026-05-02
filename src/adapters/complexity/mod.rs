@@ -1528,7 +1528,7 @@ mod contributor_tests {
         );
     }
 
-    // ── end_line + nesting_depth (issue #76 V1) ────────────────────────
+    // ── end_line + nesting_depth ───────────────────────────────────────
 
     #[test]
     fn nested_if_records_construct_end_line_and_nesting_depth_cognitive() {

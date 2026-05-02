@@ -140,9 +140,8 @@ pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
     // 6. Score each function, produce verdicts, and build result
     let mut result = score_and_summarize(&matched, &resolver)?;
 
-    // 7. Populate `Diagnostic` for over-threshold verdicts (#76 V4).
-    //    Runs only when the caller opts in (`--format advice` or
-    //    `--format sarif`). Pure-domain logic, bounded cost.
+    // 7. Populate `Diagnostic` for over-threshold verdicts when the
+    //    caller opts in. Pure-domain, runs only on exceeding verdicts.
     if options.compute_diagnostics {
         populate_diagnostics(&mut result.functions, &parse_output.coverage);
     }
@@ -421,6 +420,9 @@ fn populate_diagnostics(
     coverage: &std::collections::HashMap<String, Vec<LineCoverage>>,
 ) {
     for verdict in verdicts.iter_mut() {
+        if !verdict.exceeds {
+            continue;
+        }
         let lines = coverage
             .get(&verdict.scored.identity.file_path)
             .map(Vec::as_slice)

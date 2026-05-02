@@ -59,7 +59,7 @@ pub enum FormatArg {
     Csv,
     /// SARIF v2.1.0 — for GitHub Code Scanning (upload-sarif@v3)
     Sarif,
-    /// Agent-oriented JSON with Diagnostic remediation hints (experimental — stable from v0.4.0)
+    /// Agent-oriented JSON with Diagnostic remediation hints (experimental)
     Advice,
 }
 
@@ -716,9 +716,8 @@ fn run_inner() -> Result<bool> {
         };
         print!("{output}");
 
-        // V5: stderr summary for `--format advice` only. SARIF's primary
-        // deliverable is the `.sarif` file uploaded to Code Scanning;
-        // adding a stderr line stream there would noise up CI logs (F4).
+        // SARIF's primary deliverable is the `.sarif` file uploaded to
+        // Code Scanning; stderr lines would noise up CI logs.
         if matches!(cli.output.format, FormatArg::Advice) {
             let mut stderr = std::io::stderr();
             let _ = reporters::render_advice_summary(&view, &mut stderr);

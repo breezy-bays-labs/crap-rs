@@ -1,10 +1,5 @@
-//! Shape C `Diagnostic` types — the AST-derived remediation hint emitted
-//! under `--format advice` (issue #76) and consumed by the
-//! `/cut-the-crap` agent skill (issue #77).
-//!
-//! Hexagonal note: this module is pure domain — no `syn`, no LCOV, no I/O.
-//! Helpers in V3 (`compute_diagnostic`, `extract_split_candidates`, …)
-//! land alongside these types so reporters can stay format-only.
+//! Structured remediation hints (`Diagnostic`) attached to over-threshold
+//! verdicts. Pure domain — no `syn`, no LCOV, no I/O.
 
 use serde::{Deserialize, Serialize};
 
@@ -38,11 +33,9 @@ impl LineRange {
 // ── Root cause ──────────────────────────────────────────────────────
 
 /// Deterministic single-token classification of why a verdict exceeded
-/// the threshold. Derived from the action set per S-6 (locked in shape):
-///
-/// - `LowCoverage` when the only action is `AddTestsForLines`
-/// - `HighComplexity` when the only actions are split/simplify/accept
-/// - `Both` when both kinds of action coexist
+/// the threshold. `LowCoverage` when the only action is `AddTestsForLines`;
+/// `HighComplexity` when the only actions are split/simplify/accept;
+/// `Both` when both kinds of action coexist.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -57,8 +50,8 @@ pub enum RootCause {
 
 /// Confidence in a `SuggestedAction`, matching `rustc`'s `Applicability`
 /// taxonomy so agents using rustc-shaped tooling can interpret crap4rs
-/// suggestions without translation. T2 (locked): the default is
-/// `Unspecified` because crap4rs does not verify the suggested change.
+/// suggestions without translation. The default is `Unspecified` because
+/// crap4rs does not verify the suggested change.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -74,9 +67,9 @@ pub enum Applicability {
 
 /// Which strategy produced a `ProposedSplit`. Priority order
 /// `DeepestNesting > HighestBranchCount > LargestSubblock` is enforced
-/// at dedup time (S-7). The default variant is `DeepestNesting` because
-/// that is the highest-priority strategy and the most useful candidate
-/// when only one is needed.
+/// at dedup time. The default variant is `DeepestNesting` because that
+/// is the highest-priority strategy and the most useful candidate when
+/// only one is needed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -90,8 +83,7 @@ pub enum SplitKind {
 // ── ProposedSplit ───────────────────────────────────────────────────
 
 /// One AST-derived candidate for `extract_function`. The split is named
-/// only by its line range (R6.3 — agents do prose, the CLI does
-/// coordinates).
+/// only by its line range — agents do prose, the CLI does coordinates.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ProposedSplit {
@@ -104,7 +96,7 @@ pub struct ProposedSplit {
     pub branch_path: String,
     pub kind: SplitKind,
     /// Exactly one entry per non-empty candidate set carries
-    /// `recommended: true` (S-7).
+    /// `recommended: true`.
     pub recommended: bool,
 }
 
@@ -137,9 +129,8 @@ pub enum SuggestedAction {
 
 /// Structured remediation hint attached to an over-threshold
 /// `FunctionVerdict` when `--format advice` (or `--format sarif`) is
-/// requested. Type-level `#[serde(default)]` lets older payloads (no
-/// new fields) deserialize, so schema_version stays at 1 across the
-/// v0.3.x experimental window.
+/// requested. Type-level `#[serde(default)]` lets older payloads
+/// deserialize when fields are added under `#[non_exhaustive]`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 #[non_exhaustive]
@@ -150,16 +141,16 @@ pub struct Diagnostic {
     pub root_cause: RootCause,
 }
 
-// ── Helpers: V3 (compute_diagnostic + sub-helpers) ──────────────────
+// ── Helpers: compute_diagnostic + sub-helpers ───────────────────────
 //
 // All helpers are pure: no I/O, no `syn`, no LCOV. They consume
 // already-parsed `FunctionVerdict` + `LineCoverage` slices and emit
 // AST-derived advice. Callers keep `compute_diagnostic` as the single
 // entry point; the others are `pub(crate)` so tests can pin them.
 
-/// Effective inclusive end line for a contributor. Older payloads (or
-/// adapters that pre-date V1) may have `end_line == 0` — fall back to
-/// `line` so the construct is treated as a single-line atomic.
+/// Effective inclusive end line for a contributor. Older payloads may
+/// carry `end_line == 0`; fall back to `line` so the construct is
+/// treated as a single-line atomic.
 fn effective_end_line(c: &ComplexityContributor) -> usize {
     if c.end_line >= c.line {
         c.end_line
@@ -216,7 +207,7 @@ fn is_viable_split(range: LineRange, span: &SourceSpan, contribution: u32) -> bo
 /// contributor that **strictly encloses** `start_line` (i.e., starts
 /// before `start_line` and ends at or after it). Sorted by
 /// `nesting_depth` ascending so the path reads outermost → innermost.
-/// AST-derived only — never carries prose (R6.3).
+/// AST-derived only — never carries prose.
 pub(crate) fn derive_branch_path(
     contributors: &[ComplexityContributor],
     start_line: usize,
@@ -341,7 +332,7 @@ pub(crate) fn pick_highest_branch_count(
     })
 }
 
-/// Run all three selectors, dedup overlapping ranges by S-7 priority,
+/// Run all three selectors, dedup overlapping ranges by `SplitKind`
 /// and mark exactly one survivor `recommended: true`.
 pub(crate) fn extract_split_candidates(
     contributors: &[ComplexityContributor],
@@ -368,8 +359,8 @@ fn split_kind_priority(kind: SplitKind) -> u8 {
 }
 
 /// Dedup `splits` by `line_range`. When two candidates share the same
-/// range, the highest-priority `kind` wins (S-7:
-/// `DeepestNesting > HighestBranchCount > LargestSubblock`). Within
+/// range, the highest-priority `kind` wins
+/// (`DeepestNesting > HighestBranchCount > LargestSubblock`). Within
 /// the same kind, the lowest `start_line` wins. Exactly one survivor
 /// is marked `recommended: true` (highest priority overall).
 pub(crate) fn dedup_splits(splits: Vec<ProposedSplit>) -> Vec<ProposedSplit> {
@@ -380,13 +371,9 @@ pub(crate) fn dedup_splits(splits: Vec<ProposedSplit>) -> Vec<ProposedSplit> {
             .position(|existing| existing.line_range == split.line_range)
         {
             Some(idx) => {
-                let existing = &by_range[idx];
                 let new_priority = split_kind_priority(split.kind);
-                let existing_priority = split_kind_priority(existing.kind);
-                let replace = new_priority > existing_priority
-                    || (new_priority == existing_priority
-                        && split.line_range.start < existing.line_range.start);
-                if replace {
+                let existing_priority = split_kind_priority(by_range[idx].kind);
+                if new_priority > existing_priority {
                     by_range[idx] = split;
                 }
             }
@@ -433,7 +420,7 @@ fn dominant_contributor_kind(contributors: &[ComplexityContributor]) -> Option<C
 }
 
 /// Build the `(suggested_actions, root_cause)` pair from gaps + splits
-/// + contributors. Action gating (locked F1):
+/// + contributors. Action gating:
 ///
 /// 1. `gaps non-empty` → `AddTestsForLines`
 /// 2. `splits non-empty` → `ExtractFunction`
@@ -475,9 +462,7 @@ pub(crate) fn pick_actions(
         });
     }
 
-    let has_add_tests = actions
-        .iter()
-        .any(|a| matches!(a, SuggestedAction::AddTestsForLines { .. }));
+    let has_add_tests = !coverage_gaps.is_empty();
     let has_complexity = actions
         .iter()
         .any(|a| !matches!(a, SuggestedAction::AddTestsForLines { .. }));
@@ -492,7 +477,7 @@ pub(crate) fn pick_actions(
 }
 
 /// Build a structured remediation hint for `verdict`. Returns `None`
-/// when the verdict is below threshold (R6.4 / F2 — no diagnostic for
+/// when the verdict is below threshold (no diagnostic for
 /// passing functions). When the verdict exceeds, the diagnostic is
 /// always populated with all four fields.
 ///
@@ -724,7 +709,7 @@ mod tests {
         assert_eq!(parsed, original);
     }
 
-    // ── V3 helper tests ────────────────────────────────────────────
+    // ── Helper tests ───────────────────────────────────────────────
 
     use crate::domain::types::{
         ComplexityMetric, CrapScore, FunctionIdentity, FunctionVerdict, LineCoverage, RiskLevel,
@@ -965,7 +950,7 @@ mod tests {
 
     #[test]
     fn dedup_splits_keeps_highest_priority_for_duplicate_range() {
-        // Same range, three kinds. DeepestNesting wins under S-7.
+        // Same range, three kinds. DeepestNesting wins by priority.
         let range = LineRange::new(10, 20);
         let dn = ProposedSplit {
             line_range: range,
@@ -1282,7 +1267,7 @@ mod proptests {
         #![proptest_config(ProptestConfig::with_cases(256))]
 
         /// Non-empty `dedup_splits` output always has exactly one
-        /// recommended entry (S-7).
+        /// recommended entry.
         #[test]
         fn dedup_splits_has_exactly_one_recommended_when_non_empty(
             splits in proptest::collection::vec(arb_proposed_split(), 1..10)
@@ -1306,7 +1291,7 @@ mod proptests {
         }
 
         /// `derive_branch_path` produces no whitespace and no commas —
-        /// only `/` as separator (R6.3 — AST-derived chains only).
+        /// only `/` as separator (AST-derived chains only).
         #[test]
         fn branch_path_carries_no_whitespace_or_commas(
             depths in proptest::collection::vec(0u32..6, 0..10)

@@ -278,22 +278,17 @@ pub struct FunctionVerdict {
     pub scored: ScoredFunction,
     pub threshold: f64,
     pub exceeds: bool,
-    /// Structured remediation hint, populated by `--format advice` (#76)
-    /// and consumed by the `/cut-the-crap` agent skill (#77). `None` for
-    /// default invocations; reporters render it when present.
-    ///
-    /// Boxed so that `FunctionVerdict` (and `FunctionChange::Modified`,
-    /// which carries two of them) stay small — most verdicts have no
-    /// diagnostic, and the boxed pointer keeps `Option<…>` at 8 bytes.
-    /// `Box<T>` is transparent to serde, so the JSON shape is unchanged.
+    /// Structured remediation hint, populated when `--format advice` or
+    /// `--format sarif` is requested. Boxed so `FunctionVerdict` (and
+    /// `FunctionChange::Modified`, which carries two of them) stay small
+    /// — most verdicts have no diagnostic, and the boxed pointer keeps
+    /// `Option<…>` at 8 bytes. `Box<T>` is transparent to serde, so the
+    /// JSON shape is unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diagnostic: Option<Box<Diagnostic>>,
 }
 
-// `Diagnostic` is defined in `crate::domain::diagnostic` (issue #76 V2).
-// Re-export here so existing imports of `domain::types::Diagnostic` keep
-// resolving — `FunctionVerdict.diagnostic` and reporter call sites continue
-// to compile unchanged.
+// Re-exported here so `domain::types::Diagnostic` paths keep resolving.
 pub use crate::domain::diagnostic::Diagnostic;
 
 // ── Analysis Results ────────────────────────────────────────────────
@@ -601,8 +596,4 @@ mod tests {
     fn coverage_metric_default_is_line() {
         assert_eq!(CoverageMetric::default(), CoverageMetric::Line);
     }
-
-    // The `Diagnostic` placeholder that lived here in v0.3.0 has moved to
-    // `crate::domain::diagnostic` (issue #76 V2). Round-trip + default tests
-    // for the full Shape C type live alongside that module.
 }
