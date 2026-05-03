@@ -152,12 +152,70 @@ owns the comment.
 
 | Name | Notes |
 |---|---|
-| `markdown` | The rendered scorecard — drop into aggregator comments |
+| `markdown` | The rendered scorecard — drop into aggregator comments verbatim |
+| `row-json` | Mokumo `Row::CrapDelta` JSON object — for aggregators that re-render with full layout control. See [Structured row output](#structured-row-output-outputsrow-json) |
 | `json-envelope-path` | Path to the full JSON envelope on the runner |
 | `analysis-passed` | `true` / `false` |
 | `delta-passed` | `true` / `false`, or empty string when no baseline |
 | `new-violations` | Count of functions exceeding threshold but not in baseline |
 | `regressions` | Count of modified functions whose CRAP increased above rendering precision |
+
+## Structured row output (`outputs.row-json`)
+
+`outputs.row-json` is the raw stdout of `crap4rs --format scorecard-row` —
+one mokumo `Row::CrapDelta` JSON object, conforming to the locked
+[scorecard schema](https://github.com/breezy-bays-labs/mokumo/blob/main/.config/scorecard/schema.json)
+(the `CrapDelta` member of `definitions/Row` `oneOf`). No envelope, no
+metadata wrapper — the JSON object is the contract.
+
+Use `outputs.row-json` when an aggregator workflow re-renders the
+scorecard with full layout control. Use `outputs.markdown` when posting
+the scorecard verbatim into a sticky comment.
+
+Producer-side status policy (Red/Yellow/Green) lives in `crap4rs`
+([crap4rs#111](https://github.com/breezy-bays-labs/crap4rs/issues/111),
+PR [#119](https://github.com/breezy-bays-labs/crap4rs/pull/119)):
+
+- **Red** — at least one new threshold violation landed.
+- **Yellow** — no new violations, but at least one modified function's
+  CRAP score regressed.
+- **Green** — otherwise.
+
+### Aggregator pattern — consume `row-json` and re-render
+
+```yaml
+- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+  id: crap
+  with:
+    coverage: /tmp/head.lcov
+    baseline: /tmp/baseline.json
+    comment-mode: 'none'           # outputs only — aggregator owns the comment
+
+- name: Aggregate scorecard rows
+  id: agg
+  shell: bash
+  env:
+    CRAP_ROW: ${{ steps.crap.outputs.row-json }}
+    # ... other producers' rows here ...
+  run: |
+    # Concatenate Row JSONs into a Scorecard, render however the
+    # aggregator likes (a custom markdown layout, a Check Run summary,
+    # a Slack message, ...).
+    printf '%s\n' "$CRAP_ROW" > /tmp/crap-row.json
+    jq -r '"### " + .label + " — **" + .status + "** — " + .delta_text' /tmp/crap-row.json
+```
+
+`outputs.markdown` remains available unchanged — existing consumers
+(e.g. mokumo's `crap-scorecard` job in `quality.yml`) continue to read
+it without modification.
+
+### Version requirement
+
+`outputs.row-json` is populated for **`crap4rs ≥ 0.4.0`**. With older
+releases the action emits an empty string and prints a workflow
+warning; the rest of the action (`outputs.markdown`, gates, sticky
+comment) keeps working. Pin the `version` input to `0.4.0` or later
+once it publishes if your workflow consumes `row-json`.
 
 ## Pinning
 
