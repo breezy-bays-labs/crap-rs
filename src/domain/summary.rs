@@ -1,7 +1,9 @@
 use serde::Serialize;
 
+use super::delta::{DeltaSummary, FunctionChange};
 use super::types::{
-    AnalysisSummary, CrapScore, FunctionIdentity, FunctionVerdict, RiskDistribution, RiskLevel,
+    AnalysisResult, AnalysisSummary, CrapScore, FunctionIdentity, FunctionVerdict,
+    RiskDistribution, RiskLevel,
 };
 
 /// Compute an `AnalysisSummary` from any iterable of `&FunctionVerdict`.
@@ -331,6 +333,213 @@ fn median_of(scores: &mut [f64]) -> f64 {
         (scores[n / 2 - 1] + scores[n / 2]) / 2.0
     } else {
         scores[n / 2]
+    }
+}
+
+// ── CrapDeltaRowData (scorecard-row producer, issue #111) ───────────
+
+/// Status mirrors mokumo's `Row::CrapDelta::status` (Green/Yellow/Red).
+/// Producer-mints-status under Model P — see crap4rs gap doc at
+/// `~/Github/ops/pipelines/crap4rs/crap4rs-20260503-scorecard-row-rollout.md`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum CrapDeltaStatus {
+    Green,
+    Yellow,
+    Red,
+}
+
+/// Language-agnostic record carrying the structured signal a producer
+/// projects into a mokumo `Row::CrapDelta` JSON object. Lives in
+/// `domain/summary.rs` (pure-domain — no `syn`, no LCOV) so it ships
+/// into `crap-core` as a rename-only move during the future unification
+/// (ops#231). The reporter at `adapters/reporters/scorecard_row.rs`
+/// wires this record into the locked V3-symmetric wire shape.
+#[derive(Debug, Clone, Serialize)]
+pub struct CrapDeltaRowData {
+    pub status: CrapDeltaStatus,
+    pub threshold: u32,
+    pub delta_count: i32,
+    pub delta_text: String,
+    pub failure_detail_md: Option<String>,
+}
+
+/// Project the scorecard-row signal from a current analysis +
+/// optional baseline + delta. Status is producer-side (Model P):
+///
+/// - **Red** when `delta_summary.new_violations > 0`.
+/// - **Yellow** when no new violations but `regressions > 0`.
+/// - **Green** otherwise.
+///
+/// When `baseline` and `delta` are `None` (single-snapshot mode), status
+/// is Green if no functions exceed the threshold, Red otherwise; the
+/// row treats baseline_count = 0 so `delta_count == current_count`.
+pub fn project_crap_delta_row(
+    current: &AnalysisResult,
+    baseline: Option<&AnalysisResult>,
+    delta: Option<(&DeltaSummary, &[FunctionChange])>,
+    threshold: u32,
+) -> CrapDeltaRowData {
+    let current_count = current.summary.exceeding_threshold;
+    let baseline_count = baseline.map_or(0, |b| b.summary.exceeding_threshold);
+    let delta_count = current_count as i32 - baseline_count as i32;
+
+    let (status, delta_text, failure_detail_md) = match delta {
+        Some((delta_summary, changes)) => resolve_with_delta(
+            baseline_count,
+            current_count,
+            delta_count,
+            delta_summary,
+            changes,
+            threshold,
+        ),
+        None => resolve_no_baseline(current, current_count, threshold),
+    };
+
+    CrapDeltaRowData {
+        status,
+        threshold,
+        delta_count,
+        delta_text,
+        failure_detail_md,
+    }
+}
+
+fn resolve_with_delta(
+    baseline_count: usize,
+    current_count: usize,
+    delta_count: i32,
+    delta_summary: &DeltaSummary,
+    changes: &[FunctionChange],
+    threshold: u32,
+) -> (CrapDeltaStatus, String, Option<String>) {
+    if delta_summary.new_violations > 0 {
+        let detail = render_delta_failure_detail(changes, threshold);
+        let text = format_delta_text_red(baseline_count, current_count, delta_count);
+        (CrapDeltaStatus::Red, text, Some(detail))
+    } else if delta_summary.regressions > 0 {
+        let text =
+            format!("{baseline_count} → {current_count} (regressions on existing functions)");
+        (CrapDeltaStatus::Yellow, text, None)
+    } else {
+        let text = format_delta_text_green(baseline_count, current_count, delta_count);
+        (CrapDeltaStatus::Green, text, None)
+    }
+}
+
+fn resolve_no_baseline(
+    current: &AnalysisResult,
+    current_count: usize,
+    threshold: u32,
+) -> (CrapDeltaStatus, String, Option<String>) {
+    if current_count == 0 {
+        (
+            CrapDeltaStatus::Green,
+            "0 over threshold (no baseline)".to_string(),
+            None,
+        )
+    } else {
+        let detail = render_no_baseline_failure_detail(current, threshold);
+        let text = format!("{current_count} over threshold (no baseline)");
+        (CrapDeltaStatus::Red, text, Some(detail))
+    }
+}
+
+fn format_delta_text_red(baseline: usize, current: usize, delta: i32) -> String {
+    format!("{baseline} → {current} ({delta:+})")
+}
+
+fn format_delta_text_green(baseline: usize, current: usize, delta: i32) -> String {
+    if delta == 0 {
+        format!("{baseline} → {current}")
+    } else {
+        format!("{baseline} → {current} ({delta:+})")
+    }
+}
+
+fn render_delta_failure_detail(changes: &[FunctionChange], threshold: u32) -> String {
+    let mut violators: Vec<NewViolator> = changes
+        .iter()
+        .filter_map(NewViolator::from_change)
+        .collect();
+    violators.sort_by(|a, b| {
+        b.current_crap
+            .partial_cmp(&a.current_crap)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut out = format!("**New CRAP threshold violations (>{threshold}):**\n");
+    for v in &violators {
+        let baseline_str = match v.baseline_crap {
+            Some(b) => format!("was {b:.1}"),
+            None => "newly added".to_string(),
+        };
+        out.push_str(&format!(
+            "- `{name}` — `{file}:{line}` — CRAP {current:.1} ({baseline_str})\n",
+            name = v.qualified_name,
+            file = v.file_path,
+            line = v.line,
+            current = v.current_crap,
+        ));
+    }
+    out
+}
+
+fn render_no_baseline_failure_detail(result: &AnalysisResult, threshold: u32) -> String {
+    let mut violators: Vec<&FunctionVerdict> =
+        result.functions.iter().filter(|v| v.exceeds).collect();
+    violators.sort_by(|a, b| {
+        b.scored
+            .crap
+            .value
+            .partial_cmp(&a.scored.crap.value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut out = format!("**Functions over CRAP threshold (>{threshold}):**\n");
+    for v in &violators {
+        out.push_str(&format!(
+            "- `{name}` — `{file}:{line}` — CRAP {crap:.1}\n",
+            name = v.scored.identity.qualified_name,
+            file = v.scored.identity.file_path,
+            line = v.scored.identity.span.start_line,
+            crap = v.scored.crap.value,
+        ));
+    }
+    out
+}
+
+struct NewViolator {
+    qualified_name: String,
+    file_path: String,
+    line: usize,
+    current_crap: f64,
+    baseline_crap: Option<f64>,
+}
+
+impl NewViolator {
+    fn from_change(change: &FunctionChange) -> Option<Self> {
+        match change {
+            FunctionChange::Added { current } if current.exceeds => Some(Self {
+                qualified_name: current.scored.identity.qualified_name.clone(),
+                file_path: current.scored.identity.file_path.clone(),
+                line: current.scored.identity.span.start_line,
+                current_crap: current.scored.crap.value,
+                baseline_crap: None,
+            }),
+            FunctionChange::Modified { baseline, current }
+                if !baseline.exceeds && current.exceeds =>
+            {
+                Some(Self {
+                    qualified_name: current.scored.identity.qualified_name.clone(),
+                    file_path: current.scored.identity.file_path.clone(),
+                    line: current.scored.identity.span.start_line,
+                    current_crap: current.scored.crap.value,
+                    baseline_crap: Some(baseline.scored.crap.value),
+                })
+            }
+            _ => None,
+        }
     }
 }
 
@@ -877,5 +1086,250 @@ mod file_summary_proptests {
         ) {
             let _ = compute_file_summaries(&verdicts);
         }
+    }
+}
+
+#[cfg(test)]
+mod crap_delta_tests {
+    use super::*;
+    use crate::domain::delta::{self, AnalysisDelta};
+    use crate::domain::types::{
+        AnalysisResult, ComplexityMetric, CrapScore, FunctionIdentity, ScoredFunction, SourceSpan,
+    };
+
+    fn make_verdict_at(
+        file: &str,
+        name: &str,
+        line: usize,
+        crap_value: f64,
+        threshold: f64,
+    ) -> FunctionVerdict {
+        let risk_level = super::super::crap::classify_risk(crap_value);
+        FunctionVerdict {
+            scored: ScoredFunction {
+                identity: FunctionIdentity {
+                    file_path: file.to_string(),
+                    qualified_name: name.to_string(),
+                    span: SourceSpan {
+                        start_line: line,
+                        end_line: line + 5,
+                        start_column: 0,
+                        end_column: 0,
+                    },
+                },
+                complexity: 1,
+                complexity_metric: ComplexityMetric::Cognitive,
+                coverage_percent: 100.0,
+                crap: CrapScore {
+                    value: crap_value,
+                    risk_level,
+                },
+                contributors: vec![],
+            },
+            threshold,
+            exceeds: crap_value > threshold,
+            diagnostic: None,
+        }
+    }
+
+    fn make_result(verdicts: Vec<FunctionVerdict>) -> AnalysisResult {
+        let summary = compute_summary(&verdicts);
+        let passed = summary.exceeding_threshold == 0;
+        AnalysisResult {
+            functions: verdicts,
+            summary,
+            passed,
+        }
+    }
+
+    fn make_delta(baseline: &AnalysisResult, current: &AnalysisResult) -> AnalysisDelta {
+        delta::compute(baseline.clone(), current.clone())
+    }
+
+    // ── No-baseline (single-snapshot) mode ───────────────────────────
+
+    #[test]
+    fn no_baseline_no_violations_is_green_with_zero_delta() {
+        let current = make_result(vec![make_verdict_at("a.rs", "ok", 1, 5.0, 15.0)]);
+        let row = project_crap_delta_row(&current, None, None, 15);
+        assert_eq!(row.status, CrapDeltaStatus::Green);
+        assert_eq!(row.delta_count, 0);
+        assert_eq!(row.threshold, 15);
+        assert_eq!(row.delta_text, "0 over threshold (no baseline)");
+        assert!(row.failure_detail_md.is_none());
+    }
+
+    #[test]
+    fn no_baseline_with_violations_is_red_with_absolute_count() {
+        let current = make_result(vec![
+            make_verdict_at("a.rs", "ok", 1, 5.0, 15.0),
+            make_verdict_at("a.rs", "bad", 10, 23.4, 15.0),
+            make_verdict_at("b.rs", "worse", 4, 30.0, 15.0),
+        ]);
+        let row = project_crap_delta_row(&current, None, None, 15);
+        assert_eq!(row.status, CrapDeltaStatus::Red);
+        assert_eq!(row.delta_count, 2);
+        assert_eq!(row.delta_text, "2 over threshold (no baseline)");
+        let detail = row.failure_detail_md.expect("Red implies failure_detail");
+        assert!(detail.starts_with("**Functions over CRAP threshold (>15):**"));
+        // Sorted by CRAP descending: worse (30.0) before bad (23.4).
+        let worse_idx = detail.find("worse").expect("worse listed");
+        let bad_idx = detail.find("bad").expect("bad listed");
+        assert!(worse_idx < bad_idx, "expected CRAP-desc order");
+        assert!(detail.contains("`b.rs:4`"));
+        assert!(detail.contains("CRAP 30.0"));
+    }
+
+    // ── Baseline + delta — Red on new violations ─────────────────────
+
+    #[test]
+    fn red_when_added_function_exceeds_threshold() {
+        let baseline = make_result(vec![make_verdict_at("a.rs", "stable", 1, 5.0, 15.0)]);
+        let current = make_result(vec![
+            make_verdict_at("a.rs", "stable", 1, 5.0, 15.0),
+            make_verdict_at("a.rs", "newly_added", 20, 22.0, 15.0),
+        ]);
+        let analysis_delta = make_delta(&baseline, &current);
+        let row = project_crap_delta_row(
+            &current,
+            Some(&baseline),
+            Some((&analysis_delta.summary, &analysis_delta.changes)),
+            15,
+        );
+        assert_eq!(row.status, CrapDeltaStatus::Red);
+        assert_eq!(row.delta_count, 1);
+        assert_eq!(row.delta_text, "0 → 1 (+1)");
+        let detail = row.failure_detail_md.expect("Red implies failure_detail");
+        assert!(detail.contains("newly_added"));
+        assert!(detail.contains("newly added"));
+    }
+
+    #[test]
+    fn red_when_modified_function_crosses_threshold() {
+        let baseline = make_result(vec![make_verdict_at("a.rs", "borderline", 1, 11.2, 15.0)]);
+        let current = make_result(vec![make_verdict_at("a.rs", "borderline", 1, 23.4, 15.0)]);
+        let analysis_delta = make_delta(&baseline, &current);
+        let row = project_crap_delta_row(
+            &current,
+            Some(&baseline),
+            Some((&analysis_delta.summary, &analysis_delta.changes)),
+            15,
+        );
+        assert_eq!(row.status, CrapDeltaStatus::Red);
+        assert_eq!(row.delta_count, 1);
+        assert_eq!(row.delta_text, "0 → 1 (+1)");
+        let detail = row.failure_detail_md.expect("Red implies failure_detail");
+        assert!(detail.contains("borderline"));
+        assert!(detail.contains("CRAP 23.4"));
+        assert!(detail.contains("was 11.2"));
+    }
+
+    // ── Baseline + delta — Yellow on regression-only ────────────────
+
+    #[test]
+    fn yellow_when_existing_function_regresses_below_threshold() {
+        let baseline = make_result(vec![make_verdict_at("a.rs", "fn", 1, 5.0, 15.0)]);
+        let current = make_result(vec![make_verdict_at("a.rs", "fn", 1, 9.0, 15.0)]);
+        let analysis_delta = make_delta(&baseline, &current);
+        let row = project_crap_delta_row(
+            &current,
+            Some(&baseline),
+            Some((&analysis_delta.summary, &analysis_delta.changes)),
+            15,
+        );
+        assert_eq!(row.status, CrapDeltaStatus::Yellow);
+        assert_eq!(row.delta_count, 0);
+        assert_eq!(row.delta_text, "0 → 0 (regressions on existing functions)");
+        assert!(row.failure_detail_md.is_none());
+    }
+
+    // ── Baseline + delta — Green ─────────────────────────────────────
+
+    #[test]
+    fn green_when_no_changes_at_all() {
+        let baseline = make_result(vec![make_verdict_at("a.rs", "fn", 1, 5.0, 15.0)]);
+        let current = make_result(vec![make_verdict_at("a.rs", "fn", 1, 5.0, 15.0)]);
+        let analysis_delta = make_delta(&baseline, &current);
+        let row = project_crap_delta_row(
+            &current,
+            Some(&baseline),
+            Some((&analysis_delta.summary, &analysis_delta.changes)),
+            15,
+        );
+        assert_eq!(row.status, CrapDeltaStatus::Green);
+        assert_eq!(row.delta_count, 0);
+        assert_eq!(row.delta_text, "0 → 0");
+        assert!(row.failure_detail_md.is_none());
+    }
+
+    #[test]
+    fn green_when_violation_dropped_via_improvement() {
+        let baseline = make_result(vec![make_verdict_at("a.rs", "was_bad", 1, 22.0, 15.0)]);
+        let current = make_result(vec![make_verdict_at("a.rs", "was_bad", 1, 8.0, 15.0)]);
+        let analysis_delta = make_delta(&baseline, &current);
+        let row = project_crap_delta_row(
+            &current,
+            Some(&baseline),
+            Some((&analysis_delta.summary, &analysis_delta.changes)),
+            15,
+        );
+        assert_eq!(row.status, CrapDeltaStatus::Green);
+        assert_eq!(row.delta_count, -1);
+        assert_eq!(row.delta_text, "1 → 0 (-1)");
+        assert!(row.failure_detail_md.is_none());
+    }
+
+    #[test]
+    fn green_when_violation_dropped_via_removal() {
+        let baseline = make_result(vec![
+            make_verdict_at("a.rs", "stable", 1, 5.0, 15.0),
+            make_verdict_at("a.rs", "deleted_bad", 20, 22.0, 15.0),
+        ]);
+        let current = make_result(vec![make_verdict_at("a.rs", "stable", 1, 5.0, 15.0)]);
+        let analysis_delta = make_delta(&baseline, &current);
+        let row = project_crap_delta_row(
+            &current,
+            Some(&baseline),
+            Some((&analysis_delta.summary, &analysis_delta.changes)),
+            15,
+        );
+        assert_eq!(row.status, CrapDeltaStatus::Green);
+        assert_eq!(row.delta_count, -1);
+        assert_eq!(row.delta_text, "1 → 0 (-1)");
+        assert!(row.failure_detail_md.is_none());
+    }
+
+    // ── Failure detail ordering ──────────────────────────────────────
+
+    #[test]
+    fn red_detail_lists_violators_sorted_by_crap_descending() {
+        let baseline = make_result(vec![]);
+        let current = make_result(vec![
+            make_verdict_at("a.rs", "low_violator", 1, 16.0, 15.0),
+            make_verdict_at("b.rs", "high_violator", 1, 30.0, 15.0),
+            make_verdict_at("c.rs", "mid_violator", 1, 22.0, 15.0),
+        ]);
+        let analysis_delta = make_delta(&baseline, &current);
+        let row = project_crap_delta_row(
+            &current,
+            Some(&baseline),
+            Some((&analysis_delta.summary, &analysis_delta.changes)),
+            15,
+        );
+        let detail = row.failure_detail_md.expect("Red implies failure_detail");
+        let high_idx = detail.find("high_violator").unwrap();
+        let mid_idx = detail.find("mid_violator").unwrap();
+        let low_idx = detail.find("low_violator").unwrap();
+        assert!(high_idx < mid_idx);
+        assert!(mid_idx < low_idx);
+    }
+
+    // ── Threshold pass-through ───────────────────────────────────────
+
+    #[test]
+    fn threshold_value_passed_through() {
+        let current = make_result(vec![]);
+        let row = project_crap_delta_row(&current, None, None, 25);
+        assert_eq!(row.threshold, 25);
     }
 }

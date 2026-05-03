@@ -65,3 +65,7 @@ proptest = "1"
 pretty_assertions = "1"
 insta = { version = "1", features = ["json"] }
 tempfile = "3"
+# Schema round-trip validation for `--format scorecard-row` (issue #111).
+# Validates emitted Row::CrapDelta JSON against the vendored mokumo
+# schema fragment at tests/fixtures/scorecard/schema.json.
+jsonschema = { version = "0.30", default-features = false }

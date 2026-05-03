@@ -61,6 +61,9 @@ pub enum FormatArg {
     Sarif,
     /// Agent-oriented JSON with Diagnostic remediation hints (experimental)
     Advice,
+    /// Single mokumo-scorecard `Row::CrapDelta` JSON object — for scorecard
+    /// aggregator consumption (mokumo schema_version=2). Issue #111.
+    ScorecardRow,
 }
 
 /// Sort key for the displayed view (issue #68).
@@ -713,6 +716,23 @@ fn run_inner() -> Result<bool> {
             // `--baseline` do NOT alter SARIF output — PR annotations
             // must reflect truth.
             FormatArg::Sarif => reporters::format_sarif(&view, env!("CARGO_PKG_VERSION")),
+            // ScorecardRow projects the unshaped analysis + delta into a
+            // mokumo `Row::CrapDelta` JSON object (issue #111). View
+            // shaping does NOT alter scorecard-row — the aggregator
+            // consumes truth, not a filtered subset.
+            FormatArg::ScorecardRow => {
+                let baseline_result = delta_state.as_ref().map(|s| &s.snapshot.result);
+                let delta_inputs = delta_state
+                    .as_ref()
+                    .map(|s| (&s.delta.summary, s.delta.changes.as_slice()));
+                let row_data = crap4rs::domain::summary::project_crap_delta_row(
+                    &result,
+                    baseline_result,
+                    delta_inputs,
+                    effective_threshold.round() as u32,
+                );
+                reporters::format_scorecard_row(&row_data)
+            }
         };
         print!("{output}");
 

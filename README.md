@@ -233,6 +233,59 @@ jobs:
           sarif_file: crap.sarif
 ```
 
+### Scorecard row (`--format scorecard-row`)
+
+`--format scorecard-row` emits exactly one JSON object — a mokumo
+[`Row::CrapDelta`](https://github.com/breezy-bays-labs/mokumo/blob/main/.config/scorecard/schema.json)
+— for consumption by scorecard aggregators (mokumo's sticky PR scorecard
+comment is the first downstream consumer). The object conforms to the
+locked `definitions/Row` schema fragment at `schema_version: 2`.
+
+Status is producer-side (crap4rs mints it from `--baseline` + `--threshold`):
+
+| Status   | Trigger |
+| -------- | ------- |
+| `Red`    | A new threshold violation lands (Added function exceeds, or Modified function crosses the threshold). `failure_detail_md` carries the violator list. |
+| `Yellow` | No new violations, but at least one modified function's CRAP score regressed. |
+| `Green`  | Otherwise. |
+
+```bash
+# Run against a PR base baseline + emit a single Row JSON for the aggregator.
+crap4rs \
+  --src . \
+  --coverage lcov.info \
+  --baseline pr-base-envelope.json \
+  --threshold 15 \
+  --format scorecard-row > crap-delta-row.json
+```
+
+Sample output (Red):
+
+```json
+{
+  "type": "CrapDelta",
+  "id": "crap_delta",
+  "label": "CRAP Δ",
+  "anchor": "crap-delta",
+  "status": "Red",
+  "threshold": 15,
+  "delta_count": 2,
+  "delta_text": "5 → 7 (+2)",
+  "failure_detail_md": "**New CRAP threshold violations (>15):**\n- ..."
+}
+```
+
+When `--baseline` is omitted, the row reports the absolute count of
+over-threshold functions (`"N over threshold (no baseline)"` in
+`delta_text`); status is Green when the count is zero, Red otherwise.
+
+> **Tradeoff:** the threshold lives in `crap4rs.toml` / `--threshold`,
+> not in mokumo's `quality.toml`. CRAP-metric parameters belong to the
+> producer (Model P). If a future repo wants `quality.toml`-tuned CRAP
+> thresholds, that's a Model-A migration — non-breaking at the data
+> level (the wire shape stays identical; status-minting moves from
+> producer to aggregator).
+
 ## Shell completions
 
 Print a completion script for your shell to stdout — the subcommand does no file I/O, so redirect it wherever your shell expects completions:
