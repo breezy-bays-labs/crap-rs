@@ -205,7 +205,12 @@ runs:
         # emit an empty row-json with a workflow warning if the variant
         # isn't supported, so consumers see the gap explicitly without
         # the action turning red.
-        if crap4rs --help 2>/dev/null | grep -q -- 'scorecard-row'; then
+        # `grep -q` exits as soon as it sees a match, which under
+        # `set -o pipefail` can SIGPIPE the upstream `crap4rs --help`
+        # and surface as a non-zero pipeline status — the probe would
+        # then false-negative even when the variant IS supported.
+        # Plain `grep ... >/dev/null` reads to EOF, no SIGPIPE.
+        if crap4rs --help 2>/dev/null | grep -- 'scorecard-row' >/dev/null; then
           crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
         else
           installed_version="$(crap4rs --version 2>/dev/null || echo 'unknown')"

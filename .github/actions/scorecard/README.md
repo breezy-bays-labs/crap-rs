@@ -200,9 +200,13 @@ PR [#119](https://github.com/breezy-bays-labs/crap4rs/pull/119)):
   run: |
     # Concatenate Row JSONs into a Scorecard, render however the
     # aggregator likes (a custom markdown layout, a Check Run summary,
-    # a Slack message, ...).
-    printf '%s\n' "$CRAP_ROW" > /tmp/crap-row.json
-    jq -r '"### " + .label + " — **" + .status + "** — " + .delta_text' /tmp/crap-row.json
+    # a Slack message, ...). Guard against the documented version-gap
+    # window (crap4rs < 0.4.0) where row-json is empty — `jq` would
+    # otherwise error on a non-JSON input.
+    if [ -n "$CRAP_ROW" ]; then
+      printf '%s\n' "$CRAP_ROW" > /tmp/crap-row.json
+      jq -r '"### " + .label + " — **" + .status + "** — " + .delta_text' /tmp/crap-row.json
+    fi
 ```
 
 `outputs.markdown` remains available unchanged — existing consumers
