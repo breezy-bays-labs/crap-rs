@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`--format scorecard-row`** emits a single mokumo `Row::CrapDelta`
+  JSON object (mokumo `schema_version=2`) for scorecard-aggregator
+  consumption. Producer-mints-status (Model P): Red on new threshold
+  violations, Yellow on modified-function CRAP regression, Green
+  otherwise. `--baseline <path>` integration carries the signed
+  `delta_count`, the `delta_text` display string (e.g. `"5 → 7 (+2)"`),
+  and a Red-only `failure_detail_md` listing violators sorted by CRAP
+  descending. Schema round-trip pinned via vendored fixture at
+  `tests/fixtures/scorecard/schema.json`. Closes #111.
 - **`--format advice`** (experimental, schema_version=1) emits AST-derived
   remediation hints alongside the standard JSON envelope: a per-function
   `Diagnostic` with `coverage_gaps`, `complexity_drivers`,
