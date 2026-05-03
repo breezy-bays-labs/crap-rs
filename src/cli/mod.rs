@@ -574,174 +574,34 @@ fn run_inner() -> Result<bool> {
         return Ok(true);
     }
 
-    validate_display_flags(&cli)?;
-
-    apply_color(cli.display.color);
-
-    // Load config file (explicit path or auto-discovered)
-    let file_config = load_file_config(&cli)?;
-
-    // Resolve `--view <NAME>` (issue #80) before validate_view_args runs
-    // so preset fields participate in the same validation pass as CLI
-    // flags. `apply_preset_to_cli` mutates `cli` in place: CLI explicit
-    // values win on `Option<T>` fields, bools OR-merge.
-    view_args::resolve_view_preset(&mut cli, file_config.as_ref())?;
-    view_args::validate_view_args(&cli)?;
-
-    // Merge: CLI explicit > config file > hardcoded defaults
-    let effective_src = cli
-        .input
-        .src
-        .clone()
-        .or_else(|| file_config.as_ref().and_then(|c| c.src.clone()))
-        .unwrap_or_else(|| PathBuf::from("src"));
-    let effective_metric: ComplexityMetric = cli
-        .input
-        .metric
-        .map(Into::into)
-        .or_else(|| file_config.as_ref().and_then(|c| c.metric))
-        .unwrap_or_default();
-    let (threshold_config, effective_threshold) = merge_threshold(&cli, &file_config);
-    let effective_exclude = merge_exclude(&cli, &file_config);
-
-    // `--coverage` is required on the analysis path; subcommands like
-    // `completions` skip this branch. Clap can't express "required
-    // unless subcommand X" in derive, so we enforce it here.
-    let Some(coverage_path) = cli.input.coverage.as_ref() else {
-        bail!(
-            "--coverage <FILE> is required (run `crap4rs --help` for usage, or `crap4rs completions <SHELL>` for shell completion scripts)"
-        );
-    };
-
-    // Validate effective values (after merging)
-    validate_inputs(coverage_path, &effective_src, effective_threshold)?;
-    preflight_checks(coverage_path, &effective_src)?;
-
-    // Validate --diff ref if provided
-    if let Some(ref diff_ref) = cli.filter.diff {
-        validate_diff_ref(diff_ref)?;
-        preflight_git_worktree(&effective_src)?;
-    }
-
-    let options = AnalyzeOptions {
-        src: effective_src,
-        coverage: coverage_path.clone(),
-        threshold_config,
-        metric: effective_metric,
-        exclude: effective_exclude,
-        respect_gitignore: !cli.filter.no_gitignore,
-        diff_ref: cli.filter.diff.clone(),
-        compute_diagnostics: matches!(cli.output.format, FormatArg::Advice | FormatArg::Sarif),
-        ..AnalyzeOptions::default()
-    };
-
-    let analysis = crap4rs::core::analyze(&options)?;
-    let result = analysis.result;
-    let passed = result.passed;
-
-    // Always warn about non-fatal issues (details require --verbose)
-    warn_if_issues(&analysis.diagnostics);
-
-    // Print full diagnostics to stderr when --verbose
-    if cli.display.verbose {
-        print_diagnostics(&analysis.diagnostics);
-    }
-
-    // Resolve --baseline (issue #81): load a previously-emitted JSON
-    // envelope and compute the AnalysisDelta. None when --baseline is
-    // absent — the JSON envelope omits the `delta` block entirely so
-    // existing consumers see byte-identical output.
-    let delta_state: Option<DeltaState> = load_delta_state(&cli, &result)?;
+    let prep = prepare_pipeline(&mut cli)?;
 
     // Build the spec, then shape the result through the View pipeline.
     // V1b: `--only-failing` flows through `Filters::only_failing` here.
     // W2 fills in `--top`, `--min/max-coverage`, `--sort-by`. The
     // underlying `result` is never mutated — the gate is unshapeable.
     let spec = view_args::build_view_spec(&cli);
-    let view = view::apply(&result, spec);
+    let view = view::apply(&prep.analysis.result, spec);
 
     // Shape the delta. Spec is built from --delta-top / --delta-sort /
     // --delta-only (VS4); defaults match the dominant scorecard use
     // case (regressions first, all kinds, no truncation).
     let delta_spec = delta_args::build_delta_view_spec(&cli);
-    let delta_view: Option<DeltaView<'_>> = delta_state
+    let delta_view: Option<DeltaView<'_>> = prep
+        .delta_state
         .as_ref()
         .map(|s| delta::apply(&s.delta, delta_spec.clone()));
     let _ = &delta_spec; // keep ownership for the shaped view
 
     if !cli.display.quiet {
-        let output = match cli.output.format {
-            FormatArg::Table => reporters::format_table_with_explain(
-                &view,
-                delta_view.as_ref(),
-                effective_threshold,
-                cli.display.breakdown,
-                cli.display.explain,
-            ),
-            FormatArg::Json | FormatArg::Advice => {
-                let delta_ctx = delta_state
-                    .as_ref()
-                    .zip(delta_view.as_ref())
-                    .map(|(s, dv)| DeltaContext {
-                        view: dv,
-                        baseline_tool_version: &s.snapshot.tool_version,
-                        baseline_timestamp: &s.snapshot.timestamp,
-                        baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
-                    });
-                let config = reporters::json::JsonConfig {
-                    tool_version: env!("CARGO_PKG_VERSION").to_string(),
-                    metric: effective_metric,
-                    threshold: effective_threshold,
-                    timestamp: now_unix_epoch(),
-                    diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
-                    diff_ref: cli.filter.diff.as_deref(),
-                    minimal_view: cli.output.minimal_view,
-                    delta: delta_ctx,
-                };
-                reporters::format_json(&view, &config)?
-            }
-            FormatArg::Markdown => reporters::format_markdown(
-                &view,
-                delta_view.as_ref(),
-                effective_threshold,
-                cli.display.breakdown,
-                cli.display.explain,
-                cli.display.md_full_table,
-                cli.display.md_top,
-            ),
-            FormatArg::Csv => reporters::format_csv(&view, delta_view.as_ref(), effective_metric),
-            // SARIF is a gate translation, not a display: it iterates
-            // `view.full.functions` internally regardless of how the View
-            // was shaped. `--top`, `--sort-by`, `--only-failing`, and
-            // `--baseline` do NOT alter SARIF output — PR annotations
-            // must reflect truth.
-            FormatArg::Sarif => reporters::format_sarif(&view, env!("CARGO_PKG_VERSION")),
-            // ScorecardRow projects the unshaped analysis + delta into a
-            // mokumo `Row::CrapDelta` JSON object (issue #111). View
-            // shaping does NOT alter scorecard-row — the aggregator
-            // consumes truth, not a filtered subset.
-            FormatArg::ScorecardRow => {
-                let baseline_result = delta_state.as_ref().map(|s| &s.snapshot.result);
-                let delta_inputs = delta_state
-                    .as_ref()
-                    .map(|s| (&s.delta.summary, s.delta.changes.as_slice()));
-                let row_data = crap4rs::domain::summary::project_crap_delta_row(
-                    &result,
-                    baseline_result,
-                    delta_inputs,
-                    effective_threshold.round() as u32,
-                );
-                reporters::format_scorecard_row(&row_data)
-            }
-        };
-        print!("{output}");
-
-        // SARIF's primary deliverable is the `.sarif` file uploaded to
-        // Code Scanning; stderr lines would noise up CI logs.
-        if matches!(cli.output.format, FormatArg::Advice) {
-            let mut stderr = std::io::stderr();
-            let _ = reporters::render_advice_summary(&view, &mut stderr);
-        }
+        print_formatted_output(
+            &cli,
+            &view,
+            delta_view.as_ref(),
+            prep.delta_state.as_ref(),
+            &prep.analysis,
+            &prep.inputs,
+        )?;
     }
 
     // Exit code derives from `view.full.passed` — i.e., the underlying
@@ -753,12 +613,252 @@ fn run_inner() -> Result<bool> {
     // set. `--no-fail` overrides BOTH gates — truth lives in JSON
     // (`result.passed` and `delta.summary.passed`) so consumers can
     // still detect "would have failed."
-    let delta_passed = delta_state
-        .as_ref()
-        .map(|s| s.delta.summary.passed)
-        .unwrap_or(true);
+    Ok(compute_exit_code(
+        &cli,
+        prep.analysis.result.passed,
+        prep.delta_state.as_ref(),
+    ))
+}
+
+// ── Run-inner orchestration helpers ────────────────────────────────
+
+/// Effective inputs after CLI / config-file / preset / default merging.
+/// Everything `core::analyze` needs except the coverage path (which is
+/// validated separately and may be borrowed from `cli`).
+struct EffectiveInputs {
+    src: PathBuf,
+    metric: ComplexityMetric,
+    threshold_config: ThresholdConfig,
+    threshold: f64,
+    exclude: Vec<String>,
+}
+
+/// In-flight pipeline state assembled by `prepare_pipeline`. Owns the
+/// analysis output and the optional delta state so the dispatch layer
+/// borrows through references.
+struct PipelinePrep {
+    inputs: EffectiveInputs,
+    analysis: crap4rs::core::AnalysisOutput,
+    delta_state: Option<DeltaState>,
+}
+
+fn merge_effective_inputs(cli: &Cli, file_config: &Option<FileConfig>) -> EffectiveInputs {
+    let src = cli
+        .input
+        .src
+        .clone()
+        .or_else(|| file_config.as_ref().and_then(|c| c.src.clone()))
+        .unwrap_or_else(|| PathBuf::from("src"));
+    let metric: ComplexityMetric = cli
+        .input
+        .metric
+        .map(Into::into)
+        .or_else(|| file_config.as_ref().and_then(|c| c.metric))
+        .unwrap_or_default();
+    let (threshold_config, threshold) = merge_threshold(cli, file_config);
+    let exclude = merge_exclude(cli, file_config);
+    EffectiveInputs {
+        src,
+        metric,
+        threshold_config,
+        threshold,
+        exclude,
+    }
+}
+
+fn validate_runtime_inputs<'a>(cli: &'a Cli, inputs: &EffectiveInputs) -> Result<&'a Path> {
+    // `--coverage` is required on the analysis path; subcommands like
+    // `completions` skip this branch. Clap can't express "required
+    // unless subcommand X" in derive, so we enforce it here.
+    let Some(coverage_path) = cli.input.coverage.as_deref() else {
+        bail!(
+            "--coverage <FILE> is required (run `crap4rs --help` for usage, or `crap4rs completions <SHELL>` for shell completion scripts)"
+        );
+    };
+
+    validate_inputs(coverage_path, &inputs.src, inputs.threshold)?;
+    preflight_checks(coverage_path, &inputs.src)?;
+
+    if let Some(diff_ref) = cli.filter.diff.as_deref() {
+        validate_diff_ref(diff_ref)?;
+        preflight_git_worktree(&inputs.src)?;
+    }
+
+    Ok(coverage_path)
+}
+
+fn build_analyze_options(cli: &Cli, inputs: &EffectiveInputs, coverage: &Path) -> AnalyzeOptions {
+    AnalyzeOptions {
+        src: inputs.src.clone(),
+        coverage: coverage.to_path_buf(),
+        threshold_config: inputs.threshold_config.clone(),
+        metric: inputs.metric,
+        exclude: inputs.exclude.clone(),
+        respect_gitignore: !cli.filter.no_gitignore,
+        diff_ref: cli.filter.diff.clone(),
+        compute_diagnostics: matches!(cli.output.format, FormatArg::Advice | FormatArg::Sarif),
+        ..AnalyzeOptions::default()
+    }
+}
+
+fn apply_diagnostics(cli: &Cli, diagnostics: &AnalysisDiagnostics) {
+    // Always warn about non-fatal issues (details require --verbose)
+    warn_if_issues(diagnostics);
+    if cli.display.verbose {
+        print_diagnostics(diagnostics);
+    }
+}
+
+/// Validates inputs, merges effective config, runs the analyzer, and
+/// resolves the optional baseline delta. The bulk of `run_inner`'s
+/// pre-render work lives here so `run_inner` itself stays a flat dispatch.
+fn prepare_pipeline(cli: &mut Cli) -> Result<PipelinePrep> {
+    validate_display_flags(cli)?;
+    apply_color(cli.display.color);
+
+    // Load config file (explicit path or auto-discovered)
+    let file_config = load_file_config(cli)?;
+
+    // Resolve `--view <NAME>` (issue #80) before validate_view_args runs
+    // so preset fields participate in the same validation pass as CLI
+    // flags. `apply_preset_to_cli` mutates `cli` in place: CLI explicit
+    // values win on `Option<T>` fields, bools OR-merge.
+    view_args::resolve_view_preset(cli, file_config.as_ref())?;
+    view_args::validate_view_args(cli)?;
+
+    let inputs = merge_effective_inputs(cli, &file_config);
+    let coverage_path = validate_runtime_inputs(cli, &inputs)?;
+    let options = build_analyze_options(cli, &inputs, coverage_path);
+
+    let analysis = crap4rs::core::analyze(&options)?;
+    apply_diagnostics(cli, &analysis.diagnostics);
+
+    // Resolve --baseline (issue #81): load a previously-emitted JSON
+    // envelope and compute the AnalysisDelta. None when --baseline is
+    // absent — the JSON envelope omits the `delta` block entirely so
+    // existing consumers see byte-identical output.
+    let delta_state = load_delta_state(cli, &analysis.result)?;
+
+    Ok(PipelinePrep {
+        inputs,
+        analysis,
+        delta_state,
+    })
+}
+
+// ── Format dispatch ────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+fn format_as_json(
+    cli: &Cli,
+    view: &view::AnalysisView<'_>,
+    delta_view: Option<&DeltaView<'_>>,
+    delta_state: Option<&DeltaState>,
+    diagnostics: &AnalysisDiagnostics,
+    metric: ComplexityMetric,
+    threshold: f64,
+) -> Result<String> {
+    let delta_ctx = delta_state.zip(delta_view).map(|(s, dv)| DeltaContext {
+        view: dv,
+        baseline_tool_version: &s.snapshot.tool_version,
+        baseline_timestamp: &s.snapshot.timestamp,
+        baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
+    });
+    let config = reporters::json::JsonConfig {
+        tool_version: env!("CARGO_PKG_VERSION").to_string(),
+        metric,
+        threshold,
+        timestamp: now_unix_epoch(),
+        diagnostics: cli.display.verbose.then_some(diagnostics),
+        diff_ref: cli.filter.diff.as_deref(),
+        minimal_view: cli.output.minimal_view,
+        delta: delta_ctx,
+    };
+    Ok(reporters::format_json(view, &config)?)
+}
+
+/// ScorecardRow projects the unshaped analysis + delta into a mokumo
+/// `Row::CrapDelta` JSON object (issue #111). View shaping does NOT
+/// alter scorecard-row — the aggregator consumes truth, not a filtered
+/// subset.
+fn format_as_scorecard_row(
+    delta_state: Option<&DeltaState>,
+    result: &crap4rs::domain::types::AnalysisResult,
+    threshold: f64,
+) -> String {
+    let baseline_result = delta_state.map(|s| &s.snapshot.result);
+    let delta_inputs = delta_state.map(|s| (&s.delta.summary, s.delta.changes.as_slice()));
+    let row_data = crap4rs::domain::summary::project_crap_delta_row(
+        result,
+        baseline_result,
+        delta_inputs,
+        threshold.round() as u32,
+    );
+    reporters::format_scorecard_row(&row_data)
+}
+
+fn print_formatted_output(
+    cli: &Cli,
+    view: &view::AnalysisView<'_>,
+    delta_view: Option<&DeltaView<'_>>,
+    delta_state: Option<&DeltaState>,
+    analysis: &crap4rs::core::AnalysisOutput,
+    inputs: &EffectiveInputs,
+) -> Result<()> {
+    let output = match cli.output.format {
+        FormatArg::Table => reporters::format_table_with_explain(
+            view,
+            delta_view,
+            inputs.threshold,
+            cli.display.breakdown,
+            cli.display.explain,
+        ),
+        FormatArg::Json | FormatArg::Advice => format_as_json(
+            cli,
+            view,
+            delta_view,
+            delta_state,
+            &analysis.diagnostics,
+            inputs.metric,
+            inputs.threshold,
+        )?,
+        FormatArg::Markdown => reporters::format_markdown(
+            view,
+            delta_view,
+            inputs.threshold,
+            cli.display.breakdown,
+            cli.display.explain,
+            cli.display.md_full_table,
+            cli.display.md_top,
+        ),
+        FormatArg::Csv => reporters::format_csv(view, delta_view, inputs.metric),
+        // SARIF is a gate translation, not a display: it iterates
+        // `view.full.functions` internally regardless of how the View
+        // was shaped. `--top`, `--sort-by`, `--only-failing`, and
+        // `--baseline` do NOT alter SARIF output — PR annotations
+        // must reflect truth.
+        FormatArg::Sarif => reporters::format_sarif(view, env!("CARGO_PKG_VERSION")),
+        FormatArg::ScorecardRow => {
+            format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
+        }
+    };
+    print!("{output}");
+
+    // SARIF's primary deliverable is the `.sarif` file uploaded to
+    // Code Scanning; stderr lines would noise up CI logs. Advice gets
+    // a stderr summary so humans skimming CI logs see the headline.
+    if matches!(cli.output.format, FormatArg::Advice) {
+        let mut stderr = std::io::stderr();
+        let _ = reporters::render_advice_summary(view, &mut stderr);
+    }
+
+    Ok(())
+}
+
+fn compute_exit_code(cli: &Cli, passed: bool, delta_state: Option<&DeltaState>) -> bool {
+    let delta_passed = delta_state.map(|s| s.delta.summary.passed).unwrap_or(true);
     let combined_passed = passed && (!cli.output.delta_gate || delta_passed);
-    Ok(combined_passed || cli.output.no_fail)
+    combined_passed || cli.output.no_fail
 }
 
 // ── Delta orchestration ─────────────────────────────────────────────
@@ -1802,5 +1902,133 @@ mod tests {
     #[test]
     fn zero_coverage_warn_does_not_trigger_when_no_files() {
         assert!(!majority_zero_coverage(0, 0));
+    }
+
+    // ── merge_effective_inputs tests ───────────────────────────────────
+
+    #[test]
+    fn merge_effective_inputs_default_src() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let inputs = merge_effective_inputs(&cli, &None);
+        assert_eq!(inputs.src, PathBuf::from("src"));
+    }
+
+    #[test]
+    fn merge_effective_inputs_cli_src_wins_over_config() {
+        let cli = parse(&["--coverage", "lcov.info", "--src", "crates/"]).unwrap();
+        let file_config = Some(FileConfig {
+            src: Some(PathBuf::from("from-config/")),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config);
+        assert_eq!(inputs.src, PathBuf::from("crates/"));
+    }
+
+    #[test]
+    fn merge_effective_inputs_config_src_when_cli_absent() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            src: Some(PathBuf::from("from-config/")),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config);
+        assert_eq!(inputs.src, PathBuf::from("from-config/"));
+    }
+
+    #[test]
+    fn merge_effective_inputs_default_metric_is_cognitive() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let inputs = merge_effective_inputs(&cli, &None);
+        assert!(matches!(inputs.metric, ComplexityMetric::Cognitive));
+    }
+
+    #[test]
+    fn merge_effective_inputs_cli_metric_overrides_config() {
+        let cli = parse(&["--coverage", "lcov.info", "--metric", "cyclomatic"]).unwrap();
+        let file_config = Some(FileConfig {
+            metric: Some(ComplexityMetric::Cognitive),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config);
+        assert!(matches!(inputs.metric, ComplexityMetric::Cyclomatic));
+    }
+
+    #[test]
+    fn merge_effective_inputs_threshold_default() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let inputs = merge_effective_inputs(&cli, &None);
+        assert_eq!(inputs.threshold, DEFAULT_THRESHOLD);
+    }
+
+    #[test]
+    fn merge_effective_inputs_exclude_combines_cli_and_config() {
+        let cli = parse(&["--coverage", "lcov.info", "--exclude", "tests/**"]).unwrap();
+        let file_config = Some(FileConfig {
+            exclude: Some(vec!["benches/**".to_string()]),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config);
+        assert_eq!(inputs.exclude, vec!["tests/**", "benches/**"]);
+    }
+
+    // ── compute_exit_code tests ────────────────────────────────────────
+    //
+    // delta_state=None covers the analysis-only paths; the delta-gate +
+    // delta_state=Some interactions are exercised end-to-end in
+    // delta_gate_integration.rs (where AnalysisDelta is built through
+    // the real `delta::compute` path rather than mocked).
+
+    #[test]
+    fn compute_exit_code_passing_no_delta() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert!(compute_exit_code(&cli, true, None));
+    }
+
+    #[test]
+    fn compute_exit_code_failing_no_delta() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        assert!(!compute_exit_code(&cli, false, None));
+    }
+
+    #[test]
+    fn compute_exit_code_no_fail_overrides_failure() {
+        let cli = parse(&["--coverage", "lcov.info", "--no-fail"]).unwrap();
+        assert!(compute_exit_code(&cli, false, None));
+    }
+
+    #[test]
+    fn compute_exit_code_delta_gate_without_runtime_baseline_treats_delta_as_passed() {
+        // delta_state=None → delta_passed defaults to true even with
+        // --delta-gate; this matches the runtime behavior when the
+        // baseline file is missing or unreadable. Clap requires
+        // --baseline to accompany --delta-gate at parse time, so we
+        // pass a sentinel path to satisfy the parser without exercising
+        // the file load (compute_exit_code only inspects the resolved
+        // delta state, not cli.input.baseline).
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--delta-gate",
+            "--baseline",
+            "/dev/null",
+        ])
+        .unwrap();
+        assert!(compute_exit_code(&cli, true, None));
+    }
+
+    #[test]
+    fn compute_exit_code_no_fail_with_delta_gate() {
+        // --no-fail is the master override even when --delta-gate
+        // is set.
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--delta-gate",
+            "--baseline",
+            "/dev/null",
+            "--no-fail",
+        ])
+        .unwrap();
+        assert!(compute_exit_code(&cli, false, None));
     }
 }

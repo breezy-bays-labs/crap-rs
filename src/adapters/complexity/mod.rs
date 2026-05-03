@@ -276,145 +276,226 @@ fn count_cognitive_expr(
 ) -> u32 {
     match expr {
         Expr::If(expr_if) => count_cognitive_if(expr_if, nesting, contributors),
-        Expr::Match(expr_match) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Match,
-                expr_match.match_token.span,
-                end_line_of(expr_match),
-                nesting,
-                1 + nesting,
-            );
-            let mut total = 1 + nesting; // +1 structural, +nesting
-            total += count_cognitive_expr(&expr_match.expr, nesting, contributors);
-            for arm in &expr_match.arms {
-                if let Some(guard) = &arm.guard {
-                    total += count_cognitive_expr(&guard.1, nesting + 1, contributors);
-                }
-                total += count_cognitive_expr(&arm.body, nesting + 1, contributors);
-            }
-            total
-        }
-        Expr::While(expr_while) => {
-            add_contributor(
-                contributors,
-                ContributorKind::WhileLoop,
-                expr_while.while_token.span,
-                end_line_of(expr_while),
-                nesting,
-                1 + nesting,
-            );
-            let mut total = 1 + nesting;
-            total += count_cognitive_expr(&expr_while.cond, nesting, contributors);
-            total += count_cognitive_block(&expr_while.body, nesting + 1, contributors);
-            total
-        }
-        Expr::ForLoop(expr_for) => {
-            add_contributor(
-                contributors,
-                ContributorKind::ForLoop,
-                expr_for.for_token.span,
-                end_line_of(expr_for),
-                nesting,
-                1 + nesting,
-            );
-            let mut total = 1 + nesting;
-            total += count_cognitive_expr(&expr_for.expr, nesting, contributors);
-            total += count_cognitive_block(&expr_for.body, nesting + 1, contributors);
-            total
-        }
-        Expr::Loop(expr_loop) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Loop,
-                expr_loop.loop_token.span,
-                end_line_of(expr_loop),
-                nesting,
-                1 + nesting,
-            );
-            let mut total = 1 + nesting;
-            total += count_cognitive_block(&expr_loop.body, nesting + 1, contributors);
-            total
-        }
-        Expr::Binary(bin) => {
-            // count_cognitive_binary_chain handles all &&/|| operators in the tree.
-            // count_cognitive_binary_operands walks the non-binary leaves so that
-            // constructs like `?`, `if`, etc. inside binary expressions are also counted.
-            count_cognitive_binary_chain(bin, nesting, contributors)
-                + count_cognitive_binary_operands(&bin.left, nesting, contributors)
-                + count_cognitive_binary_operands(&bin.right, nesting, contributors)
-        }
-        Expr::Try(expr_try) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Try,
-                expr_try.question_token.span,
-                expr_try.question_token.span.end().line,
-                nesting,
-                1,
-            );
-            1 + count_cognitive_expr(&expr_try.expr, nesting, contributors)
-        }
-        Expr::Break(expr_break) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Break,
-                expr_break.break_token.span,
-                expr_break.break_token.span.end().line,
-                nesting,
-                1,
-            );
-            1
-        }
+        Expr::Match(expr_match) => count_cognitive_match(expr_match, nesting, contributors),
+        Expr::While(expr_while) => count_cognitive_while(expr_while, nesting, contributors),
+        Expr::ForLoop(expr_for) => count_cognitive_for_loop(expr_for, nesting, contributors),
+        Expr::Loop(expr_loop) => count_cognitive_loop(expr_loop, nesting, contributors),
+        Expr::Binary(bin) => count_cognitive_binary(bin, nesting, contributors),
+        Expr::Try(expr_try) => count_cognitive_try(expr_try, nesting, contributors),
+        Expr::Break(expr_break) => count_cognitive_break(expr_break, nesting, contributors),
         Expr::Continue(expr_continue) => {
-            add_contributor(
-                contributors,
-                ContributorKind::Continue,
-                expr_continue.continue_token.span,
-                expr_continue.continue_token.span.end().line,
-                nesting,
-                1,
-            );
-            1
+            count_cognitive_continue(expr_continue, nesting, contributors)
         }
         Expr::Block(expr_block) => count_cognitive_block(&expr_block.block, nesting, contributors),
-        Expr::Return(ret) => {
-            if let Some(expr) = &ret.expr {
-                count_cognitive_expr(expr, nesting, contributors)
-            } else {
-                0
-            }
-        }
-        Expr::Closure(closure) => {
-            // No structural increment, but increases nesting depth for nested structures
-            count_cognitive_expr(&closure.body, nesting + 1, contributors)
-        }
-        Expr::Call(call) => {
-            let mut total = count_cognitive_expr(&call.func, nesting, contributors);
-            for arg in &call.args {
-                total += count_cognitive_expr(arg, nesting, contributors);
-            }
-            total
-        }
-        Expr::MethodCall(mc) => {
-            let mut total = count_cognitive_expr(&mc.receiver, nesting, contributors);
-            for arg in &mc.args {
-                total += count_cognitive_expr(arg, nesting, contributors);
-            }
-            total
-        }
-        Expr::Tuple(tuple) => {
-            let mut total = 0;
-            for elem in &tuple.elems {
-                total += count_cognitive_expr(elem, nesting, contributors);
-            }
-            total
-        }
+        Expr::Return(ret) => count_cognitive_return(ret, nesting, contributors),
+        Expr::Closure(closure) => count_cognitive_closure(closure, nesting, contributors),
+        Expr::Call(call) => count_cognitive_call(call, nesting, contributors),
+        Expr::MethodCall(mc) => count_cognitive_method_call(mc, nesting, contributors),
+        Expr::Tuple(tuple) => count_cognitive_tuple(tuple, nesting, contributors),
         Expr::Reference(r) => count_cognitive_expr(&r.expr, nesting, contributors),
         Expr::Unary(u) => count_cognitive_expr(&u.expr, nesting, contributors),
         Expr::Paren(p) => count_cognitive_expr(&p.expr, nesting, contributors),
         _ => 0,
     }
+}
+
+fn count_cognitive_match(
+    expr_match: &syn::ExprMatch,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    add_contributor(
+        contributors,
+        ContributorKind::Match,
+        expr_match.match_token.span,
+        end_line_of(expr_match),
+        nesting,
+        1 + nesting,
+    );
+    let mut total = 1 + nesting; // +1 structural, +nesting
+    total += count_cognitive_expr(&expr_match.expr, nesting, contributors);
+    for arm in &expr_match.arms {
+        if let Some(guard) = &arm.guard {
+            total += count_cognitive_expr(&guard.1, nesting + 1, contributors);
+        }
+        total += count_cognitive_expr(&arm.body, nesting + 1, contributors);
+    }
+    total
+}
+
+fn count_cognitive_while(
+    expr_while: &syn::ExprWhile,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    add_contributor(
+        contributors,
+        ContributorKind::WhileLoop,
+        expr_while.while_token.span,
+        end_line_of(expr_while),
+        nesting,
+        1 + nesting,
+    );
+    let mut total = 1 + nesting;
+    total += count_cognitive_expr(&expr_while.cond, nesting, contributors);
+    total += count_cognitive_block(&expr_while.body, nesting + 1, contributors);
+    total
+}
+
+fn count_cognitive_for_loop(
+    expr_for: &syn::ExprForLoop,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    add_contributor(
+        contributors,
+        ContributorKind::ForLoop,
+        expr_for.for_token.span,
+        end_line_of(expr_for),
+        nesting,
+        1 + nesting,
+    );
+    let mut total = 1 + nesting;
+    total += count_cognitive_expr(&expr_for.expr, nesting, contributors);
+    total += count_cognitive_block(&expr_for.body, nesting + 1, contributors);
+    total
+}
+
+fn count_cognitive_loop(
+    expr_loop: &syn::ExprLoop,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    add_contributor(
+        contributors,
+        ContributorKind::Loop,
+        expr_loop.loop_token.span,
+        end_line_of(expr_loop),
+        nesting,
+        1 + nesting,
+    );
+    let mut total = 1 + nesting;
+    total += count_cognitive_block(&expr_loop.body, nesting + 1, contributors);
+    total
+}
+
+// `count_cognitive_binary_chain` walks all `&&` / `||` operators in the
+// tree; `count_cognitive_binary_operands` walks the non-binary leaves so
+// constructs like `?`, `if`, etc. inside binary expressions are also
+// counted.
+fn count_cognitive_binary(
+    bin: &ExprBinary,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    count_cognitive_binary_chain(bin, nesting, contributors)
+        + count_cognitive_binary_operands(&bin.left, nesting, contributors)
+        + count_cognitive_binary_operands(&bin.right, nesting, contributors)
+}
+
+fn count_cognitive_try(
+    expr_try: &syn::ExprTry,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    add_contributor(
+        contributors,
+        ContributorKind::Try,
+        expr_try.question_token.span,
+        expr_try.question_token.span.end().line,
+        nesting,
+        1,
+    );
+    1 + count_cognitive_expr(&expr_try.expr, nesting, contributors)
+}
+
+fn count_cognitive_break(
+    expr_break: &syn::ExprBreak,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    add_contributor(
+        contributors,
+        ContributorKind::Break,
+        expr_break.break_token.span,
+        expr_break.break_token.span.end().line,
+        nesting,
+        1,
+    );
+    1
+}
+
+fn count_cognitive_continue(
+    expr_continue: &syn::ExprContinue,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    add_contributor(
+        contributors,
+        ContributorKind::Continue,
+        expr_continue.continue_token.span,
+        expr_continue.continue_token.span.end().line,
+        nesting,
+        1,
+    );
+    1
+}
+
+fn count_cognitive_return(
+    ret: &syn::ExprReturn,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    match &ret.expr {
+        Some(expr) => count_cognitive_expr(expr, nesting, contributors),
+        None => 0,
+    }
+}
+
+// Closures don't add a structural increment but bump nesting so any
+// branching inside the closure body is charged for being deeper.
+fn count_cognitive_closure(
+    closure: &syn::ExprClosure,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    count_cognitive_expr(&closure.body, nesting + 1, contributors)
+}
+
+fn count_cognitive_call(
+    call: &syn::ExprCall,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    let mut total = count_cognitive_expr(&call.func, nesting, contributors);
+    for arg in &call.args {
+        total += count_cognitive_expr(arg, nesting, contributors);
+    }
+    total
+}
+
+fn count_cognitive_method_call(
+    mc: &syn::ExprMethodCall,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    let mut total = count_cognitive_expr(&mc.receiver, nesting, contributors);
+    for arg in &mc.args {
+        total += count_cognitive_expr(arg, nesting, contributors);
+    }
+    total
+}
+
+fn count_cognitive_tuple(
+    tuple: &syn::ExprTuple,
+    nesting: u32,
+    contributors: &mut Vec<ComplexityContributor>,
+) -> u32 {
+    let mut total = 0;
+    for elem in &tuple.elems {
+        total += count_cognitive_expr(elem, nesting, contributors);
+    }
+    total
 }
 
 fn count_cognitive_if(
