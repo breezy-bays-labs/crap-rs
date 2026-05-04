@@ -29,7 +29,7 @@ If no `lcov.info` exists, generate one first via `cargo llvm-cov --lcov --output
 ### Step 1 — Run the analyzer
 
 ```bash
-crap4rs --src src --coverage lcov.info --format advice --no-fail > /tmp/advice.json 2>&1
+crap4rs --src src --coverage lcov.info --format advice --no-fail > tmp/advice.json 2>&1
 ```
 
 `--format advice` (issue #76) attaches a `Diagnostic` to every over-threshold verdict containing:
@@ -133,10 +133,10 @@ Examples for a real `branch_path`:
 Dogfood on crap4rs itself:
 
 ```bash
-cd ~/Github/crap4rs
+cd path/to/crap4rs              # adjust to your local clone
 cargo llvm-cov --lcov --output-path lcov.info
-crap4rs --src src --coverage lcov.info --strict --format advice --no-fail > /tmp/crap-advice.json
-# Then trigger the skill — it reads /tmp/crap-advice.json (or re-invokes crap4rs).
+crap4rs --src src --coverage lcov.info --strict --format advice --no-fail > tmp/crap-advice.json
+# Then trigger the skill — it reads tmp/crap-advice.json (or re-invokes crap4rs).
 ```
 
 The PR shipping this skill (#77) includes one such dogfood example linked from the changelog entry.

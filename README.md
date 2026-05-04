@@ -352,7 +352,7 @@ cp -r skills/cut-the-crap ~/.claude/skills/
 
 Then in any Claude Code session:
 
-```
+```text
 /cut-the-crap                       # cover-then-split, apply changes
 /cut-the-crap --explain-only        # produce plan, do not modify
 /cut-the-crap --threshold 15        # custom CRAP threshold

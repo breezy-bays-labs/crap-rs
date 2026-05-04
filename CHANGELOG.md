@@ -31,8 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   advice from either entry point. SARIF output stays byte-identical for
   runs without diagnostics.
 - **`/cut-the-crap` reference Claude Code skill** — ships at
-  `.claude/skills/cut-the-crap/` (install via
-  `cp -r .claude/skills/cut-the-crap ~/.claude/skills/`). Consumes
+  `skills/cut-the-crap/` (install via
+  `cp -r skills/cut-the-crap ~/.claude/skills/`). Consumes
   `crap4rs --format advice` and drives the cover-then-split remediation
   loop: write tests for `coverage_gaps` first when `root_cause:
   low_coverage`, name + apply the `recommended` `ProposedSplit` when

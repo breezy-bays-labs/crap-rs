@@ -508,8 +508,13 @@ async fn main() {
     // JSON when invoked via `cargo nextest run` (which probes `--list`),
     // and falls back to the human-readable basic writer for plain
     // `cargo test` runs. Required for nextest discovery (#115).
+    //
+    // `run_and_exit` (not `run`) panics on scenario failure, which gives
+    // a non-zero process exit under `cargo test`. Plain `run` returns a
+    // Writer and exits 0 even when scenarios fail — silently turning a
+    // red CI step green.
     JsonWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
-        .run("tests/features/json_reporter.feature")
+        .run_and_exit("tests/features/json_reporter.feature")
         .await;
 }

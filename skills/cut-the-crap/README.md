@@ -15,7 +15,7 @@ The skill is then invocable as `/cut-the-crap` from any Claude Code session — 
 
 ## Usage
 
-```
+```text
 /cut-the-crap                       # cover-then-split, apply changes
 /cut-the-crap --explain-only        # produce plan, do not modify
 /cut-the-crap --threshold 15        # custom CRAP threshold
