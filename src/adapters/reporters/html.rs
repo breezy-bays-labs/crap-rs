@@ -31,14 +31,10 @@ pub fn format_html(view: &AnalysisView<'_>, threshold: f64) -> String {
 
     let mut body = String::new();
     body.push_str(&render_header(&title, threshold));
-    body.push_str(&render_summary(
-        &view.full.summary,
-        threshold,
-        view.full.passed,
-    ));
+    body.push_str(&render_summary(&view.full.summary, view.full.passed));
 
-    if view.full.functions.is_empty() {
-        body.push_str("<p class=\"empty\">No functions analyzed.</p>\n");
+    if visible_section_is_empty(view) {
+        body.push_str("<p class=\"empty\">No functions to display.</p>\n");
     } else {
         body.push_str(&render_files_section(view));
     }
@@ -224,7 +220,7 @@ fn render_header(title: &str, threshold: f64) -> String {
     out
 }
 
-fn render_summary(summary: &AnalysisSummary, _threshold: f64, passed: bool) -> String {
+fn render_summary(summary: &AnalysisSummary, passed: bool) -> String {
     let mut out = String::new();
     out.push_str("<section class=\"summary\">\n");
     let badge = if passed {
@@ -285,12 +281,36 @@ fn render_distribution(dist: &RiskDistribution) -> String {
 fn render_files_section(view: &AnalysisView<'_>) -> String {
     let mut out = String::new();
     out.push_str("<section class=\"files\">\n<h2>Functions by file</h2>\n");
-    let by_file = group_by_file(&view.shown);
-    for (file, fns) in &by_file {
-        out.push_str(&render_file(file, fns));
+    // When `--group-by file` is active, `view.grouped.files` carries the
+    // file-level sort/Top-N selection; respect that order and restrict
+    // the rendered file list to it. Otherwise fall back to the natural
+    // file partition over `view.shown`.
+    if let Some(grouped) = view.grouped.as_ref() {
+        let fns_by_file = group_by_file(&view.shown);
+        for file_summary in &grouped.files {
+            let fns: Vec<&FunctionVerdict> = fns_by_file
+                .get(file_summary.file_path.as_str())
+                .cloned()
+                .unwrap_or_default();
+            out.push_str(&render_file(&file_summary.file_path, &fns));
+        }
+    } else {
+        for (file, fns) in &group_by_file(&view.shown) {
+            out.push_str(&render_file(file, fns));
+        }
     }
     out.push_str("</section>\n");
     out
+}
+
+/// True when there are no rows to render in the file section. Honors
+/// the shaped view: with grouping active, considers the post-truncate
+/// file list; otherwise considers the post-filter `shown` rows.
+fn visible_section_is_empty(view: &AnalysisView<'_>) -> bool {
+    match view.grouped.as_ref() {
+        Some(g) => g.files.is_empty(),
+        None => view.shown.is_empty(),
+    }
 }
 
 fn group_by_file<'a>(rows: &[&'a FunctionVerdict]) -> BTreeMap<&'a str, Vec<&'a FunctionVerdict>> {
@@ -447,7 +467,7 @@ mod tests {
         let view = make_view_default(&result);
         let html = format_html(&view, 8.0);
         assert!(html.starts_with("<!DOCTYPE html>"));
-        assert!(html.contains("No functions analyzed"));
+        assert!(html.contains("No functions to display"));
         assert!(html.ends_with("</html>\n"));
     }
 
@@ -558,5 +578,57 @@ mod tests {
         assert!(html.contains("<!DOCTYPE html>"));
         assert!(html.contains("<html lang=\"en\">"));
         assert!(html.contains("viewport"));
+    }
+
+    #[test]
+    fn empty_after_filter_renders_empty_marker() {
+        // The fixture has functions in `full`, but a filter that strips
+        // every function from `shown` should produce the empty section
+        // — not a stale "Functions by file" header with no contents.
+        use crate::domain::view::{self, CoverageRange, Filters, ViewSpec};
+        let result = make_multi_function_result();
+        // Fixture coverage maxes out at 95% — a 99–100% band drops all.
+        let spec = ViewSpec {
+            filters: Filters {
+                coverage_range: Some(CoverageRange::new(99.0, 100.0).unwrap()),
+                ..Filters::default()
+            },
+            ..ViewSpec::default()
+        };
+        let view = view::apply(&result, spec);
+        assert!(
+            view.shown.is_empty(),
+            "fixture pre-condition: shown should be empty under this filter"
+        );
+        let html = format_html(&view, 8.0);
+        assert!(html.contains("No functions to display"));
+        assert!(!html.contains("Functions by file"));
+    }
+
+    #[test]
+    fn grouped_view_honors_file_top_n_and_order() {
+        // Under `--group-by file --top 1`, only the worst file should
+        // appear in the rendered output. The fixture's worst file
+        // (highest CRAP) is `src/domain/crap.rs` (complex_fn @ 45.2);
+        // the other two should be omitted.
+        use crate::domain::view::{self, GroupKey, SortKey, ViewSpec};
+        let result = make_multi_function_result();
+        let spec = ViewSpec {
+            sort: SortKey::Crap,
+            group_by: Some(GroupKey::File),
+            limit: Some(1),
+            ..ViewSpec::default()
+        };
+        let view = view::apply(&result, spec);
+        assert!(view.grouped.is_some());
+        let html = format_html(&view, 8.0);
+        assert_eq!(
+            html.matches("<details class=\"file\"").count(),
+            1,
+            "only the top-1 file should be rendered when grouped"
+        );
+        assert!(html.contains("src/domain/crap.rs"));
+        assert!(!html.contains("src/lib.rs"));
+        assert!(!html.contains("src/adapters/coverage/mod.rs"));
     }
 }
