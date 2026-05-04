@@ -16,12 +16,18 @@ CRAP(complexity, coverage) = complexity^2 * (1 - coverage)^3 + complexity
 
 High complexity + low coverage = high CRAP score = high risk of bugs when changed.
 
+### Risk classification (intrinsic)
+
+Every score lands in one of four risk levels. The classification is intrinsic to the score and drives the SARIF severity mapping — it is **not** the build gate.
+
 | CRAP Score | Risk Level |
 |------------|------------|
 | ≤ 5 | Low |
 | ≤ 8 | Acceptable |
 | ≤ 30 | Moderate |
 | > 30 | High |
+
+The build gate is a separate axis — see [Threshold (the gate)](#threshold-the-gate) below.
 
 ## Usage
 
@@ -54,13 +60,21 @@ crap4rs --src src/ --coverage lcov.info
 | `--group-by <key>` | — | Aggregate the displayed view by a key. Today: `file` (per-file summaries). Under grouping, `--top` and `--sort-by` key at the file level. |
 | `--no-fail` | — | Always exit `0`; `result.passed` in JSON still reflects the truthful state |
 
-Threshold presets are Rust-specific:
+### Threshold (the gate)
 
-- `--strict` = `15`
-- default = `25`
-- `--lenient` = `40`
+`--threshold` is the line above which a function trips the build gate (exit `1` unless `--no-fail`). It is a separate axis from the risk classification — the gate is deliberately more aggressive than waiting for the `High` tier so functions surface before they cliff.
 
-These do not match `crap4ts` exactly. The long-term goal is shared CRAP math and shared analysis concepts via `crap-core`, with language-specific adapters and threshold policy above that core.
+| Preset | Threshold | Where the gate sits relative to risk levels |
+|--------|-----------|---------------------------------------------|
+| `--strict` | `15` | Fires inside `Moderate` — flags borderline functions early |
+| default | `25` | Fires near the top of `Moderate` (just before `High` at 30) |
+| `--lenient` | `40` | Fires inside `High` — only catches genuinely-dangerous functions |
+
+A function with CRAP `7` is `Acceptable` and never trips any preset. A function with CRAP `40` is `High` and trips every preset. A function with CRAP `20` is `Moderate` (the risk classification) but trips `--strict` (the gate); the two answers are independent.
+
+Risk classification feeds SARIF severity (`high → error`, `moderate → warning`, `acceptable/low → note`); threshold feeds the exit code. Scorecard-row status (`Red`/`Yellow`/`Green`) — see [docs/scorecard-row-contract.md](docs/scorecard-row-contract.md) — is minted from the threshold gate, not from risk classification.
+
+These thresholds do not match `crap4ts` exactly. The long-term goal is shared CRAP math and shared analysis concepts via `crap-core`, with language-specific adapters and threshold policy above that core.
 
 ### Why cognitive by default?
 
@@ -157,6 +171,19 @@ The shaping flags `--delta-top`, `--delta-sort` (`score-delta` (default) | `curr
 
 `--format markdown` produces GitHub-flavored Markdown (pipe-syntax table plus a Summary block) — paste it into a PR comment, an issue body, or a doc page. `--format csv` produces RFC 4180 CSV with a fixed header row, suitable for piping into spreadsheets, BI tools, or `awk`/`jq` pipelines that prefer tabular input. Both honor every shaping flag (`--top`, `--sort-by`, `--only-failing`, `--min-coverage` / `--max-coverage`).
 
+### Scorecard row (`--format scorecard-row`)
+
+Emits a single `Row::CrapDelta` JSON object on stdout, conformant to the locked schema in [breezy-bays-labs/mokumo](https://github.com/breezy-bays-labs/mokumo) at `.config/scorecard/schema.json`. Designed for cross-tool aggregation: a fan-in workflow can run crap4rs alongside other per-gate emitters (mutation testing, BDD, dep-cruiser, coverage) and post one composed scorecard comment per PR.
+
+```bash
+# Producer mode — one Row per run, no envelope, no markdown noise
+crap4rs --coverage lcov.info --baseline baseline.json --format scorecard-row
+```
+
+Status (`Red`/`Yellow`/`Green`) is minted by crap4rs from the [threshold gate](#threshold-the-gate) and modified-function regressions, *not* from the intrinsic risk classification. See **[docs/scorecard-row-contract.md](docs/scorecard-row-contract.md)** for the full contract reference: wire shape, status policy, schema vendoring, producer-pattern overview, and the planned crap-core extraction path.
+
+The composite action at `.github/actions/scorecard` exposes the same JSON via `outputs.row-json` for downstream aggregator workflows.
+
 ### Agent advice (`--format advice`) — experimental
 
 `--format advice` emits the same JSON envelope as `--format json`, but with a populated `Diagnostic` on every over-threshold `view.shown[]` entry. The diagnostic is AST-derived — coverage gaps, complexity drivers, suggested actions, and a flat `root_cause` scalar — so coding agents can read findings and propose remediations without re-walking the source.
@@ -206,6 +233,8 @@ A grep-friendly stderr summary streams alongside stdout — one line per over-th
 | `moderate`     | `warning`     |
 | `acceptable`   | `note`        |
 | `low`          | `note`        |
+
+Severity is the [intrinsic risk classification](#risk-classification-intrinsic), not the threshold gate — a `Moderate` function is a SARIF `warning` regardless of which preset is in effect.
 
 Unlike the table / JSON / Markdown / CSV reporters, SARIF is a **gate translation**, not a display: it iterates the unshapeable analysis. `--top`, `--sort-by`, `--only-failing`, and `--baseline` do **not** alter SARIF output — PR annotations must reflect truth, not a presentation choice. `--no-fail` overrides the exit code only; the `results[]` array still lists every finding.
 
