@@ -77,6 +77,15 @@ outputs:
   markdown:
     description: 'The rendered markdown scorecard. Consume directly in aggregator bots.'
     value: ${{ steps.run.outputs.markdown }}
+  row-json:
+    description: |
+      The mokumo `Row::CrapDelta` JSON object emitted by `crap4rs --format scorecard-row`.
+      Conforms to the locked scorecard schema published at
+      https://github.com/breezy-bays-labs/mokumo/blob/main/.config/scorecard/schema.json
+      (the `CrapDelta` member of `definitions/Row` `oneOf`). Consume in aggregator workflows
+      that re-render the scorecard with full layout control instead of parsing `outputs.markdown`.
+      Producer-side status policy lives in crap4rs (see PR #119).
+    value: ${{ steps.run.outputs.row_json }}
   json-envelope-path:
     description: 'Path to the full JSON envelope on the runner — pass to downstream tooling.'
     value: ${{ steps.run.outputs.envelope_path }}
@@ -166,6 +175,7 @@ runs:
         set -euo pipefail
         envelope="$RUNNER_TEMP/crap4rs-envelope.json"
         markdown_file="$RUNNER_TEMP/crap4rs-scorecard.md"
+        row_json_file="$RUNNER_TEMP/crap4rs-row.json"
         common=(--coverage "$COVERAGE" --src "$SRC" --threshold "$THRESHOLD")
         [ -n "$CONFIG" ] && common+=(--config "$CONFIG")
         if [ -n "$BASELINE" ]; then
@@ -177,14 +187,36 @@ runs:
         # gates would have tripped. The hard gating happens in the dedicated
         # gate step below, gated by the analysis-gate / delta-gate inputs.
         #
-        # Two-pass note: we run crap4rs twice — once for JSON, once for
-        # markdown — because the analyzer doesn't yet support multi-format
-        # output in a single invocation. The cost is one extra LCOV parse +
-        # CRAP recompute (cheap relative to runner setup); the user-visible
-        # latency is dominated by `cargo binstall crap4rs` upstream. Tracked
-        # in https://github.com/breezy-bays-labs/crap4rs/issues/100.
+        # Three-pass note: we run crap4rs three times — once each for JSON,
+        # markdown, and scorecard-row — because the analyzer doesn't yet
+        # support multi-format output in a single invocation. The cost is two
+        # extra LCOV parses + CRAP recomputes (cheap relative to runner
+        # setup); the user-visible latency is dominated by
+        # `cargo binstall crap4rs` upstream. Tracked in
+        # https://github.com/breezy-bays-labs/crap4rs/issues/100.
         crap4rs "${common[@]}" --format json --no-fail > "$envelope"
         crap4rs "${common[@]}" --format markdown --no-fail > "$markdown_file"
+
+        # Graceful probe: --format scorecard-row landed in crap4rs 0.4.0
+        # (https://github.com/breezy-bays-labs/crap4rs/pull/119). Older
+        # releases — including crates.io's 0.3.0, which `cargo binstall
+        # crap4rs` resolves to until 0.4.0 publishes — don't recognize the
+        # value and clap exits non-zero. Probe the installed help text and
+        # emit an empty row-json with a workflow warning if the variant
+        # isn't supported, so consumers see the gap explicitly without
+        # the action turning red.
+        # `grep -q` exits as soon as it sees a match, which under
+        # `set -o pipefail` can SIGPIPE the upstream `crap4rs --help`
+        # and surface as a non-zero pipeline status — the probe would
+        # then false-negative even when the variant IS supported.
+        # Plain `grep ... >/dev/null` reads to EOF, no SIGPIPE.
+        if crap4rs --help 2>/dev/null | grep -- 'scorecard-row' >/dev/null; then
+          crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
+        else
+          installed_version="$(crap4rs --version 2>/dev/null || echo 'unknown')"
+          echo "::warning::Installed crap4rs ($installed_version) lacks '--format scorecard-row'; outputs.row-json will be empty. Pin the action's 'version' input to '0.4.0' or later once it publishes for structured Row::CrapDelta output."
+          : > "$row_json_file"
+        fi
 
         # Parse the envelope. jq is preinstalled on GitHub-hosted runners.
         analysis_passed=$(jq -r '.result.passed' "$envelope")
@@ -203,6 +235,17 @@ runs:
           echo "markdown<<__CRAP_SCORECARD_EOF__"
           cat "$markdown_file"
           echo "__CRAP_SCORECARD_EOF__"
+        } >> "$GITHUB_OUTPUT"
+
+        # Multi-line output: file the row-json via a distinct heredoc sentinel.
+        # The file is the raw stdout of `crap4rs --format scorecard-row` —
+        # one mokumo Row::CrapDelta JSON object, no envelope wrapping. The
+        # sentinel must not appear in the JSON; pretty-printed CrapDelta
+        # never contains it.
+        {
+          echo "row_json<<__CRAP_SCORECARD_ROW_EOF__"
+          cat "$row_json_file"
+          echo "__CRAP_SCORECARD_ROW_EOF__"
         } >> "$GITHUB_OUTPUT"
 
         # Surface a compact summary in the job log so failures are obvious
