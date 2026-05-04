@@ -125,6 +125,42 @@ fn red_row_without_failure_detail_is_rejected_by_layer_2_if_then() {
     );
 }
 
+// ── End-to-end CLI dispatch ──────────────────────────────────────────
+//
+// Exercise `crap4rs --format scorecard-row` through the binary so the
+// CLI dispatch path (`format_as_scorecard_row` and the surrounding
+// `print_formatted_output` arm) is covered. The earlier per-status
+// tests above call the projector + reporter directly — they don't go
+// through `run_inner`, so the dispatch arm previously had zero
+// coverage.
+
+#[test]
+fn cli_dispatch_emits_scorecard_row_validating_against_schema() {
+    let binary = env!("CARGO_BIN_EXE_crap4rs");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let out = std::process::Command::new(binary)
+        .args([
+            "--coverage",
+            &format!("{manifest_dir}/tests/fixtures/crap4rs-self.lcov"),
+            "--src",
+            &format!("{manifest_dir}/src"),
+            "--format",
+            "scorecard-row",
+            "--no-fail",
+        ])
+        .output()
+        .expect("failed to run crap4rs binary");
+
+    assert!(
+        out.status.success(),
+        "crap4rs --format scorecard-row exited non-zero ({:?}); stderr=\n{}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    let stdout = String::from_utf8(out.stdout).expect("stdout must be UTF-8");
+    validate_row(&stdout);
+}
+
 // ── Schema version pin ───────────────────────────────────────────────
 
 #[test]
