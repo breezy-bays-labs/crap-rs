@@ -36,6 +36,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nesting_depth` so domain helpers can answer span/nesting questions
   without re-walking the AST. Both fields default to `0` for
   forward-compat with older payloads.
+- **Breaking — JSON envelope `schema_version` 1 → 2.**
+  `ComplexityContributor.column` is now **1-based inclusive** (was
+  0-based), matching `SourceSpan::start_column` / `end_column` and the
+  SARIF spec. The bump is the wire signal that contributor column
+  semantics shifted; consumers reading `column` should add `1` to v1
+  values when comparing against v2. Baseline JSON files at v1 remain
+  loadable for `--baseline` delta calculations (matching is identity-
+  keyed, not column-keyed); `crap4rs --format json` now emits v2. The
+  CLI rejects baseline envelopes with unknown `schema_version` and
+  reports the accepted set (`[1, 2]`) in stderr. Closes #107.
+
+- `core::analyze` is now a thin facade over a private
+  `AnalysisContext` (`fn analyze(opts) -> AnalysisContext::new(opts).run()`).
+  Phase methods (`discover_sources`, `load_diff_data`, `parse_coverage`,
+  `extract_complexities`) hang off the context; diff-mode early-exit is
+  surfaced via `Option<AnalysisOutput>` from
+  `short_circuit_on_files` / `short_circuit_on_complexities` so the
+  top-level `run()` body stays flat. Public API (`analyze`,
+  `AnalyzeOptions`, `AnalysisOutput`) is unchanged; behavior is identical
+  (every existing test passes unmodified). Closes #57.
+
+- **Self-CRAP gate is honest again** — lifted `--exclude "cli/**"` from
+  the self-referential CRAP step in `.github/workflows/ci.yml`. The
+  exclusion was added during the M0 cli/ scaffolding sprint and outlived
+  its tracking issue; with the recent `prepare_pipeline` /
+  `count_cognitive_expr` splits (#121, #122) and `core::analyze`
+  decomposition (#57), the worst CRAP across the entire codebase is
+  13.0 — well under the strict-mode threshold of 15. The gate now
+  exercises every shipped `.rs` file. Closes #109.
+
+### Documentation
+- **`domain::view` public-surface rustdoc** — the canonical pure-domain
+  shaping primitive (`view::apply`) is now fully documented at the
+  module level (input contract, pipeline order
+  `filter → group? → sort → truncate`, gate-keystone invariant,
+  `should_render_view_line` predicate, `#[non_exhaustive]` extension
+  policy, `crap-core` extraction note) and per public item:
+  `ViewSpec`, `Filters`, `CoverageRange`, `SortKey`, `GroupKey`,
+  `GroupedView`, `AnalysisView`, `apply`, `should_render_view_line`,
+  `CoverageRangeError`. No code change. Closes #94.
 
 ## [0.3.0] - 2026-04-27
 

@@ -88,7 +88,11 @@ jobs:
           name: lcov
       - run: cargo build --release
       - name: Run crap4rs against itself
-        run: ./target/release/crap4rs --coverage lcov.info --src src --strict --exclude "cli/**" --color always
+        # Lifted `--exclude "cli/**"` (closes #109): cli/ now passes the
+        # gate after the prepare_pipeline / count_cognitive_expr split
+        # (#121, #122) and core::analyze decomposition (#57). Worst CRAP
+        # across the codebase is well under the default threshold of 25.
+        run: ./target/release/crap4rs --coverage lcov.info --src src --strict --color always
 
   self-crap-view:
     name: domain/view.rs per-function CC <= 15

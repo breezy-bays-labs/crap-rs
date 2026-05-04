@@ -5,15 +5,69 @@
 //! ViewSpec → view::apply(&result, spec) → AnalysisView<'_>
 //! ```
 //!
-//! The View filters, sorts, and truncates findings to produce a shaped
-//! report. The keystone invariant is the **gate is unshapeable; only the
-//! display is shapeable**: `view.full` always borrows the original,
-//! unfiltered `AnalysisResult`, and exit-code logic must derive from
-//! `view.full.passed`, never from the post-shape `view.shown`.
+//! # Input contract
+//!
+//! `apply` borrows an `AnalysisResult` (already-thresholded function
+//! verdicts plus a precomputed summary and gate verdict) and a
+//! by-value `ViewSpec` (filter set, sort key, optional row limit,
+//! optional group-by key). Both inputs are pure domain types — no I/O
+//! happens inside the View layer.
+//!
+//! # Pipeline order
+//!
+//! `apply` runs phases in a fixed order:
+//!
+//! ```text
+//! filter → group? → sort → truncate
+//! ```
+//!
+//! 1. **Filter** — `Filters` AND-compose; `apply_filters` returns the
+//!    eligible (post-filter, pre-shape) borrow vector.
+//! 2. **Group** (optional) — when `spec.group_by.is_some()`, eligible
+//!    rows fan into `GroupedView::files` (file-level aggregates that
+//!    are independently sorted and truncated). Function-level `shown`
+//!    retains the un-truncated eligible set under grouping for
+//!    drill-down ergonomics.
+//! 3. **Sort** — function-level (or file-level under grouping) by
+//!    `SortKey`. `sort_by` is *stable* — callers rely on input-order
+//!    preservation on tied keys (BDD: `view.feature:122-128`).
+//! 4. **Truncate** — `limit` applies to whichever level was sorted in
+//!    step 3. `Some(0)` and `None` are treated identically as "no limit"
+//!    (`--top 0` ergonomic, BDD: `view.feature:213`).
+//!
+//! # Gate keystone — unshapeable
+//!
+//! **The gate is unshapeable; only the display is shapeable.**
+//! `view.full` always borrows the original, unfiltered `AnalysisResult`,
+//! and exit-code logic must derive from `view.full.passed`, never from
+//! the post-shape `view.shown` or `view.shown_summary`. This invariant
+//! lets reporters ship `--top`, `--only-failing`, `--coverage-range`,
+//! and `--group-by` without ever changing CI's verdict.
+//!
+//! # Display predicate
+//!
+//! [`should_render_view_line`] returns true iff the shaped view
+//! materially differs from the underlying analysis (rows filtered out,
+//! function-level rows truncated, or grouped files truncated). Reporters
+//! consult this predicate to decide whether to emit a "View:" subtitle
+//! line — sort-only or default-spec invocations skip the subtitle.
+//!
+//! # `#[non_exhaustive]` extension policy
+//!
+//! Every public type in this module is `#[non_exhaustive]` so additive
+//! extensions (new `SortKey` variants, new `GroupKey` aggregations, new
+//! `Filters` predicates, new `AnalysisView` aggregates) ship as minor
+//! version bumps without requiring downstream consumers to update match
+//! arms or struct literals. Construct with `Default` + struct-update
+//! syntax (`ViewSpec { sort: SortKey::Coverage, ..Default::default() }`)
+//! to stay forward-compatible.
+//!
+//! # `crap-core` extraction
 //!
 //! Pure domain code — no I/O, no external crates beyond `serde` and
 //! `thiserror` (mirrors `domain::types`). Future `crap-core` extraction
-//! takes this module whole.
+//! (ops#231) takes this module whole; LSP, web, and agent consumers all
+//! flow through `view::apply` as the canonical CRAP shaping surface.
 
 use crate::domain::summary::{FileSummary, compute_file_summaries, compute_summary};
 use crate::domain::types::{AnalysisResult, AnalysisSummary, FunctionVerdict};
@@ -21,11 +75,34 @@ use serde::Serialize;
 
 // ── Spec types ───────────────────────────────────────────────────────
 
+/// Caller-supplied shape for the View pipeline.
+///
+/// `Default::default()` produces a no-op spec: no filtering, CRAP
+/// descending, no row limit, no grouping. Construct with struct-update
+/// syntax to stay forward-compatible with future fields:
+///
+/// ```ignore
+/// let spec = ViewSpec {
+///     filters: Filters { only_failing: true, ..Default::default() },
+///     sort: SortKey::Coverage,
+///     limit: Some(10),
+///     ..Default::default()
+/// };
+/// ```
+///
+/// `#[non_exhaustive]` reserves namespace for additive fields (e.g.,
+/// future `min_complexity`, `risk_floor`, secondary sort) without
+/// breaking downstream callers.
 #[non_exhaustive]
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ViewSpec {
+    /// Eligibility predicates — AND-composed. See [`Filters`].
     pub filters: Filters,
+    /// Ordering key. See [`SortKey`].
     pub sort: SortKey,
+    /// Maximum rows after sort. `None` and `Some(0)` mean "no limit"
+    /// (the `--top 0` ergonomic). When `group_by` is set, `limit`
+    /// shifts to the file level — function-level rows are not truncated.
     pub limit: Option<usize>,
     /// When set, the View carries a parallel per-key aggregation
     /// (`AnalysisView::grouped`). The function-level row list
@@ -50,10 +127,22 @@ pub enum GroupKey {
     File,
 }
 
+/// Eligibility predicates over a `FunctionVerdict`. AND-composed: a
+/// verdict is eligible iff every active filter admits it.
+///
+/// `Default::default()` admits all verdicts (no filtering).
+/// `#[non_exhaustive]` reserves namespace for future predicates
+/// (`min_complexity`, `risk_floor`, `path_glob`, etc.) without breaking
+/// downstream construction.
 #[non_exhaustive]
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Filters {
+    /// When true, retain only verdicts where `exceeds == true`
+    /// (CRAP score strictly exceeds the threshold).
     pub only_failing: bool,
+    /// Inclusive coverage band. Verdicts with `coverage_percent` outside
+    /// the band are excluded; non-finite coverage (NaN, ±∞) is excluded
+    /// regardless of the band.
     pub coverage_range: Option<CoverageRange>,
 }
 
@@ -61,15 +150,22 @@ pub struct Filters {
 ///
 /// Both endpoints are validated to be in `[0.0, 100.0]` and `min <= max`
 /// at construction time; downstream consumers can rely on these
-/// invariants without re-checking.
+/// invariants without re-checking. Construct via [`CoverageRange::new`]
+/// — direct field initialization is intentionally blocked by
+/// `#[non_exhaustive]`.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct CoverageRange {
+    /// Lower bound (inclusive), in `[0.0, 100.0]`, finite, `<= max`.
     pub min: f64,
+    /// Upper bound (inclusive), in `[0.0, 100.0]`, finite, `>= min`.
     pub max: f64,
 }
 
 impl CoverageRange {
+    /// Construct a validated range. Returns [`CoverageRangeError`] when
+    /// either endpoint is outside `[0.0, 100.0]` (including non-finite),
+    /// or when `min > max`.
     pub fn new(min: f64, max: f64) -> Result<Self, CoverageRangeError> {
         if !is_in_unit_percent(min) {
             return Err(CoverageRangeError::OutOfRange { value: min });
@@ -100,6 +196,25 @@ pub enum CoverageRangeError {
     MinExceedsMax { min: f64, max: f64 },
 }
 
+/// Ordering key for the View pipeline's sort phase.
+///
+/// All sorts are *stable* (`sort_by`, not `sort_unstable_by`) so input
+/// order is preserved on tied keys. NaN-bearing keys (CRAP value,
+/// coverage percent) sort last under their respective orientation —
+/// non-NaN winners take the descending positions.
+///
+/// File-level interpretation under `--group-by file`:
+///
+/// | Variant       | File-level meaning              |
+/// |---------------|---------------------------------|
+/// | `Crap`        | `average_crap` descending       |
+/// | `Coverage`    | `average_coverage` ascending    |
+/// | `Complexity`  | `max_complexity` descending     |
+/// | `Path`        | `file_path` ascending           |
+///
+/// `#[non_exhaustive]` reserves namespace for future keys
+/// (e.g., risk-bucket, function-name) without forcing match-arm churn
+/// downstream.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -123,17 +238,39 @@ pub enum SortKey {
 /// `result` field already carries the same data). All shaping happens
 /// over `shown`; `eligible_count` is the post-filter, pre-truncate
 /// count; `truncated` records whether `limit` reduced the row set.
+///
+/// **Gate keystone:** exit-code logic must derive from
+/// `view.full.passed`, never from `view.shown` or
+/// `view.shown_summary`. Reporters consult [`should_render_view_line`]
+/// to decide whether to emit a "View:" subtitle for the shaped output.
+///
+/// `#[non_exhaustive]` reserves namespace for future per-view aggregates
+/// (e.g., per-risk-bucket counts, per-module fan-in) without breaking
+/// downstream pattern matches.
 #[non_exhaustive]
 #[derive(Debug, Serialize)]
 pub struct AnalysisView<'a> {
     /// Borrows the original analysis. `#[serde(skip)]` because the
     /// envelope's `result` already serializes the full analysis.
+    /// **Gate source of truth** — exit-code logic uses `full.passed`.
     #[serde(skip)]
     pub full: &'a AnalysisResult,
+    /// The spec that produced this view (echoed for JSON consumers).
     pub spec: ViewSpec,
+    /// Post-filter, pre-truncate row count. When grouping is active,
+    /// this is the function-level eligible count; the file-level
+    /// equivalent lives in [`GroupedView::eligible_count`].
     pub eligible_count: usize,
+    /// True iff `limit` dropped function-level rows. When grouping is
+    /// active, this is forced false (the function-level row list is
+    /// not truncated under grouping); see [`GroupedView::truncated`].
     pub truncated: bool,
+    /// Borrow vector over the shaped function rows. Order, count, and
+    /// truncation depend on `spec`.
     pub shown: Vec<&'a FunctionVerdict>,
+    /// Summary computed over `shown` only — useful for reporters that
+    /// want a "selected subset" header. **Not** the gate source: use
+    /// `full.summary` and `full.passed` for verdict logic.
     pub shown_summary: AnalysisSummary,
     /// Optional parallel grouping. Present iff `spec.group_by.is_some()`.
     /// When set, `shown` retains the *un-truncated* eligible function
@@ -147,20 +284,46 @@ pub struct AnalysisView<'a> {
 /// `eligible_count` and `truncated` mirror the function-level analogs
 /// but at the file level so consumers can render headers like
 /// "Showing 10 of 45 files" without recomputing.
+///
+/// `#[non_exhaustive]` reserves namespace for future per-group
+/// aggregates (e.g., risk-bucket totals, complexity histograms) without
+/// breaking downstream pattern matches.
 #[non_exhaustive]
 #[derive(Debug, Clone, Serialize)]
 pub struct GroupedView {
+    /// The key this view was grouped by (today: always `GroupKey::File`).
     pub key: GroupKey,
     /// Distinct files surviving the function-level filter pass —
     /// before `limit` truncates the file list.
     pub eligible_count: usize,
     /// True iff `limit` reduced the file list.
     pub truncated: bool,
+    /// Per-file aggregates, sorted and truncated per `spec.sort` and
+    /// `spec.limit` at the file level.
     pub files: Vec<FileSummary>,
 }
 
 // ── apply: filter → sort → truncate ──────────────────────────────────
 
+/// Apply a `ViewSpec` to an `AnalysisResult`, producing the shaped
+/// `AnalysisView`.
+///
+/// Phases run in fixed order: **filter → group? → sort → truncate**.
+/// See the module-level docs for the full pipeline contract.
+///
+/// The returned view borrows from `result`; `view.full == &result` is
+/// guaranteed (pointer-equal). The gate verdict (`view.full.passed`,
+/// `view.full.summary`) is *unshapeable* — it always reflects the
+/// pre-shape analysis, regardless of how aggressively the spec
+/// filters or truncates.
+///
+/// Stable sort: input order is preserved on tied sort keys. NaN-bearing
+/// keys sort last under their orientation.
+///
+/// `apply` is total — it never panics, even on NaN coverage or empty
+/// inputs. See the BDD harness `tests/features/view.feature` for the
+/// full behavioral contract and the property-test suite at the bottom
+/// of this module for the order/identity/summary/display invariants.
 pub fn apply<'a>(result: &'a AnalysisResult, spec: ViewSpec) -> AnalysisView<'a> {
     let eligible: Vec<&'a FunctionVerdict> = apply_filters(&result.functions, &spec.filters);
     let eligible_count = eligible.len();
@@ -368,11 +531,17 @@ fn truncate_to(shown: &mut Vec<&FunctionVerdict>, limit: Option<usize>) -> bool 
 // ── Display predicate ────────────────────────────────────────────────
 
 /// True iff the shaped view materially differs from the underlying
-/// analysis (rows filtered out OR rows truncated). Reporters use this
-/// to decide whether to emit a "View:" subtitle line.
+/// analysis. Returns `true` when any of:
 ///
-/// Default `ViewSpec` over a non-empty result returns `false` — the
-/// walking-skeleton invariant.
+/// - Filtering reduced the eligible row count
+///   (`eligible_count < full.functions.len()`),
+/// - The function-level `limit` truncated rows (`view.truncated`),
+/// - Grouping is active and the file-level `limit` truncated files.
+///
+/// Reporters use this to decide whether to emit a "View:" subtitle
+/// line. Default `ViewSpec` over a non-empty result returns `false` —
+/// the walking-skeleton invariant. Sort-only invocations also return
+/// `false`: changing order doesn't change information content.
 pub fn should_render_view_line(view: &AnalysisView<'_>) -> bool {
     view.eligible_count < view.full.functions.len()
         || view.truncated

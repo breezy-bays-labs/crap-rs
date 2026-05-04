@@ -240,9 +240,10 @@ Feature: CLI ergonomics — shaping the report from the command line
     And `view.sort` is "complexity"
     And `view.limit` is 10
 
-  Scenario: schema_version remains 1 with the additive view block
+  Scenario: schema_version is 2 with the additive view block
+    # Bumped 1 → 2 in 0.4.0 by #107 (ComplexityContributor.column 0-based → 1-based).
     When the operator runs `crap4rs --coverage lcov.info --format json`
-    Then the JSON envelope's `schema_version` is the integer 1
+    Then the JSON envelope's `schema_version` is the integer 2
     And the JSON envelope key declaration order is `schema_version, tool_version, language, timestamp, metric, threshold, diff_ref, result, view`
 
   Scenario: agent consumer reads the JSON envelope to plan refactor scope

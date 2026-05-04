@@ -85,108 +85,230 @@ impl Default for AnalyzeOptions {
 
 /// Run CRAP analysis: discover files, extract complexity, parse coverage,
 /// match, score, and produce results with diagnostics.
+///
+/// Thin facade over a private `AnalysisContext`. Phase methods on the
+/// context compose the pipeline; diff-mode short-circuits are surfaced
+/// via `Option<AnalysisOutput>` so the top-level orchestration stays flat.
 pub fn analyze(options: &AnalyzeOptions) -> Result<AnalysisOutput> {
-    let src_canonical = canonicalize_src(&options.src);
-    let mut discovered = discover_sources(options)?;
-    let diff_data = load_diff_data(options, &src_canonical, &discovered.source_files)?;
+    AnalysisContext::new(options).run()
+}
 
-    if let Some(ref diff_result) = diff_data {
-        retain_changed_source_files(&mut discovered.source_files, &options.src, diff_result);
-        if discovered.source_files.is_empty() {
-            return Ok(empty_output_with_diagnostics(diagnostics_for_empty_result(
-                vec![],
-                discovered.files_found,
-                0,
-                0,
-            )));
+/// Mutable per-run context: bundles `&AnalyzeOptions` with the canonicalized
+/// source root so phase methods don't repeat that setup.
+///
+/// The pipeline phases are `&self`-methods that read options and produce
+/// fresh values; nothing is mutated on the context itself. Diff-mode
+/// short-circuits return `Option<AnalysisOutput>` — `Some(early)` signals
+/// "no work left, return this," `None` signals "continue."
+struct AnalysisContext<'a> {
+    options: &'a AnalyzeOptions,
+    src_canonical: PathBuf,
+}
+
+impl<'a> AnalysisContext<'a> {
+    fn new(options: &'a AnalyzeOptions) -> Self {
+        Self {
+            options,
+            src_canonical: canonicalize_src(&options.src),
         }
     }
 
-    let parse_output = parse_coverage(options, &src_canonical)?;
-    let extracted = extract_complexities(&discovered.source_files, &options.src, options.metric)?;
-    let mut all_complexities = extracted.all_complexities;
-    let functions_extracted = all_complexities.len();
+    fn run(&self) -> Result<AnalysisOutput> {
+        let mut discovered = self.discover_sources()?;
+        let diff_data = self.load_diff_data(&discovered.source_files)?;
 
-    if let Some(ref diff_result) = diff_data {
-        retain_changed_functions(&mut all_complexities, diff_result);
-        if all_complexities.is_empty() {
-            return Ok(empty_output_with_diagnostics(diagnostics_for_empty_result(
-                parse_output.diagnostics,
-                discovered.files_found,
-                extracted.files_unparseable,
-                functions_extracted,
-            )));
+        if let Some(early) = self.short_circuit_on_files(&mut discovered, diff_data.as_ref()) {
+            return Ok(early);
         }
+
+        let mut parse_output = self.parse_coverage()?;
+        let ExtractedComplexities {
+            mut all_complexities,
+            files_unparseable,
+        } = self.extract_complexities(&discovered.source_files)?;
+        let functions_extracted = all_complexities.len();
+
+        if let Some(early) = self.short_circuit_on_complexities(
+            &mut all_complexities,
+            diff_data.as_ref(),
+            &mut parse_output,
+            &discovered,
+            files_unparseable,
+            functions_extracted,
+        ) {
+            return Ok(early);
+        }
+
+        ensure_functions_extracted(&all_complexities, &self.options.src)?;
+
+        let matched = match_functions(
+            &all_complexities,
+            &parse_output.coverage,
+            parse_output.branches.as_ref(),
+        );
+
+        let functions_no_coverage = matched
+            .iter()
+            .filter(|(comp, _)| !parse_output.coverage.contains_key(&comp.identity.file_path))
+            .count();
+        let functions_matched = matched.len() - functions_no_coverage;
+
+        let resolver = ThresholdResolver::new(&self.options.threshold_config)?;
+        let mut result = score_and_summarize(&matched, &resolver)?;
+        populate_diagnostics(
+            &mut result.functions,
+            &parse_output.coverage,
+            self.options.compute_diagnostics,
+        );
+
+        let (files_analyzed, files_zero_coverage) = compute_file_coverage_stats(&result);
+
+        let diagnostics = AnalysisDiagnostics {
+            parse_diagnostics: parse_output.diagnostics,
+            files_found: discovered.files_found,
+            files_unparseable,
+            functions_extracted,
+            functions_matched,
+            functions_no_coverage,
+            files_analyzed,
+            files_zero_coverage,
+        };
+
+        debug_assert_eq!(
+            diagnostics.functions_matched + diagnostics.functions_no_coverage,
+            result.functions.len(),
+            "diagnostics counts must partition scored functions"
+        );
+
+        Ok(AnalysisOutput {
+            result,
+            diagnostics,
+        })
     }
 
-    ensure_functions_extracted(&all_complexities, &options.src)?;
+    fn discover_sources(&self) -> Result<DiscoveredSources> {
+        let source_files = discover_rust_files(
+            &self.options.src,
+            &self.options.exclude,
+            self.options.respect_gitignore,
+        )?;
+        let files_found = source_files.len();
+        ensure_source_files_found(&source_files, &self.options.src)?;
 
-    let matched = match_functions(
-        &all_complexities,
-        &parse_output.coverage,
-        parse_output.branches.as_ref(),
-    );
+        Ok(DiscoveredSources {
+            source_files,
+            files_found,
+        })
+    }
 
-    // Count functions with no LCOV data (file not in coverage map)
-    let functions_no_coverage = matched
-        .iter()
-        .filter(|(comp, _)| !parse_output.coverage.contains_key(&comp.identity.file_path))
-        .count();
-    let functions_matched = matched.len() - functions_no_coverage;
+    fn load_diff_data(
+        &self,
+        source_files: &[PathBuf],
+    ) -> Result<Option<std::collections::HashMap<String, FileChangeKind>>> {
+        self.options
+            .diff_ref
+            .as_deref()
+            .map(|diff_ref| {
+                compute_diff_regions(
+                    diff_ref,
+                    &self.src_canonical,
+                    &self.options.src,
+                    source_files,
+                )
+            })
+            .transpose()
+    }
 
-    // 5. Compile threshold overrides for glob matching
-    let resolver = ThresholdResolver::new(&options.threshold_config)?;
+    fn parse_coverage(&self) -> Result<ParseOutput> {
+        let coverage_data = std::fs::read_to_string(&self.options.coverage).with_context(|| {
+            format!(
+                "failed to read coverage file: {}",
+                self.options.coverage.display()
+            )
+        })?;
+        let parser = LcovParser::new(self.src_canonical.clone());
+        parser
+            .parse(&coverage_data)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+    }
 
-    // 6. Score each function, produce verdicts, and build result
-    let mut result = score_and_summarize(&matched, &resolver)?;
+    fn extract_complexities(&self, source_files: &[PathBuf]) -> Result<ExtractedComplexities> {
+        let complexity_adapter = SynComplexityAdapter::new();
+        let mut all_complexities = Vec::new();
+        let mut files_unparseable = 0usize;
 
-    // 7. Populate `Diagnostic` for over-threshold verdicts when the
-    //    caller opts in. Pure-domain, runs only on exceeding verdicts.
-    populate_diagnostics(
-        &mut result.functions,
-        &parse_output.coverage,
-        options.compute_diagnostics,
-    );
+        for file_path in source_files {
+            let source = std::fs::read_to_string(file_path)
+                .with_context(|| format!("failed to read source file: {}", file_path.display()))?;
+            let relative = src_relative_path(file_path, &self.options.src);
 
-    let (files_analyzed, files_zero_coverage) = compute_file_coverage_stats(&result);
+            match complexity_adapter.extract(&source, &relative, self.options.metric) {
+                Ok(fns) => all_complexities.extend(fns),
+                Err(e) => {
+                    files_unparseable += 1;
+                    eprintln!("warning: skipping {relative}: {e}");
+                }
+            }
+        }
 
-    let diagnostics = AnalysisDiagnostics {
-        parse_diagnostics: parse_output.diagnostics,
-        files_found: discovered.files_found,
-        files_unparseable: extracted.files_unparseable,
-        functions_extracted,
-        functions_matched,
-        functions_no_coverage,
-        files_analyzed,
-        files_zero_coverage,
-    };
+        Ok(ExtractedComplexities {
+            all_complexities,
+            files_unparseable,
+        })
+    }
 
-    debug_assert_eq!(
-        diagnostics.functions_matched + diagnostics.functions_no_coverage,
-        result.functions.len(),
-        "diagnostics counts must partition scored functions"
-    );
+    /// Apply diff-mode file filtering and signal early-exit if nothing remains.
+    /// Returns `None` when there is no diff ref OR the filter still leaves
+    /// files to analyze; returns `Some(empty_output)` when the diff cleared
+    /// every source file.
+    fn short_circuit_on_files(
+        &self,
+        discovered: &mut DiscoveredSources,
+        diff_data: Option<&std::collections::HashMap<String, FileChangeKind>>,
+    ) -> Option<AnalysisOutput> {
+        let diff_result = diff_data?;
+        retain_changed_source_files(&mut discovered.source_files, &self.options.src, diff_result);
+        if !discovered.source_files.is_empty() {
+            return None;
+        }
+        Some(empty_output_with_diagnostics(diagnostics_for_empty_result(
+            vec![],
+            discovered.files_found,
+            0,
+            0,
+        )))
+    }
 
-    Ok(AnalysisOutput {
-        result,
-        diagnostics,
-    })
+    /// Apply diff-mode function filtering and signal early-exit if nothing
+    /// remains. Same `Option<AnalysisOutput>` signal as
+    /// [`Self::short_circuit_on_files`]; takes `parse_output` mutably so the
+    /// empty-result diagnostics can move out of `parse_output.diagnostics`
+    /// without cloning when this branch fires.
+    fn short_circuit_on_complexities(
+        &self,
+        complexities: &mut Vec<FunctionComplexity>,
+        diff_data: Option<&std::collections::HashMap<String, FileChangeKind>>,
+        parse_output: &mut ParseOutput,
+        discovered: &DiscoveredSources,
+        files_unparseable: usize,
+        functions_extracted: usize,
+    ) -> Option<AnalysisOutput> {
+        let diff_result = diff_data?;
+        retain_changed_functions(complexities, diff_result);
+        if !complexities.is_empty() {
+            return None;
+        }
+        Some(empty_output_with_diagnostics(diagnostics_for_empty_result(
+            std::mem::take(&mut parse_output.diagnostics),
+            discovered.files_found,
+            files_unparseable,
+            functions_extracted,
+        )))
+    }
 }
 
 fn canonicalize_src(src: &Path) -> PathBuf {
     src.canonicalize().unwrap_or_else(|_| src.to_path_buf())
-}
-
-fn discover_sources(options: &AnalyzeOptions) -> Result<DiscoveredSources> {
-    let source_files =
-        discover_rust_files(&options.src, &options.exclude, options.respect_gitignore)?;
-    let files_found = source_files.len();
-    ensure_source_files_found(&source_files, &options.src)?;
-
-    Ok(DiscoveredSources {
-        source_files,
-        files_found,
-    })
 }
 
 fn ensure_source_files_found(source_files: &[PathBuf], src: &Path) -> Result<()> {
@@ -200,18 +322,6 @@ fn ensure_source_files_found(source_files: &[PathBuf], src: &Path) -> Result<()>
     Ok(())
 }
 
-fn load_diff_data(
-    options: &AnalyzeOptions,
-    src_canonical: &Path,
-    source_files: &[PathBuf],
-) -> Result<Option<std::collections::HashMap<String, FileChangeKind>>> {
-    options
-        .diff_ref
-        .as_deref()
-        .map(|diff_ref| compute_diff_regions(diff_ref, src_canonical, &options.src, source_files))
-        .transpose()
-}
-
 fn retain_changed_source_files(
     source_files: &mut Vec<PathBuf>,
     src_root: &Path,
@@ -221,48 +331,6 @@ fn retain_changed_source_files(
         let rel = src_relative_path(path, src_root);
         diff_result.contains_key(&rel)
     });
-}
-
-fn parse_coverage(options: &AnalyzeOptions, src_canonical: &Path) -> Result<ParseOutput> {
-    let coverage_data = std::fs::read_to_string(&options.coverage).with_context(|| {
-        format!(
-            "failed to read coverage file: {}",
-            options.coverage.display()
-        )
-    })?;
-    let parser = LcovParser::new(src_canonical.to_path_buf());
-    parser
-        .parse(&coverage_data)
-        .map_err(|e| anyhow::anyhow!("{e}"))
-}
-
-fn extract_complexities(
-    source_files: &[PathBuf],
-    src_root: &Path,
-    metric: ComplexityMetric,
-) -> Result<ExtractedComplexities> {
-    let complexity_adapter = SynComplexityAdapter::new();
-    let mut all_complexities = Vec::new();
-    let mut files_unparseable = 0usize;
-
-    for file_path in source_files {
-        let source = std::fs::read_to_string(file_path)
-            .with_context(|| format!("failed to read source file: {}", file_path.display()))?;
-        let relative = src_relative_path(file_path, src_root);
-
-        match complexity_adapter.extract(&source, &relative, metric) {
-            Ok(fns) => all_complexities.extend(fns),
-            Err(e) => {
-                files_unparseable += 1;
-                eprintln!("warning: skipping {relative}: {e}");
-            }
-        }
-    }
-
-    Ok(ExtractedComplexities {
-        all_complexities,
-        files_unparseable,
-    })
 }
 
 fn retain_changed_functions(

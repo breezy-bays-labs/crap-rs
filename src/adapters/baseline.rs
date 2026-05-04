@@ -10,8 +10,11 @@
 //! optionally `diagnostics` so that consumers can produce baseline
 //! envelopes that contain extra fields without breaking us.
 //!
-//! Schema version validation: only `schema_version == 1` is accepted
-//! today. Future schema bumps will need an explicit migration path.
+//! Schema version validation: `schema_version` 1 and 2 are both
+//! accepted (#107 bumped the current emit version 1 → 2 in 0.4.0; v1
+//! baselines remain loadable because delta matching is identity-keyed,
+//! not column-keyed). Future schema bumps will need an explicit
+//! migration path.
 
 use crate::domain::types::{AnalysisDiagnostics, AnalysisResult};
 use serde::Deserialize;
@@ -19,9 +22,15 @@ use std::fs::File;
 use std::io::{BufReader, ErrorKind};
 use std::path::Path;
 
-/// Currently-supported envelope schema version. Lockstep with
+/// Currently-emitted envelope schema version. Lockstep with
 /// `adapters::reporters::json::JsonEnvelope::schema_version`.
-pub const SUPPORTED_SCHEMA_VERSION: u32 = 1;
+pub const CURRENT_SCHEMA_VERSION: u32 = 2;
+
+/// Envelope schema versions accepted by the baseline loader. v1 stays
+/// loadable across the v0.3.x → v0.4.x boundary so users can keep their
+/// committed baseline JSON; the column-convention shift in v2 doesn't
+/// affect delta calculations (identity-keyed matching).
+pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1, 2];
 
 /// On-disk shape we read. Mirrors the relevant subset of
 /// `JsonEnvelope`. `serde(default)` on optional fields keeps us
@@ -54,7 +63,12 @@ pub struct BaselineSnapshot {
 /// pre-formatted prose. The CLI translates these into user-facing
 /// stderr messages (keeps the adapter language-neutral for future
 /// `crap-core` extraction).
+///
+/// `#[non_exhaustive]` reserves namespace for future variants (e.g.,
+/// `MissingRequiredField`, `IncompatibleToolVersion`) without forcing a
+/// downstream major-version bump on every adapter error addition.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum BaselineError {
     #[error("baseline file not found: {path}")]
     NotFound { path: String },
@@ -71,9 +85,12 @@ pub enum BaselineError {
         source: serde_json::Error,
     },
     #[error(
-        "unsupported baseline schema_version: {found} (this build of crap4rs accepts {supported})"
+        "unsupported baseline schema_version: {found} (this build of crap4rs accepts {supported:?})"
     )]
-    UnsupportedSchemaVersion { found: u32, supported: u32 },
+    UnsupportedSchemaVersion {
+        found: u32,
+        supported: &'static [u32],
+    },
 }
 
 /// Load a crap4rs JSON envelope from disk and return the baseline
@@ -100,10 +117,10 @@ pub fn load(path: &Path) -> Result<BaselineSnapshot, BaselineError> {
             source,
         })?;
 
-    if envelope.schema_version != SUPPORTED_SCHEMA_VERSION {
+    if !SUPPORTED_SCHEMA_VERSIONS.contains(&envelope.schema_version) {
         return Err(BaselineError::UnsupportedSchemaVersion {
             found: envelope.schema_version,
-            supported: SUPPORTED_SCHEMA_VERSION,
+            supported: SUPPORTED_SCHEMA_VERSIONS,
         });
     }
 
@@ -247,8 +264,10 @@ mod tests {
 
     #[test]
     fn load_unsupported_schema_version_rejects() {
+        // Use a future-unsupported version (99) — both 1 and 2 are
+        // accepted today after the #107 column-convention bump.
         let json = r#"{
-            "schema_version": 2,
+            "schema_version": 99,
             "result": {
                 "functions": [],
                 "summary": {
@@ -264,11 +283,36 @@ mod tests {
         let err = load(file.path()).unwrap_err();
         match err {
             BaselineError::UnsupportedSchemaVersion {
-                found: 2,
-                supported: 1,
-            } => {}
-            other => panic!("expected UnsupportedSchemaVersion(2,1), got {other:?}"),
+                found: 99,
+                supported,
+            } => {
+                assert_eq!(supported, &[1, 2]);
+            }
+            other => panic!("expected UnsupportedSchemaVersion {{ found: 99, .. }}, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn load_v2_schema_version_accepted() {
+        // Post-#107: v2 baselines (1-based contributor columns) load
+        // alongside v1 baselines.
+        let json = r#"{
+            "schema_version": 2,
+            "tool_version": "0.4.0",
+            "result": {
+                "functions": [],
+                "summary": {
+                    "total_functions": 0, "total_files": 0, "exceeding_threshold": 0,
+                    "average_crap": 0.0, "median_crap": 0.0,
+                    "max_crap": null, "worst_function": null,
+                    "distribution": { "low": 0, "acceptable": 0, "moderate": 0, "high": 0 }
+                },
+                "passed": true
+            }
+        }"#;
+        let file = write_envelope(json);
+        let snapshot = load(file.path()).expect("v2 envelope should load");
+        assert_eq!(snapshot.tool_version, "0.4.0");
     }
 
     #[test]

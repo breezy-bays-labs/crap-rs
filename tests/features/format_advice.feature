@@ -7,7 +7,7 @@ Feature: --format advice (issue #76)
   agent skill (#77); secondary consumers are CI/SARIF and humans.
 
   The shape is **experimental** in v0.3.x and stabilises at v0.4.0
-  (schema_version stays at 1 throughout v0.3.x; bumps to 2 at v0.4.0).
+  (schema_version was 1 throughout v0.3.x; bumped to 2 at v0.4.0 by #107).
 
   Background:
     Given a project with a mix of over-threshold and under-threshold
@@ -24,7 +24,7 @@ Feature: --format advice (issue #76)
   Scenario: --format advice emits the canonical envelope on stdout
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then stdout is parseable JSON
-    And the document carries top-level `schema_version` "1"
+    And the document carries top-level `schema_version` "2"
     And the document carries a top-level `view.shown[]` array
     And every `view.shown[].diagnostic` is either populated or absent
       (never `null`-with-fields-present)
@@ -212,8 +212,9 @@ Feature: --format advice (issue #76)
 
   # ── Stability (R4.1 / G1) ──────────────────────────────────────────
 
-  Scenario: schema_version stays at 1 throughout v0.3.x
+  Scenario: schema_version is 2 in v0.4.0+
+    # #107 bumped 1 → 2 to mark the column-convention shift.
     When the operator runs `crap4rs --coverage lcov.info --format advice`
-    Then the document's top-level `schema_version` is "1"
+    Then the document's top-level `schema_version` is "2"
     And the README "Output formats" section flags this shape as
       "experimental" until v0.4.0

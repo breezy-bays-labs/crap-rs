@@ -8,7 +8,7 @@ Feature: JSON reporter
   Scenario: JSON output contains a versioned envelope
     Given an analysis result
     When the JSON is formatted
-    Then the output contains "schema_version" with value 1
+    Then the output contains "schema_version" with value 2
     And the output contains "tool_version"
     And the output contains "language" with value "rust"
     And the output contains "timestamp" as an ISO 8601 string
@@ -25,7 +25,7 @@ Feature: JSON reporter
   Scenario: Schema version is an integer
     Given an analysis result
     When the JSON is formatted
-    Then "schema_version" is the integer 1
+    Then "schema_version" is the integer 2
 
   # ── Result Content ─────────────────────────────────────────────────
 

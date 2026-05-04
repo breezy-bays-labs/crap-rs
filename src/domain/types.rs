@@ -102,7 +102,11 @@ pub struct ComplexityContributor {
     pub kind: ContributorKind,
     /// 1-based line number of the construct's start (or signal token).
     pub line: usize,
-    /// 0-based column offset from syn Span, if available.
+    /// 1-based inclusive column of the construct's start, if available.
+    /// `None` when the source adapter has no column data (e.g., diff
+    /// hunks parse line ranges only). Aligned with `SourceSpan::start_column`
+    /// (also 1-based) and SARIF region semantics so consumers correlating
+    /// contributor positions with span positions see one convention.
     pub column: Option<u32>,
     /// How much this contributor added to the total.
     /// Cognitive: `1 + nesting_depth`. Cyclomatic: always 1.

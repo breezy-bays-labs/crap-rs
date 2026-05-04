@@ -52,8 +52,11 @@ pub struct DeltaContext<'a> {
 /// declaration order is exactly:
 ///   schema_version, tool_version, language, timestamp, metric,
 ///   threshold, diff_ref, result, view
-/// Per ADR D2 the schema is additive: adding `view` keeps
-/// `schema_version` at 1.
+/// Per ADR D2 the schema is additive across minor versions; the
+/// `schema_version` bump from 1 → 2 in 0.4.0 reflects the
+/// `ComplexityContributor.column` 0-based → 1-based convention shift
+/// (#107). Older v1 baselines remain loadable for delta reporting
+/// (matching is identity-keyed, not column-keyed).
 #[derive(Serialize)]
 struct JsonEnvelope<'a> {
     schema_version: u32,
@@ -67,8 +70,8 @@ struct JsonEnvelope<'a> {
     view: ViewWire<'a>,
     /// Delta block. Present iff `--baseline` was passed; absent (key
     /// elided) otherwise so existing consumers see byte-identical
-    /// output for the no-delta case. Additive — `schema_version` stays
-    /// at 1 (ADR D2).
+    /// output for the no-delta case. Additive — does not itself bump
+    /// `schema_version` (ADR D2).
     #[serde(skip_serializing_if = "Option::is_none")]
     delta: Option<DeltaWire<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -169,7 +172,7 @@ pub fn format_json(
     let delta_wire: Option<DeltaWire> = config.delta.as_ref().map(DeltaWire::from_context);
 
     let envelope = JsonEnvelope {
-        schema_version: 1,
+        schema_version: 2,
         tool_version: &config.tool_version,
         language: "rust",
         timestamp: &config.timestamp,
@@ -240,7 +243,7 @@ mod tests {
         let v = parse_json(&result, &default_config());
         let sv = v.get("schema_version").unwrap();
         assert!(sv.is_number());
-        assert_eq!(sv.as_u64(), Some(1));
+        assert_eq!(sv.as_u64(), Some(2));
     }
 
     #[test]
