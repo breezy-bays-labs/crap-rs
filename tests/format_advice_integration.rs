@@ -84,7 +84,9 @@ end_of_record
 // ── Envelope shape ──────────────────────────────────────────────────
 
 #[test]
-fn advice_emits_schema_version_one_and_view_shown_array() {
+fn advice_emits_schema_version_two_and_view_shown_array() {
+    // schema_version was bumped 1 → 2 in 0.4.0 by #107
+    // (ComplexityContributor.column 0-based → 1-based).
     let tmp = tempfile::tempdir().expect("create tempdir");
     setup_dir(tmp.path(), FIXTURE_SRC, FIXTURE_LCOV);
 
@@ -101,7 +103,7 @@ fn advice_emits_schema_version_one_and_view_shown_array() {
     );
     let json = parse_json(&output);
 
-    assert_eq!(json["schema_version"], 1);
+    assert_eq!(json["schema_version"], 2);
     assert!(json["view"]["shown"].is_array());
 }
 

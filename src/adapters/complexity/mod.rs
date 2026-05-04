@@ -160,7 +160,10 @@ fn add_contributor(
     contributors.push(ComplexityContributor {
         kind,
         line: span.start().line,
-        column: Some(span.start().column as u32),
+        // syn `Span::start().column` is 0-based; `ComplexityContributor.column`
+        // is 1-based inclusive (aligned with `SourceSpan::start_column` and
+        // SARIF). +1 here is the only conversion site.
+        column: Some(span.start().column as u32 + 1),
         increment,
         end_line,
         nesting_depth,

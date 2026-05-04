@@ -217,7 +217,10 @@ fn default_view_eligible_count_equals_total_functions() {
 }
 
 #[test]
-fn schema_version_remains_one_with_additive_view() {
+fn schema_version_is_two_in_v0_4_0() {
+    // 0.4.0 bumped schema_version 1 → 2 via #107 (ComplexityContributor.column
+    // 0-based → 1-based). The view block stayed additive (ADR D2); the bump
+    // is for the column-convention shift, not the view block.
     let dir = tempfile::tempdir().unwrap();
     setup_dir(dir.path(), SIMPLE_SRC, SIMPLE_LCOV);
 
@@ -226,8 +229,8 @@ fn schema_version_remains_one_with_additive_view() {
     let v = parse_json(&output);
     assert_eq!(
         v["schema_version"].as_u64(),
-        Some(1),
-        "View block was added per ADR D2 additive rule; schema_version stays at 1"
+        Some(2),
+        "0.4.0 bumped schema_version 1 → 2 for the contributor-column 1-based convention shift"
     );
 }
 
