@@ -2,7 +2,7 @@
 source: src/adapters/reporters/table.rs
 expression: output
 ---
-crap4rs v0.3.0 — CRAP Score Analysis
+crap4rs v0.4.0 — CRAP Score Analysis
 
 +------------------------------+--------------+----+------+-------+------+
 | File                         | Function     | CC | Cov% | CRAP  | Risk |
