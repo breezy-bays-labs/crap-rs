@@ -30,6 +30,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consumers and the `/cut-the-crap` agent skill (#77) can read identical
   advice from either entry point. SARIF output stays byte-identical for
   runs without diagnostics.
+- **`/cut-the-crap` reference Claude Code skill** — ships at
+  `.claude/skills/cut-the-crap/` (install via
+  `cp -r .claude/skills/cut-the-crap ~/.claude/skills/`). Consumes
+  `crap4rs --format advice` and drives the cover-then-split remediation
+  loop: write tests for `coverage_gaps` first when `root_cause:
+  low_coverage`, name + apply the `recommended` `ProposedSplit` when
+  `root_cause: high_complexity`, cover-then-split when
+  `root_cause: both`. The skill emits a structured plan to
+  `tmp/cut-the-crap-plan.md` before applying changes; `--explain-only`
+  produces the plan without modifying code. crap4rs the binary stays a
+  unix-style emitter — naming and the agent loop live in the skill.
+  Closes #77.
+- **Cucumber-rs harness for `tests/features/*.feature` files** —
+  `cucumber = "0.22"` + `tokio` join `[dev-dependencies]`; the first
+  migrated feature (`json_reporter.feature`, 12 scenarios / 59 steps)
+  executes via `tests/json_reporter_cucumber.rs`. The test target uses
+  `harness = false` (cucumber prints its own output) and
+  `writer::Libtest::or_basic()` to remain IDE-friendly. Future feature
+  files migrate one-at-a-time under the same naming convention
+  (`<feature>_cucumber`). Step definitions deserialize fixture
+  `AnalysisResult`s from inline JSON to stay outside `#[non_exhaustive]`
+  struct-literal restrictions — no `pub(crate)` test-fixture exposure
+  required. **CI integration**: `cargo nextest run --all-targets`
+  excludes cucumber binaries via `.config/nextest.toml`
+  (`default-filter = "not binary(/.*_cucumber$/)"`) because they don't
+  speak libtest's `--list --format terse` protocol; cucumber tests run
+  in a dedicated CI step (`cargo test --test json_reporter_cucumber`).
+  **Migration policy**: existing `tests/*_integration.rs` files keep
+  their assertions; cucumber adds Gherkin-driven coverage incrementally
+  rather than replacing the integration suite wholesale. Closes #115.
+
+### Tests
+- Regression guard for the trait-default-impl boundary case (#116).
+  `tests/fixtures/trait_default_override.rs` pairs a trait with a
+  default `greet` body against a concrete `impl Greeter for Casual`
+  override of the same method; the new
+  `trait_default_and_concrete_override_have_disjoint_spans` test pins
+  the walker invariant that emits two distinct `FunctionComplexity`
+  entries with disjoint spans, and that contributors stay inside their
+  own function's span. The walker structure
+  (`visit_trait_item_fn` + `visit_impl_item_fn`) and the
+  `is_viable_split` invariant
+  (`range.start >= span.start_line && range.end <= span.end_line`)
+  already prevent the hypothesised phantom split by construction;
+  the test is the permanent guard. Closes #116.
 
 ### Changed
 - `domain::types::ComplexityContributor` now records `end_line` and

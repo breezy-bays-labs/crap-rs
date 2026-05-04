@@ -52,6 +52,10 @@ jobs:
         with:
           tool: cargo-nextest@0.9
       - run: cargo nextest run --all-targets
+      # Cucumber-rs targets (#115) speak their own CLI, not libtest's
+      # `--list --format terse`; nextest excludes them via
+      # `.config/nextest.toml` and they run via `cargo test`.
+      - run: cargo test --test json_reporter_cucumber
 
   coverage:
     name: Coverage

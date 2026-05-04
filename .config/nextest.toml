@@ -1,0 +1,14 @@
+# cargo-nextest configuration.
+#
+# Cucumber-rs test targets (#115) build with `harness = false` because
+# cucumber prints its own output instead of going through libtest. That
+# means they reject `--list --format terse`, which is how nextest probes
+# every test binary at startup. The default filter below excludes the
+# `*_cucumber` binaries so `cargo nextest run` still completes cleanly;
+# cucumber tests are exercised by `cargo test --test <name>` (CI runs
+# both as separate steps).
+#
+# Future cucumber-rs targets should be named `<feature>_cucumber` so
+# this filter keeps catching them automatically.
+[profile.default]
+default-filter = "not binary(/.*_cucumber$/)"
