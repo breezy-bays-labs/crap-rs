@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-04
+
+The agent-loop + multi-output milestone. Bundles 13 issues across three
+review-passed PRs ([#124](https://github.com/breezy-bays-labs/crap4rs/pull/124),
+[#125](https://github.com/breezy-bays-labs/crap4rs/pull/125),
+[#126](https://github.com/breezy-bays-labs/crap4rs/pull/126)) plus the
+post-0.3.0 follow-ups (`run_inner` CC reduction, scorecard composite-
+action `outputs.row-json`, scorecard row-contract docs).
+
+Three new output formats (`html`, `scorecard-row`, `advice`), multi-format
+fan-out from one analysis pass (`--format json:env.json,markdown:r.md,html:r.html`),
+the `/cut-the-crap` reference Claude Code skill, a cucumber-rs BDD harness,
+honest end-to-end self-CRAP coverage (lifted `--exclude "cli/**"`), the
+`AnalysisContext` decomposition of `core::analyze`, and full rustdoc on
+`domain::view`.
+
+JSON envelope schema bumped 1 → 2 — `ComplexityContributor.column` is now
+1-based inclusive (matches `SourceSpan` + SARIF). v1 baselines remain
+loadable for `--baseline` delta calculations.
+
+**Relicensed to MIT OR Apache-2.0** (was GPL-3.0-or-later) — matches the
+Rust ecosystem standard and removes copyleft friction for downstream
+consumers, including the planned `crap-core` library extraction
+(ops#231).
+
 ### Added
 - **Multi-format output in a single run** — `--format` now accepts a
   comma-separated list with optional per-format file destinations:
