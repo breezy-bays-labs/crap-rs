@@ -585,13 +585,14 @@ fn run_inner() -> Result<bool> {
 
     // Shape the delta. Spec is built from --delta-top / --delta-sort /
     // --delta-only (VS4); defaults match the dominant scorecard use
-    // case (regressions first, all kinds, no truncation).
+    // case (regressions first, all kinds, no truncation). `Option::map`
+    // is `FnOnce`, so the closure moves the spec rather than cloning —
+    // `DeltaView` owns its `spec` field, no further uses upstream.
     let delta_spec = delta_args::build_delta_view_spec(&cli);
     let delta_view: Option<DeltaView<'_>> = prep
         .delta_state
         .as_ref()
-        .map(|s| delta::apply(&s.delta, delta_spec.clone()));
-    let _ = &delta_spec; // keep ownership for the shaped view
+        .map(move |s| delta::apply(&s.delta, delta_spec));
 
     if !cli.display.quiet {
         print_formatted_output(
@@ -748,15 +749,13 @@ fn prepare_pipeline(cli: &mut Cli) -> Result<PipelinePrep> {
 
 // ── Format dispatch ────────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
 fn format_as_json(
     cli: &Cli,
     view: &view::AnalysisView<'_>,
     delta_view: Option<&DeltaView<'_>>,
     delta_state: Option<&DeltaState>,
-    diagnostics: &AnalysisDiagnostics,
-    metric: ComplexityMetric,
-    threshold: f64,
+    analysis: &crap4rs::core::AnalysisOutput,
+    inputs: &EffectiveInputs,
 ) -> Result<String> {
     let delta_ctx = delta_state.zip(delta_view).map(|(s, dv)| DeltaContext {
         view: dv,
@@ -766,15 +765,15 @@ fn format_as_json(
     });
     let config = reporters::json::JsonConfig {
         tool_version: env!("CARGO_PKG_VERSION").to_string(),
-        metric,
-        threshold,
+        metric: inputs.metric,
+        threshold: inputs.threshold,
         timestamp: now_unix_epoch(),
-        diagnostics: cli.display.verbose.then_some(diagnostics),
+        diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
         diff_ref: cli.filter.diff.as_deref(),
         minimal_view: cli.output.minimal_view,
         delta: delta_ctx,
     };
-    Ok(reporters::format_json(view, &config)?)
+    reporters::format_json(view, &config).map_err(Into::into)
 }
 
 /// ScorecardRow projects the unshaped analysis + delta into a mokumo
@@ -813,15 +812,9 @@ fn print_formatted_output(
             cli.display.breakdown,
             cli.display.explain,
         ),
-        FormatArg::Json | FormatArg::Advice => format_as_json(
-            cli,
-            view,
-            delta_view,
-            delta_state,
-            &analysis.diagnostics,
-            inputs.metric,
-            inputs.threshold,
-        )?,
+        FormatArg::Json | FormatArg::Advice => {
+            format_as_json(cli, view, delta_view, delta_state, analysis, inputs)?
+        }
         FormatArg::Markdown => reporters::format_markdown(
             view,
             delta_view,
