@@ -64,6 +64,41 @@ pub enum FormatArg {
     /// Single mokumo-scorecard `Row::CrapDelta` JSON object — for scorecard
     /// aggregator consumption (mokumo schema_version=2). Issue #111.
     ScorecardRow,
+    /// Self-contained HTML dashboard with summary stats, risk
+    /// distribution, and per-file collapsible function tables. Inline
+    /// CSS, no external assets, mobile-responsive. Issue #71.
+    Html,
+}
+
+/// One requested output: a format and an optional file destination.
+///
+/// Parsed from `--format X` (stdout) or `--format X:FILE` (write to file).
+/// `--format` accepts a comma-separated list of these specs so a single
+/// analysis pass can fan out to multiple shapes (issue #100).
+#[derive(Debug, Clone)]
+pub struct FormatSpec {
+    pub format: FormatArg,
+    pub output: Option<PathBuf>,
+}
+
+impl std::str::FromStr for FormatSpec {
+    type Err = String;
+
+    fn from_str(spec: &str) -> Result<Self, Self::Err> {
+        let (fmt_str, output) = match spec.split_once(':') {
+            Some((f, path)) if !path.is_empty() => (f, Some(PathBuf::from(path))),
+            Some((_, _)) => return Err(format!("empty file path in `--format {spec}`")),
+            None => (spec, None),
+        };
+        let format = FormatArg::from_str(fmt_str, true)
+            .map_err(|e| format!("invalid format `{fmt_str}`: {e}"))?;
+        Ok(FormatSpec { format, output })
+    }
+}
+
+/// Clap value parser for `FormatSpec` — delegates to the `FromStr` impl.
+fn parse_format_spec(s: &str) -> Result<FormatSpec, String> {
+    s.parse()
 }
 
 /// Sort key for the displayed view (issue #68).
@@ -276,9 +311,22 @@ pub struct InputArgs {
 #[derive(Debug, Args)]
 #[command(next_help_heading = "Output")]
 pub struct OutputArgs {
-    /// Output format
-    #[arg(short, long, value_enum, default_value_t = FormatArg::Table)]
-    pub format: FormatArg,
+    /// Output format(s).
+    ///
+    /// Accepts a single format (`--format json`) for stdout, or a comma-
+    /// separated list to fan out a single analysis pass to multiple
+    /// destinations (`--format json:envelope.json,markdown:report.md`).
+    /// Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file).
+    /// Multi-format invocations require every entry to specify a file —
+    /// stdout cannot multiplex (issue #100).
+    #[arg(
+        short,
+        long,
+        value_delimiter = ',',
+        default_value = "table",
+        value_parser = parse_format_spec
+    )]
+    pub format: Vec<FormatSpec>,
 
     /// CRAP score threshold — functions above this fail the check [default: 25]
     // allow_hyphen_values: lets clap parse `--threshold -5` as a value
@@ -697,7 +745,11 @@ fn build_analyze_options(cli: &Cli, inputs: &EffectiveInputs, coverage: &Path) -
         exclude: inputs.exclude.clone(),
         respect_gitignore: !cli.filter.no_gitignore,
         diff_ref: cli.filter.diff.clone(),
-        compute_diagnostics: matches!(cli.output.format, FormatArg::Advice | FormatArg::Sarif),
+        compute_diagnostics: cli
+            .output
+            .format
+            .iter()
+            .any(|s| matches!(s.format, FormatArg::Advice | FormatArg::Sarif)),
         ..AnalyzeOptions::default()
     }
 }
@@ -796,15 +848,16 @@ fn format_as_scorecard_row(
     reporters::format_scorecard_row(&row_data)
 }
 
-fn print_formatted_output(
+fn render_format(
     cli: &Cli,
+    spec: &FormatSpec,
     view: &view::AnalysisView<'_>,
     delta_view: Option<&DeltaView<'_>>,
     delta_state: Option<&DeltaState>,
     analysis: &crap4rs::core::AnalysisOutput,
     inputs: &EffectiveInputs,
-) -> Result<()> {
-    let output = match cli.output.format {
+) -> Result<String> {
+    Ok(match spec.format {
         FormatArg::Table => reporters::format_table_with_explain(
             view,
             delta_view,
@@ -834,13 +887,37 @@ fn print_formatted_output(
         FormatArg::ScorecardRow => {
             format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
         }
-    };
-    print!("{output}");
+        FormatArg::Html => reporters::format_html(view, inputs.threshold),
+    })
+}
 
-    // SARIF's primary deliverable is the `.sarif` file uploaded to
-    // Code Scanning; stderr lines would noise up CI logs. Advice gets
-    // a stderr summary so humans skimming CI logs see the headline.
-    if matches!(cli.output.format, FormatArg::Advice) {
+fn print_formatted_output(
+    cli: &Cli,
+    view: &view::AnalysisView<'_>,
+    delta_view: Option<&DeltaView<'_>>,
+    delta_state: Option<&DeltaState>,
+    analysis: &crap4rs::core::AnalysisOutput,
+    inputs: &EffectiveInputs,
+) -> Result<()> {
+    for spec in &cli.output.format {
+        let output = render_format(cli, spec, view, delta_view, delta_state, analysis, inputs)?;
+        match &spec.output {
+            Some(path) => std::fs::write(path, &output)
+                .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", path.display()))?,
+            None => print!("{output}"),
+        }
+    }
+
+    // Advice's stderr summary fires once even if Advice appears multiple
+    // times in `--format`. SARIF stays silent — its primary deliverable
+    // is the `.sarif` file uploaded to Code Scanning; stderr would noise
+    // up CI logs.
+    if cli
+        .output
+        .format
+        .iter()
+        .any(|s| matches!(s.format, FormatArg::Advice))
+    {
         let mut stderr = std::io::stderr();
         let _ = reporters::render_advice_summary(view, &mut stderr);
     }
@@ -880,13 +957,45 @@ fn load_delta_state(
 }
 
 fn validate_display_flags(cli: &Cli) -> Result<()> {
-    if cli.display.explain
-        && matches!(cli.output.format, FormatArg::Table)
-        && !cli.display.breakdown
-    {
+    let any_table = cli
+        .output
+        .format
+        .iter()
+        .any(|s| matches!(s.format, FormatArg::Table));
+    if cli.display.explain && any_table && !cli.display.breakdown {
         bail!("--explain requires --breakdown for table output");
     }
+    validate_format_destinations(&cli.output.format)?;
     Ok(())
+}
+
+/// Multi-format invocations require every entry to specify a file —
+/// stdout cannot multiplex (issue #100).
+fn validate_format_destinations(specs: &[FormatSpec]) -> Result<()> {
+    if specs.len() > 1 {
+        let stdout_specs: Vec<_> = specs
+            .iter()
+            .filter(|s| s.output.is_none())
+            .map(|s| format_arg_kebab(s.format).to_string())
+            .collect();
+        if !stdout_specs.is_empty() {
+            bail!(
+                "multi-format `--format` requires every entry to specify a file (e.g. `json:envelope.json`); stdout-only entries: {}",
+                stdout_specs.join(", ")
+            );
+        }
+    }
+    Ok(())
+}
+
+/// User-facing kebab-case name for a `FormatArg` (matches the clap CLI
+/// surface `--format X`). Defaults to `Debug` lowercased if clap's
+/// `ValueEnum` registry can't resolve a name.
+fn format_arg_kebab(arg: FormatArg) -> String {
+    use clap::ValueEnum;
+    arg.to_possible_value()
+        .map(|v| v.get_name().to_string())
+        .unwrap_or_else(|| format!("{arg:?}").to_lowercase())
 }
 
 // ── Config loading & merging ───────────────────────────────────────
@@ -1259,7 +1368,9 @@ mod tests {
     #[test]
     fn default_format_is_table() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        assert!(matches!(cli.output.format, FormatArg::Table));
+        assert_eq!(cli.output.format.len(), 1);
+        assert!(matches!(cli.output.format[0].format, FormatArg::Table));
+        assert!(cli.output.format[0].output.is_none());
     }
 
     #[test]
@@ -1283,13 +1394,59 @@ mod tests {
     #[test]
     fn format_json() {
         let cli = parse(&["--coverage", "lcov.info", "--format", "json"]).unwrap();
-        assert!(matches!(cli.output.format, FormatArg::Json));
+        assert_eq!(cli.output.format.len(), 1);
+        assert!(matches!(cli.output.format[0].format, FormatArg::Json));
+        assert!(cli.output.format[0].output.is_none());
     }
 
     #[test]
     fn format_sarif() {
         let cli = parse(&["--coverage", "lcov.info", "--format", "sarif"]).unwrap();
-        assert!(matches!(cli.output.format, FormatArg::Sarif));
+        assert_eq!(cli.output.format.len(), 1);
+        assert!(matches!(cli.output.format[0].format, FormatArg::Sarif));
+    }
+
+    #[test]
+    fn format_with_file_destination() {
+        let cli = parse(&["--coverage", "lcov.info", "--format", "json:env.json"]).unwrap();
+        assert_eq!(cli.output.format.len(), 1);
+        assert!(matches!(cli.output.format[0].format, FormatArg::Json));
+        assert_eq!(cli.output.format[0].output, Some(PathBuf::from("env.json")));
+    }
+
+    #[test]
+    fn format_multi_with_files() {
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--format",
+            "json:env.json,markdown:report.md",
+        ])
+        .unwrap();
+        assert_eq!(cli.output.format.len(), 2);
+        assert!(matches!(cli.output.format[0].format, FormatArg::Json));
+        assert_eq!(cli.output.format[0].output, Some(PathBuf::from("env.json")));
+        assert!(matches!(cli.output.format[1].format, FormatArg::Markdown));
+        assert_eq!(
+            cli.output.format[1].output,
+            Some(PathBuf::from("report.md"))
+        );
+    }
+
+    #[test]
+    fn format_multi_without_files_rejected() {
+        let cli = parse(&["--coverage", "lcov.info", "--format", "json,markdown"]).unwrap();
+        let err = validate_display_flags(&cli).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("multi-format"));
+        assert!(msg.contains("file"));
+    }
+
+    #[test]
+    fn format_empty_path_rejected() {
+        let err = parse(&["--coverage", "lcov.info", "--format", "json:"]).unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("empty file path"));
     }
 
     #[test]
@@ -1477,7 +1634,7 @@ mod tests {
     #[test]
     fn format_short_flag() {
         let cli = parse(&["--coverage", "lcov.info", "-f", "json"]).unwrap();
-        assert!(matches!(cli.output.format, FormatArg::Json));
+        assert!(matches!(cli.output.format[0].format, FormatArg::Json));
     }
 
     #[test]

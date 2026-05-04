@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Multi-format output in a single run** — `--format` now accepts a
+  comma-separated list with optional per-format file destinations:
+  `--format json:envelope.json,markdown:report.md,html:report.html`.
+  A single LCOV parse + syn walk + CRAP recompute fans out to every
+  reporter, so CI no longer pays for repeated `crap4rs` invocations.
+  Single-format invocations are unchanged (`--format json` still goes
+  to stdout). Multi-format invocations require every entry to specify
+  a file — stdout cannot multiplex. Closes #100.
+- **`--format html`** emits a self-contained HTML dashboard with a
+  summary block (totals, average/median/max CRAP, risk distribution,
+  pass/fail badge), per-file collapsible function tables (native
+  `<details>`/`<summary>`, no JS), and contributor breakdowns under
+  every scored function. Inline CSS (no CDN, no external fonts), grid-
+  based mobile-responsive layout, and color-coded risk levels matching
+  the SARIF severity mapping. Closes #71.
 - **`--format scorecard-row`** emits a single mokumo `Row::CrapDelta`
   JSON object (mokumo `schema_version=2`) for scorecard-aggregator
   consumption. Producer-mints-status (Model P): Red on new threshold
