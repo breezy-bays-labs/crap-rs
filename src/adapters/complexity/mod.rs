@@ -1338,6 +1338,49 @@ mod tests {
         );
     }
 
+    /// Regression guard for #116: trait default body + concrete impl that
+    /// overrides the same-named method must yield two FunctionComplexity
+    /// entries with disjoint spans. The walker uses separate visitors
+    /// (`visit_trait_item_fn` for the default, `visit_impl_item_fn` for the
+    /// override), each calling `count_complexity` on its own block — so
+    /// contributors and `ProposedSplit`s cannot leak across the
+    /// trait/impl boundary by construction.
+    #[test]
+    fn trait_default_and_concrete_override_have_disjoint_spans() {
+        let fns = extract_fixture("trait_default_override.rs", ComplexityMetric::Cognitive);
+
+        let default = find_fn(&fns, "Greeter::greet");
+        let override_ = find_fn(&fns, "Casual::greet");
+
+        assert_eq!(default.complexity, 2, "trait default body");
+        // base(1) + if(+1+0) + else-if(+1+0) = 3 (else-if does not add nesting)
+        assert_eq!(override_.complexity, 3, "concrete impl override body");
+
+        let default_span = &default.identity.span;
+        let override_span = &override_.identity.span;
+        assert!(
+            default_span.end_line < override_span.start_line,
+            "default body must end strictly before concrete override begins \
+             (default {default_span:?}, override {override_span:?})"
+        );
+
+        // Contributors must stay inside their own function's span.
+        for c in &default.contributors {
+            assert!(
+                c.line >= default_span.start_line && c.line <= default_span.end_line,
+                "default contributor at line {} escaped span {default_span:?}",
+                c.line
+            );
+        }
+        for c in &override_.contributors {
+            assert!(
+                c.line >= override_span.start_line && c.line <= override_span.end_line,
+                "override contributor at line {} escaped span {override_span:?}",
+                c.line
+            );
+        }
+    }
+
     // ── Impl methods complexity ────────────────────────────────────────
 
     #[test]

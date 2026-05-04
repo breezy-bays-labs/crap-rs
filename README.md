@@ -219,7 +219,7 @@ A grep-friendly stderr summary streams alongside stdout — one line per over-th
 [crap=56.00] src/lib.rs:5-21 branchy_fail [actions: add_tests_for_lines,extract_function]
 ```
 
-`--format sarif` carries the same `Diagnostic` shape under `result.properties.diagnostic`, so SARIF consumers (and the future `/cut-the-crap` agent skill) read the same advice as `--format advice`.
+`--format sarif` carries the same `Diagnostic` shape under `result.properties.diagnostic`, so SARIF consumers (and the [`/cut-the-crap` Claude Code skill](#claude-code-skill-cut-the-crap)) read the same advice as `--format advice`.
 
 > **Stability:** `--format advice` is **experimental in v0.3.x**. The shape may grow additively (new fields, new `SuggestedAction` variants under `#[non_exhaustive]`), but `schema_version` stays at `1` and existing fields will not change meaning. The shape stabilises at v0.4.0 with `schema_version: 2`.
 
@@ -340,6 +340,25 @@ crap4rs completions elvish > ~/.config/elvish/lib/crap4rs.elv
 ```
 
 `crap4rs completions <SHELL>` does not need `--coverage`. Unknown shell names exit `2`.
+
+## Claude Code skill (`/cut-the-crap`)
+
+crap4rs ships a reference [Claude Code](https://claude.com/claude-code) skill that consumes `--format advice` and drives a cover-then-split remediation loop on every over-threshold function. It lives in [`skills/cut-the-crap/`](skills/cut-the-crap/) — copy it into your user skills directory once and it's available from any Claude Code session:
+
+```bash
+# from the repo root
+cp -r skills/cut-the-crap ~/.claude/skills/
+```
+
+Then in any Claude Code session:
+
+```text
+/cut-the-crap                       # cover-then-split, apply changes
+/cut-the-crap --explain-only        # produce plan, do not modify
+/cut-the-crap --threshold 15        # custom CRAP threshold
+```
+
+The skill handles the agent-loop side of remediation (covering uncovered branches first, naming proposed extractions, writing a plan to `tmp/cut-the-crap-plan.md` before applying); the crap4rs binary stays a unix-style mechanical emitter. See [`skills/cut-the-crap/SKILL.md`](skills/cut-the-crap/SKILL.md) for the full process specification.
 
 ## Coverage notes
 
