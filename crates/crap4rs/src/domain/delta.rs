@@ -261,7 +261,7 @@ fn identity_key(identity: &FunctionIdentity) -> IdentityKey<'_> {
 /// or Modified. Stable: `current`'s order is preserved for matched +
 /// added rows, then baseline-only (`Removed`) rows trail.
 ///
-/// Decomposed into a private helper [`pair_identities`] to keep the
+/// Decomposed into a private helper `pair_identities` to keep the
 /// public surface declarative and to localize the HashMap construction
 /// for testing.
 pub fn compute(baseline: AnalysisResult, current: AnalysisResult) -> AnalysisDelta {

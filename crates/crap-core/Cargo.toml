@@ -1,0 +1,26 @@
+[package]
+name = "crap-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Language-agnostic foundation for the CRAP analyzer family (placeholder; populated in S2)."
+keywords = ["crap", "complexity", "coverage", "testing", "quality"]
+categories = ["development-tools::testing"]
+
+[lib]
+name = "crap_core"
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+# Cross-crate binary invocation: tests/wire_envelope_snapshot.rs runs
+# the crap4rs binary across crate boundaries. `env!("CARGO_BIN_EXE_*")`
+# is only set for tests inside the bin's own crate, so assert_cmd's
+# workspace-aware `Command::cargo_bin("crap4rs")` is required.
+assert_cmd = { workspace = true }
+insta = { workspace = true }
+serde_json = { workspace = true }
