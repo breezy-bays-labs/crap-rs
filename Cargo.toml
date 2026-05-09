@@ -1,85 +1,78 @@
-[package]
-name = "crap4rs"
-version = "0.4.0"
+[workspace]
+resolver = "2"
+members = [
+    "crates/crap-core",
+    "crates/crap4rs",
+]
+
+[workspace.package]
 edition = "2024"
-authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
-description = "CRAP score analyzer for Rust — find complex, under-tested functions"
+rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/breezy-bays-labs/crap4rs"
-keywords = ["crap", "complexity", "coverage", "testing", "quality"]
-categories = ["development-tools::testing", "command-line-utilities"]
+authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
 
-[package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
-pkg-fmt = "tgz"
-# Binary lives at the archive root (release.yml's `tar -C target/{target}/release crap4rs`).
-# `"."` resolves to an empty source path under cargo-binstall ≥ 1.x and forces fallback to
-# `cargo install`. `{ bin }{ binary-ext }` resolves to `crap4rs` on Linux/macOS, `crap4rs.exe`
-# on Windows. Closes #101.
-bin-dir = "{ bin }{ binary-ext }"
+# ── Workspace dependency catalog ──────────────────────────────────────
+#
+# Every dependency used by any crate in the workspace declares its
+# version pin here. Per-crate Cargo.toml files reference these via
+# `{ workspace = true }` so a version bump touches one place.
+#
+# `crap-core` is the language-agnostic foundation; `crap4rs` is the
+# Rust adapter. Future siblings (`crap4ts`) inherit the same pins.
+[workspace.dependencies]
+# ── In-workspace crates ──
+crap-core = { path = "crates/crap-core", version = "0.1.0" }
 
-[lib]
-name = "crap4rs"
-path = "src/lib.rs"
-
-[[bin]]
-name = "crap4rs"
-path = "src/main.rs"
-
-[dependencies]
-# CLI
+# ── CLI (crap4rs only today) ──
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 clap_complete_nushell = "4"
 
-# AST parsing for complexity analysis
+# ── AST parsing for complexity analysis (Rust adapter only) ──
 syn = { version = "2", features = ["full", "parsing", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 
-# Serialization
+# ── Serialization ──
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Terminal output
+# ── Terminal output ──
 comfy-table = { version = "7", features = ["custom_styling"] }
 colored = "3"
 
-# Config file parsing
+# ── Config file parsing ──
 toml = "0.8"
 
-# Regex (hunk header parsing in diff adapter)
+# ── Regex (hunk header parsing in diff adapter) ──
 regex = "1"
 
-# Error handling
+# ── Error handling ──
 thiserror = "2"
 anyhow = "1"
 
-# File discovery
+# ── File discovery ──
 ignore = "0.4"
 
-# Glob matching for per-path threshold overrides
+# ── Glob matching for per-path threshold overrides ──
 globset = "0.4"
 
-[dev-dependencies]
+# ── Dev-dependency catalog (consumed via `{ workspace = true }`) ──
 proptest = "1"
 pretty_assertions = "1"
 insta = { version = "1", features = ["json"] }
 tempfile = "3"
 # Schema round-trip validation for `--format scorecard-row` (issue #111).
-# Validates emitted Row::CrapDelta JSON against the vendored mokumo
-# schema fragment at tests/fixtures/scorecard/schema.json.
 jsonschema = { version = "0.30", default-features = false }
 # BDD execution of `tests/features/*.feature` files (issue #115).
-# Adopted incrementally: `json_reporter.feature` is the POC; future
-# feature files migrate one at a time. cucumber-rs requires a test
-# target with `harness = false` because it prints its own output
-# instead of the libtest harness.
-cucumber = { version = "0.22", features = ["libtest"] }
+# Per-crate `[dev-dependencies]` adds `features = ["libtest"]`; the
+# libtest feature is dev-only and is NOT lifted to workspace scope
+# because cucumber's libtest feature is adapter-specific (the
+# json_reporter_cucumber harness is crap4rs-only).
+cucumber = { version = "0.22" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-
-# ── Cucumber-rs test targets ──
-# Each migrated `.feature` file gets its own `[[test]]` entry. The
-# `harness = false` flag is mandatory for cucumber-rs (see #115).
-[[test]]
-name = "json_reporter_cucumber"
-harness = false
+# Cross-crate binary invocation for the wire-envelope snapshot test.
+# crap-core's `tests/wire_envelope_snapshot.rs` runs the crap4rs
+# binary; `env!("CARGO_BIN_EXE_crap4rs")` is only set inside the
+# crap4rs crate's tests, so cross-crate invocation needs assert_cmd.
+assert_cmd = "2"

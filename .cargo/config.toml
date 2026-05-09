@@ -1,5 +1,8 @@
-# Share a single target directory across all worktrees.
-# Prevents each worktree from building its own multi-GB target/.
-# See: ops/playbooks/disk-hygiene.md
+# Workspace-relative target directory. Each worktree gets its own
+# `target/` (CEng-3 audit, S1 of the monorepo migration): the prior
+# absolute path was Christopher-specific, didn't survive the planned
+# repo rename to `crap-rs`, and broke clean checkouts on other dev
+# machines. CI's `CARGO_TARGET_DIR=target` env override stays a
+# no-op now that this file's value is also `target`.
 [build]
-target-dir = "/Users/cmbays/Github/crap4rs/target"
+target-dir = "target"

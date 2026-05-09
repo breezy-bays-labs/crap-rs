@@ -1,0 +1,88 @@
+[package]
+name = "crap4rs"
+version = "0.4.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CRAP score analyzer for Rust — find complex, under-tested functions"
+keywords = ["crap", "complexity", "coverage", "testing", "quality"]
+categories = ["development-tools::testing", "command-line-utilities"]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+pkg-fmt = "tgz"
+# Binary lives at the archive root (release.yml's `tar -C target/{target}/release crap4rs`).
+# `"."` resolves to an empty source path under cargo-binstall ≥ 1.x and forces fallback to
+# `cargo install`. `{ bin }{ binary-ext }` resolves to `crap4rs` on Linux/macOS, `crap4rs.exe`
+# on Windows. Closes #101.
+bin-dir = "{ bin }{ binary-ext }"
+
+[lib]
+name = "crap4rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "crap4rs"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { workspace = true }
+clap_complete = { workspace = true }
+clap_complete_nushell = { workspace = true }
+
+# AST parsing for complexity analysis
+syn = { workspace = true }
+proc-macro2 = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Terminal output
+comfy-table = { workspace = true }
+colored = { workspace = true }
+
+# Config file parsing
+toml = { workspace = true }
+
+# Regex (hunk header parsing in diff adapter)
+regex = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# File discovery
+ignore = { workspace = true }
+
+# Glob matching for per-path threshold overrides
+globset = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+pretty_assertions = { workspace = true }
+insta = { workspace = true }
+tempfile = { workspace = true }
+# Schema round-trip validation for `--format scorecard-row` (issue #111).
+# Validates emitted Row::CrapDelta JSON against the vendored mokumo
+# schema fragment at tests/fixtures/scorecard/schema.json.
+jsonschema = { workspace = true }
+# BDD execution of `tests/features/*.feature` files (issue #115).
+# Adopted incrementally: `json_reporter.feature` is the POC; future
+# feature files migrate one at a time. cucumber-rs requires a test
+# target with `harness = false` because it prints its own output
+# instead of the libtest harness. The `libtest` feature is added per
+# crate (NOT lifted to workspace scope) — only crap4rs runs the
+# harness; future siblings (crap4ts) consume their own bindings.
+cucumber = { workspace = true, features = ["libtest"] }
+tokio = { workspace = true }
+
+# ── Cucumber-rs test targets ──
+# Each migrated `.feature` file gets its own `[[test]]` entry. The
+# `harness = false` flag is mandatory for cucumber-rs (see #115).
+[[test]]
+name = "json_reporter_cucumber"
+harness = false

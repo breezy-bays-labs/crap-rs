@@ -1,0 +1,71 @@
+# Pre-commit and pre-push hooks for the crap4rs workspace.
+#
+# After cloning, run `lefthook install` once to wire git hooks. CI
+# runs the same gates (plus coverage); pre-push catches everything
+# coverage-independent so most pushes don't burn CI minutes on
+# easily-caught local issues.
+#
+# Mirror of `.github/workflows/ci.yml` minus coverage / mutation /
+# self-CRAP / scorecard-smoke (those rely on cargo-llvm-cov +
+# cargo-mutants, too slow for pre-push).
+
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.rs"
+      run: cargo fmt --all --check
+      timeout: 60s
+
+pre-push:
+  parallel: false
+  commands:
+    fmt:
+      run: cargo fmt --all --check
+      timeout: 60s
+    ast-purity:
+      # Mirror the `ast-purity` CI job. Rejects AST-library imports
+      # in `crates/crap-core/src/`. Scope is `crap-core` ONLY —
+      # adapter crates (crap4rs uses `syn`; future crap4ts uses
+      # `oxc`/`swc`) legitimately import these. Do NOT widen the
+      # path to `crates/*/src/` — that would reject every adapter.
+      # Regex matches both `use` and `extern crate` forms; trailing
+      # `([_:; ]|$)` is a portable word-boundary substitute (GNU +
+      # BSD grep). Rejects false positives like
+      # `use syntactic_analysis::X`.
+      run: |
+        set -euo pipefail
+        if grep -rE '^[[:space:]]*(use|extern[[:space:]]+crate)[[:space:]]+(::)?(syn|quote|proc_macro2?|tree_sitter|swc|oxc)([_:; ]|$)' crates/crap-core/src/; then
+          echo "crap-core must not import AST libraries — see CLAUDE.md and shaping.md"
+          exit 1
+        fi
+      timeout: 30s
+    clippy:
+      run: cargo clippy --workspace --all-targets -- -D warnings
+      timeout: 300s
+    deny:
+      run: cargo deny check
+      timeout: 60s
+    msrv:
+      # Pre-flight gate. `cargo +1.88 check --workspace --all-targets`
+      # exercises every crate's full target set (lib, bin, tests,
+      # examples) under the declared MSRV. Lib-only `cargo check`
+      # silently misses dev-dep MSRV breaks (cucumber 0.22 needs
+      # 1.88, which the audit's lib-only check did not catch); the
+      # `--all-targets` flag is what surfaces them.
+      run: cargo +1.88 check --workspace --all-targets
+      timeout: 180s
+    test:
+      run: cargo nextest run --workspace --all-targets
+      timeout: 300s
+    cucumber:
+      # cucumber-rs harness=false targets bypass libtest's
+      # `--list --format terse` probing, so nextest excludes them
+      # via `.config/nextest.toml` and they run via `cargo test`.
+      run: cargo test --test json_reporter_cucumber
+      timeout: 180s
+    docs:
+      env:
+        RUSTDOCFLAGS: -D warnings
+      run: cargo doc --workspace --no-deps
+      timeout: 120s
