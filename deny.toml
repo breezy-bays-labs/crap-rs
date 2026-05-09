@@ -1,0 +1,87 @@
+# cargo-deny configuration for the crap4rs workspace.
+#
+# Locks the supply chain at v0.x. As `crap-core` populates (S2–S4)
+# and adapter siblings land (`crap4ts`, S5), the dep graph will
+# expand — every license/source addition becomes a deliberate PR
+# decision, not a pre-allowance.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Allowlisted to the licenses encountered in the current dep tree.
+# Every additional license decision happens in the PR that
+# introduces the dep; that keeps cargo-deny's signal-to-noise clean
+# and turns each "unmatched license allowance" warning into a real
+# action item rather than background noise.
+version = 2
+allow = [
+  "Apache-2.0",
+  "MIT",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "MPL-2.0",
+]
+confidence-threshold = 0.93
+
+[bans]
+# `multiple-versions = "warn"` is intentional during v0.x: dep
+# upgrades during S2–S5 will inevitably introduce duplicate-semver
+# versions of transitive deps; `deny` would block on benign
+# duplicates. Promote to `deny` at v1.0.
+multiple-versions = "warn"
+wildcards = "deny"
+allow = []
+deny = []
+
+# AST-library policy.
+#
+# The hexagonal layout (`crap4rs/CLAUDE.md`, shaping.md) forbids
+# AST libraries (`syn`, `swc_*`, `oxc_*`, `tree-sitter*`,
+# `proc-macro2`, `quote`) from `crap-core` so the same library can
+# be linked by every adapter binary in the workspace (crap4rs via
+# syn, crap4ts via swc/oxc).
+#
+# This `deny.toml` does NOT encode the per-crate transitive ban
+# via `bans.deny.wrappers`, because:
+#
+# - `crap-core` will legitimately use `serde` derive (and other
+#   proc-macro deps) once code lands in S2; cargo-deny treats
+#   proc-macros as graph nodes, so a naive `{ crate = "syn",
+#   wrappers = ["crap4rs"] }` would false-positive on the
+#   `serde_derive` chain.
+# - Expanding `wrappers` to allow proc-macro chains
+#   (`serde_derive`, `thiserror_impl`, etc.) requires a fragile,
+#   ever-growing list — a new derive macro entering the workspace
+#   silently bypasses the rule until someone updates the wrappers.
+#
+# Two enforcement mechanisms substitute for transitive cargo-deny:
+#
+# 1. **Direct-dep enforcement** — `crates/crap-core/Cargo.toml`
+#    does not list any AST library. Any addition would require a
+#    deliberate Cargo.toml edit, visible in PR diff and
+#    structurally forbidding the corresponding `use` line.
+# 2. **Source-level grep** — the `ast-purity` CI job in
+#    `.github/workflows/ci.yml` rejects any `use` / `extern crate`
+#    line referencing `syn`/`quote`/`proc_macro2?`/`tree_sitter`/
+#    `swc`/`oxc` inside `crates/crap-core/src/`. Catches the case
+#    where an AST lib is added as a dep AND imported in the same
+#    PR.
+#
+# Operator backstop: `cargo tree -p crap-core --invert syn` should
+# show only proc-macro chains (lines marked `(proc-macro)` like
+# `serde_derive`, `thiserror-impl`). Any non-proc-macro path from
+# `syn` back to `crap-core` is a real AST-library leak the two
+# mechanisms above missed.
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

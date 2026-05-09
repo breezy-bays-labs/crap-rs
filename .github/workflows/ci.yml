@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
     name: Test (${{ matrix.name }})
@@ -51,7 +51,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9
-      - run: cargo nextest run --all-targets
+      - run: cargo nextest run --workspace --all-targets
       # Cucumber-rs targets (#115) speak their own CLI, not libtest's
       # `--list --format terse`; nextest excludes them via
       # `.config/nextest.toml` and they run via `cargo test`.
@@ -90,13 +90,16 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: lcov
-      - run: cargo build --release
+      - run: cargo build --release --package crap4rs
       - name: Run crap4rs against itself
-        # Lifted `--exclude "cli/**"` (closes #109): cli/ now passes the
-        # gate after the prepare_pipeline / count_cognitive_expr split
-        # (#121, #122) and core::analyze decomposition (#57). Worst CRAP
-        # across the codebase is well under the default threshold of 25.
-        run: ./target/release/crap4rs --coverage lcov.info --src src --strict --color always
+        # Scoped to crates/crap4rs/src — crap-core is empty in S1, so a
+        # workspace-root --src would walk only the Rust adapter anyway.
+        # S2+ widens this to a per-crate run-twice once code lands in
+        # crap-core. Lifted `--exclude "cli/**"` (closes #109): cli/ now
+        # passes the gate after the prepare_pipeline / count_cognitive_expr
+        # split (#121, #122) and core::analyze decomposition (#57). Worst
+        # CRAP across the codebase is well under the default threshold of 25.
+        run: ./target/release/crap4rs --coverage lcov.info --src crates/crap4rs/src --strict --color always
 
   self-crap-view:
     name: domain/view.rs per-function CC <= 15
@@ -109,11 +112,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: lcov
-      - run: cargo build --release
-      - name: Assert max CC in src/domain/view.rs is <= 15
+      - run: cargo build --release --package crap4rs
+      - name: Assert max CC in crates/crap4rs/src/domain/view.rs is <= 15
         run: |
           set -euo pipefail
-          ./target/release/crap4rs --coverage lcov.info --src src --threshold 1000 --format json > view-report.json
+          ./target/release/crap4rs --coverage lcov.info --src crates/crap4rs/src --threshold 1000 --format json > view-report.json
           python3 - <<'PY'
           import json, sys
           MAX_CC = 15
@@ -125,13 +128,13 @@ jobs:
           ]
           offenders = [f for f in view_fns if f["scored"]["complexity"] > MAX_CC]
           if offenders:
-              print(f"FAIL: {len(offenders)} function(s) in src/domain/view.rs exceed CC {MAX_CC}:")
+              print(f"FAIL: {len(offenders)} function(s) in domain/view.rs exceed CC {MAX_CC}:")
               for f in sorted(offenders, key=lambda x: x["scored"]["complexity"], reverse=True):
                   ident = f["scored"]["identity"]
                   print(f"  CC={f['scored']['complexity']} {ident['qualified_name']} ({ident['file_path']})")
               sys.exit(1)
           worst = max((f["scored"]["complexity"] for f in view_fns), default=0)
-          print(f"PASS: {len(view_fns)} fn(s) in src/domain/view.rs, worst CC={worst} (limit {MAX_CC})")
+          print(f"PASS: {len(view_fns)} fn(s) in domain/view.rs, worst CC={worst} (limit {MAX_CC})")
           PY
 
   mutants:
@@ -145,8 +148,8 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
-      - name: Run cargo mutants on src/domain/view.rs
-        run: cargo mutants --package crap4rs --file src/domain/view.rs --no-shuffle --in-place
+      - name: Run cargo mutants on crates/crap4rs/src/domain/view.rs
+        run: cargo mutants --package crap4rs --file crates/crap4rs/src/domain/view.rs --no-shuffle --in-place
 
   scorecard-smoke:
     # Two-layer smoke for the composite action:
@@ -175,13 +178,13 @@ jobs:
 
       # Layer (1): exercise the PR's binary directly.
       - name: Build PR binary
-        run: cargo build --release
+        run: cargo build --release --package crap4rs
       - name: Direct smoke — JSON envelope shape
         env:
           BIN: ./target/release/crap4rs
         run: |
           set -euo pipefail
-          envelope=$("$BIN" --coverage lcov.info --src src --threshold 25 --format json --no-fail)
+          envelope=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 25 --format json --no-fail)
           # Required fields the action's jq queries depend on.
           for field in '.schema_version' '.tool_version' '.result.passed' '.result.functions'; do
             value=$(printf '%s' "$envelope" | jq -e "$field" >/dev/null && echo ok || echo missing)
@@ -195,7 +198,7 @@ jobs:
           BIN: ./target/release/crap4rs
         run: |
           set -euo pipefail
-          md=$("$BIN" --coverage lcov.info --src src --threshold 25 --format markdown --no-fail)
+          md=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 25 --format markdown --no-fail)
           if [ -z "$md" ]; then
             echo "::error::markdown reporter produced empty output"
             exit 1
@@ -234,7 +237,7 @@ jobs:
         uses: ./.github/actions/scorecard
         with:
           coverage: lcov.info
-          src: src
+          src: crates/crap4rs/src
           threshold: '25'
           comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
           comment-header: 'crap-scorecard-self'
@@ -255,3 +258,87 @@ jobs:
           echo "analysis_passed=$ANALYSIS_PASSED"
           echo "regressions=$REGRESSIONS"
           echo "new_violations=$NEW_VIOLATIONS"
+
+  msrv:
+    # Pre-flight gate at the workspace's declared `rust-version`. The
+    # original CEng audit (B3) ran lib-only `cargo +1.85 check` and
+    # missed dev-dep MSRV blockers (cucumber 0.22 needs 1.88, jsonschema
+    # → idna → icu chain needs 1.86). `--all-targets` exercises the
+    # full target set (lib, bin, tests) and surfaces those.
+    name: MSRV (1.88)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: crap4rs-msrv
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo check --workspace --all-targets
+
+  deny:
+    name: cargo-deny (advisories + licenses + bans)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # SHA-pinned: cargo-deny is the supply-chain gate itself, so a
+      # tag-poisoning attack on the action would silently disable every
+      # other supply-chain check. Tag v2 → 91bf2b6 (verified via
+      # `gh api repos/EmbarkStudios/cargo-deny-action/git/ref/tags/v2`).
+      - uses: EmbarkStudios/cargo-deny-action@91bf2b620e09e18d6eb78b92e7861937469acedb # v2
+        with:
+          command: check
+
+  ast-purity:
+    # Source-level grep enforcing that crap-core stays AST-library-pure.
+    # The hexagonal layout (CLAUDE.md) bans `syn`, `quote`, `proc-macro2`,
+    # `tree-sitter`, `swc`, `oxc` from crap-core so the same library can
+    # be linked by every adapter (crap4rs via syn, future crap4ts via
+    # swc/oxc). cargo-deny's transitive ban (`bans.deny.wrappers`) would
+    # false-positive on serde_derive's proc-macro chain or require a
+    # fragile, ever-growing wrapper list — see deny.toml's "AST-library
+    # policy" comment for the full rationale.
+    name: crap-core AST-library purity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject AST-library imports in crap-core
+        # Scope: crap-core ONLY. oxc/swc imports are legitimate in
+        # crates/crap4ts/ once that lands; crap4rs uses syn. Do NOT
+        # widen the path below to `crates/*/src/` — that would reject
+        # every adapter. Static pattern, no untrusted-input
+        # interpolation. Regex notes:
+        #   - Matches both `use` and `extern crate` forms.
+        #   - Optional `(::)?` handles absolute-path imports
+        #     (`use ::syn::Foo`).
+        #   - Trailing `([_:; ]|$)` is a portable word-boundary
+        #     substitute that works on GNU and BSD grep (avoids `\b`/
+        #     `\w` non-portable shortcuts). Catches `syn::`, `syn;`,
+        #     `syn_codegen::`, `swc_ecma_parser::`,
+        #     `tree_sitter_typescript::`, etc.; rejects false
+        #     positives like `use syntactic_analysis::X`.
+        run: |
+          set -euo pipefail
+          if grep -rE '^[[:space:]]*(use|extern[[:space:]]+crate)[[:space:]]+(::)?(syn|quote|proc_macro2?|tree_sitter|swc|oxc)([_:; ]|$)' crates/crap-core/src/; then
+            echo "::error::crap-core must not import AST libraries — see CLAUDE.md and shaping.md"
+            exit 1
+          fi
+          echo "crap-core is AST-library-pure"
+
+  docs:
+    name: cargo doc (warnings as errors)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: crap4rs
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo doc --workspace --no-deps
