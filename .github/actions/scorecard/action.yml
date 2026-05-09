@@ -199,22 +199,25 @@ runs:
 
         # Graceful probe: --format scorecard-row landed in crap4rs 0.4.0
         # (https://github.com/breezy-bays-labs/crap4rs/pull/119). Older
-        # releases — including crates.io's 0.3.0, which `cargo binstall
-        # crap4rs` resolves to until 0.4.0 publishes — don't recognize the
-        # value and clap exits non-zero. Probe the installed help text and
-        # emit an empty row-json with a workflow warning if the variant
-        # isn't supported, so consumers see the gap explicitly without
-        # the action turning red.
-        # `grep -q` exits as soon as it sees a match, which under
-        # `set -o pipefail` can SIGPIPE the upstream `crap4rs --help`
-        # and surface as a non-zero pipeline status — the probe would
-        # then false-negative even when the variant IS supported.
-        # Plain `grep ... >/dev/null` reads to EOF, no SIGPIPE.
-        if crap4rs --help 2>/dev/null | grep -- 'scorecard-row' >/dev/null; then
+        # releases don't recognize the value and clap exits non-zero, so
+        # we probe before invoking and degrade to an empty row-json with
+        # a workflow warning when unsupported.
+        #
+        # Probe by version, not `--help` text. crap4rs 0.4.0 replaced
+        # clap's `--format` ValueEnum with a custom FormatSpec parser so
+        # `--format` could accept `<format>:<file>` syntax (#100), and
+        # clap can't introspect a custom parser — `--help` no longer
+        # enumerates format names. Grepping `--help` for `scorecard-row`
+        # therefore false-negatives against the very versions that
+        # support it. `sort -V` works on both GitHub-hosted Ubuntu and
+        # macOS runners.
+        installed_version="$(crap4rs --version 2>/dev/null | awk '{print $2}')"
+        required_version="0.4.0"
+        if [ -n "$installed_version" ] \
+          && [ "$(printf '%s\n%s\n' "$required_version" "$installed_version" | sort -V | head -n1)" = "$required_version" ]; then
           crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
         else
-          installed_version="$(crap4rs --version 2>/dev/null || echo 'unknown')"
-          echo "::warning::Installed crap4rs ($installed_version) lacks '--format scorecard-row'; outputs.row-json will be empty. Pin the action's 'version' input to '0.4.0' or later once it publishes for structured Row::CrapDelta output."
+          echo "::warning::Installed crap4rs (${installed_version:-unknown}) is older than $required_version; outputs.row-json will be empty. Pin the action's 'version' input to '$required_version' or later for structured Row::CrapDelta output."
           : > "$row_json_file"
         fi
 
