@@ -211,13 +211,23 @@ runs:
         # therefore false-negatives against the very versions that
         # support it. `sort -V` works on both GitHub-hosted Ubuntu and
         # macOS runners.
-        installed_version="$(crap4rs --version 2>/dev/null | awk '{print $2}')"
+        installed_version_raw="$(crap4rs --version 2>/dev/null | awk '{print $2}')"
+        installed_version="${installed_version_raw#v}"
         required_version="0.4.0"
-        if [ -n "$installed_version" ] \
+        # Validate against a strict semver shape before `sort -V`. `sort -V`
+        # treats non-numeric tokens (e.g. "unknown", "garbage") and `v`-prefixed
+        # tags as sorting after pure semver strings, so without this gate they
+        # would false-positive into the supported branch and skip the warning.
+        supports_scorecard_row=false
+        if [[ "$installed_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
           && [ "$(printf '%s\n%s\n' "$required_version" "$installed_version" | sort -V | head -n1)" = "$required_version" ]; then
+          supports_scorecard_row=true
+        fi
+
+        if [ "$supports_scorecard_row" = true ]; then
           crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
         else
-          echo "::warning::Installed crap4rs (${installed_version:-unknown}) is older than $required_version; outputs.row-json will be empty. Pin the action's 'version' input to '$required_version' or later for structured Row::CrapDelta output."
+          echo "::warning::Installed crap4rs (${installed_version:-unknown}) is older than $required_version or reports a non-semver version; outputs.row-json will be empty. Pin the action's 'version' input to '$required_version' or later for structured Row::CrapDelta output."
           : > "$row_json_file"
         fi
 
