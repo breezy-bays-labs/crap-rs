@@ -8,7 +8,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.93"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/breezy-bays-labs/crap4rs"
 authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
@@ -35,15 +35,17 @@ syn = { version = "2", features = ["full", "parsing", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 
 # ── AST parsing for TypeScript adapter (crap4ts only) ──
-# oxc 0.96 is the last release that keeps MSRV at Rust 1.88; 0.97+
-# bumped to 1.89 and 0.127+ to 1.93. S5 ships the walker as a stub —
-# the dep is wired so the cdylib link surface is locked in, but no
-# oxc APIs are exercised yet. The real walker lands in a follow-up
-# pipeline and will revisit the pin then.
-oxc = "0.96"
+# oxc 0.129 is the current latest. Earlier versions (0.96–0.126)
+# had progressively-lower MSRV floors (1.88–1.92); 0.127+ requires
+# Rust 1.93, which matches the workspace floor. The walker is still
+# a stub (crap4ts adapters `unimplemented!()`); the dep is wired so
+# the cdylib link surface is locked in. Real walker lands in a
+# follow-up pipeline.
+oxc = "0.129"
 
 # ── napi-rs bindings for the Node.js cdylib (crap4ts only) ──
-# napi 3.x is the current stable line (MSRV 1.88). napi_build::setup()
+# napi 3.x is the current stable line (MSRV 1.88; workspace floor is
+# higher at 1.93). napi_build::setup()
 # emits the macOS `-undefined dynamic_lookup` link arg automatically,
 # so no `.cargo/config.toml` rustflags are needed.
 napi = { version = "3", default-features = false, features = ["napi9"] }
