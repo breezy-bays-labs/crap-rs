@@ -541,7 +541,6 @@ fn populate_diagnostics(
     }
 }
 
-/// Find the git repository root by running `git rev-parse --show-toplevel`.
 /// Strip `src_root` prefix from a path, returning a forward-slash-normalised string.
 /// Panics if the path is not under `src_root` (a bug in the file walker).
 fn src_relative_path(path: &Path, src_root: &Path) -> String {

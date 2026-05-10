@@ -622,22 +622,6 @@ pub struct Cli {
 
 // ── Entry point ─────────────────────────────────────────────────────
 
-/// Run the CRAP CLI pipeline end-to-end. Generic over `P:
-/// ParseDiagnostic` so the same orchestrator drives every adapter
-/// crate's binary (per ADR D9, mixed-dispatch).
-///
-/// `tool_version` is the binary's own version (e.g. `crap4rs`'s
-/// `CARGO_PKG_VERSION` resolves to `0.4.0`, not crap-core's `0.1.0`).
-/// It feeds the JSON envelope's `tool_version` field, the SARIF run
-/// metadata, the markdown header, the HTML report header, and clap's
-/// long-version splice when the caller threads it through.
-///
-/// `long_version` is the multi-line `--version` string (typically
-/// `"<version> (<git-hash> <build-date>)"`). Computed at the binary's
-/// `build.rs` time. Splicing it here, instead of in clap-derive, is
-/// the S4 lesson-7 pattern — `env!` in this module resolves against
-/// crap-core, not against the calling binary, so the binary's build
-/// metadata can only reach the help text via this parameter.
 /// Parse process args and produce a `Cli`. Splits in half from `run`
 /// so the binary `main.rs` can consult `cli.input.src` (config-aware)
 /// before constructing its `LcovParser` (which needs the source root
@@ -701,6 +685,15 @@ fn build_command(tool_version: &str, long_version: &str) -> clap::Command {
         .long_version(long_version_static)
 }
 
+/// Run the CRAP CLI pipeline end-to-end. Generic over `P:
+/// ParseDiagnostic` so the same orchestrator drives every adapter
+/// crate's binary (per ADR D9, mixed-dispatch).
+///
+/// `tool_version` is the binary's own version (e.g. `crap4rs`'s
+/// `CARGO_PKG_VERSION` resolves to `0.4.0`, not crap-core's `0.1.0`).
+/// It feeds the JSON envelope's `tool_version` field, the SARIF run
+/// metadata, the markdown header, the HTML report header, and clap's
+/// long-version splice when the caller threads it through.
 pub fn run<P: ParseDiagnostic + std::fmt::Display>(
     cli: Cli,
     complexity: &dyn ComplexityPort,

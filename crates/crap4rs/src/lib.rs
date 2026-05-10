@@ -97,6 +97,6 @@ pub mod cli {
     pub use crap_core::cli::{
         Cli, Cli as Args, ColorArg, Command, DeltaKindArg, DeltaSortKeyArg, DisplayArgs,
         FilterArgs, FormatArg, FormatSpec, GroupByArg, InputArgs, MetricArg, OutputArgs, ShellArg,
-        SortKeyArg, run,
+        SortKeyArg, parse_args, run,
     };
 }
