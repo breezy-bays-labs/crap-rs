@@ -73,13 +73,6 @@ jobs:
         with:
           tool: cargo-llvm-cov@0.6
       - run: cargo llvm-cov nextest --lcov --output-path lcov.info
-      - name: Normalize LCOV paths to workspace-relative
-        # cargo llvm-cov emits absolute SF paths (e.g.
-        # `SF:/home/runner/work/crap4rs/crap4rs/crates/crap-core/src/...`).
-        # Self-CRAP matches against WalkBuilder paths, which are
-        # workspace-relative. Strip the runner workspace prefix so
-        # downstream `--src crates/...` invocations match correctly.
-        run: sed -i "s|^SF:${GITHUB_WORKSPACE}/|SF:|g" lcov.info
       - uses: actions/upload-artifact@v4
         with:
           name: lcov
