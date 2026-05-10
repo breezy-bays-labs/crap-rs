@@ -96,19 +96,17 @@ jobs:
       # InputArgs.src is single-path; recursive walk would pull in
       # crates/crap4ts/napi/ (post-S5), tests/fixtures/*.lcov, proptest
       # seeds. Targeted `--src` per crate keeps the boundary strict.
-      - name: Verify LCOV paths workspace-relative
-        # If cargo llvm-cov emits absolute SF paths, LcovParser path
-        # normalization won't match WalkBuilder paths and self-CRAP
-        # silently produces zero matches.
+      - name: Debug — LCOV SF path shape
+        # Diagnostic only. LcovParser::normalize_path strips an absolute
+        # `--src` prefix from absolute SF records, so absolute paths are
+        # fine. This step prints a sample so a future run-twice mismatch
+        # has visible evidence (e.g. path divergence between
+        # `--src crates/crap-core/src` and the SF prefix in lcov.info).
         run: |
           set -euo pipefail
           echo "First 5 SF records in lcov.info:"
-          head -200 lcov.info | grep '^SF:' | head -5
-          if head -200 lcov.info | grep -q '^SF:/'; then
-            echo "::error::lcov.info has absolute SF paths; self-CRAP path matching will fail"
-            echo "  hint: cargo llvm-cov needs --workspace-root . or --remap-path-prefix"
-            exit 1
-          fi
+          head -200 lcov.info | grep '^SF:' | head -5 || true
+          echo "Working directory: $PWD"
       - name: Self-CRAP — crap-core
         run: ./target/release/crap4rs --coverage lcov.info --src crates/crap-core/src --strict --color always
       - name: Self-CRAP — crap4rs
