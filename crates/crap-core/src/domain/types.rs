@@ -14,7 +14,9 @@ use std::fmt;
 /// SARIF reporters convert inclusive → exclusive end at serialization
 /// time; consumers of `SourceSpan` directly get the intuitive bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5: cli/core constructors live in
+// crap4rs through S3/S4 and need cross-crate struct-literal init.
+// Restored at v1.0 once those constructors land in crap-core.
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
@@ -62,9 +64,14 @@ pub enum ContributorKind {
     OptionalChain,
 }
 
-impl fmt::Display for ContributorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
+impl ContributorKind {
+    /// Canonical wire string for this variant — equal to the serde JSON
+    /// representation (sans surrounding quotes). Pinned so reporters,
+    /// diff tools, and adapters that build raw payloads bypass the
+    /// `serde_json::to_value(...)` round-trip without risking drift.
+    /// `tests::wire_str_matches_serde` asserts equality variant-by-variant.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
             Self::IfBranch => "if-branch",
             Self::ForLoop => "for-loop",
             Self::WhileLoop => "while-loop",
@@ -84,8 +91,13 @@ impl fmt::Display for ContributorKind {
             Self::CaseBranch => "case-branch",
             Self::Ternary => "ternary",
             Self::OptionalChain => "optional-chain",
-        };
-        f.write_str(s)
+        }
+    }
+}
+
+impl fmt::Display for ContributorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_wire_str())
     }
 }
 
@@ -97,7 +109,7 @@ impl fmt::Display for ContributorKind {
 /// these fields treat `end_line == 0` as "use `line` instead", since a
 /// real source position is always >= 1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct ComplexityContributor {
     pub kind: ContributorKind,
     /// 1-based line number of the construct's start (or signal token).
@@ -136,12 +148,21 @@ pub enum ComplexityMetric {
     Cyclomatic,
 }
 
+impl ComplexityMetric {
+    /// Canonical wire string — see `ContributorKind::as_wire_str` for
+    /// the rationale. Variant-by-variant equality with serde is pinned
+    /// in `tests::wire_str_matches_serde`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Cognitive => "cognitive",
+            Self::Cyclomatic => "cyclomatic",
+        }
+    }
+}
+
 impl fmt::Display for ComplexityMetric {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Cognitive => write!(f, "cognitive"),
-            Self::Cyclomatic => write!(f, "cyclomatic"),
-        }
+        f.write_str(self.as_wire_str())
     }
 }
 
@@ -149,7 +170,7 @@ impl fmt::Display for ComplexityMetric {
 
 /// Identifies a function in the source code.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct FunctionIdentity {
     /// Project-relative file path, forward-slash normalized.
     pub file_path: String,
@@ -209,12 +230,19 @@ pub enum CoverageMetric {
     Branch,
 }
 
+impl CoverageMetric {
+    /// Canonical wire string — see `ContributorKind::as_wire_str`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Line => "line",
+            Self::Branch => "branch",
+        }
+    }
+}
+
 impl fmt::Display for CoverageMetric {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Line => write!(f, "line"),
-            Self::Branch => write!(f, "branch"),
-        }
+        f.write_str(self.as_wire_str())
     }
 }
 
@@ -241,20 +269,27 @@ pub enum RiskLevel {
     High,
 }
 
+impl RiskLevel {
+    /// Canonical wire string — see `ContributorKind::as_wire_str`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Acceptable => "acceptable",
+            Self::Moderate => "moderate",
+            Self::High => "high",
+        }
+    }
+}
+
 impl fmt::Display for RiskLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Low => write!(f, "low"),
-            Self::Acceptable => write!(f, "acceptable"),
-            Self::Moderate => write!(f, "moderate"),
-            Self::High => write!(f, "high"),
-        }
+        f.write_str(self.as_wire_str())
     }
 }
 
 /// Computed CRAP score with risk classification.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct CrapScore {
     /// Rounded to 2 decimal places.
     pub value: f64,
@@ -263,7 +298,7 @@ pub struct CrapScore {
 
 /// A function with all metrics computed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct ScoredFunction {
     pub identity: FunctionIdentity,
     pub complexity: u32,
@@ -277,7 +312,7 @@ pub struct ScoredFunction {
 
 /// A scored function compared against a threshold.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct FunctionVerdict {
     pub scored: ScoredFunction,
     pub threshold: f64,
@@ -298,7 +333,7 @@ pub use crate::domain::diagnostic::Diagnostic;
 // ── Analysis Results ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct RiskDistribution {
     pub low: usize,
     pub acceptable: usize,
@@ -307,7 +342,7 @@ pub struct RiskDistribution {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct AnalysisSummary {
     pub total_functions: usize,
     pub total_files: usize,
@@ -341,53 +376,40 @@ pub struct AnalysisSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
 pub struct AnalysisResult {
     pub functions: Vec<FunctionVerdict>,
     pub summary: AnalysisSummary,
     pub passed: bool,
 }
 
-// ── Parse Diagnostics ──────────────────────────────────────────────
-
-/// Non-fatal issues encountered during coverage parsing.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ParseDiagnostic {
-    /// A DA record could not be parsed (bad format, missing fields, invalid values).
-    MalformedRecord {
-        /// 1-based line number in the LCOV input where the issue occurred.
-        line_number: usize,
-        /// The raw line content that failed to parse.
-        content: String,
-    },
-    /// An SF record had an empty path.
-    EmptySourceFile {
-        /// The 1-based line number in the LCOV input.
-        line_number: usize,
-    },
-}
-
-impl fmt::Display for ParseDiagnostic {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MalformedRecord {
-                line_number,
-                content,
-            } => write!(f, "line {line_number}: malformed record: {content}"),
-            Self::EmptySourceFile { line_number } => {
-                write!(f, "line {line_number}: empty SF path")
-            }
-        }
-    }
-}
+// ── Analysis Diagnostics ───────────────────────────────────────────
 
 /// Statistics about the analysis process, surfaced by `--verbose`.
+///
+/// Generic over `P: ParseDiagnostic` so adapter-specific parse
+/// diagnostics (`LcovParseDiagnostic` in `crap4rs`, future
+/// `IstanbulParseDiagnostic` in `crap4ts`) thread through one shared
+/// shape. The numeric counts (`files_found`, `files_unparseable`,
+/// `functions_extracted`, `functions_matched`, `functions_no_coverage`,
+/// `files_analyzed`, `files_zero_coverage`) are language-agnostic; only
+/// the `parse_diagnostics` payload varies by adapter. Decomposition
+/// per CAO B2 + ADR D9 — see ADR D4 amendment (2026-05-09).
+///
+/// `#[serde(bound = "")]` suppresses serde's auto-generated
+/// `P: Serialize`/`P: Deserialize<'de>` bounds — the trait bound
+/// `P: ParseDiagnostic` already provides the equivalent (`Serialize +
+/// DeserializeOwned`); the auto-generated bounds conflict with the
+/// owned-deserialize requirement and trip up trait resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct AnalysisDiagnostics {
-    /// Non-fatal parse issues from the LCOV coverage file.
-    pub parse_diagnostics: Vec<ParseDiagnostic>,
+#[serde(bound = "")]
+// `#[non_exhaustive]` paused for v0.5: cli/core in crap4rs construct
+// `AnalysisDiagnostics<LcovParseDiagnostic>` via struct literal until
+// they relocate to crap-core in S3/S4. Restored at v1.0.
+pub struct AnalysisDiagnostics<P: crate::ports::ParseDiagnostic> {
+    /// Non-fatal parse issues from the coverage parser. Concrete shape
+    /// is adapter-specific (LCOV-flavored for crap4rs).
+    pub parse_diagnostics: Vec<P>,
     /// Number of source files discovered.
     pub files_found: usize,
     /// Number of source files that failed to parse (skipped).
@@ -396,7 +418,7 @@ pub struct AnalysisDiagnostics {
     pub functions_extracted: usize,
     /// Functions matched with coverage data.
     pub functions_matched: usize,
-    /// Functions with no LCOV data (0% coverage assumed).
+    /// Functions with no coverage data (0% coverage assumed).
     pub functions_no_coverage: usize,
     /// Files with at least one analyzed function.
     pub files_analyzed: usize,
@@ -558,10 +580,11 @@ pub enum CrapError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_strategies::DummyParseDiagnostic;
 
     #[test]
     fn analysis_diagnostics_has_zero_coverage_fields() {
-        let diag = AnalysisDiagnostics {
+        let diag: AnalysisDiagnostics<DummyParseDiagnostic> = AnalysisDiagnostics {
             parse_diagnostics: vec![],
             files_found: 10,
             files_unparseable: 0,
@@ -573,21 +596,6 @@ mod tests {
         };
         assert_eq!(diag.files_analyzed, 8);
         assert_eq!(diag.files_zero_coverage, 3);
-    }
-
-    #[test]
-    fn parse_diagnostic_display_malformed_record() {
-        let d = ParseDiagnostic::MalformedRecord {
-            line_number: 42,
-            content: "DA:bad".to_string(),
-        };
-        assert_eq!(d.to_string(), "line 42: malformed record: DA:bad");
-    }
-
-    #[test]
-    fn parse_diagnostic_display_empty_source_file() {
-        let d = ParseDiagnostic::EmptySourceFile { line_number: 7 };
-        assert_eq!(d.to_string(), "line 7: empty SF path");
     }
 
     #[test]

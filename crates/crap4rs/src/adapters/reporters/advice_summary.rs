@@ -63,11 +63,15 @@ fn format_actions(verdict: &FunctionVerdict) -> String {
 
 fn action_kind_label(action: &crate::domain::diagnostic::SuggestedAction) -> &'static str {
     use crate::domain::diagnostic::SuggestedAction::*;
+    // `SuggestedAction` is `#[non_exhaustive]` and lives in crap-core;
+    // cross-crate matches need a wildcard arm. New variants land with
+    // an explicit label at v1.0.
     match action {
         AddTestsForLines { .. } => "add_tests_for_lines",
         ExtractFunction { .. } => "extract_function",
         SimplifyBranching { .. } => "simplify_branching",
         AcceptInherentComplexity { .. } => "accept_inherent_complexity",
+        _ => "unknown",
     }
 }
 

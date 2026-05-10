@@ -113,10 +113,15 @@ jobs:
         with:
           name: lcov
       - run: cargo build --release --package crap4rs
-      - name: Assert max CC in crates/crap4rs/src/domain/view.rs is <= 15
+      - name: Assert max CC in crates/crap-core/src/domain/view.rs is <= 15
+        # S2 (#134) moved domain/view.rs from crates/crap4rs/src/ to
+        # crates/crap-core/src/. Run-twice for a workspace gate is the
+        # S4 plan; until then, this targeted invocation analyzes
+        # crap-core's source where view.rs now lives. The substring
+        # filter still matches "domain/view.rs" verbatim.
         run: |
           set -euo pipefail
-          ./target/release/crap4rs --coverage lcov.info --src crates/crap4rs/src --threshold 1000 --format json > view-report.json
+          ./target/release/crap4rs --coverage lcov.info --src crates/crap-core/src --threshold 1000 --format json > view-report.json
           python3 - <<'PY'
           import json, sys
           MAX_CC = 15
@@ -148,8 +153,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
-      - name: Run cargo mutants on crates/crap4rs/src/domain/view.rs
-        run: cargo mutants --package crap4rs --file crates/crap4rs/src/domain/view.rs --no-shuffle --in-place
+      - name: Run cargo mutants on crates/crap-core/src/domain/view.rs
+        # S2 (#134) moved view.rs from crap4rs to crap-core. Update
+        # both --package and --file to follow the move.
+        run: cargo mutants --package crap-core --file crates/crap-core/src/domain/view.rs --no-shuffle --in-place
 
   scorecard-smoke:
     # Two-layer smoke for the composite action:

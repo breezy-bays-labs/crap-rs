@@ -1,4 +1,4 @@
-//! Shared proptest strategies for crate-wide property tests.
+//! Shared proptest strategies + test stubs for crate-wide property tests.
 //!
 //! Lives at the crate root (not inside an adapter module) so that any
 //! layer with `#[cfg(test)]` access — including `domain::view` — can
@@ -8,13 +8,29 @@
 //! to `src/adapters/reporters/json.rs`; they are reused (unmodified in
 //! shape) here, with the analysis-result vec bound widened to `0..50`
 //! so property tests probe empty + small-N + N>limit cases.
+//!
+//! `DummyParseDiagnostic` is a minimal `ParseDiagnostic` impl used by
+//! the object-safety compile-fence in `crate::ports` and by tests that
+//! need to construct an `AnalysisDiagnostics<P>` without depending on
+//! the `crap4rs` adapter's `LcovParseDiagnostic`.
 
 use crate::domain::summary::compute_summary;
 use crate::domain::types::{
     AnalysisResult, ComplexityMetric, CrapScore, FunctionIdentity, FunctionVerdict, RiskLevel,
     ScoredFunction, SourceSpan,
 };
+use crate::ports::ParseDiagnostic;
 use proptest::prelude::*;
+use serde::{Deserialize, Serialize};
+
+/// Minimal `ParseDiagnostic` implementation for crap-core's own tests
+/// (no LCOV / Istanbul knowledge). Adapter crates supply their own
+/// concrete diagnostic type; this stub exists so `AnalysisDiagnostics<P>`
+/// is constructible inside crap-core without a circular dep on an adapter.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DummyParseDiagnostic;
+
+impl ParseDiagnostic for DummyParseDiagnostic {}
 
 pub fn arb_risk_level() -> impl Strategy<Value = RiskLevel> {
     prop_oneof![

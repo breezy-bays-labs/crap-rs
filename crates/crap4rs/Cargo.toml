@@ -28,6 +28,9 @@ name = "crap4rs"
 path = "src/main.rs"
 
 [dependencies]
+# Language-agnostic foundation: domain types, port traits, shared invariants.
+crap-core = { workspace = true }
+
 # CLI
 clap = { workspace = true }
 clap_complete = { workspace = true }
@@ -62,6 +65,10 @@ ignore = { workspace = true }
 globset = { workspace = true }
 
 [dev-dependencies]
+# Pull `crap_core::test_strategies::*` (proptest generators + the
+# `DummyParseDiagnostic` stub) into crap4rs's test build via the
+# `test-helpers` feature. Production builds leave it off.
+crap-core = { workspace = true, features = ["test-helpers"] }
 proptest = { workspace = true }
 pretty_assertions = { workspace = true }
 insta = { workspace = true }

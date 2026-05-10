@@ -65,6 +65,8 @@ fn format_csv_delta(view: &DeltaView<'_>, metric: ComplexityMetric) -> String {
 }
 
 fn row_for_change(change: &FunctionChange, metric: ComplexityMetric) -> String {
+    // `FunctionChange` is `#[non_exhaustive]` and lives in crap-core;
+    // cross-crate matches need wildcard arms. New variants land at v1.0.
     let baseline_cells = match change {
         FunctionChange::Removed { baseline } | FunctionChange::Modified { baseline, .. } => {
             let s = &baseline.scored;
@@ -74,6 +76,7 @@ fn row_for_change(change: &FunctionChange, metric: ComplexityMetric) -> String {
             )
         }
         FunctionChange::Added { .. } => ",,".to_string(),
+        _ => ",,".to_string(),
     };
     let current_cells = match change {
         FunctionChange::Added { current } | FunctionChange::Modified { current, .. } => {
@@ -84,6 +87,7 @@ fn row_for_change(change: &FunctionChange, metric: ComplexityMetric) -> String {
             )
         }
         FunctionChange::Removed { .. } => ",,".to_string(),
+        _ => ",,".to_string(),
     };
     let delta_cell = change
         .score_delta()

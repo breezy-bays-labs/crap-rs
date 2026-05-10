@@ -316,7 +316,11 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "insta",
+ "pretty_assertions",
+ "proptest",
+ "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -329,6 +333,7 @@ dependencies = [
  "clap_complete_nushell",
  "colored",
  "comfy-table",
+ "crap-core",
  "cucumber",
  "globset",
  "ignore",
