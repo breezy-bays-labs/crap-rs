@@ -3,10 +3,24 @@
 //! Tests the full pipeline: file discovery → complexity extraction →
 //! coverage parsing → matching → scoring → verdict → summary.
 
+use crap4rs::adapters::complexity::SynComplexityAdapter;
+use crap4rs::adapters::coverage::LcovParser;
 use crap4rs::core::{AnalyzeOptions, analyze};
 use crap4rs::domain::threshold::ThresholdConfig;
 use crap4rs::domain::types::ComplexityMetric;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// Construct the LCOV/syn adapter pair rooted at `src`. Threaded
+/// through the post-S4 (#136) `analyze` signature, which takes
+/// `&dyn ComplexityPort` + `&dyn CoveragePort<Diagnostic = P>` from
+/// the caller — the orchestrator no longer constructs adapters
+/// internally.
+fn adapters(src: &Path) -> (SynComplexityAdapter, LcovParser) {
+    (
+        SynComplexityAdapter::new(),
+        LcovParser::new(src.to_path_buf()),
+    )
+}
 
 /// Self-referential test: crap4rs analyzes its own source code.
 ///
@@ -36,7 +50,8 @@ fn self_referential_analysis() {
         ..AnalyzeOptions::default()
     };
 
-    let result = analyze(&opts).unwrap().result;
+    let (cx, cov) = adapters(&src);
+    let result = analyze(&opts, &cx, &cov).unwrap().result;
 
     // Must find functions (we know crap4rs has many)
     assert!(
@@ -83,6 +98,7 @@ fn self_referential_with_cyclomatic() {
     let lcov_path = tmp.path().join("lcov.info");
     std::fs::write(&lcov_path, &lcov).unwrap();
 
+    let (cx, cov) = adapters(&src);
     let opts = AnalyzeOptions {
         src,
         coverage: lcov_path,
@@ -96,7 +112,7 @@ fn self_referential_with_cyclomatic() {
         ..AnalyzeOptions::default()
     };
 
-    let result = analyze(&opts).unwrap().result;
+    let result = analyze(&opts, &cx, &cov).unwrap().result;
 
     // All functions should use cyclomatic metric
     for v in &result.functions {
@@ -117,6 +133,7 @@ fn self_referential_known_functions_present() {
     let lcov_path = tmp.path().join("lcov.info");
     std::fs::write(&lcov_path, &lcov).unwrap();
 
+    let (cx, cov) = adapters(&src);
     let opts = AnalyzeOptions {
         src,
         coverage: lcov_path,
@@ -130,7 +147,7 @@ fn self_referential_known_functions_present() {
         ..AnalyzeOptions::default()
     };
 
-    let result = analyze(&opts).unwrap().result;
+    let result = analyze(&opts, &cx, &cov).unwrap().result;
 
     let names: Vec<&str> = result
         .functions
@@ -138,11 +155,12 @@ fn self_referential_known_functions_present() {
         .map(|v| v.scored.identity.qualified_name.as_str())
         .collect();
 
-    // Sentinel functions that must exist in crap4rs's adapter / core /
-    // wiring layers (post-S2 monorepo split — domain functions like
-    // compute_crap, match_functions, compute_summary moved to crap-core
-    // and are exercised by the analogous self-referential test there).
-    assert!(names.contains(&"analyze"), "missing analyze");
+    // Sentinel functions that must exist in crap4rs's adapter layers
+    // (post-S4 monorepo split — `analyze`, domain helpers, and the
+    // CLI dispatch all moved to crap-core, so the only landlord
+    // functions remaining in crap4rs/src are the language-specific
+    // adapter constructors and the LCOV parse machinery; main.rs is a
+    // 20-line shell that doesn't expose function-name surface).
     assert!(
         names.contains(&"SynComplexityAdapter::new"),
         "missing SynComplexityAdapter::new"
@@ -163,6 +181,8 @@ fn exclude_pattern_filters_correctly() {
     let lcov_path = tmp_all.path().join("lcov.info");
     std::fs::write(&lcov_path, &lcov).unwrap();
 
+    let (cx, cov) = adapters(&src);
+
     // Analyze all files
     let all_opts = AnalyzeOptions {
         src: src.clone(),
@@ -176,7 +196,7 @@ fn exclude_pattern_filters_correctly() {
         respect_gitignore: false,
         ..AnalyzeOptions::default()
     };
-    let all_result = analyze(&all_opts).unwrap().result;
+    let all_result = analyze(&all_opts, &cx, &cov).unwrap().result;
 
     // Analyze with adapter exclusion
     let filtered_opts = AnalyzeOptions {
@@ -191,7 +211,7 @@ fn exclude_pattern_filters_correctly() {
         respect_gitignore: false,
         ..AnalyzeOptions::default()
     };
-    let filtered_result = analyze(&filtered_opts).unwrap().result;
+    let filtered_result = analyze(&filtered_opts, &cx, &cov).unwrap().result;
 
     // Filtered should have fewer functions
     assert!(
