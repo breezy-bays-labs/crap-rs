@@ -1,0 +1,13 @@
+# cargo-mutants config — see https://mutants.rs/
+
+# Skip the wire-envelope canary test under mutants.
+#
+# `crates/crap-core/tests/wire_envelope_snapshot.rs` exec's the `crap4rs`
+# binary via `assert_cmd::Command::cargo_bin("crap4rs")` to lock the JSON
+# envelope shape across the migration. Under `cargo mutants --package
+# crap-core` the bin is not built (only crap-core's targets are), so the
+# test panics before any mutant runs. The canary still gates every PR via
+# the `Test (linux-x86)` / `Test (macos-arm)` / `Test (macos-x86)` jobs,
+# which run `cargo nextest run --workspace --all-targets` and DO build the
+# crap4rs bin first. Excluding it here is scoped to mutants only.
+additional_cargo_test_args = ["--", "--skip", "envelope"]

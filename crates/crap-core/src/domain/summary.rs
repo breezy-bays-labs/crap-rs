@@ -349,6 +349,21 @@ pub enum CrapDeltaStatus {
     Red,
 }
 
+impl CrapDeltaStatus {
+    /// Canonical wire string — equal to the serde JSON representation
+    /// (PascalCase, sans quotes). See
+    /// `crate::domain::types::ContributorKind::as_wire_str` for the
+    /// rationale; equality with serde is pinned in
+    /// `tests::wire_str_matches_serde`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Green => "Green",
+            Self::Yellow => "Yellow",
+            Self::Red => "Red",
+        }
+    }
+}
+
 /// Language-agnostic record carrying the structured signal a producer
 /// projects into a mokumo `Row::CrapDelta` JSON object. Lives in
 /// `domain/summary.rs` (pure-domain — no `syn`, no LCOV) so it ships

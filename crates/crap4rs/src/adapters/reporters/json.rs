@@ -530,10 +530,11 @@ mod tests {
 
     #[test]
     fn test_diagnostics_included_when_present() {
-        use crate::domain::types::{AnalysisDiagnostics, ParseDiagnostic};
+        use crate::domain::types::AnalysisDiagnostics;
+        use crate::parse_diagnostic::LcovParseDiagnostic;
 
         let diag = AnalysisDiagnostics {
-            parse_diagnostics: vec![ParseDiagnostic::MalformedRecord {
+            parse_diagnostics: vec![LcovParseDiagnostic::MalformedRecord {
                 line_number: 5,
                 content: "DA:bad".to_string(),
             }],
@@ -572,7 +573,7 @@ mod tests {
 mod proptests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::make_view_default;
-    use crate::test_strategies::arb_analysis_result;
+    use crap_core::test_strategies::arb_analysis_result;
     use proptest::prelude::*;
 
     fn arb_config() -> impl Strategy<Value = JsonConfig<'static>> {

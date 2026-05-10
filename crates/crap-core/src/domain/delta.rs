@@ -44,6 +44,14 @@ impl ChangeKind {
     pub const ALL: [ChangeKind; 3] = [ChangeKind::Added, ChangeKind::Removed, ChangeKind::Modified];
 
     pub fn as_str(&self) -> &'static str {
+        self.as_wire_str()
+    }
+
+    /// Canonical wire string — equal to the serde JSON representation
+    /// (sans quotes). See `ContributorKind::as_wire_str` for the
+    /// rationale; equality with serde is pinned in
+    /// `tests::wire_str_matches_serde`.
+    pub fn as_wire_str(&self) -> &'static str {
         match self {
             ChangeKind::Added => "added",
             ChangeKind::Removed => "removed",
@@ -378,6 +386,18 @@ pub enum DeltaSortKey {
     BaselineCrap,
     /// Alphabetical by `file_path`, then `qualified_name`.
     Path,
+}
+
+impl DeltaSortKey {
+    /// Canonical wire string — see `ContributorKind::as_wire_str`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::ScoreDelta => "score_delta",
+            Self::CurrentCrap => "current_crap",
+            Self::BaselineCrap => "baseline_crap",
+            Self::Path => "path",
+        }
+    }
 }
 
 /// Shaped view over an [`AnalysisDelta`].

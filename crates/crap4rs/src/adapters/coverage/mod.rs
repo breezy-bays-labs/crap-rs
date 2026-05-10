@@ -5,8 +5,9 @@
 //! FN/FNDA records are ignored because function matching uses line ranges
 //! from syn, not LCOV function names (which are mangled Rust symbols).
 
-use crate::domain::types::{BranchCoverage, CrapError, LineCoverage, ParseDiagnostic};
-use crate::ports::{CoveragePort, ParseOutput};
+use crate::domain::types::{BranchCoverage, CrapError, LineCoverage};
+use crate::parse_diagnostic::LcovParseDiagnostic;
+use crap_core::ports::{CoveragePort, ParseOutput};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
@@ -30,7 +31,7 @@ pub struct LcovParser {
 struct ParseState {
     raw_coverage: RawCoverage,
     raw_branches: RawBranches,
-    diagnostics: Vec<ParseDiagnostic>,
+    diagnostics: Vec<LcovParseDiagnostic>,
     current_path: Option<String>,
     current_lines: BTreeMap<usize, u64>,
     current_branches: BTreeMap<BranchKey, Option<u64>>,
@@ -54,7 +55,9 @@ impl LcovParser {
 }
 
 impl CoveragePort for LcovParser {
-    fn parse(&self, data: &str) -> Result<ParseOutput, CrapError> {
+    type Diagnostic = LcovParseDiagnostic;
+
+    fn parse(&self, data: &str) -> Result<ParseOutput<LcovParseDiagnostic>, CrapError> {
         let mut state = ParseState::default();
 
         for (line, line_number) in data.lines().zip(1usize..) {
@@ -88,7 +91,7 @@ fn start_source_file(parser: &LcovParser, state: &mut ParseState, path: &str, li
     if path.is_empty() {
         state
             .diagnostics
-            .push(ParseDiagnostic::EmptySourceFile { line_number });
+            .push(LcovParseDiagnostic::EmptySourceFile { line_number });
         state.current_path = None;
     } else {
         state.current_path = Some(parser.normalize_path(path));
@@ -120,10 +123,12 @@ fn record_brda(state: &mut ParseState, brda_rest: &str, line: &str, line_number:
 }
 
 fn push_malformed_record(state: &mut ParseState, line_number: usize, line: &str) {
-    state.diagnostics.push(ParseDiagnostic::MalformedRecord {
-        line_number,
-        content: line.to_string(),
-    });
+    state
+        .diagnostics
+        .push(LcovParseDiagnostic::MalformedRecord {
+            line_number,
+            content: line.to_string(),
+        });
 }
 
 /// Parse a DA record value (after "DA:" prefix).
@@ -238,7 +243,7 @@ fn clear_current_block(state: &mut ParseState) {
     state.current_branches.clear();
 }
 
-fn build_parse_output(state: ParseState) -> ParseOutput {
+fn build_parse_output(state: ParseState) -> ParseOutput<LcovParseDiagnostic> {
     let coverage = state
         .raw_coverage
         .into_iter()
@@ -282,7 +287,7 @@ mod tests {
         LcovParser::new(PathBuf::from("/project"))
     }
 
-    fn parse(input: &str) -> ParseOutput {
+    fn parse(input: &str) -> ParseOutput<LcovParseDiagnostic> {
         parser().parse(input).unwrap()
     }
 
@@ -396,7 +401,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         assert!(!output.coverage.contains_key("src/main.rs"));
         assert_eq!(output.diagnostics.len(), 1);
         match &output.diagnostics[0] {
-            ParseDiagnostic::MalformedRecord {
+            LcovParseDiagnostic::MalformedRecord {
                 line_number,
                 content,
             } => {
@@ -421,7 +426,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         assert_eq!(output.diagnostics.len(), 1);
         assert!(matches!(
             &output.diagnostics[0],
-            ParseDiagnostic::MalformedRecord { .. }
+            LcovParseDiagnostic::MalformedRecord { .. }
         ));
     }
 
@@ -431,7 +436,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         assert_eq!(output.diagnostics.len(), 1);
         assert!(matches!(
             &output.diagnostics[0],
-            ParseDiagnostic::MalformedRecord { .. }
+            LcovParseDiagnostic::MalformedRecord { .. }
         ));
     }
 
@@ -440,7 +445,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         let output = parse("SF:/project/src/main.rs\nDA:0,5\nend_of_record\n");
         assert_eq!(output.diagnostics.len(), 1);
         match &output.diagnostics[0] {
-            ParseDiagnostic::MalformedRecord {
+            LcovParseDiagnostic::MalformedRecord {
                 line_number,
                 content,
             } => {
@@ -476,7 +481,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         assert_eq!(output.diagnostics.len(), 1);
         assert!(matches!(
             &output.diagnostics[0],
-            ParseDiagnostic::EmptySourceFile { line_number: 1 }
+            LcovParseDiagnostic::EmptySourceFile { line_number: 1 }
         ));
     }
 
@@ -559,7 +564,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         let output = parse("SF:/project/src/lib.rs\nBRDA:not,valid\nend_of_record\n");
         assert_eq!(output.diagnostics.len(), 1);
         match &output.diagnostics[0] {
-            ParseDiagnostic::MalformedRecord {
+            LcovParseDiagnostic::MalformedRecord {
                 line_number,
                 content,
             } => {
@@ -577,7 +582,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         assert_eq!(output.diagnostics.len(), 1);
         assert!(matches!(
             &output.diagnostics[0],
-            ParseDiagnostic::MalformedRecord { .. }
+            LcovParseDiagnostic::MalformedRecord { .. }
         ));
     }
 
@@ -588,7 +593,7 @@ SF:/project/src/main.rs\nDA:2,2\nDA:3,7\nend_of_record\n";
         assert_eq!(output.diagnostics.len(), 1);
         assert!(matches!(
             &output.diagnostics[0],
-            ParseDiagnostic::MalformedRecord { .. }
+            LcovParseDiagnostic::MalformedRecord { .. }
         ));
     }
 
@@ -627,7 +632,7 @@ SF:/project/src/main.rs\nBRDA:1,0,0,7\nBRDA:2,0,0,1\nend_of_record\n";
         assert_eq!(output.diagnostics.len(), 1);
         assert!(matches!(
             &output.diagnostics[0],
-            ParseDiagnostic::MalformedRecord { .. }
+            LcovParseDiagnostic::MalformedRecord { .. }
         ));
     }
 

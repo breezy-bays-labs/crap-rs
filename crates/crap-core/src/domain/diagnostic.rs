@@ -13,7 +13,7 @@ use crate::domain::types::{
 /// convention (per `.claude/rules/domain.md` §5) so coverage gaps and
 /// proposed splits address the same line space as `ComplexityContributor`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
 pub struct LineRange {
     pub start: usize,
     pub end: usize,
@@ -46,6 +46,20 @@ pub enum RootCause {
     Both,
 }
 
+impl RootCause {
+    /// Canonical wire string — equal to the serde JSON representation
+    /// (sans quotes). See `crate::domain::types::ContributorKind::as_wire_str`
+    /// for the rationale; equality with serde is pinned in
+    /// `tests::wire_str_matches_serde`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::LowCoverage => "low_coverage",
+            Self::HighComplexity => "high_complexity",
+            Self::Both => "both",
+        }
+    }
+}
+
 // ── Applicability ───────────────────────────────────────────────────
 
 /// Confidence in a `SuggestedAction`, matching `rustc`'s `Applicability`
@@ -61,6 +75,18 @@ pub enum Applicability {
     HasPlaceholders,
     #[default]
     Unspecified,
+}
+
+impl Applicability {
+    /// Canonical wire string — see `RootCause::as_wire_str`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::MachineApplicable => "machine_applicable",
+            Self::MaybeIncorrect => "maybe_incorrect",
+            Self::HasPlaceholders => "has_placeholders",
+            Self::Unspecified => "unspecified",
+        }
+    }
 }
 
 // ── SplitKind ───────────────────────────────────────────────────────
@@ -80,12 +106,23 @@ pub enum SplitKind {
     HighestBranchCount,
 }
 
+impl SplitKind {
+    /// Canonical wire string — see `RootCause::as_wire_str`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::DeepestNesting => "deepest_nesting",
+            Self::LargestSubblock => "largest_subblock",
+            Self::HighestBranchCount => "highest_branch_count",
+        }
+    }
+}
+
 // ── ProposedSplit ───────────────────────────────────────────────────
 
 /// One AST-derived candidate for `extract_function`. The split is named
 /// only by its line range — agents do prose, the CLI does coordinates.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
 pub struct ProposedSplit {
     pub line_range: LineRange,
     /// Sum of contributor increments inside `line_range` (cognitive or
@@ -133,7 +170,7 @@ pub enum SuggestedAction {
 /// deserialize when fields are added under `#[non_exhaustive]`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
 pub struct Diagnostic {
     pub coverage_gaps: Vec<LineRange>,
     pub complexity_drivers: Vec<ComplexityContributor>,

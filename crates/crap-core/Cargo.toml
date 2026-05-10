@@ -6,7 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Language-agnostic foundation for the CRAP analyzer family (placeholder; populated in S2)."
+description = "Language-agnostic foundation for the CRAP analyzer family — domain types, port traits, and shared invariants for crap4rs / future crap4ts."
 keywords = ["crap", "complexity", "coverage", "testing", "quality"]
 categories = ["development-tools::testing"]
 
@@ -14,13 +14,39 @@ categories = ["development-tools::testing"]
 name = "crap_core"
 path = "src/lib.rs"
 
+[features]
+# Exposes `crap_core::test_strategies::*` (proptest generators + the
+# `DummyParseDiagnostic` stub) to downstream adapter tests. Production
+# builds leave this off so `proptest` is not pulled into the prod tree.
+# crap4rs's `[dev-dependencies]` opts in.
+test-helpers = ["dep:proptest"]
+
 [dependencies]
+# Serialization — domain types derive Serialize/Deserialize so reporters
+# in crap4rs and future siblings (crap4ts) can hand them to any serde
+# format without translation.
+serde = { workspace = true }
+
+# Error tagging on `CrapError` and `view::CoverageRangeError`. Pure
+# typed errors, no I/O.
+thiserror = { workspace = true }
+
+# Optional — only pulled in by the `test-helpers` feature. The
+# `test_strategies` module imports `proptest::prelude::*`; gating it
+# behind a feature keeps the prod dependency tree clean.
+proptest = { workspace = true, optional = true }
 
 [dev-dependencies]
+# `proptest` powers the property tests interleaved through the domain
+# modules; `pretty_assertions` improves diff output; `serde_json` is
+# used by enum wire-string round-trip tests and Diagnostic round trips.
+proptest = { workspace = true }
+pretty_assertions = { workspace = true }
+serde_json = { workspace = true }
+
 # Cross-crate binary invocation: tests/wire_envelope_snapshot.rs runs
 # the crap4rs binary across crate boundaries. `env!("CARGO_BIN_EXE_*")`
 # is only set for tests inside the bin's own crate, so assert_cmd's
 # workspace-aware `Command::cargo_bin("crap4rs")` is required.
 assert_cmd = { workspace = true }
 insta = { workspace = true }
-serde_json = { workspace = true }

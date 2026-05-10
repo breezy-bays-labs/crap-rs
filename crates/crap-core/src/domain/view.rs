@@ -93,7 +93,7 @@ use serde::Serialize;
 /// `#[non_exhaustive]` reserves namespace for additive fields (e.g.,
 /// future `min_complexity`, `risk_floor`, secondary sort) without
 /// breaking downstream callers.
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ViewSpec {
     /// Eligibility predicates — AND-composed. See [`Filters`].
@@ -127,6 +127,19 @@ pub enum GroupKey {
     File,
 }
 
+impl GroupKey {
+    /// Canonical wire string — equal to the serde JSON representation
+    /// (sans quotes). See
+    /// `crate::domain::types::ContributorKind::as_wire_str` for the
+    /// rationale; equality with serde is pinned in
+    /// `tests::wire_str_matches_serde`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::File => "file",
+        }
+    }
+}
+
 /// Eligibility predicates over a `FunctionVerdict`. AND-composed: a
 /// verdict is eligible iff every active filter admits it.
 ///
@@ -134,7 +147,7 @@ pub enum GroupKey {
 /// `#[non_exhaustive]` reserves namespace for future predicates
 /// (`min_complexity`, `risk_floor`, `path_glob`, etc.) without breaking
 /// downstream construction.
-#[non_exhaustive]
+// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Filters {
     /// When true, retain only verdicts where `exceeds == true`
@@ -228,6 +241,18 @@ pub enum SortKey {
     Complexity,
     /// Alphabetical by `file_path`, then CRAP descending within file.
     Path,
+}
+
+impl SortKey {
+    /// Canonical wire string — see `GroupKey::as_wire_str`.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Crap => "crap",
+            Self::Coverage => "coverage",
+            Self::Complexity => "complexity",
+            Self::Path => "path",
+        }
+    }
 }
 
 // ── View output ──────────────────────────────────────────────────────

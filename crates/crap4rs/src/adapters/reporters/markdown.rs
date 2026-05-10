@@ -275,6 +275,10 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
             FunctionChange::Added { current } => current.exceeds,
             FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
             FunctionChange::Removed { .. } => false,
+            // `FunctionChange` is `#[non_exhaustive]` and lives in
+            // crap-core. Future variants default to "not a new violation"
+            // until the reporter is updated.
+            _ => false,
         })
         .collect();
     if !new_violations.is_empty() {

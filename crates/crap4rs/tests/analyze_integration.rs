@@ -138,16 +138,10 @@ fn self_referential_known_functions_present() {
         .map(|v| v.scored.identity.qualified_name.as_str())
         .collect();
 
-    // These functions must exist in crap4rs source
-    assert!(names.contains(&"compute_crap"), "missing compute_crap");
-    assert!(
-        names.contains(&"match_functions"),
-        "missing match_functions"
-    );
-    assert!(
-        names.contains(&"compute_summary"),
-        "missing compute_summary"
-    );
+    // Sentinel functions that must exist in crap4rs's adapter / core /
+    // wiring layers (post-S2 monorepo split — domain functions like
+    // compute_crap, match_functions, compute_summary moved to crap-core
+    // and are exercised by the analogous self-referential test there).
     assert!(names.contains(&"analyze"), "missing analyze");
     assert!(
         names.contains(&"SynComplexityAdapter::new"),
