@@ -1,0 +1,65 @@
+[package]
+name = "crap4ts"
+version = "2.0.0-alpha.1"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "TypeScript adapter for crap-rs (CRAP score analyzer) — ALPHA: oxc walker not yet shipped"
+keywords = ["crap", "complexity", "coverage", "typescript", "quality"]
+categories = ["development-tools::testing", "command-line-utilities"]
+
+# Single-crate cdylib + bin (CAO A3). The cdylib artifact powers the
+# napi-rs Node.js binding; the bin artifact is the standalone CLI that
+# mirrors crap4rs/src/main.rs. Both share `src/adapters/*`.
+[lib]
+name = "crap4ts"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "crap4ts"
+path = "src/main.rs"
+
+[features]
+# Default build is the standalone `crap4ts` CLI binary — no napi-rs
+# linkage, no Node-provided symbols at link time. The napi binding is
+# only relevant when producing the `.node` cdylib, so it lives behind
+# a feature that the cdylib build (and only the cdylib build) flips
+# on. Without this split the `crap4ts` bin would fail to link with
+# "Undefined symbols: _napi_create_function …" because `napi_build`'s
+# macOS `-undefined dynamic_lookup` directive only applies to the
+# `cdylib` crate-type, not to the bin.
+default = []
+napi-binding = ["dep:napi", "dep:napi-derive"]
+
+[dependencies]
+# Language-agnostic foundation: domain types, port traits, CLI shell.
+crap-core = { workspace = true }
+
+# TypeScript AST parsing (stubbed in S5 — wired so the dep graph + license
+# allowlist are settled before the real walker lands).
+oxc = { workspace = true }
+
+# napi-rs Node.js bindings. Optional / behind the `napi-binding`
+# feature — see the [features] block above for why. `napi-build` in
+# `[build-dependencies]` stays unconditional because its `setup()`
+# only emits link directives for the cdylib crate-type, so it's a
+# safe no-op for the standalone bin build.
+napi = { workspace = true, optional = true }
+napi-derive = { workspace = true, optional = true }
+
+# Serialization — IstanbulParseDiagnostic implements `ParseDiagnostic`
+# which requires `Serialize + DeserializeOwned`.
+serde = { workspace = true }
+
+[dev-dependencies]
+# Used by `parse_diagnostic` round-trip tests. The production code path
+# doesn't depend on serde_json — `IstanbulParseDiagnostic` derives serde
+# traits for the envelope, the JSON serialization happens up in
+# crap-core's reporter layer.
+serde_json = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }

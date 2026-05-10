@@ -27,6 +27,12 @@ allow = [
   "ISC",
   "Unicode-3.0",
   "MPL-2.0",
+  # Added in S5 (#137): oxc 0.96 pulls `dragonbox_ecma`, whose license
+  # expression is `Apache-2.0 WITH LLVM-exception OR BSL-1.0`. The
+  # `WITH LLVM-exception` variant is not in the cargo-deny SPDX
+  # allowlist by default, so we satisfy the OR via BSL-1.0 (Boost
+  # Software License — OSI-approved, FSF-Free, permissive).
+  "BSL-1.0",
 ]
 confidence-threshold = 0.93
 

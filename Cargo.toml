@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/crap-core",
     "crates/crap4rs",
+    "crates/crap4ts",
 ]
 
 [workspace.package]
@@ -32,6 +33,22 @@ clap_complete_nushell = "4"
 # ── AST parsing for complexity analysis (Rust adapter only) ──
 syn = { version = "2", features = ["full", "parsing", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
+
+# ── AST parsing for TypeScript adapter (crap4ts only) ──
+# oxc 0.96 is the last release that keeps MSRV at Rust 1.88; 0.97+
+# bumped to 1.89 and 0.127+ to 1.93. S5 ships the walker as a stub —
+# the dep is wired so the cdylib link surface is locked in, but no
+# oxc APIs are exercised yet. The real walker lands in a follow-up
+# pipeline and will revisit the pin then.
+oxc = "0.96"
+
+# ── napi-rs bindings for the Node.js cdylib (crap4ts only) ──
+# napi 3.x is the current stable line (MSRV 1.88). napi_build::setup()
+# emits the macOS `-undefined dynamic_lookup` link arg automatically,
+# so no `.cargo/config.toml` rustflags are needed.
+napi = { version = "3", default-features = false, features = ["napi9"] }
+napi-derive = "3"
+napi-build = "2"
 
 # ── Serialization ──
 serde = { version = "1", features = ["derive"] }
