@@ -57,6 +57,50 @@ jobs:
       # `.config/nextest.toml` and they run via `cargo test`.
       - run: cargo test --test json_reporter_cucumber
 
+  crap4ts-build:
+    # Per-platform build check for the new `crap4ts` shell crate (S5,
+    # #137). Two artifacts share the crate: the standalone `crap4ts`
+    # bin (default features) and the `libcrap4ts` cdylib used by the
+    # napi-rs Node binding (`--features napi-binding --lib`). Both
+    # need to compile cleanly on every platform the workspace claims
+    # to support so the v2 walker pipeline (follow-up) doesn't
+    # discover platform-link surprises after the fact.
+    #
+    # The macOS dynamic_lookup link arg comes from `napi_build::setup()`
+    # in `crates/crap4ts/build.rs`; on the bin target (without the
+    # `napi-binding` feature) there are no napi symbols to resolve,
+    # which is why the bin builds with default features only.
+    #
+    # Coverage of the bin path is already in the `test` job's
+    # `cargo nextest run --workspace --all-targets`; this job is the
+    # cdylib-specific gate. linux-arm is best-effort: GitHub-hosted
+    # arm64 Linux runners are still rolling out, so the matrix targets
+    # the three platforms with stable hosted runners. See follow-up
+    # tracker for linux-arm coverage.
+    name: crap4ts build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86
+          - os: macos-latest
+            name: macos-arm
+          - os: macos-15-intel
+            name: macos-x86
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: crap4ts-${{ matrix.name }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build crap4ts bin (default features)
+        run: cargo build --package crap4ts --release
+      - name: Build crap4ts cdylib (napi-binding feature)
+        run: cargo build --package crap4ts --features napi-binding --lib --release
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

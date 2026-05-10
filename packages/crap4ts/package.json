@@ -1,0 +1,19 @@
+{
+  "name": "crap4ts",
+  "version": "2.0.0-alpha.1",
+  "description": "TypeScript adapter for crap-rs. ALPHA: walker not yet implemented; depends on the in-progress oxc parser. For working CRAP analysis on TS today, see crap4ts@1.x.",
+  "main": "index.js",
+  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/breezy-bays-labs/crap4rs.git",
+    "directory": "packages/crap4ts"
+  },
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  }
+}
