@@ -17,8 +17,13 @@ use comfy_table::{ContentArrangement, Table};
 /// functions (per-path overrides), the summary shows
 /// "varied (default: N)" instead of a single number. Returns a
 /// ready-to-print `String`.
-pub fn format_table(view: &AnalysisView<'_>, threshold: f64, breakdown: bool) -> String {
-    format_table_with_explain(view, None, threshold, breakdown, false)
+pub fn format_table(
+    view: &AnalysisView<'_>,
+    threshold: f64,
+    breakdown: bool,
+    tool_version: &str,
+) -> String {
+    format_table_with_explain(view, None, threshold, breakdown, false, tool_version)
 }
 
 /// Format an `AnalysisView` as a colored terminal table with optional
@@ -28,20 +33,24 @@ pub fn format_table(view: &AnalysisView<'_>, threshold: f64, breakdown: bool) ->
 /// below the analysis table — header line + per-change rows + a
 /// summary line. When `delta` is `None`, output is byte-identical to
 /// the pre-delta version.
+///
+/// `tool_version` is threaded from the caller (was `env!("CARGO_PKG_VERSION")`
+/// before the S3 relocation; that macro now resolves to `crap-core`'s
+/// version, not `crap4rs`'s, so the calling adapter passes its own
+/// version explicitly — same parameter pattern `format_sarif` already
+/// established).
 pub fn format_table_with_explain(
     view: &AnalysisView<'_>,
     delta: Option<&DeltaView<'_>>,
     threshold: f64,
     breakdown: bool,
     explain: bool,
+    tool_version: &str,
 ) -> String {
     let mut output = String::new();
 
     // Header
-    output.push_str(&format!(
-        "crap4rs v{} — CRAP Score Analysis\n",
-        env!("CARGO_PKG_VERSION")
-    ));
+    output.push_str(&format!("crap4rs v{tool_version} — CRAP Score Analysis\n",));
 
     // Empty guard — derived from the underlying analysis (the gate),
     // not from the shaped view, so an empty `view.shown` resulting from
@@ -420,7 +429,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_empty_result();
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("crap4rs v"));
         assert!(output.contains("No functions analyzed"));
         // No table header should be present
@@ -432,7 +441,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         let lines: Vec<&str> = output.lines().collect();
 
         // Find data rows (after header row + separator)
@@ -466,7 +475,7 @@ mod tests {
             RiskLevel::Acceptable,
             8.0,
         );
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("File"));
         assert!(output.contains("Function"));
         assert!(output.contains("CC"));
@@ -488,7 +497,7 @@ mod tests {
             RiskLevel::Moderate,
             8.0,
         );
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("src/adapters/coverage/mod.rs"));
         assert!(output.contains("parse_record"));
         assert!(output.contains("6"));
@@ -502,7 +511,7 @@ mod tests {
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 5.0, RiskLevel::Low, 8.0);
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("5.00"));
     }
 
@@ -512,7 +521,7 @@ mod tests {
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 85.0, 1.0, RiskLevel::Low, 8.0);
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("85.0"));
     }
 
@@ -521,8 +530,13 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_empty_result();
-        let output = format_table(&make_view_default(&result), 8.0, false);
-        assert!(output.starts_with(&format!("crap4rs v{}", env!("CARGO_PKG_VERSION"))));
+        // S3 (#135): version is now caller-supplied (the
+        // `env!("CARGO_PKG_VERSION")` macro resolves to crap-core's
+        // version after the relocation). The literal "0.4.0" matches
+        // what the cli passes via env!("CARGO_PKG_VERSION") under the
+        // crap4rs binary.
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
+        assert!(output.starts_with("crap4rs v0.4.0"));
     }
 
     #[test]
@@ -530,7 +544,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("3 functions"));
         assert!(output.contains("2 above threshold (8)"));
         assert!(output.contains("worst: 45.2"));
@@ -543,7 +557,7 @@ mod tests {
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("PASS"));
         assert!(!output.contains("FAIL"));
     }
@@ -553,7 +567,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(output.contains("avg: 21.1"));
         assert!(output.contains("median: 15.0"));
         assert!(output.contains("low: 1"));
@@ -611,7 +625,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(
             !output.contains("├─"),
             "breakdown=false should not show sub-rows: {output}"
@@ -643,7 +657,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table(&make_view_default(&result), 8.0, true);
+        let output = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
         assert!(
             output.contains("line 5:"),
             "Should show line 5 contributor: {output}"
@@ -676,7 +690,7 @@ mod tests {
             summary: make_empty_result().summary,
             passed: true,
         };
-        let output = format_table(&make_view_default(&result), 8.0, true);
+        let output = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
         assert!(
             !output.contains("├─"),
             "Non-exceeding fn should not show sub-rows even with breakdown=true: {output}"
@@ -704,7 +718,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table(&make_view_default(&result), 8.0, true);
+        let output = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
         assert!(output.contains("├─"), "Should have branch char: {output}");
         assert!(output.contains("└─"), "Should have corner char: {output}");
         // Make sure corner appears after branch
@@ -734,7 +748,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table(&make_view_default(&result), 8.0, true);
+        let output = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
         assert!(
             output.contains("(nested)"),
             "increment > 1 should show '(nested)': {output}"
@@ -763,7 +777,8 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table_with_explain(&make_view_default(&result), None, 8.0, true, true);
+        let output =
+            format_table_with_explain(&make_view_default(&result), None, 8.0, true, true, "0.4.0");
         assert!(output.contains("Legend: +1 = base structural increment."));
         assert!(output.contains("+N (nested) = +1 base plus +(N-1)"));
         assert!(output.contains("if/else branches, match arms"));
@@ -792,7 +807,8 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table_with_explain(&make_view_default(&result), None, 8.0, false, true);
+        let output =
+            format_table_with_explain(&make_view_default(&result), None, 8.0, false, true, "0.4.0");
         assert!(!output.contains("Legend:"));
         assert!(!output.contains("line 3: match (+3 (nested))"));
     }
@@ -825,7 +841,8 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table_with_explain(&make_view_default(&result), None, 8.0, true, true);
+        let output =
+            format_table_with_explain(&make_view_default(&result), None, 8.0, true, true, "0.4.0");
         assert!(!output.contains("Legend:"));
     }
 
@@ -869,7 +886,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table(&make_view_default(&result), 8.0, true);
+        let output = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
         let line5_pos = output.find("line 5:").unwrap();
         let line20_pos = output.find("line 20:").unwrap();
         assert!(
@@ -922,7 +939,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table(&make_view_default(&result), 8.0, true);
+        let output = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
 
         // Each contributor kind should appear exactly once
         let if_branch_count = output.matches("if-branch").count();
@@ -972,7 +989,7 @@ mod tests {
             summary: make_multi_function_result().summary,
             passed: false,
         };
-        let output = format_table(&make_view_default(&result), 8.0, true);
+        let output = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
         assert!(
             output.contains("if-branch"),
             "Sub-row should appear even when function name is in file path: {output}"
@@ -992,7 +1009,7 @@ mod tests {
         result.functions[1].threshold = 10.0;
         result.functions[2].threshold = 8.0;
 
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(
             output.contains("varied (default: 8)"),
             "Should show varied threshold: {output}"
@@ -1005,7 +1022,7 @@ mod tests {
         colored::control::set_override(false);
 
         let result = make_multi_function_result();
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(
             !output.contains("varied"),
             "Uniform thresholds should not show 'varied': {output}"
@@ -1019,7 +1036,7 @@ mod tests {
 
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         assert!(!output.contains("varied"));
     }
 
@@ -1129,7 +1146,7 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output = format_table(&make_view_default(&result), 8.0, false);
+        let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         insta::assert_snapshot!(output);
     }
 
@@ -1146,7 +1163,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let output = format_table(&view, 8.0, false);
+        let output = format_table(&view, 8.0, false, "0.4.0");
         // Per-file column header
         assert!(output.contains("File"));
         assert!(output.contains("Functions"));
@@ -1182,7 +1199,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let output = format_table(&view, 8.0, false);
+        let output = format_table(&view, 8.0, false, "0.4.0");
         insta::assert_snapshot!(output);
     }
 
@@ -1200,6 +1217,7 @@ mod tests {
             8.0,
             false,
             false,
+            "0.4.0",
         );
         assert!(
             output.contains("Delta vs baseline:"),
@@ -1228,6 +1246,7 @@ mod tests {
             8.0,
             false,
             false,
+            "0.4.0",
         );
         // Per-change rows present
         assert!(output.contains("added"));
@@ -1243,8 +1262,14 @@ mod tests {
         let _guard = COLOR_LOCK.lock().unwrap();
         colored::control::set_override(false);
         let result = make_multi_function_result();
-        let output =
-            format_table_with_explain(&make_view_default(&result), None, 8.0, false, false);
+        let output = format_table_with_explain(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            "0.4.0",
+        );
         assert!(!output.contains("Delta vs baseline"));
     }
 
@@ -1260,6 +1285,7 @@ mod tests {
             8.0,
             false,
             false,
+            "0.4.0",
         );
         insta::assert_snapshot!(output);
     }
@@ -1400,7 +1426,7 @@ mod proptests {
         fn prop_format_table_never_panics(result in arb_analysis_result()) {
             let _guard = super::COLOR_LOCK.lock().unwrap();
             colored::control::set_override(false);
-            let _ = format_table(&make_view_default(&result), 8.0, false);
+            let _ = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
         }
 
         #[test]
@@ -1415,14 +1441,14 @@ mod proptests {
                 v.scored.contributors = contributors;
             }
             // Must not panic regardless of contributor content
-            let _ = format_table(&make_view_default(&result), 8.0, true);
+            let _ = format_table(&make_view_default(&result), 8.0, true, "0.4.0");
         }
 
         #[test]
         fn prop_format_table_row_count(result in arb_analysis_result()) {
             let _guard = super::COLOR_LOCK.lock().unwrap();
             colored::control::set_override(false);
-            let output = format_table(&make_view_default(&result), 8.0, false);
+            let output = format_table(&make_view_default(&result), 8.0, false, "0.4.0");
             if result.functions.is_empty() {
                 prop_assert!(output.contains("No functions analyzed"));
             } else {

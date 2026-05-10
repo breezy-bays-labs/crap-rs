@@ -17,6 +17,7 @@
 //! migration path.
 
 use crate::domain::types::{AnalysisDiagnostics, AnalysisResult};
+use crate::ports::ParseDiagnostic;
 use serde::Deserialize;
 use std::fs::File;
 use std::io::{BufReader, ErrorKind};
@@ -35,8 +36,17 @@ pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1, 2];
 /// On-disk shape we read. Mirrors the relevant subset of
 /// `JsonEnvelope`. `serde(default)` on optional fields keeps us
 /// forward-compatible with envelopes that omit fields we don't need.
+///
+/// `P: ParseDiagnostic` carries the adapter-specific parse-diagnostic
+/// type through `AnalysisDiagnostics<P>` (S2's decomposition); crap4rs
+/// concretizes to `LcovParseDiagnostic` via the v0.4 shim alias.
+/// `serde(bound = "")` suppresses the auto-generated `P: Serialize` /
+/// `P: Deserialize<'de>` bounds — `P: ParseDiagnostic` already provides
+/// `Serialize + DeserializeOwned`, and the auto-bounds conflict with
+/// the owned-deserialize requirement.
 #[derive(Debug, Deserialize)]
-struct BaselineEnvelope {
+#[serde(bound = "")]
+struct BaselineEnvelope<P: ParseDiagnostic> {
     schema_version: u32,
     #[serde(default)]
     tool_version: String,
@@ -44,17 +54,21 @@ struct BaselineEnvelope {
     timestamp: String,
     result: AnalysisResult,
     #[serde(default)]
-    diagnostics: Option<AnalysisDiagnostics>,
+    diagnostics: Option<AnalysisDiagnostics<P>>,
 }
 
 /// What the loader returns to callers. The fields are all the metadata
 /// the delta envelope's `delta.baseline_*` keys ultimately surface.
+///
+/// Generic over `P: ParseDiagnostic` so the loader works for any
+/// adapter that supplies a concrete parse-diagnostic type. The crap4rs
+/// shim concretizes this to `BaselineSnapshot<LcovParseDiagnostic>`.
 #[derive(Debug, Clone)]
-pub struct BaselineSnapshot {
+pub struct BaselineSnapshot<P: ParseDiagnostic> {
     pub result: AnalysisResult,
     pub tool_version: String,
     pub timestamp: String,
-    pub diagnostics: Option<AnalysisDiagnostics>,
+    pub diagnostics: Option<AnalysisDiagnostics<P>>,
 }
 
 /// Errors raised while loading a baseline envelope.
@@ -98,7 +112,13 @@ pub enum BaselineError {
 /// reading the whole envelope into memory — large codebases produce
 /// envelopes in the multi-MB range and there's no reason to allocate
 /// that twice.
-pub fn load(path: &Path) -> Result<BaselineSnapshot, BaselineError> {
+///
+/// Generic over `P: ParseDiagnostic` so each adapter (LCOV, Istanbul,
+/// …) supplies its own concrete diagnostic shape. The crap4rs shim
+/// `crap4rs::adapters::baseline::load` instantiates `P =
+/// LcovParseDiagnostic` so v0.4 callers' import paths stay byte-
+/// identical.
+pub fn load<P: ParseDiagnostic>(path: &Path) -> Result<BaselineSnapshot<P>, BaselineError> {
     let path_str = path.display().to_string();
 
     let file = File::open(path).map_err(|source| match source.kind() {
@@ -111,7 +131,7 @@ pub fn load(path: &Path) -> Result<BaselineSnapshot, BaselineError> {
         },
     })?;
 
-    let envelope: BaselineEnvelope =
+    let envelope: BaselineEnvelope<P> =
         serde_json::from_reader(BufReader::new(file)).map_err(|source| BaselineError::Parse {
             path: path_str.clone(),
             source,
@@ -135,8 +155,22 @@ pub fn load(path: &Path) -> Result<BaselineSnapshot, BaselineError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_strategies::DummyParseDiagnostic;
     use std::io::Write;
     use tempfile::NamedTempFile;
+
+    /// Concrete `P` for tests in this module — the loader's behavior is
+    /// `P`-agnostic for the cases we test (none reach into per-variant
+    /// fields), so the dummy stub keeps the assertions byte-identical
+    /// to crap4rs's pre-S3 unit suite.
+    type TestSnapshot = BaselineSnapshot<DummyParseDiagnostic>;
+
+    /// Wrapper that pins `P = DummyParseDiagnostic`. Keeps the original
+    /// test bodies untouched (they were written before `load` was
+    /// generic over `P`).
+    fn load_test(path: &Path) -> Result<TestSnapshot, BaselineError> {
+        load::<DummyParseDiagnostic>(path)
+    }
 
     fn write_envelope(content: &str) -> NamedTempFile {
         let mut file = NamedTempFile::new().expect("create temp file");
@@ -179,7 +213,7 @@ mod tests {
     #[test]
     fn load_minimal_envelope_extracts_result_and_metadata() {
         let file = write_envelope(minimal_envelope_json());
-        let snapshot = load(file.path()).expect("load minimal envelope");
+        let snapshot = load_test(file.path()).expect("load minimal envelope");
         assert_eq!(snapshot.tool_version, "0.2.0");
         assert_eq!(snapshot.timestamp, "2026-04-26T10:00:00Z");
         assert_eq!(snapshot.result.functions.len(), 0);
@@ -234,7 +268,7 @@ mod tests {
             }
         }"#;
         let file = write_envelope(json);
-        let snapshot = load(file.path()).expect("load function envelope");
+        let snapshot = load_test(file.path()).expect("load function envelope");
         assert_eq!(snapshot.result.functions.len(), 1);
         let v = &snapshot.result.functions[0];
         assert_eq!(v.scored.identity.qualified_name, "foo::bar");
@@ -245,7 +279,7 @@ mod tests {
 
     #[test]
     fn load_nonexistent_path_returns_not_found() {
-        let result = load(Path::new("/tmp/definitely-does-not-exist-xyzzy.json"));
+        let result = load_test(Path::new("/tmp/definitely-does-not-exist-xyzzy.json"));
         match result {
             Err(BaselineError::NotFound { .. }) => {}
             other => panic!("expected NotFound, got {other:?}"),
@@ -255,7 +289,7 @@ mod tests {
     #[test]
     fn load_malformed_json_returns_parse_error() {
         let file = write_envelope("{ not valid JSON");
-        let err = load(file.path()).unwrap_err();
+        let err = load_test(file.path()).unwrap_err();
         match err {
             BaselineError::Parse { .. } => {}
             other => panic!("expected Parse, got {other:?}"),
@@ -280,7 +314,7 @@ mod tests {
             }
         }"#;
         let file = write_envelope(json);
-        let err = load(file.path()).unwrap_err();
+        let err = load_test(file.path()).unwrap_err();
         match err {
             BaselineError::UnsupportedSchemaVersion {
                 found: 99,
@@ -311,7 +345,7 @@ mod tests {
             }
         }"#;
         let file = write_envelope(json);
-        let snapshot = load(file.path()).expect("v2 envelope should load");
+        let snapshot = load_test(file.path()).expect("v2 envelope should load");
         assert_eq!(snapshot.tool_version, "0.4.0");
     }
 
@@ -341,7 +375,7 @@ mod tests {
             }
         }"#;
         let file = write_envelope(json);
-        let snapshot = load(file.path()).expect("load envelope with diagnostics");
+        let snapshot = load_test(file.path()).expect("load envelope with diagnostics");
         let diag = snapshot.diagnostics.expect("diagnostics should be present");
         assert_eq!(diag.files_found, 5);
         assert_eq!(diag.functions_matched, 10);
@@ -367,7 +401,7 @@ mod tests {
             "future_field": { "unknown": "shape" }
         }"#;
         let file = write_envelope(json);
-        let snapshot = load(file.path()).expect("forward-compat load");
+        let snapshot = load_test(file.path()).expect("forward-compat load");
         assert_eq!(snapshot.tool_version, "0.99.0");
     }
 }

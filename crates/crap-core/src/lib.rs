@@ -7,7 +7,12 @@
 //! type through `ParseOutput<P>` and `AnalysisDiagnostics<P>`.
 //!
 //! Imported in S2 ([crap4rs#134](https://github.com/breezy-bays-labs/crap4rs/issues/134)).
+//! Adapter relocation (reporters + baseline + config + diff + filesystem
+//! walker) landed in S3
+//! ([crap4rs#135](https://github.com/breezy-bays-labs/crap4rs/issues/135)).
 
+pub mod adapters;
+pub mod core;
 pub mod domain;
 pub mod ports;
 

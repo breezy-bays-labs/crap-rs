@@ -456,7 +456,7 @@ mod tests {
 mod proptests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::make_view_default;
-    use crap_core::test_strategies::arb_analysis_result;
+    use crate::test_strategies::arb_analysis_result;
     use proptest::prelude::*;
 
     proptest! {

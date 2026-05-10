@@ -239,10 +239,11 @@ fn validate_preset_coverage_range(
     }
     let lo = min.unwrap_or(0.0);
     let hi = max.unwrap_or(100.0);
-    // `CoverageRangeError` lives in `crap-core` and is `#[non_exhaustive]`,
-    // so cross-crate matches must include a wildcard arm. v0.5 surfaces
-    // exactly the two variants below; future variants land with a CLI
-    // prose update at v1.0.
+    // `CoverageRangeError` is `#[non_exhaustive]` paused per D10
+    // amendment (#147 restores at v1.0). Now that this adapter lives in
+    // crap-core alongside the enum, the match is in-crate and
+    // exhaustive — no wildcard arm needed. v1.0 new variants will
+    // require an explicit arm here.
     match CoverageRange::new(lo, hi) {
         Ok(_) => Ok(()),
         Err(CoverageRangeError::OutOfRange { value }) => anyhow::bail!(
@@ -250,9 +251,6 @@ fn validate_preset_coverage_range(
         ),
         Err(CoverageRangeError::MinExceedsMax { min, max }) => anyhow::bail!(
             "preset `{preset_name}`: min_coverage ({min}) must not exceed max_coverage ({max})"
-        ),
-        Err(_) => anyhow::bail!(
-            "preset `{preset_name}`: unsupported CoverageRangeError variant introduced after v0.5"
         ),
     }
 }
