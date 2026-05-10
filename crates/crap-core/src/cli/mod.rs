@@ -2,26 +2,33 @@
 //!
 //! Parses args with clap, validates inputs, delegates to `core::analyze()`.
 //! No business logic lives here.
+//!
+//! Relocated from `crap4rs::cli` in S4 (#136). The orchestrator
+//! `cli::run<P>` is generic over the coverage adapter's parse-diagnostic
+//! type so the same dispatch shell drives every adapter binary
+//! (`crap4rs`, future `crap4ts`). Per-binary main.rs supplies the
+//! complexity + coverage ports as `&dyn` trait objects (ADR D9).
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
 use anyhow::{Result, bail};
-use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
+use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum, ValueHint};
 use clap_complete::Shell as ClapShell;
 
-use crap4rs::adapters::baseline::{self, BaselineSnapshot};
-use crap4rs::adapters::config::{self, FileConfig};
-use crap4rs::adapters::reporters;
-use crap4rs::adapters::reporters::json::DeltaContext;
-use crap4rs::core::AnalyzeOptions;
-use crap4rs::domain::delta::{self, AnalysisDelta, DeltaView};
-use crap4rs::domain::threshold::{
+use crate::adapters::baseline::{self, BaselineSnapshot};
+use crate::adapters::config::{self, FileConfig};
+use crate::adapters::reporters;
+use crate::adapters::reporters::json::DeltaContext;
+use crate::core::{AnalysisOutput, AnalyzeOptions};
+use crate::domain::delta::{self, AnalysisDelta, DeltaView};
+use crate::domain::threshold::{
     DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
 };
-use crap4rs::domain::types::{AnalysisDiagnostics, ComplexityMetric};
-use crap4rs::domain::view::{self, GroupKey, SortKey};
+use crate::domain::types::{AnalysisDiagnostics, ComplexityMetric};
+use crate::domain::view::{self, GroupKey, SortKey};
+use crate::ports::{ComplexityPort, CoveragePort, ParseDiagnostic};
 
 mod delta_args;
 mod view_args;
@@ -132,10 +139,13 @@ impl From<SortKeyArg> for SortKey {
 /// Reverse mapping for saved view presets (issue #80) — preset stores
 /// domain `SortKey`, but `FilterArgs.sort_by` is the clap-side wrapper.
 ///
-/// `SortKey` is `#[non_exhaustive]` cross-crate, so the wildcard arm is
-/// required by the compiler. New domain variants must land with a paired
-/// CLI variant in the same PR — the panic surfaces a missed update
-/// during integration testing rather than masking it.
+/// `SortKey` is `#[non_exhaustive]` for cross-crate consumers, but
+/// post-S4 (#136) the cli module lives in the same crate as the domain
+/// `SortKey` definition, so the compiler treats the match as exhaustive
+/// without a wildcard arm. New domain variants must still land with a
+/// paired CLI variant in the same PR — clippy's missing-pattern error
+/// is now the loud failure point (the formerly-required wildcard arm
+/// triggered `unreachable_patterns` post-relocation).
 impl From<SortKey> for SortKeyArg {
     fn from(key: SortKey) -> Self {
         match key {
@@ -143,9 +153,6 @@ impl From<SortKey> for SortKeyArg {
             SortKey::Coverage => SortKeyArg::Coverage,
             SortKey::Complexity => SortKeyArg::Complexity,
             SortKey::Path => SortKeyArg::Path,
-            other => unreachable!(
-                "domain::view::SortKey::{other:?} has no CLI mapping; add a SortKeyArg variant"
-            ),
         }
     }
 }
@@ -169,14 +176,11 @@ impl From<GroupByArg> for GroupKey {
 }
 
 /// Reverse mapping for saved view presets (issue #80). See `From<SortKey>`
-/// above for the wildcard-arm rationale.
+/// above for the wildcard-arm rationale (post-S4 in-crate exhaustive).
 impl From<GroupKey> for GroupByArg {
     fn from(key: GroupKey) -> Self {
         match key {
             GroupKey::File => GroupByArg::File,
-            other => unreachable!(
-                "domain::view::GroupKey::{other:?} has no CLI mapping; add a GroupByArg variant"
-            ),
         }
     }
 }
@@ -194,9 +198,9 @@ pub enum DeltaSortKeyArg {
     Path,
 }
 
-impl From<DeltaSortKeyArg> for crap4rs::domain::delta::DeltaSortKey {
+impl From<DeltaSortKeyArg> for crate::domain::delta::DeltaSortKey {
     fn from(arg: DeltaSortKeyArg) -> Self {
-        use crap4rs::domain::delta::DeltaSortKey;
+        use crate::domain::delta::DeltaSortKey;
         match arg {
             DeltaSortKeyArg::ScoreDelta => DeltaSortKey::ScoreDelta,
             DeltaSortKeyArg::CurrentCrap => DeltaSortKey::CurrentCrap,
@@ -214,9 +218,9 @@ pub enum DeltaKindArg {
     Modified,
 }
 
-impl From<DeltaKindArg> for crap4rs::domain::delta::ChangeKind {
+impl From<DeltaKindArg> for crate::domain::delta::ChangeKind {
     fn from(arg: DeltaKindArg) -> Self {
-        use crap4rs::domain::delta::ChangeKind;
+        use crate::domain::delta::ChangeKind;
         match arg {
             DeltaKindArg::Added => ChangeKind::Added,
             DeltaKindArg::Removed => ChangeKind::Removed,
@@ -534,10 +538,25 @@ pub struct DisplayArgs {
 
 // ── Top-level CLI ───────────────────────────────────────────────────
 
+// `long_version` is overridden at runtime in `cli::run` so the binary's
+// build script (`crap4rs/build.rs`) can splice the git hash + build date
+// into the Rust adapter's `--version` output without forcing crap-core
+// to read an env var that's only set during crap4rs's compile. The
+// derive's `version` here resolves to the **adapter** crate's
+// `CARGO_PKG_VERSION` because clap captures the env at the macro
+// expansion site — that's the binary crate's version when compiling
+// the binary, but the lib crate's version when compiling the lib.
+// Production callers always reach `cli::run` through the binary, so
+// `--version` displays the adapter's version. Tests that go through
+// the lib see crap-core's version, which is fine for tests.
+//
+// Threading per S4 lesson 7 (tool-version threading): consumer-visible
+// version strings flow as parameters from the bin where `env!` resolves
+// against the bin's package, not against this module's home crate.
+
 #[derive(Debug, Parser)]
 #[command(
     version,
-    long_version = env!("CRAP4RS_LONG_VERSION"),
     author,
     about = "CRAP score analyzer for Rust",
     long_about = "CRAP (Change Risk Anti-Patterns) score analyzer for Rust codebases.\n\n\
@@ -603,8 +622,92 @@ pub struct Cli {
 
 // ── Entry point ─────────────────────────────────────────────────────
 
-pub fn run() -> ExitCode {
-    match run_inner() {
+/// Run the CRAP CLI pipeline end-to-end. Generic over `P:
+/// ParseDiagnostic` so the same orchestrator drives every adapter
+/// crate's binary (per ADR D9, mixed-dispatch).
+///
+/// `tool_version` is the binary's own version (e.g. `crap4rs`'s
+/// `CARGO_PKG_VERSION` resolves to `0.4.0`, not crap-core's `0.1.0`).
+/// It feeds the JSON envelope's `tool_version` field, the SARIF run
+/// metadata, the markdown header, the HTML report header, and clap's
+/// long-version splice when the caller threads it through.
+///
+/// `long_version` is the multi-line `--version` string (typically
+/// `"<version> (<git-hash> <build-date>)"`). Computed at the binary's
+/// `build.rs` time. Splicing it here, instead of in clap-derive, is
+/// the S4 lesson-7 pattern — `env!` in this module resolves against
+/// crap-core, not against the calling binary, so the binary's build
+/// metadata can only reach the help text via this parameter.
+/// Parse process args and produce a `Cli`. Splits in half from `run`
+/// so the binary `main.rs` can consult `cli.input.src` (config-aware)
+/// before constructing its `LcovParser` (which needs the source root
+/// at construction time per the LCOV adapter's path-stripping
+/// invariant). `run` then consumes the parsed `Cli` directly.
+///
+/// `tool_version` (e.g. `crap4rs`'s `0.4.0`) and `long_version`
+/// (e.g. `0.4.0 (abc1234 2026-05-09)`) are spliced into clap's help
+/// and `--version` output at runtime so the binary's build-script
+/// metadata reaches the help text — the derive macro's `version`
+/// reads `CARGO_PKG_VERSION` at lib-crate compile time (crap-core's
+/// `0.1.0`), and `CRAP4RS_LONG_VERSION` is only set during the
+/// binary's compile.
+///
+/// `clap::Command::{version,long_version}` take
+/// `IntoResettable<Str>` which implements `From<&'static str>` but
+/// not `From<String>`. The strings live for the program's lifetime,
+/// so leaking once at startup is the cheapest path that satisfies
+/// clap's expected lifetime. The leak is fixed-size and one-shot.
+pub fn parse_args(tool_version: &str, long_version: &str) -> Cli {
+    let cmd = build_command(tool_version, long_version);
+    let matches = cmd.get_matches();
+    Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit())
+}
+
+/// Read the adapter binary's name from `argv[0]`. The clap-derive
+/// `Cli::command()` defaults to `CARGO_PKG_NAME` of the lib crate
+/// (crap-core) which would print `--version` lines as
+/// `crap-core 0.4.0 ...` and shape generated completion scripts to
+/// the wrong identifier; runtime detection ensures the displayed
+/// name matches whichever adapter binary (`crap4rs`, future
+/// `crap4ts`) actually ran.
+fn current_bin_name() -> String {
+    std::env::args()
+        .next()
+        .and_then(|first| {
+            // `file_stem()` (not `file_name()`) so Windows builds drop
+            // the `.exe` suffix — without it `--version` prints
+            // `crap4rs.exe 0.4.0` and breaks scripts (and the
+            // version-stamp integration tests) that match `^crap4rs `.
+            // No-op on Linux/macOS.
+            std::path::PathBuf::from(first)
+                .file_stem()
+                .map(|os| os.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| "crap4rs".to_string())
+}
+
+/// Build the clap `Command` with the binary's runtime metadata
+/// spliced in. Used by `parse_args`; `emit_completions` reads the
+/// bin name through `current_bin_name` directly because
+/// `clap_complete::generate` takes the bin name as a separate arg.
+fn build_command(tool_version: &str, long_version: &str) -> clap::Command {
+    let bin_static: &'static str = Box::leak(current_bin_name().into_boxed_str());
+    let version_static: &'static str = Box::leak(tool_version.to_string().into_boxed_str());
+    let long_version_static: &'static str = Box::leak(long_version.to_string().into_boxed_str());
+    Cli::command()
+        .name(bin_static)
+        .bin_name(bin_static)
+        .version(version_static)
+        .long_version(long_version_static)
+}
+
+pub fn run<P: ParseDiagnostic + std::fmt::Display>(
+    cli: Cli,
+    complexity: &dyn ComplexityPort,
+    coverage: &dyn CoveragePort<Diagnostic = P>,
+    tool_version: &str,
+) -> ExitCode {
+    match run_inner(cli, complexity, coverage, tool_version) {
         Ok(true) => ExitCode::from(0),
         Ok(false) => ExitCode::from(1),
         Err(e) => {
@@ -614,15 +717,18 @@ pub fn run() -> ExitCode {
     }
 }
 
-fn run_inner() -> Result<bool> {
-    let mut cli = Cli::parse();
-
+fn run_inner<P: ParseDiagnostic + std::fmt::Display>(
+    mut cli: Cli,
+    complexity: &dyn ComplexityPort,
+    coverage: &dyn CoveragePort<Diagnostic = P>,
+    tool_version: &str,
+) -> Result<bool> {
     if let Some(Command::Completions { shell }) = cli.command {
-        emit_completions(shell);
+        emit_completions(shell, &current_bin_name());
         return Ok(true);
     }
 
-    let prep = prepare_pipeline(&mut cli)?;
+    let prep = prepare_pipeline(&mut cli, complexity, coverage)?;
 
     // Build the spec, then shape the result through the View pipeline.
     // V1b: `--only-failing` flows through `Filters::only_failing` here.
@@ -650,6 +756,7 @@ fn run_inner() -> Result<bool> {
             prep.delta_state.as_ref(),
             &prep.analysis,
             &prep.inputs,
+            tool_version,
         )?;
     }
 
@@ -684,11 +791,13 @@ struct EffectiveInputs {
 
 /// In-flight pipeline state assembled by `prepare_pipeline`. Owns the
 /// analysis output and the optional delta state so the dispatch layer
-/// borrows through references.
-struct PipelinePrep {
+/// borrows through references. Generic over `P: ParseDiagnostic` so
+/// `AnalysisOutput<P>` and `DeltaState<P>` carry the adapter's diagnostic
+/// shape (LCOV, future Istanbul, …) end-to-end.
+struct PipelinePrep<P: ParseDiagnostic> {
     inputs: EffectiveInputs,
-    analysis: crap4rs::core::AnalysisOutput,
-    delta_state: Option<DeltaState>,
+    analysis: AnalysisOutput<P>,
+    delta_state: Option<DeltaState<P>>,
 }
 
 fn merge_effective_inputs(cli: &Cli, file_config: &Option<FileConfig>) -> EffectiveInputs {
@@ -754,7 +863,10 @@ fn build_analyze_options(cli: &Cli, inputs: &EffectiveInputs, coverage: &Path) -
     }
 }
 
-fn apply_diagnostics(cli: &Cli, diagnostics: &AnalysisDiagnostics) {
+fn apply_diagnostics<P: ParseDiagnostic + std::fmt::Display>(
+    cli: &Cli,
+    diagnostics: &AnalysisDiagnostics<P>,
+) {
     // Always warn about non-fatal issues (details require --verbose)
     warn_if_issues(diagnostics);
     if cli.display.verbose {
@@ -765,7 +877,11 @@ fn apply_diagnostics(cli: &Cli, diagnostics: &AnalysisDiagnostics) {
 /// Validates inputs, merges effective config, runs the analyzer, and
 /// resolves the optional baseline delta. The bulk of `run_inner`'s
 /// pre-render work lives here so `run_inner` itself stays a flat dispatch.
-fn prepare_pipeline(cli: &mut Cli) -> Result<PipelinePrep> {
+fn prepare_pipeline<P: ParseDiagnostic + std::fmt::Display>(
+    cli: &mut Cli,
+    complexity: &dyn ComplexityPort,
+    coverage: &dyn CoveragePort<Diagnostic = P>,
+) -> Result<PipelinePrep<P>> {
     validate_display_flags(cli)?;
     apply_color(cli.display.color);
 
@@ -783,7 +899,7 @@ fn prepare_pipeline(cli: &mut Cli) -> Result<PipelinePrep> {
     let coverage_path = validate_runtime_inputs(cli, &inputs)?;
     let options = build_analyze_options(cli, &inputs, coverage_path);
 
-    let analysis = crap4rs::core::analyze(&options)?;
+    let analysis = crate::core::analyze(&options, complexity, coverage)?;
     apply_diagnostics(cli, &analysis.diagnostics);
 
     // Resolve --baseline (issue #81): load a previously-emitted JSON
@@ -801,13 +917,14 @@ fn prepare_pipeline(cli: &mut Cli) -> Result<PipelinePrep> {
 
 // ── Format dispatch ────────────────────────────────────────────────
 
-fn format_as_json(
+fn format_as_json<P: ParseDiagnostic>(
     cli: &Cli,
     view: &view::AnalysisView<'_>,
     delta_view: Option<&DeltaView<'_>>,
-    delta_state: Option<&DeltaState>,
-    analysis: &crap4rs::core::AnalysisOutput,
+    delta_state: Option<&DeltaState<P>>,
+    analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
+    tool_version: &str,
 ) -> Result<String> {
     let delta_ctx = delta_state.zip(delta_view).map(|(s, dv)| DeltaContext {
         view: dv,
@@ -816,7 +933,7 @@ fn format_as_json(
         baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
     });
     let config = reporters::json::JsonConfig {
-        tool_version: env!("CARGO_PKG_VERSION").to_string(),
+        tool_version: tool_version.to_string(),
         metric: inputs.metric,
         threshold: inputs.threshold,
         timestamp: now_unix_epoch(),
@@ -825,21 +942,21 @@ fn format_as_json(
         minimal_view: cli.output.minimal_view,
         delta: delta_ctx,
     };
-    reporters::format_json(view, &config).map_err(Into::into)
+    reporters::json::format_json(view, &config).map_err(Into::into)
 }
 
 /// ScorecardRow projects the unshaped analysis + delta into a mokumo
 /// `Row::CrapDelta` JSON object (issue #111). View shaping does NOT
 /// alter scorecard-row — the aggregator consumes truth, not a filtered
 /// subset.
-fn format_as_scorecard_row(
-    delta_state: Option<&DeltaState>,
-    result: &crap4rs::domain::types::AnalysisResult,
+fn format_as_scorecard_row<P: ParseDiagnostic>(
+    delta_state: Option<&DeltaState<P>>,
+    result: &crate::domain::types::AnalysisResult,
     threshold: f64,
 ) -> String {
     let baseline_result = delta_state.map(|s| &s.snapshot.result);
     let delta_inputs = delta_state.map(|s| (&s.delta.summary, s.delta.changes.as_slice()));
-    let row_data = crap4rs::domain::summary::project_crap_delta_row(
+    let row_data = crate::domain::summary::project_crap_delta_row(
         result,
         baseline_result,
         delta_inputs,
@@ -848,14 +965,22 @@ fn format_as_scorecard_row(
     reporters::format_scorecard_row(&row_data)
 }
 
-fn render_format(
+// 8-arg dispatch is the cost of threading `<P>` + `tool_version` through
+// the format match without restructuring the per-reporter call sites
+// (which carry heterogeneous, irreducible signatures per `adapters.md`
+// rule 1). Bundling them into a context struct would shadow the per-arm
+// argument list that's the whole point of this match. Tracked under v1.0
+// follow-up for the broader cli refactor.
+#[allow(clippy::too_many_arguments)]
+fn render_format<P: ParseDiagnostic>(
     cli: &Cli,
     spec: &FormatSpec,
     view: &view::AnalysisView<'_>,
     delta_view: Option<&DeltaView<'_>>,
-    delta_state: Option<&DeltaState>,
-    analysis: &crap4rs::core::AnalysisOutput,
+    delta_state: Option<&DeltaState<P>>,
+    analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
+    tool_version: &str,
 ) -> Result<String> {
     Ok(match spec.format {
         FormatArg::Table => reporters::format_table_with_explain(
@@ -864,11 +989,17 @@ fn render_format(
             inputs.threshold,
             cli.display.breakdown,
             cli.display.explain,
-            env!("CARGO_PKG_VERSION"),
+            tool_version,
         ),
-        FormatArg::Json | FormatArg::Advice => {
-            format_as_json(cli, view, delta_view, delta_state, analysis, inputs)?
-        }
+        FormatArg::Json | FormatArg::Advice => format_as_json(
+            cli,
+            view,
+            delta_view,
+            delta_state,
+            analysis,
+            inputs,
+            tool_version,
+        )?,
         FormatArg::Markdown => reporters::format_markdown(
             view,
             delta_view,
@@ -877,7 +1008,7 @@ fn render_format(
             cli.display.explain,
             cli.display.md_full_table,
             cli.display.md_top,
-            env!("CARGO_PKG_VERSION"),
+            tool_version,
         ),
         FormatArg::Csv => reporters::format_csv(view, delta_view, inputs.metric),
         // SARIF is a gate translation, not a display: it iterates
@@ -885,26 +1016,34 @@ fn render_format(
         // was shaped. `--top`, `--sort-by`, `--only-failing`, and
         // `--baseline` do NOT alter SARIF output — PR annotations
         // must reflect truth.
-        FormatArg::Sarif => reporters::format_sarif(view, env!("CARGO_PKG_VERSION")),
+        FormatArg::Sarif => reporters::format_sarif(view, tool_version),
         FormatArg::ScorecardRow => {
             format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
         }
-        FormatArg::Html => {
-            reporters::format_html(view, inputs.threshold, env!("CARGO_PKG_VERSION"))
-        }
+        FormatArg::Html => reporters::format_html(view, inputs.threshold, tool_version),
     })
 }
 
-fn print_formatted_output(
+fn print_formatted_output<P: ParseDiagnostic>(
     cli: &Cli,
     view: &view::AnalysisView<'_>,
     delta_view: Option<&DeltaView<'_>>,
-    delta_state: Option<&DeltaState>,
-    analysis: &crap4rs::core::AnalysisOutput,
+    delta_state: Option<&DeltaState<P>>,
+    analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
+    tool_version: &str,
 ) -> Result<()> {
     for spec in &cli.output.format {
-        let output = render_format(cli, spec, view, delta_view, delta_state, analysis, inputs)?;
+        let output = render_format(
+            cli,
+            spec,
+            view,
+            delta_view,
+            delta_state,
+            analysis,
+            inputs,
+            tool_version,
+        )?;
         match &spec.output {
             Some(path) => std::fs::write(path, &output)
                 .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", path.display()))?,
@@ -929,7 +1068,11 @@ fn print_formatted_output(
     Ok(())
 }
 
-fn compute_exit_code(cli: &Cli, passed: bool, delta_state: Option<&DeltaState>) -> bool {
+fn compute_exit_code<P: ParseDiagnostic>(
+    cli: &Cli,
+    passed: bool,
+    delta_state: Option<&DeltaState<P>>,
+) -> bool {
     let delta_passed = delta_state.map(|s| s.delta.summary.passed).unwrap_or(true);
     let combined_passed = passed && (!cli.output.delta_gate || delta_passed);
     combined_passed || cli.output.no_fail
@@ -940,20 +1083,22 @@ fn compute_exit_code(cli: &Cli, passed: bool, delta_state: Option<&DeltaState>) 
 /// In-flight delta state — owned baseline metadata + computed delta.
 /// `cli/mod.rs` keeps this for the lifetime of `run_inner` so reporters
 /// can borrow through it. Constructed once per invocation when
-/// `--baseline` is set; absent otherwise.
-struct DeltaState {
-    snapshot: BaselineSnapshot,
+/// `--baseline` is set; absent otherwise. Generic over `P:
+/// ParseDiagnostic` so the snapshot's `BaselineSnapshot<P>` matches the
+/// adapter's diagnostic shape.
+struct DeltaState<P: ParseDiagnostic> {
+    snapshot: BaselineSnapshot<P>,
     delta: AnalysisDelta,
 }
 
-fn load_delta_state(
+fn load_delta_state<P: ParseDiagnostic>(
     cli: &Cli,
-    current: &crap4rs::domain::types::AnalysisResult,
-) -> Result<Option<DeltaState>> {
+    current: &crate::domain::types::AnalysisResult,
+) -> Result<Option<DeltaState<P>>> {
     let Some(path) = cli.input.baseline.as_ref() else {
         return Ok(None);
     };
-    let snapshot = baseline::load(path).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let snapshot = baseline::load::<P>(path).map_err(|e| anyhow::anyhow!("{e}"))?;
     // delta::compute consumes both — we own snapshot.result, clone the
     // current analysis so the surrounding pipeline keeps its handle.
     let delta = delta::compute(snapshot.result.clone(), current.clone());
@@ -1232,7 +1377,7 @@ fn majority_zero_coverage(files_analyzed: usize, files_zero_coverage: usize) -> 
     files_analyzed > 0 && files_zero_coverage * 2 > files_analyzed
 }
 
-fn warn_if_issues(diag: &AnalysisDiagnostics) {
+fn warn_if_issues<P: ParseDiagnostic>(diag: &AnalysisDiagnostics<P>) {
     if !diag.parse_diagnostics.is_empty() {
         eprintln!(
             "warning: {} LCOV parse issue(s) encountered (use --verbose for details)",
@@ -1259,7 +1404,7 @@ fn warn_if_issues(diag: &AnalysisDiagnostics) {
     }
 }
 
-fn print_diagnostics(diag: &AnalysisDiagnostics) {
+fn print_diagnostics<P: ParseDiagnostic + std::fmt::Display>(diag: &AnalysisDiagnostics<P>) {
     eprintln!(
         "verbose: file discovery: {} files found, {} unparseable",
         diag.files_found, diag.files_unparseable
@@ -1292,20 +1437,24 @@ fn print_diagnostics(diag: &AnalysisDiagnostics) {
 /// Print a shell completion script to stdout for the given shell.
 /// `clap_complete::generate` covers POSIX shells + PowerShell + Elvish;
 /// nushell uses the separate `clap_complete_nushell` crate.
-fn emit_completions(shell: ShellArg) {
+///
+/// `bin_name` is the adapter binary's name (`crap4rs`, future
+/// `crap4ts`, …) inferred at runtime from `argv[0]` — generated
+/// completion scripts should reference the binary the user invoked,
+/// not crap-core's library name.
+fn emit_completions(shell: ShellArg, bin_name: &str) {
     let mut cmd = Cli::command();
-    let bin = "crap4rs";
     let stdout = &mut std::io::stdout();
     match shell {
-        ShellArg::Bash => clap_complete::generate(ClapShell::Bash, &mut cmd, bin, stdout),
-        ShellArg::Zsh => clap_complete::generate(ClapShell::Zsh, &mut cmd, bin, stdout),
-        ShellArg::Fish => clap_complete::generate(ClapShell::Fish, &mut cmd, bin, stdout),
+        ShellArg::Bash => clap_complete::generate(ClapShell::Bash, &mut cmd, bin_name, stdout),
+        ShellArg::Zsh => clap_complete::generate(ClapShell::Zsh, &mut cmd, bin_name, stdout),
+        ShellArg::Fish => clap_complete::generate(ClapShell::Fish, &mut cmd, bin_name, stdout),
         ShellArg::Powershell => {
-            clap_complete::generate(ClapShell::PowerShell, &mut cmd, bin, stdout)
+            clap_complete::generate(ClapShell::PowerShell, &mut cmd, bin_name, stdout)
         }
-        ShellArg::Elvish => clap_complete::generate(ClapShell::Elvish, &mut cmd, bin, stdout),
+        ShellArg::Elvish => clap_complete::generate(ClapShell::Elvish, &mut cmd, bin_name, stdout),
         ShellArg::Nushell => {
-            clap_complete::generate(clap_complete_nushell::Nushell, &mut cmd, bin, stdout)
+            clap_complete::generate(clap_complete_nushell::Nushell, &mut cmd, bin_name, stdout)
         }
     }
 }
@@ -1691,7 +1840,7 @@ mod tests {
 
     #[test]
     fn merge_threshold_preserves_overrides() {
-        use crap4rs::domain::threshold::ThresholdOverride;
+        use crate::domain::threshold::ThresholdOverride;
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         let file_config = Some(FileConfig {
             threshold: Some(10.0),
@@ -1998,7 +2147,7 @@ mod tests {
 
     #[test]
     fn merge_threshold_strict_flag() {
-        use crap4rs::domain::threshold::STRICT_THRESHOLD;
+        use crate::domain::threshold::STRICT_THRESHOLD;
         let cli = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
         let (config, display) = merge_threshold(&cli, &None);
         assert_eq!(config.global, STRICT_THRESHOLD);
@@ -2007,7 +2156,7 @@ mod tests {
 
     #[test]
     fn merge_threshold_lenient_flag() {
-        use crap4rs::domain::threshold::LENIENT_THRESHOLD;
+        use crate::domain::threshold::LENIENT_THRESHOLD;
         let cli = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
         let (config, display) = merge_threshold(&cli, &None);
         assert_eq!(config.global, LENIENT_THRESHOLD);
@@ -2016,7 +2165,7 @@ mod tests {
 
     #[test]
     fn merge_threshold_toml_preset_used_when_no_cli_flag() {
-        use crap4rs::domain::threshold::{STRICT_THRESHOLD, ThresholdPreset};
+        use crate::domain::threshold::{STRICT_THRESHOLD, ThresholdPreset};
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         let file_config = Some(FileConfig {
             preset: Some(ThresholdPreset::Strict),
@@ -2028,7 +2177,7 @@ mod tests {
 
     #[test]
     fn merge_threshold_cli_threshold_overrides_toml_preset() {
-        use crap4rs::domain::threshold::ThresholdPreset;
+        use crate::domain::threshold::ThresholdPreset;
         let cli = parse(&["--coverage", "lcov.info", "--threshold", "50.0"]).unwrap();
         let file_config = Some(FileConfig {
             preset: Some(ThresholdPreset::Strict),
@@ -2135,19 +2284,25 @@ mod tests {
     #[test]
     fn compute_exit_code_passing_no_delta() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        assert!(compute_exit_code(&cli, true, None));
+        assert!(compute_exit_code::<
+            crate::test_strategies::DummyParseDiagnostic,
+        >(&cli, true, None));
     }
 
     #[test]
     fn compute_exit_code_failing_no_delta() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        assert!(!compute_exit_code(&cli, false, None));
+        assert!(!compute_exit_code::<
+            crate::test_strategies::DummyParseDiagnostic,
+        >(&cli, false, None));
     }
 
     #[test]
     fn compute_exit_code_no_fail_overrides_failure() {
         let cli = parse(&["--coverage", "lcov.info", "--no-fail"]).unwrap();
-        assert!(compute_exit_code(&cli, false, None));
+        assert!(compute_exit_code::<
+            crate::test_strategies::DummyParseDiagnostic,
+        >(&cli, false, None));
     }
 
     #[test]
@@ -2167,7 +2322,9 @@ mod tests {
             "/dev/null",
         ])
         .unwrap();
-        assert!(compute_exit_code(&cli, true, None));
+        assert!(compute_exit_code::<
+            crate::test_strategies::DummyParseDiagnostic,
+        >(&cli, true, None));
     }
 
     #[test]
@@ -2183,6 +2340,8 @@ mod tests {
             "--no-fail",
         ])
         .unwrap();
-        assert!(compute_exit_code(&cli, false, None));
+        assert!(compute_exit_code::<
+            crate::test_strategies::DummyParseDiagnostic,
+        >(&cli, false, None));
     }
 }

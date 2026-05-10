@@ -3,11 +3,23 @@
 //! Each test creates a tempdir git repo with controlled commits, runs
 //! `analyze()` with `diff_ref`, and verifies the filtering behavior.
 
-use crap4rs::core::{AnalyzeOptions, analyze};
+use crap4rs::adapters::complexity::SynComplexityAdapter;
+use crap4rs::adapters::coverage::LcovParser;
+use crap4rs::core::{AnalysisOutput, AnalyzeOptions, analyze};
 use crap4rs::domain::threshold::ThresholdConfig;
 use crap4rs::domain::types::ComplexityMetric;
 use std::path::Path;
 use std::process::Command;
+
+/// Wrapper for `analyze(&opts, &cx, &cov)` that constructs the LCOV +
+/// syn ports from `opts.src`. Mirrors the Rust adapter binary's wiring
+/// in `crap4rs/src/main.rs` post-S4 (#136); the orchestrator no longer
+/// constructs adapters internally.
+fn analyze_with_adapters(opts: &AnalyzeOptions) -> anyhow::Result<AnalysisOutput> {
+    let cx = SynComplexityAdapter::new();
+    let cov = LcovParser::new(opts.src.clone());
+    analyze(opts, &cx, &cov)
+}
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -100,7 +112,9 @@ fn diff_modified_function_only() {
         &[("lib.rs", &[(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)])],
     );
 
-    let result = analyze(&make_opts(root, Some("HEAD~1"))).unwrap().result;
+    let result = analyze_with_adapters(&make_opts(root, Some("HEAD~1")))
+        .unwrap()
+        .result;
     let names = function_names(&result);
 
     assert!(
@@ -137,7 +151,9 @@ fn diff_new_file_includes_all_functions() {
 
     write_lcov(root, &[("lib.rs", &[(1, 1), (2, 1)])]);
 
-    let result = analyze(&make_opts(root, Some("HEAD~1"))).unwrap().result;
+    let result = analyze_with_adapters(&make_opts(root, Some("HEAD~1")))
+        .unwrap()
+        .result;
     let names = function_names(&result);
 
     assert!(names.contains(&"baz".to_string()));
@@ -199,7 +215,9 @@ pub fn beta() -> i32 {
     let lines: Vec<(usize, u64)> = (1..=14).map(|l| (l, 1)).collect();
     write_lcov(root, &[("lib.rs", &lines)]);
 
-    let result = analyze(&make_opts(root, Some("HEAD~1"))).unwrap().result;
+    let result = analyze_with_adapters(&make_opts(root, Some("HEAD~1")))
+        .unwrap()
+        .result;
     let names = function_names(&result);
 
     assert!(names.contains(&"alpha".to_string()), "alpha was modified");
@@ -235,9 +253,13 @@ fn diff_scores_match_full_analysis() {
     write_lcov(root, &[("lib.rs", &[(1, 1), (2, 1), (3, 1), (4, 1)])]);
 
     // Full analysis
-    let full = analyze(&make_opts(root, None)).unwrap().result;
+    let full = analyze_with_adapters(&make_opts(root, None))
+        .unwrap()
+        .result;
     // Diff analysis
-    let diff = analyze(&make_opts(root, Some("HEAD~1"))).unwrap().result;
+    let diff = analyze_with_adapters(&make_opts(root, Some("HEAD~1")))
+        .unwrap()
+        .result;
 
     // Find "added" in both results
     let full_added = full
@@ -278,7 +300,7 @@ fn diff_empty_returns_passed_true() {
     write_lcov(root, &[("lib.rs", &[(1, 1)])]);
 
     // Diff HEAD against itself → empty
-    let output = analyze(&make_opts(root, Some("HEAD"))).unwrap();
+    let output = analyze_with_adapters(&make_opts(root, Some("HEAD"))).unwrap();
     assert!(output.result.functions.is_empty());
     assert!(output.result.passed);
     assert_eq!(output.result.summary.total_functions, 0);
@@ -316,7 +338,7 @@ fn diff_composes_with_exclude() {
     let mut opts = make_opts(root, Some("HEAD~1"));
     opts.exclude = vec!["tests/**".to_string()];
 
-    let result = analyze(&opts).unwrap().result;
+    let result = analyze_with_adapters(&opts).unwrap().result;
     let names = function_names(&result);
     assert!(names.contains(&"kept".to_string()));
     for v in &result.functions {
@@ -364,7 +386,7 @@ fn diff_composes_with_only_failing() {
 
     // Diff analysis returns both functions
     let opts = make_opts(root, Some("HEAD~1"));
-    let output = analyze(&opts).unwrap();
+    let output = analyze_with_adapters(&opts).unwrap();
 
     // Simulate --only-failing post-filter (threshold is default 30.0 from make_opts)
     // simple() has low CRAP (passes), complex() has high CRAP (fails)
@@ -407,7 +429,7 @@ fn diff_outside_git_repo_errors() {
     std::fs::write(src.join("lib.rs"), "pub fn f() -> i32 { 1 }\n").unwrap();
     write_lcov(root, &[("lib.rs", &[(1, 1)])]);
 
-    let result = analyze(&make_opts(root, Some("main")));
+    let result = analyze_with_adapters(&make_opts(root, Some("main")));
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(
@@ -431,7 +453,7 @@ fn diff_invalid_ref_errors() {
     git(root, &["commit", "-m", "initial"]);
     write_lcov(root, &[("lib.rs", &[(1, 1)])]);
 
-    let result = analyze(&make_opts(root, Some("nonexistent-ref-xyz")));
+    let result = analyze_with_adapters(&make_opts(root, Some("nonexistent-ref-xyz")));
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(
@@ -462,7 +484,9 @@ fn diff_ignores_non_rust_files() {
 
     write_lcov(root, &[("lib.rs", &[(1, 1), (2, 1), (3, 1)])]);
 
-    let result = analyze(&make_opts(root, Some("HEAD~1"))).unwrap().result;
+    let result = analyze_with_adapters(&make_opts(root, Some("HEAD~1")))
+        .unwrap()
+        .result;
     // Should include lib.rs functions, no crash from README.md
     assert!(!result.functions.is_empty());
     for v in &result.functions {
@@ -505,7 +529,9 @@ fn diff_deletion_only_excluded() {
 
     write_lcov(root, &[("lib.rs", &[(1, 1), (2, 1), (3, 1), (4, 1)])]);
 
-    let _result = analyze(&make_opts(root, Some("HEAD~1"))).unwrap().result;
+    let _result = analyze_with_adapters(&make_opts(root, Some("HEAD~1")))
+        .unwrap()
+        .result;
     // Verifies no crash when diff includes replacement lines.
     // True deletion-only (zero additions) is covered by adapter unit tests.
 }
@@ -529,7 +555,9 @@ fn diff_nested_path_normalization() {
 
     write_lcov(root, &[("sub/mod.rs", &[(1, 1)])]);
 
-    let result = analyze(&make_opts(root, Some("HEAD~1"))).unwrap().result;
+    let result = analyze_with_adapters(&make_opts(root, Some("HEAD~1")))
+        .unwrap()
+        .result;
     let names = function_names(&result);
     assert!(
         names.contains(&"nested".to_string()),
@@ -563,7 +591,9 @@ fn json_envelope_contains_diff_ref() {
     write_lcov(root, &[("lib.rs", &[(1, 1)])]);
 
     // Analyze with diff_ref
-    let result = analyze(&make_opts(root, Some("HEAD"))).unwrap().result;
+    let result = analyze_with_adapters(&make_opts(root, Some("HEAD")))
+        .unwrap()
+        .result;
 
     let config = reporters::json::JsonConfig {
         tool_version: "0.1.0".to_string(),
@@ -598,7 +628,9 @@ fn json_envelope_diff_ref_null_without_flag() {
 
     write_lcov(root, &[("lib.rs", &[(1, 1)])]);
 
-    let result = analyze(&make_opts(root, None)).unwrap().result;
+    let result = analyze_with_adapters(&make_opts(root, None))
+        .unwrap()
+        .result;
 
     let config = reporters::json::JsonConfig {
         tool_version: "0.1.0".to_string(),

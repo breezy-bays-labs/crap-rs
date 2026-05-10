@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use super::{Cli, DeltaKindArg};
-use crap4rs::domain::delta::{ChangeKind, DeltaFilters, DeltaSortKey, DeltaViewSpec};
+use crate::domain::delta::{ChangeKind, DeltaFilters, DeltaSortKey, DeltaViewSpec};
 
 /// Map `--delta-top` / `--delta-sort` / `--delta-only` flags into a
 /// `DeltaViewSpec`.
@@ -13,21 +13,25 @@ use crap4rs::domain::delta::{ChangeKind, DeltaFilters, DeltaSortKey, DeltaViewSp
 /// consumers see effective behaviour, not the literal input. Same
 /// pattern as `view_args::build_view_spec`.
 pub(super) fn build_delta_view_spec(cli: &Cli) -> DeltaViewSpec {
-    // `DeltaViewSpec` and `DeltaFilters` are `#[non_exhaustive]`
-    // cross-crate, so we build via `Default::default` and mutate
-    // public fields rather than struct-literal initialisation.
-    let mut filters = DeltaFilters::default();
-    filters.change_kinds = kinds_from_cli(&cli.filter.delta_only);
-
-    let mut spec = DeltaViewSpec::default();
-    spec.filters = filters;
-    spec.sort = cli
-        .filter
-        .delta_sort
-        .map(DeltaSortKey::from)
-        .unwrap_or_default();
-    spec.limit = limit_from_cli(cli.filter.delta_top);
-    spec
+    // `DeltaViewSpec` and `DeltaFilters` are `#[non_exhaustive]` for
+    // cross-crate consumers, but in-crate (post-S4 #136) struct-update
+    // syntax is permitted and clippy's `field_reassign_with_default`
+    // fires on the previous mutate-after-default pattern. Use
+    // struct-update so the cli/domain boundary stays clear.
+    let filters = DeltaFilters {
+        change_kinds: kinds_from_cli(&cli.filter.delta_only),
+        ..DeltaFilters::default()
+    };
+    DeltaViewSpec {
+        filters,
+        sort: cli
+            .filter
+            .delta_sort
+            .map(DeltaSortKey::from)
+            .unwrap_or_default(),
+        limit: limit_from_cli(cli.filter.delta_top),
+        ..DeltaViewSpec::default()
+    }
 }
 
 fn limit_from_cli(top: Option<u32>) -> Option<usize> {

@@ -10,8 +10,14 @@
 //! Adapter relocation (reporters + baseline + config + diff + filesystem
 //! walker) landed in S3
 //! ([crap4rs#135](https://github.com/breezy-bays-labs/crap4rs/issues/135)).
+//! Core orchestration + CLI dispatch landed in S4
+//! ([crap4rs#136](https://github.com/breezy-bays-labs/crap4rs/issues/136)) —
+//! `core::analyze<P>` and `cli::run<P>` are language-agnostic; the
+//! per-adapter binaries (`crap4rs`, future `crap4ts`) inject their own
+//! `ComplexityPort` + `CoveragePort<Diagnostic = P>`.
 
 pub mod adapters;
+pub mod cli;
 pub mod core;
 pub mod domain;
 pub mod ports;

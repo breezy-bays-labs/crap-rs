@@ -316,8 +316,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "clap",
+ "clap_complete",
+ "clap_complete_nushell",
  "colored",
  "comfy-table",
+ "globset",
  "ignore",
  "insta",
  "pretty_assertions",

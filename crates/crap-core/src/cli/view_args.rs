@@ -8,8 +8,8 @@
 use anyhow::{Result, bail};
 
 use super::{Cli, GroupByArg, SortKeyArg};
-use crap4rs::adapters::config::{FileConfig, ViewPreset};
-use crap4rs::domain::view::{CoverageRange, CoverageRangeError, ViewSpec};
+use crate::adapters::config::{FileConfig, ViewPreset};
+use crate::domain::view::{CoverageRange, CoverageRangeError, ViewSpec};
 // `GroupKey` flows from CLI to `ViewSpec` via `cli::GroupByArg::Into<GroupKey>`.
 
 /// Build a `ViewSpec` from the parsed CLI.
@@ -163,7 +163,7 @@ pub(super) fn apply_preset_to_cli(cli: &mut Cli, preset: &ViewPreset) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crap4rs::domain::view::{GroupKey, SortKey};
+    use crate::domain::view::{GroupKey, SortKey};
 
     fn parse(args: &[&str]) -> Cli {
         let mut full = vec!["crap4rs"];

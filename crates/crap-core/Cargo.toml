@@ -53,6 +53,20 @@ comfy-table = { workspace = true }
 # in S3).
 colored = { workspace = true }
 
+# CLI argument parsing (cli/mod.rs — relocated from crap4rs in S4).
+# `clap_complete{,_nushell}` back the `completions` subcommand. The
+# concrete adapter binaries (crap4rs, future crap4ts) consume `cli::run`
+# but do not invoke clap themselves; clap lives here so cli/mod.rs
+# stays self-contained after the relocation.
+clap = { workspace = true }
+clap_complete = { workspace = true }
+clap_complete_nushell = { workspace = true }
+
+# Glob matching for per-path threshold overrides — used by
+# `core::ThresholdResolver` (relocated from crap4rs in S4). Pure data
+# match logic; satisfies AST-purity.
+globset = { workspace = true }
+
 # Optional — only pulled in by the `test-helpers` feature. The
 # `test_strategies` module imports `proptest::prelude::*`; gating it
 # behind a feature keeps the prod dependency tree clean.
