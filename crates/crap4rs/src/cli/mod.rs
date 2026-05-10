@@ -864,6 +864,7 @@ fn render_format(
             inputs.threshold,
             cli.display.breakdown,
             cli.display.explain,
+            env!("CARGO_PKG_VERSION"),
         ),
         FormatArg::Json | FormatArg::Advice => {
             format_as_json(cli, view, delta_view, delta_state, analysis, inputs)?
@@ -876,6 +877,7 @@ fn render_format(
             cli.display.explain,
             cli.display.md_full_table,
             cli.display.md_top,
+            env!("CARGO_PKG_VERSION"),
         ),
         FormatArg::Csv => reporters::format_csv(view, delta_view, inputs.metric),
         // SARIF is a gate translation, not a display: it iterates
@@ -887,7 +889,9 @@ fn render_format(
         FormatArg::ScorecardRow => {
             format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
         }
-        FormatArg::Html => reporters::format_html(view, inputs.threshold),
+        FormatArg::Html => {
+            reporters::format_html(view, inputs.threshold, env!("CARGO_PKG_VERSION"))
+        }
     })
 }
 

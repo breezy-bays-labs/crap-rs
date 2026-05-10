@@ -6,7 +6,8 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use ignore::WalkBuilder;
+
+use crap_core::core::walker::discover_rust_files;
 
 use crate::adapters::complexity::SynComplexityAdapter;
 use crate::adapters::coverage::LcovParser;
@@ -605,41 +606,10 @@ fn empty_passing_result() -> AnalysisResult {
     }
 }
 
-/// Walk the source directory and collect all `.rs` files, respecting
-/// .gitignore and user-provided exclude patterns.
-fn discover_rust_files(
-    src: &Path,
-    exclude: &[String],
-    respect_gitignore: bool,
-) -> Result<Vec<PathBuf>> {
-    let mut builder = WalkBuilder::new(src);
-    builder.git_ignore(respect_gitignore);
-
-    // Add exclude patterns as overrides
-    if !exclude.is_empty() {
-        let mut overrides = ignore::overrides::OverrideBuilder::new(src);
-        for pattern in exclude {
-            overrides
-                .add(&format!("!{pattern}"))
-                .with_context(|| format!("invalid exclude pattern: {pattern}"))?;
-        }
-        builder.overrides(overrides.build()?);
-    }
-
-    let mut files = Vec::new();
-    for entry in builder.build() {
-        let entry = entry?;
-        if entry.file_type().is_some_and(|ft| ft.is_file())
-            && entry.path().extension().is_some_and(|ext| ext == "rs")
-        {
-            files.push(entry.into_path());
-        }
-    }
-
-    // Sort for deterministic output
-    files.sort();
-    Ok(files)
-}
+// `discover_rust_files` relocated to
+// `crap_core::core::walker::discover_rust_files` in S3 (#135). The
+// import at the top of this file binds the name back into local scope
+// so the call sites in `discover_sources` keep compiling.
 
 #[cfg(test)]
 mod tests {
@@ -1023,33 +993,10 @@ pub fn with_branch(x: i32) -> &'static str {
         }
     }
 
-    #[test]
-    fn discover_rust_files_finds_nested() {
-        let dir = tempfile::tempdir().unwrap();
-        let src = dir.path().join("src");
-        fs::create_dir_all(src.join("sub")).unwrap();
-        fs::write(src.join("lib.rs"), "").unwrap();
-        fs::write(src.join("sub").join("mod.rs"), "").unwrap();
-        fs::write(src.join("readme.txt"), "").unwrap();
-
-        let files = discover_rust_files(&src, &[], false).unwrap();
-        assert_eq!(files.len(), 2);
-        assert!(files.iter().all(|f| f.extension().unwrap() == "rs"));
-    }
-
-    #[test]
-    fn discover_rust_files_sorted_deterministically() {
-        let dir = tempfile::tempdir().unwrap();
-        let src = dir.path().join("src");
-        fs::create_dir_all(&src).unwrap();
-        fs::write(src.join("z.rs"), "").unwrap();
-        fs::write(src.join("a.rs"), "").unwrap();
-        fs::write(src.join("m.rs"), "").unwrap();
-
-        let files = discover_rust_files(&src, &[], false).unwrap();
-        let names: Vec<_> = files.iter().map(|f| f.file_name().unwrap()).collect();
-        assert_eq!(names, vec!["a.rs", "m.rs", "z.rs"]);
-    }
+    // `discover_rust_files_finds_nested` and
+    // `discover_rust_files_sorted_deterministically` moved with
+    // `discover_rust_files` to `crap_core::core::walker::tests` in
+    // S3 (#135).
 
     #[test]
     fn summary_computed_correctly() {

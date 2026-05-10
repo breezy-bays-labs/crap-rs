@@ -26,10 +26,32 @@ test-helpers = ["dep:proptest"]
 # in crap4rs and future siblings (crap4ts) can hand them to any serde
 # format without translation.
 serde = { workspace = true }
+# JSON envelope rendering (reporters/json + reporters/sarif), baseline
+# envelope load (adapters/baseline). Relocated from crap4rs in S3.
+serde_json = { workspace = true }
+# Config file parsing (adapters/config). Relocated from crap4rs in S3.
+toml = { workspace = true }
 
-# Error tagging on `CrapError` and `view::CoverageRangeError`. Pure
-# typed errors, no I/O.
+# Error tagging on `CrapError`, `view::CoverageRangeError`, and the
+# adapter error families. Pure typed errors, no I/O.
 thiserror = { workspace = true }
+# anyhow::Result threads through adapters/config, adapters/diff, and
+# core::walker — context propagation for IO/parse failures. Relocated
+# from crap4rs in S3.
+anyhow = { workspace = true }
+
+# Filesystem walker (core::walker — relocated from crap4rs in S3).
+ignore = { workspace = true }
+
+# Hunk-header / @@-line parsing in adapters/diff (relocated from
+# crap4rs in S3).
+regex = { workspace = true }
+
+# Terminal table reporter (relocated from crap4rs in S3).
+comfy-table = { workspace = true }
+# ANSI colorization for the terminal reporter (relocated from crap4rs
+# in S3).
+colored = { workspace = true }
 
 # Optional — only pulled in by the `test-helpers` feature. The
 # `test_strategies` module imports `proptest::prelude::*`; gating it
@@ -38,11 +60,12 @@ proptest = { workspace = true, optional = true }
 
 [dev-dependencies]
 # `proptest` powers the property tests interleaved through the domain
-# modules; `pretty_assertions` improves diff output; `serde_json` is
-# used by enum wire-string round-trip tests and Diagnostic round trips.
+# modules; `pretty_assertions` improves diff output.
 proptest = { workspace = true }
 pretty_assertions = { workspace = true }
-serde_json = { workspace = true }
+# Adapter tests construct temp dirs / files for baseline + diff +
+# walker fixtures.
+tempfile = { workspace = true }
 
 # Cross-crate binary invocation: tests/wire_envelope_snapshot.rs runs
 # the crap4rs binary across crate boundaries. `env!("CARGO_BIN_EXE_*")`

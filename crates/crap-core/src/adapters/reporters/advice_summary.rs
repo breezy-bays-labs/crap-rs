@@ -63,15 +63,16 @@ fn format_actions(verdict: &FunctionVerdict) -> String {
 
 fn action_kind_label(action: &crate::domain::diagnostic::SuggestedAction) -> &'static str {
     use crate::domain::diagnostic::SuggestedAction::*;
-    // `SuggestedAction` is `#[non_exhaustive]` and lives in crap-core;
-    // cross-crate matches need a wildcard arm. New variants land with
-    // an explicit label at v1.0.
+    // `SuggestedAction` is `#[non_exhaustive]` paused per D10 amendment
+    // (#147 restores at v1.0). Now that this reporter lives in crap-core
+    // alongside the enum, the match is in-crate and exhaustive — no
+    // wildcard arm needed. v1.0 new variants will require explicit
+    // arms here; #147 covers that update path.
     match action {
         AddTestsForLines { .. } => "add_tests_for_lines",
         ExtractFunction { .. } => "extract_function",
         SimplifyBranching { .. } => "simplify_branching",
         AcceptInherentComplexity { .. } => "accept_inherent_complexity",
-        _ => "unknown",
     }
 }
 

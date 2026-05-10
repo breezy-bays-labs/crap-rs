@@ -11,17 +11,24 @@ use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, AnalysisSummary, ComplexityMetric, FunctionVerdict,
 };
 use crate::domain::view::{AnalysisView, GroupedView, ViewSpec};
+use crate::ports::ParseDiagnostic;
 use serde::Serialize;
 
 /// Configuration for the JSON envelope metadata.
+///
+/// Generic over `P: ParseDiagnostic` — relocated to crap-core in S3
+/// (#135), where `AnalysisDiagnostics<P>` is generic across adapters.
+/// crap4rs concretizes via the `JsonConfig<'a>` type alias in
+/// `crap4rs::adapters::reporters::json` so v0.4 callers' type paths
+/// stay byte-identical.
 #[derive(Debug)]
-pub struct JsonConfig<'a> {
+pub struct JsonConfig<'a, P: ParseDiagnostic> {
     pub tool_version: String,
     pub metric: ComplexityMetric,
     pub threshold: f64,
     pub timestamp: String,
     /// When present, diagnostics are included in the JSON output (--verbose).
-    pub diagnostics: Option<&'a AnalysisDiagnostics>,
+    pub diagnostics: Option<&'a AnalysisDiagnostics<P>>,
     /// Git ref used for diff filtering (`--diff <ref>`). `None` when not in diff mode.
     pub diff_ref: Option<&'a str>,
     /// When true, the per-row `view.shown` array is omitted (`--minimal-view`).
@@ -31,20 +38,23 @@ pub struct JsonConfig<'a> {
     /// When present, the envelope grows a top-level `delta` block
     /// describing changes vs the baseline. None means no `--baseline`
     /// was passed; the `delta` key is omitted entirely.
-    pub delta: Option<DeltaContext<'a>>,
+    pub delta: Option<DeltaContext<'a, P>>,
 }
 
 /// Bundles everything the JSON reporter needs to render the `delta`
 /// block: the shaped view (post-filter / sort / truncate) plus the
 /// underlying delta and baseline metadata captured when the baseline
 /// envelope was loaded.
+///
+/// Generic over `P: ParseDiagnostic` — see `JsonConfig` for the
+/// rationale.
 #[derive(Debug)]
-pub struct DeltaContext<'a> {
+pub struct DeltaContext<'a, P: ParseDiagnostic> {
     /// Shaped view — drives `shown`, `spec`, `eligible_count`, `truncated`.
     pub view: &'a DeltaView<'a>,
     pub baseline_tool_version: &'a str,
     pub baseline_timestamp: &'a str,
-    pub baseline_diagnostics: Option<&'a AnalysisDiagnostics>,
+    pub baseline_diagnostics: Option<&'a AnalysisDiagnostics<P>>,
 }
 
 /// JSON envelope. Field order is **load-bearing** —
@@ -58,7 +68,8 @@ pub struct DeltaContext<'a> {
 /// (#107). Older v1 baselines remain loadable for delta reporting
 /// (matching is identity-keyed, not column-keyed).
 #[derive(Serialize)]
-struct JsonEnvelope<'a> {
+#[serde(bound = "")]
+struct JsonEnvelope<'a, P: ParseDiagnostic> {
     schema_version: u32,
     tool_version: &'a str,
     language: &'static str,
@@ -73,15 +84,16 @@ struct JsonEnvelope<'a> {
     /// output for the no-delta case. Additive — does not itself bump
     /// `schema_version` (ADR D2).
     #[serde(skip_serializing_if = "Option::is_none")]
-    delta: Option<DeltaWire<'a>>,
+    delta: Option<DeltaWire<'a, P>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    diagnostics: Option<&'a AnalysisDiagnostics>,
+    diagnostics: Option<&'a AnalysisDiagnostics<P>>,
 }
 
 /// On-the-wire delta representation. Mirrors the `delta` envelope key
 /// shape documented in ADR D7 §DeltaView.
 #[derive(Serialize)]
-struct DeltaWire<'a> {
+#[serde(bound = "")]
+struct DeltaWire<'a, P: ParseDiagnostic> {
     /// Aggregate counts over the *unshaped* change set. The gate
     /// keystone — shaping never alters this.
     summary: &'a DeltaSummary,
@@ -101,11 +113,11 @@ struct DeltaWire<'a> {
     /// (the borrows hold for the envelope's lifetime via the View).
     shown: Vec<&'a FunctionChange>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    baseline_diagnostics: Option<&'a AnalysisDiagnostics>,
+    baseline_diagnostics: Option<&'a AnalysisDiagnostics<P>>,
 }
 
-impl<'a> DeltaWire<'a> {
-    fn from_context(ctx: &'a DeltaContext<'a>) -> Self {
+impl<'a, P: ParseDiagnostic> DeltaWire<'a, P> {
+    fn from_context(ctx: &'a DeltaContext<'a, P>) -> Self {
         DeltaWire {
             summary: &ctx.view.full.summary,
             spec: &ctx.view.spec,
@@ -165,11 +177,11 @@ impl<'a> ViewWire<'a> {
 /// `view.full` is the canonical analysis (gate); the envelope's
 /// `result` field serializes it. The additive `view` field carries
 /// the spec, eligible/truncated metadata, and the shaped row list.
-pub fn format_json(
+pub fn format_json<P: ParseDiagnostic>(
     view: &AnalysisView<'_>,
-    config: &JsonConfig<'_>,
+    config: &JsonConfig<'_, P>,
 ) -> Result<String, serde_json::Error> {
-    let delta_wire: Option<DeltaWire> = config.delta.as_ref().map(DeltaWire::from_context);
+    let delta_wire: Option<DeltaWire<P>> = config.delta.as_ref().map(DeltaWire::from_context);
 
     let envelope = JsonEnvelope {
         schema_version: 2,
@@ -192,8 +204,16 @@ mod tests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::*;
     use crate::domain::types::{ComplexityMetric, RiskLevel};
+    use crate::test_strategies::DummyParseDiagnostic;
 
-    fn default_config() -> JsonConfig<'static> {
+    /// Concrete `P` for in-module tests — the JSON reporter's behavior
+    /// is `P`-agnostic for the cases asserted here (no test reaches
+    /// into per-variant fields of a parse diagnostic). Pinning to the
+    /// dummy stub keeps the assertions byte-identical to crap4rs's
+    /// pre-S3 unit suite.
+    type TestJsonConfig = JsonConfig<'static, DummyParseDiagnostic>;
+
+    fn default_config() -> TestJsonConfig {
         JsonConfig {
             tool_version: "0.1.0".to_string(),
             metric: ComplexityMetric::Cognitive,
@@ -206,7 +226,10 @@ mod tests {
         }
     }
 
-    fn parse_json(result: &AnalysisResult, config: &JsonConfig) -> serde_json::Value {
+    fn parse_json<'a>(
+        result: &AnalysisResult,
+        config: &JsonConfig<'a, DummyParseDiagnostic>,
+    ) -> serde_json::Value {
         let view = make_view_default(result);
         let json_str = format_json(&view, config).expect("format_json should succeed");
         serde_json::from_str(&json_str).expect("output should be valid JSON")
@@ -529,15 +552,19 @@ mod tests {
     }
 
     #[test]
-    fn test_diagnostics_included_when_present() {
+    fn test_diagnostics_included_when_present_p_agnostic_top_level() {
+        // P-agnostic slice: counts on AnalysisDiagnostics<P> serialize
+        // through regardless of how `parse_diagnostics` flatten. The
+        // LCOV-specific per-variant wire shape is asserted in the
+        // crap4rs-side companion test
+        // `tests/json_reporter_lcov_diagnostics.rs::diagnostics_included_when_present`
+        // (relocated in S3 — moved with the reporter so the LCOV
+        // assertion lives next to LcovParseDiagnostic, not in
+        // crap-core which is `P`-generic).
         use crate::domain::types::AnalysisDiagnostics;
-        use crate::parse_diagnostic::LcovParseDiagnostic;
 
-        let diag = AnalysisDiagnostics {
-            parse_diagnostics: vec![LcovParseDiagnostic::MalformedRecord {
-                line_number: 5,
-                content: "DA:bad".to_string(),
-            }],
+        let diag: AnalysisDiagnostics<DummyParseDiagnostic> = AnalysisDiagnostics {
+            parse_diagnostics: vec![],
             files_found: 10,
             files_unparseable: 1,
             functions_extracted: 42,
@@ -560,12 +587,10 @@ mod tests {
         assert_eq!(d["functions_extracted"], 42);
         assert_eq!(d["functions_matched"], 40);
         assert_eq!(d["functions_no_coverage"], 2);
-
+        // parse_diagnostics is empty under DummyParseDiagnostic; the
+        // crap4rs-side companion exercises the populated case.
         let parse_diags = d["parse_diagnostics"].as_array().unwrap();
-        assert_eq!(parse_diags.len(), 1);
-        assert_eq!(parse_diags[0]["kind"], "malformed_record");
-        assert_eq!(parse_diags[0]["line_number"], 5);
-        assert_eq!(parse_diags[0]["content"], "DA:bad");
+        assert!(parse_diags.is_empty());
     }
 }
 
@@ -573,10 +598,10 @@ mod tests {
 mod proptests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::make_view_default;
-    use crap_core::test_strategies::arb_analysis_result;
+    use crate::test_strategies::{DummyParseDiagnostic, arb_analysis_result};
     use proptest::prelude::*;
 
-    fn arb_config() -> impl Strategy<Value = JsonConfig<'static>> {
+    fn arb_config() -> impl Strategy<Value = JsonConfig<'static, DummyParseDiagnostic>> {
         (1.0..100.0f64,).prop_map(|(threshold,)| JsonConfig {
             tool_version: "0.1.0".to_string(),
             metric: ComplexityMetric::Cognitive,
