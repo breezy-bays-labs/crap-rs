@@ -47,13 +47,13 @@ pre-push:
       run: cargo deny check
       timeout: 60s
     msrv:
-      # Pre-flight gate. `cargo +1.88 check --workspace --all-targets`
+      # Pre-flight gate. `cargo +1.93 check --workspace --all-targets`
       # exercises every crate's full target set (lib, bin, tests,
       # examples) under the declared MSRV. Lib-only `cargo check`
       # silently misses dev-dep MSRV breaks (cucumber 0.22 needs
-      # 1.88, which the audit's lib-only check did not catch); the
-      # `--all-targets` flag is what surfaces them.
-      run: cargo +1.88 check --workspace --all-targets
+      # 1.88, oxc 0.127+ needs 1.93); the `--all-targets` flag is
+      # what surfaces them.
+      run: cargo +1.93 check --workspace --all-targets
       timeout: 180s
     test:
       run: cargo nextest run --workspace --all-targets

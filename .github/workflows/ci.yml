@@ -327,12 +327,14 @@ jobs:
     # missed dev-dep MSRV blockers (cucumber 0.22 needs 1.88, jsonschema
     # → idna → icu chain needs 1.86). `--all-targets` exercises the
     # full target set (lib, bin, tests) and surfaces those.
-    name: MSRV (1.88)
+    # Bumped 1.88 → 1.93 to unlock current oxc (the TS walker dep) and
+    # avoid the running carry-cost of holding oxc back across releases.
+    name: MSRV (1.93)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.88
+      - uses: dtolnay/rust-toolchain@1.93
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: crap4rs-msrv
