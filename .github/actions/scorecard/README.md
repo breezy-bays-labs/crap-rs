@@ -22,7 +22,7 @@ for a future release of this action — see ops
 [#231](https://github.com/breezy-bays-labs/ops/issues/231).
 
 ```yaml
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
   with:
     language: auto                 # rust | typescript | auto (infers from extension)
     coverage: lcov.info
@@ -33,7 +33,7 @@ for a future release of this action — see ops
 ```yaml
 - uses: actions/checkout@v4
 - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
   id: crap
   with:
     coverage: lcov.info
@@ -74,7 +74,7 @@ jobs:
         run: cargo llvm-cov --workspace --lcov --output-path /tmp/head.lcov
 
       # 3. Render the scorecard, post sticky comment.
-      - uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+      - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
         with:
           coverage: /tmp/head.lcov
           baseline: /tmp/baseline.json
@@ -108,7 +108,7 @@ one sticky comment. This action contributes the CRAP rows; the aggregator
 owns the comment.
 
 ```yaml
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
   id: crap
   with:
     coverage: /tmp/head.lcov
@@ -184,7 +184,7 @@ PR [#119](https://github.com/breezy-bays-labs/crap4rs/pull/119)):
 ### Aggregator pattern — consume `row-json` and re-render
 
 ```yaml
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
   id: crap
   with:
     coverage: /tmp/head.lcov
@@ -228,7 +228,7 @@ workflows** so a regression in the action can't break your CI without you
 noticing:
 
 ```yaml
-uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@<sha>
+uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
 ```
 
 When the action is folded into the future
@@ -258,7 +258,7 @@ to be on `PATH`. Pinned-version semantics override pre-installed semantics.
 # Example: dogfood a workspace-local build
 - run: cargo build --release
 - run: install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
-- uses: breezy-bays-labs/crap4rs/.github/actions/scorecard@main
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
   with:
     coverage: lcov.info
     # version defaults to 'latest' → install step short-circuits

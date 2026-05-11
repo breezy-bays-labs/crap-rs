@@ -5,8 +5,8 @@ Reference Claude Code skill for crap4rs. Drives over-threshold functions below t
 ## Install
 
 ```bash
-git clone https://github.com/breezy-bays-labs/crap4rs
-cp -r crap4rs/skills/cut-the-crap ~/.claude/skills/
+git clone https://github.com/breezy-bays-labs/crap-rs
+cp -r crap-rs/skills/cut-the-crap ~/.claude/skills/
 ```
 
 Or, if you already have the repo checked out, run `cp -r skills/cut-the-crap ~/.claude/skills/` from the repo root.

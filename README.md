@@ -1,6 +1,6 @@
 # crap4rs
 
-[![CI](https://github.com/breezy-bays-labs/crap4rs/actions/workflows/ci.yml/badge.svg)](https://github.com/breezy-bays-labs/crap4rs/actions/workflows/ci.yml)
+[![CI](https://github.com/breezy-bays-labs/crap-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/breezy-bays-labs/crap-rs/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/crap4rs.svg)](https://crates.io/crates/crap4rs)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
@@ -396,8 +396,8 @@ When more than half of analyzed files show 0% coverage, `crap4rs` will print a w
 cargo install crap4rs
 
 # Or clone and build
-git clone https://github.com/breezy-bays-labs/crap4rs.git
-cd crap4rs
+git clone https://github.com/breezy-bays-labs/crap-rs.git
+cd crap-rs
 cargo build --release
 ```
 
