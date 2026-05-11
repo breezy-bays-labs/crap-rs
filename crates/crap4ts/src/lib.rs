@@ -3,10 +3,9 @@
 //!
 //! ALPHA: the oxc complexity walker and Istanbul JSON coverage parser
 //! are stubs that `unimplemented!()`. The real TS pipeline lands in a
-//! follow-up (`crap-rs/2026XXXX-typescript-adapter`) — S5 here ships
-//! only the structural shell so the workspace layout, cdylib + bin
-//! crate-type combo, license allowlist, and CI surface are settled
-//! before the walker work begins.
+//! follow-up; this crate ships the structural shell so the workspace
+//! layout, cdylib + bin crate-type combo, license allowlist, and CI
+//! surface are settled before the walker work begins.
 //!
 //! Unlike `crap4rs`, this crate has no v0.4 history and therefore no
 //! backward-compat shim modules — its public surface starts fresh at

@@ -30,12 +30,10 @@ use crate::domain::view::AnalysisView;
 ///
 /// When `delta` is `Some`, a `## CRAP Scorecard` section is appended
 /// after the analysis body — designed for PR-comment rendering.
-// `tool_version` was added in S3 (#135) when reporters relocated to
-// crap-core (env!("CARGO_PKG_VERSION") here resolves to crap-core's
-// version, not the calling adapter's). The argument count climbs to 8.
-// A struct-of-args refactor is queued for the v1.0 reporter polish per
-// the impl-plan; leaving the linear list for now keeps the diff
-// reviewable.
+// `tool_name` and `tool_version` are caller-supplied (env!() inside
+// crap-core would resolve to crap-core's name/version, not the
+// adapter's). The argument count climbs to 9; a struct-of-args
+// refactor is queued for the v1.0 reporter polish.
 #[allow(clippy::too_many_arguments)]
 pub fn format_markdown(
     view: &AnalysisView<'_>,
@@ -45,6 +43,7 @@ pub fn format_markdown(
     explain: bool,
     full_table: bool,
     top_n: usize,
+    tool_name: &str,
     tool_version: &str,
 ) -> String {
     let mut out = format_markdown_body(
@@ -54,6 +53,7 @@ pub fn format_markdown(
         explain,
         full_table,
         top_n,
+        tool_name,
         tool_version,
     );
     if let Some(delta_view) = delta {
@@ -67,11 +67,11 @@ pub fn format_markdown(
 /// empty / grouped / spotlight / full-table paths; the delta block is
 /// appended once by the caller.
 ///
-/// `tool_version` is threaded from the caller (was `env!("CARGO_PKG_VERSION")`
-/// before the S3 relocation; that macro now resolves to `crap-core`'s
-/// version, not `crap4rs`'s, so the calling adapter passes its own
-/// version explicitly — same parameter pattern `format_sarif` already
-/// established).
+/// `tool_name` (the adapter binary's `env!("CARGO_PKG_NAME")`) and `tool_version`
+/// are threaded from the caller — `env!("CARGO_PKG_NAME")` and
+/// `env!("CARGO_PKG_VERSION")` resolve against `crap-core` here, not
+/// the adapter binary, so the calling binary supplies its own identity.
+#[allow(clippy::too_many_arguments)]
 fn format_markdown_body(
     view: &AnalysisView<'_>,
     threshold: f64,
@@ -79,11 +79,12 @@ fn format_markdown_body(
     explain: bool,
     full_table: bool,
     top_n: usize,
+    tool_name: &str,
     tool_version: &str,
 ) -> String {
     let mut out = String::new();
     out.push_str(&format!(
-        "# crap4rs v{tool_version} — CRAP Score Analysis\n\n",
+        "# {tool_name} v{tool_version} — CRAP Score Analysis\n\n",
     ));
 
     if view.full.functions.is_empty() {
@@ -297,10 +298,10 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
             FunctionChange::Added { current } => current.exceeds,
             FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
             FunctionChange::Removed { .. } => false,
-            // `FunctionChange` is `#[non_exhaustive]` paused per D10
-            // amendment (#147 restores at v1.0). In-crate match is
-            // exhaustive after S3 relocation — no wildcard arm needed.
-            // v1.0 new variants will require an explicit arm here.
+            // `FunctionChange` has `#[non_exhaustive]` paused per ADR
+            // D10 (restored at v1.0). In-crate match is exhaustive —
+            // no wildcard arm needed. v1.0 new variants will require
+            // an explicit arm here.
         })
         .collect();
     if !new_violations.is_empty() {
@@ -447,7 +448,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("| File | Function | CC | Cov% | CRAP | Risk |"));
         assert!(out.contains("|------|"));
@@ -464,7 +466,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("No functions analyzed"));
         assert!(!out.contains("| File |"));
@@ -482,7 +485,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("a\\|b"), "expected escaped pipe in: {out}");
     }
@@ -500,7 +504,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("**Result:** FAIL"));
         assert!(out.contains("**Functions:** 3"));
@@ -518,7 +523,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         insta::assert_snapshot!(out);
     }
@@ -534,7 +540,8 @@ mod tests {
             false,
             true, // --md-full-table
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         // Summary block still leads.
         assert!(out.contains("## Summary"));
@@ -594,7 +601,8 @@ mod tests {
             true, // --explain
             true, // --md-full-table
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("## All functions"));
         // Breakdown bullets rendered for the exceeding row.
@@ -649,7 +657,8 @@ mod tests {
             true,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         insta::assert_snapshot!(out);
     }
@@ -667,7 +676,17 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_markdown(&view, None, 8.0, false, false, false, 10, "0.4.0");
+        let out = format_markdown(
+            &view,
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+        );
         assert!(out.contains("| File | Functions | Failing | Avg CRAP | Worst CRAP | Worst Fn |"));
         // Per-function CC/Cov% headers absent in the per-file aggregate table
         assert!(!out.contains("| File | Function | CC |"));
@@ -687,7 +706,17 @@ mod tests {
                 ..Default::default()
             },
         );
-        let out = format_markdown(&view, None, 8.0, false, false, false, 10, "0.4.0");
+        let out = format_markdown(
+            &view,
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+        );
         insta::assert_snapshot!(out);
     }
 
@@ -705,7 +734,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("## CRAP Scorecard"));
         // Status reflects the delta gate (new_violations > 0 → FAIL)
@@ -727,7 +757,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("### Regressions"));
         // parse_record went 15.0 → 22.0
@@ -747,7 +778,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(out.contains("### New violations"));
         assert!(out.contains("new_fn"));
@@ -764,7 +796,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         assert!(!out.contains("CRAP Scorecard"));
         assert!(!out.contains("Delta status"));
@@ -782,7 +815,8 @@ mod tests {
             false,
             false,
             10,
-            "0.4.0",
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
         );
         insta::assert_snapshot!(out);
     }

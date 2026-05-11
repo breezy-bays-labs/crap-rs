@@ -281,7 +281,7 @@ fn analyze_empty_src_dir_errors() {
     };
 
     let err = analyze(&opts, &cx, &cov).unwrap_err();
-    assert!(err.to_string().contains("no Rust source files"));
+    assert!(err.to_string().contains("no source files"));
 }
 
 #[test]

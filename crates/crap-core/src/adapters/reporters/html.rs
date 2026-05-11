@@ -3,7 +3,7 @@
 //! Produces a single document with inline CSS and no external assets
 //! (no CDN, no fonts). Layout is mobile-responsive via CSS flex/grid
 //! and per-file collapsibility uses native `<details>`/`<summary>` —
-//! no JavaScript required (issue #71).
+//! no JavaScript required.
 //!
 //! Color-coded risk levels match the SARIF severity mapping:
 //! - High → red
@@ -26,13 +26,17 @@ use crate::domain::view::AnalysisView;
 /// document should consume the structured view directly rather than
 /// scraping this output.
 ///
-/// `tool_version` is threaded from the caller (was `env!("CARGO_PKG_VERSION")`
-/// before the S3 relocation; that macro now resolves to `crap-core`'s
-/// version, not `crap4rs`'s, so the calling adapter passes its own
-/// version explicitly — same parameter pattern `format_sarif` already
-/// established).
-pub fn format_html(view: &AnalysisView<'_>, threshold: f64, tool_version: &str) -> String {
-    let title = format!("crap4rs v{tool_version} — CRAP Score Analysis");
+/// `tool_name` (the adapter binary's `env!("CARGO_PKG_NAME")`) and `tool_version`
+/// are threaded from the caller — `env!("CARGO_PKG_NAME")` and
+/// `env!("CARGO_PKG_VERSION")` resolve against `crap-core` here, not
+/// the adapter binary, so the calling binary supplies its own identity.
+pub fn format_html(
+    view: &AnalysisView<'_>,
+    threshold: f64,
+    tool_name: &str,
+    tool_version: &str,
+) -> String {
+    let title = format!("{tool_name} v{tool_version} — CRAP Score Analysis");
 
     let mut body = String::new();
     body.push_str(&render_header(&title, threshold));
@@ -461,8 +465,8 @@ fn escape_html(s: &str) -> String {
 mod tests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::{
-        make_empty_result, make_multi_function_result, make_single_function_result,
-        make_view_default,
+        TEST_TOOL_NAME, TEST_TOOL_VERSION, make_empty_result, make_multi_function_result,
+        make_single_function_result, make_view_default,
     };
     use crate::domain::types::RiskLevel;
 
@@ -470,7 +474,7 @@ mod tests {
     fn empty_renders_doctype_and_empty_marker() {
         let result = make_empty_result();
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(html.starts_with("<!DOCTYPE html>"));
         assert!(html.contains("No functions to display"));
         assert!(html.ends_with("</html>\n"));
@@ -480,7 +484,7 @@ mod tests {
     fn self_contained_no_external_assets() {
         let result = make_multi_function_result();
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         // No <script>, no <link>, no external font/CDN URLs.
         assert!(!html.contains("<script"), "html should ship no JS for v1");
         assert!(!html.contains("<link"));
@@ -494,7 +498,7 @@ mod tests {
         let result =
             make_single_function_result("ok", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(html.contains("badge badge-pass\">PASS"));
         assert!(!html.contains("badge badge-fail\">FAIL"));
     }
@@ -504,7 +508,7 @@ mod tests {
         let result =
             make_single_function_result("bad", "src/lib.rs", 20, 10.0, 45.0, RiskLevel::High, 8.0);
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(html.contains("badge badge-fail\">FAIL"));
         assert!(html.contains("risk risk-high"));
         // Exceeding functions show the file pre-expanded.
@@ -515,7 +519,7 @@ mod tests {
     fn risk_levels_render_distinct_classes() {
         let result = make_multi_function_result();
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(html.contains("risk-low"));
         assert!(html.contains("risk-moderate"));
         assert!(html.contains("risk-high"));
@@ -533,7 +537,7 @@ mod tests {
             8.0,
         );
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(!html.contains("<script>alert"));
         assert!(html.contains("&lt;script&gt;"));
     }
@@ -550,7 +554,7 @@ mod tests {
             8.0,
         );
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(!html.contains("<dangerous>"));
         assert!(html.contains("&lt;dangerous&gt;"));
     }
@@ -559,7 +563,7 @@ mod tests {
     fn groups_functions_by_file() {
         let result = make_multi_function_result();
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         // Three distinct files in the fixture.
         assert_eq!(html.matches("<details class=\"file\"").count(), 3);
     }
@@ -568,7 +572,7 @@ mod tests {
     fn risk_distribution_shows_all_buckets() {
         let result = make_multi_function_result();
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(html.contains("dist-low"));
         assert!(html.contains("dist-acceptable"));
         assert!(html.contains("dist-moderate"));
@@ -579,7 +583,7 @@ mod tests {
     fn doctype_present_and_lang_set() {
         let result = make_empty_result();
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(html.contains("<!DOCTYPE html>"));
         assert!(html.contains("<html lang=\"en\">"));
         assert!(html.contains("viewport"));
@@ -605,7 +609,7 @@ mod tests {
             view.shown.is_empty(),
             "fixture pre-condition: shown should be empty under this filter"
         );
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert!(html.contains("No functions to display"));
         assert!(!html.contains("Functions by file"));
     }
@@ -626,7 +630,7 @@ mod tests {
         };
         let view = view::apply(&result, spec);
         assert!(view.grouped.is_some());
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         assert_eq!(
             html.matches("<details class=\"file\"").count(),
             1,
@@ -637,7 +641,7 @@ mod tests {
         assert!(!html.contains("src/adapters/coverage/mod.rs"));
     }
 
-    /// Byte-level snapshot lock for the HTML reporter (#141).
+    /// Byte-level snapshot lock for the HTML reporter.
     ///
     /// Complements the existing structural asserts (`PASS`/`FAIL`
     /// badge, risk-class strings, self-contained markup) with a
@@ -658,7 +662,7 @@ mod tests {
     fn full_html_snapshot() {
         let result = make_multi_function_result();
         let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, "0.4.0");
+        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         insta::assert_snapshot!(html);
     }
 }

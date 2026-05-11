@@ -1,6 +1,5 @@
 ---
-source: src/adapters/reporters/sarif.rs
-assertion_line: 322
+source: crates/crap-core/src/adapters/reporters/sarif.rs
 expression: out
 ---
 {
@@ -10,9 +9,9 @@ expression: out
     {
       "tool": {
         "driver": {
-          "name": "crap4rs",
+          "name": "test-adapter",
           "version": "0.2.2",
-          "informationUri": "https://github.com/breezy-bays-labs/crap4rs",
+          "informationUri": "https://example.com/test-adapter",
           "rules": [
             {
               "id": "crap/threshold-exceeded",
@@ -23,7 +22,7 @@ expression: out
               "fullDescription": {
                 "text": "Functions whose CRAP score (complexity * complexity * (1 - coverage)^3 + complexity) exceeds the threshold are change-risk hot spots: cover them first, then extract sub-functions if complexity remains the driver."
               },
-              "helpUri": "https://github.com/breezy-bays-labs/crap4rs#crap-formula"
+              "helpUri": "https://example.com/test-adapter#crap"
             }
           ]
         }

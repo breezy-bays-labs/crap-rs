@@ -1,4 +1,4 @@
-//! Baseline-envelope loader — reads a previously-emitted crap4rs JSON
+//! Baseline-envelope loader — reads a previously-emitted analyzer JSON
 //! envelope from disk and extracts the `result` block, plus the
 //! envelope metadata (tool_version, timestamp) needed for delta
 //! reporting.
@@ -11,9 +11,9 @@
 //! envelopes that contain extra fields without breaking us.
 //!
 //! Schema version validation: `schema_version` 1 and 2 are both
-//! accepted (#107 bumped the current emit version 1 → 2 in 0.4.0; v1
-//! baselines remain loadable because delta matching is identity-keyed,
-//! not column-keyed). Future schema bumps will need an explicit
+//! accepted (the current emit version is 2; v1 baselines remain
+//! loadable because delta matching is identity-keyed, not
+//! column-keyed). Future schema bumps will need an explicit
 //! migration path.
 
 use crate::domain::types::{AnalysisDiagnostics, AnalysisResult};
@@ -38,8 +38,8 @@ pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1, 2];
 /// forward-compatible with envelopes that omit fields we don't need.
 ///
 /// `P: ParseDiagnostic` carries the adapter-specific parse-diagnostic
-/// type through `AnalysisDiagnostics<P>` (S2's decomposition); crap4rs
-/// concretizes to `LcovParseDiagnostic` via the v0.4 shim alias.
+/// type through `AnalysisDiagnostics<P>`. crap4rs concretizes to
+/// `LcovParseDiagnostic` via the v0.4 shim alias.
 /// `serde(bound = "")` suppresses the auto-generated `P: Serialize` /
 /// `P: Deserialize<'de>` bounds — `P: ParseDiagnostic` already provides
 /// `Serialize + DeserializeOwned`, and the auto-bounds conflict with
@@ -98,16 +98,14 @@ pub enum BaselineError {
         #[source]
         source: serde_json::Error,
     },
-    #[error(
-        "unsupported baseline schema_version: {found} (this build of crap4rs accepts {supported:?})"
-    )]
+    #[error("unsupported baseline schema_version: {found} (this build accepts {supported:?})")]
     UnsupportedSchemaVersion {
         found: u32,
         supported: &'static [u32],
     },
 }
 
-/// Load a crap4rs JSON envelope from disk and return the baseline
+/// Load an analyzer JSON envelope from disk and return the baseline
 /// snapshot. Streams the file through a `BufReader` rather than
 /// reading the whole envelope into memory — large codebases produce
 /// envelopes in the multi-MB range and there's no reason to allocate
@@ -161,8 +159,8 @@ mod tests {
 
     /// Concrete `P` for tests in this module — the loader's behavior is
     /// `P`-agnostic for the cases we test (none reach into per-variant
-    /// fields), so the dummy stub keeps the assertions byte-identical
-    /// to crap4rs's pre-S3 unit suite.
+    /// fields), so a dummy stub is sufficient and decouples these
+    /// tests from any specific adapter's diagnostic shape.
     type TestSnapshot = BaselineSnapshot<DummyParseDiagnostic>;
 
     /// Wrapper that pins `P = DummyParseDiagnostic`. Keeps the original
@@ -299,7 +297,7 @@ mod tests {
     #[test]
     fn load_unsupported_schema_version_rejects() {
         // Use a future-unsupported version (99) — both 1 and 2 are
-        // accepted today after the #107 column-convention bump.
+        // accepted today.
         let json = r#"{
             "schema_version": 99,
             "result": {
@@ -328,7 +326,7 @@ mod tests {
 
     #[test]
     fn load_v2_schema_version_accepted() {
-        // Post-#107: v2 baselines (1-based contributor columns) load
+        // After the migration: v2 baselines (1-based contributor columns) load
         // alongside v1 baselines.
         let json = r#"{
             "schema_version": 2,

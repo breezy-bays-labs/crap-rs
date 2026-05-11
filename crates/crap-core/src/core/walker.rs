@@ -1,30 +1,32 @@
-//! Filesystem walker — discovers Rust source files for analysis,
+//! Filesystem walker — discovers source files for analysis,
 //! respecting `.gitignore` and user-provided exclude patterns.
 //!
-//! Lives in `crap-core` even though it carries a hardcoded `.rs`
-//! extension filter today: the only AST-purity gate that matters here
-//! is "no `syn` / `quote` / `tree_sitter` / `swc` / `oxc` imports."
-//! `ignore::WalkBuilder` is purely filesystem-walking machinery and
-//! satisfies that gate. The `.rs` literal is a function-body wart that
-//! `analyze<P: ParseDiagnostic>` will parameterize in S4 once the
-//! parse-diagnostic type can carry the language-specific extension(s)
-//! it consumes.
+//! Adapter-agnostic: the extension filter is parameter-driven via
+//! `AnalyzeOptions::extensions` so crap4rs passes `&["rs"]`, crap4ts
+//! passes `&["ts","tsx","js","jsx","mjs","cjs"]`, and future adapters
+//! supply their own. AST-purity gate satisfied — `ignore::WalkBuilder`
+//! is filesystem-walking machinery with no `syn` / `tree_sitter` /
+//! `swc` / `oxc` coupling.
 //!
-//! Extracted from `crates/crap4rs/src/core/mod.rs::discover_rust_files`
-//! during S3 (crap4rs#135) so that S4's relocation of `core::analyze` to
-//! `crap-core` doesn't need to upward-import from the Rust adapter.
-
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use ignore::WalkBuilder;
 
-/// Walk the source directory and collect all `.rs` files, respecting
-/// .gitignore and user-provided exclude patterns.
-pub fn discover_rust_files(
+/// Walk the source directory and collect all files whose extension
+/// matches one in `extensions` (case-sensitive), respecting
+/// `.gitignore` and user-provided exclude patterns.
+///
+/// `extensions` is the bare suffix without the leading dot
+/// (`"rs"`, `"ts"`, `"tsx"`). An empty slice matches no files (the
+/// caller is expected to short-circuit on
+/// `AnalyzeOptions::extensions.is_empty()` upstream, but we don't
+/// crash here).
+pub fn discover_source_files(
     src: &Path,
     exclude: &[String],
     respect_gitignore: bool,
+    extensions: &[&str],
 ) -> Result<Vec<PathBuf>> {
     let mut builder = WalkBuilder::new(src);
     builder.git_ignore(respect_gitignore);
@@ -44,7 +46,8 @@ pub fn discover_rust_files(
     for entry in builder.build() {
         let entry = entry?;
         if entry.file_type().is_some_and(|ft| ft.is_file())
-            && entry.path().extension().is_some_and(|ext| ext == "rs")
+            && let Some(ext) = entry.path().extension()
+            && extensions.iter().any(|e| ext == *e)
         {
             files.push(entry.into_path());
         }
@@ -61,7 +64,7 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn discover_rust_files_finds_nested() {
+    fn discover_source_files_finds_nested_rust_extension() {
         let dir = tempfile::tempdir().unwrap();
         let src = dir.path().join("src");
         fs::create_dir_all(src.join("sub")).unwrap();
@@ -69,13 +72,13 @@ mod tests {
         fs::write(src.join("sub").join("mod.rs"), "").unwrap();
         fs::write(src.join("readme.txt"), "").unwrap();
 
-        let files = discover_rust_files(&src, &[], false).unwrap();
+        let files = discover_source_files(&src, &[], false, &["rs"]).unwrap();
         assert_eq!(files.len(), 2);
         assert!(files.iter().all(|f| f.extension().unwrap() == "rs"));
     }
 
     #[test]
-    fn discover_rust_files_sorted_deterministically() {
+    fn discover_source_files_sorted_deterministically() {
         let dir = tempfile::tempdir().unwrap();
         let src = dir.path().join("src");
         fs::create_dir_all(&src).unwrap();
@@ -83,8 +86,52 @@ mod tests {
         fs::write(src.join("a.rs"), "").unwrap();
         fs::write(src.join("m.rs"), "").unwrap();
 
-        let files = discover_rust_files(&src, &[], false).unwrap();
+        let files = discover_source_files(&src, &[], false, &["rs"]).unwrap();
         let names: Vec<_> = files.iter().map(|f| f.file_name().unwrap()).collect();
         assert_eq!(names, vec!["a.rs", "m.rs", "z.rs"]);
+    }
+
+    /// Walker honors arbitrary extensions, not just `.rs`, so crap4ts
+    /// can later land its oxc walker against the same filesystem layer.
+    #[test]
+    fn discover_source_files_finds_typescript_extensions() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::write(src.join("a.ts"), "").unwrap();
+        fs::write(src.join("b.tsx"), "").unwrap();
+        fs::write(src.join("sub").join("c.js"), "").unwrap();
+        fs::write(src.join("d.rs"), "").unwrap(); // wrong-language sibling
+        fs::write(src.join("notes.md"), "").unwrap();
+
+        let files =
+            discover_source_files(&src, &[], false, &["ts", "tsx", "js", "jsx", "mjs", "cjs"])
+                .unwrap();
+        let names: Vec<_> = files
+            .iter()
+            .filter_map(|f| f.file_name().and_then(|n| n.to_str()))
+            .collect();
+        assert_eq!(names, vec!["a.ts", "b.tsx", "c.js"]);
+        assert!(
+            !names.iter().any(|n| n.ends_with(".rs")),
+            "walker must not pick up `.rs` when it's not in the extension allow-list"
+        );
+    }
+
+    /// Empty `extensions` returns no files — the only sane behavior
+    /// when the caller forgot to set `AnalyzeOptions::extensions`.
+    /// `core::ensure_source_files_found` then surfaces the diagnostic.
+    #[test]
+    fn discover_source_files_empty_extensions_returns_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("lib.rs"), "").unwrap();
+
+        let files = discover_source_files(&src, &[], false, &[]).unwrap();
+        assert!(
+            files.is_empty(),
+            "no extensions configured ⇒ no files (caller surfaces diagnostic upstream)"
+        );
     }
 }

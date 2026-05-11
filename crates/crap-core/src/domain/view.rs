@@ -65,9 +65,9 @@
 //! # `crap-core` extraction
 //!
 //! Pure domain code — no I/O, no external crates beyond `serde` and
-//! `thiserror` (mirrors `domain::types`). Future `crap-core` extraction
-//! (ops#231) takes this module whole; LSP, web, and agent consumers all
-//! flow through `view::apply` as the canonical CRAP shaping surface.
+//! `thiserror` (mirrors `domain::types`). LSP, web, and agent
+//! consumers all flow through `view::apply` as the canonical CRAP
+//! shaping surface.
 
 use crate::domain::summary::{FileSummary, compute_file_summaries, compute_summary};
 use crate::domain::types::{AnalysisResult, AnalysisSummary, FunctionVerdict};
@@ -116,7 +116,7 @@ pub struct ViewSpec {
 /// Aggregation key for the optional grouped block of an
 /// `AnalysisView`.
 ///
-/// Only `File` is supported today (issue #64). `#[non_exhaustive]`
+/// Only `File` is supported today. `#[non_exhaustive]`
 /// reserves namespace for `Risk` and `Module` as listed in the
 /// shaping doc — adding variants is additive on `crap-core`.
 #[non_exhaustive]
@@ -1480,7 +1480,7 @@ mod tests {
         assert!(should_render_view_line(&view));
     }
 
-    // ── Grouping (issue #64 — `--group-by file`) ────────────────────
+    // ── Grouping (`--group-by file`) ────────────────────────────────
 
     #[test]
     fn no_group_by_means_no_grouped_block() {

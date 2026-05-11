@@ -14,7 +14,7 @@ use crate::domain::delta::{ChangeKind, DeltaFilters, DeltaSortKey, DeltaViewSpec
 /// pattern as `view_args::build_view_spec`.
 pub(super) fn build_delta_view_spec(cli: &Cli) -> DeltaViewSpec {
     // `DeltaViewSpec` and `DeltaFilters` are `#[non_exhaustive]` for
-    // cross-crate consumers, but in-crate (post-S4 #136) struct-update
+    // cross-crate consumers, but in-crate struct-update
     // syntax is permitted and clippy's `field_reassign_with_default`
     // fires on the previous mutate-after-default pattern. Use
     // struct-update so the cli/domain boundary stays clear.
@@ -56,7 +56,7 @@ mod tests {
     fn parse(args: &[&str]) -> Cli {
         // Prepend a placeholder arg0 + the required --coverage flag so
         // clap's positional validators don't reject the parse outright.
-        let mut full = vec!["crap4rs", "--coverage", "lcov.info"];
+        let mut full = vec!["test-adapter", "--coverage", "lcov.info"];
         full.extend_from_slice(args);
         Cli::try_parse_from(full).expect("clap parse should succeed")
     }
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn delta_only_unknown_token_exits_with_clap_error() {
         let result = Cli::try_parse_from([
-            "crap4rs",
+            "test-adapter",
             "--coverage",
             "lcov.info",
             "--delta-only",
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn delta_sort_unknown_token_exits_with_clap_error() {
         let result = Cli::try_parse_from([
-            "crap4rs",
+            "test-adapter",
             "--coverage",
             "lcov.info",
             "--delta-sort",
@@ -141,8 +141,13 @@ mod tests {
 
     #[test]
     fn delta_top_negative_is_attributed_to_flag() {
-        let result =
-            Cli::try_parse_from(["crap4rs", "--coverage", "lcov.info", "--delta-top", "-5"]);
+        let result = Cli::try_parse_from([
+            "test-adapter",
+            "--coverage",
+            "lcov.info",
+            "--delta-top",
+            "-5",
+        ]);
         let err = result.expect_err("negative should fail u32 parse");
         let stderr = err.to_string();
         assert!(stderr.contains("--delta-top"));

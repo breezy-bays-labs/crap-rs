@@ -12,16 +12,25 @@ use crate::domain::view::AnalysisView;
 
 const SCHEMA_URI: &str = "https://json.schemastore.org/sarif-2.1.0.json";
 const RULE_ID: &str = "crap/threshold-exceeded";
-const TOOL_NAME: &str = "crap4rs";
-const TOOL_INFO_URI: &str = "https://github.com/breezy-bays-labs/crap4rs";
-const RULE_HELP_URI: &str = "https://github.com/breezy-bays-labs/crap4rs#crap-formula";
 
 /// Format an `AnalysisView` as SARIF v2.1.0 JSON.
 ///
 /// One SARIF `result` per `FunctionVerdict` whose `exceeds == true`,
-/// iterating the *full* analysis (not the shaped slice). `tool_version`
-/// is threaded through to `runs[0].tool.driver.version`.
-pub fn format_sarif(view: &AnalysisView<'_>, tool_version: &str) -> String {
+/// iterating the *full* analysis (not the shaped slice).
+///
+/// `tool_name`, `tool_version`, `tool_info_uri`, `rule_help_uri` are
+/// adapter-supplied — production callers thread the binary's
+/// `env!("CARGO_PKG_NAME")` / `env!("CARGO_PKG_VERSION")` plus the
+/// adapter's repo URLs. The values land in `runs[0].tool.driver.*`
+/// and `rules[0].helpUri` so SARIF consumers (GitHub Code Scanning,
+/// etc.) link back to the *real* tool, not a hardcoded default.
+pub fn format_sarif(
+    view: &AnalysisView<'_>,
+    tool_name: &str,
+    tool_version: &str,
+    tool_info_uri: &str,
+    rule_help_uri: &str,
+) -> String {
     let results: Vec<SarifResult> = view
         .full
         .functions
@@ -36,10 +45,10 @@ pub fn format_sarif(view: &AnalysisView<'_>, tool_version: &str) -> String {
         runs: vec![SarifRun {
             tool: SarifTool {
                 driver: SarifDriver {
-                    name: TOOL_NAME,
+                    name: tool_name.to_string(),
                     version: tool_version.to_string(),
-                    information_uri: TOOL_INFO_URI,
-                    rules: vec![rule()],
+                    information_uri: tool_info_uri.to_string(),
+                    rules: vec![rule(rule_help_uri)],
                 },
             },
             results,
@@ -50,7 +59,7 @@ pub fn format_sarif(view: &AnalysisView<'_>, tool_version: &str) -> String {
         .expect("SARIF serialization is infallible — all fields are owned strings or numbers")
 }
 
-fn rule() -> SarifRule {
+fn rule(help_uri: &str) -> SarifRule {
     SarifRule {
         id: RULE_ID,
         name: "ThresholdExceeded",
@@ -62,7 +71,7 @@ fn rule() -> SarifRule {
                    exceeds the threshold are change-risk hot spots: cover them first, then extract \
                    sub-functions if complexity remains the driver.",
         },
-        help_uri: RULE_HELP_URI,
+        help_uri: help_uri.to_string(),
     }
 }
 
@@ -169,10 +178,10 @@ struct SarifTool {
 
 #[derive(Serialize)]
 struct SarifDriver {
-    name: &'static str,
+    name: String,
     version: String,
     #[serde(rename = "informationUri")]
-    information_uri: &'static str,
+    information_uri: String,
     rules: Vec<SarifRule>,
 }
 
@@ -185,7 +194,7 @@ struct SarifRule {
     #[serde(rename = "fullDescription")]
     full_description: SarifText<&'static str>,
     #[serde(rename = "helpUri")]
-    help_uri: &'static str,
+    help_uri: String,
 }
 
 #[derive(Serialize)]
@@ -255,11 +264,26 @@ mod tests {
         serde_json::from_str(json).expect("format_sarif must produce valid JSON")
     }
 
+    /// Test wrapper that splices in the synthetic adapter URIs so each
+    /// individual test stays focused on its own assertion. SARIF
+    /// `tool_name` / `tool_info_uri` / `rule_help_uri` are now
+    /// adapter-supplied — production callers thread their
+    /// binary's real identity; tests use deterministic placeholders.
+    fn format_sarif_t(view: &AnalysisView<'_>, tool_version: &str) -> String {
+        format_sarif(
+            view,
+            TEST_TOOL_NAME,
+            tool_version,
+            TEST_TOOL_INFO_URI,
+            TEST_RULE_HELP_URI,
+        )
+    }
+
     #[test]
     fn empty_result_produces_empty_results_array() {
         let result = make_empty_result();
         let view = make_view_default(&result);
-        let v = parse(&format_sarif(&view, "test-version"));
+        let v = parse(&format_sarif_t(&view, "test-version"));
         assert_eq!(v["version"], "2.1.0");
         assert_eq!(v["runs"][0]["results"].as_array().unwrap().len(), 0);
     }
@@ -276,7 +300,7 @@ mod tests {
             8.0,
         );
         let view = make_view_default(&result);
-        let v = parse(&format_sarif(&view, "test-version"));
+        let v = parse(&format_sarif_t(&view, "test-version"));
         let results = v["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0]["ruleId"], "crap/threshold-exceeded");
@@ -304,7 +328,7 @@ mod tests {
             passed: false,
         };
         let view = make_view_default(&result);
-        let v = parse(&format_sarif(&view, "test-version"));
+        let v = parse(&format_sarif_t(&view, "test-version"));
         let results = v["runs"][0]["results"].as_array().unwrap();
         let levels: Vec<&str> = results
             .iter()
@@ -325,7 +349,7 @@ mod tests {
             8.0,
         );
         let view = make_view_default(&result);
-        let v = parse(&format_sarif(&view, "test-version"));
+        let v = parse(&format_sarif_t(&view, "test-version"));
         let r0 = &v["runs"][0]["results"][0];
         assert_eq!(
             r0["partialFingerprints"]["functionIdentity"],
@@ -337,14 +361,22 @@ mod tests {
     fn schema_uri_and_top_level_shape() {
         let result = make_multi_function_result();
         let view = make_view_default(&result);
-        let v = parse(&format_sarif(&view, "0.2.2"));
+        let v = parse(&format_sarif_t(&view, "0.2.2"));
         assert_eq!(
             v["$schema"],
             "https://json.schemastore.org/sarif-2.1.0.json"
         );
         assert_eq!(v["version"], "2.1.0");
-        assert_eq!(v["runs"][0]["tool"]["driver"]["name"], "crap4rs");
+        assert_eq!(v["runs"][0]["tool"]["driver"]["name"], TEST_TOOL_NAME);
         assert_eq!(v["runs"][0]["tool"]["driver"]["version"], "0.2.2");
+        assert_eq!(
+            v["runs"][0]["tool"]["driver"]["informationUri"],
+            TEST_TOOL_INFO_URI
+        );
+        assert_eq!(
+            v["runs"][0]["tool"]["driver"]["rules"][0]["helpUri"],
+            TEST_RULE_HELP_URI
+        );
     }
 
     #[test]
@@ -352,7 +384,7 @@ mod tests {
         // The rule must be defined on the run regardless of whether any
         // result references it, so consumers can introspect the schema.
         let empty = make_empty_result();
-        let v = parse(&format_sarif(&make_view_default(&empty), "0.2.2"));
+        let v = parse(&format_sarif_t(&make_view_default(&empty), "0.2.2"));
         let rules = v["runs"][0]["tool"]["driver"]["rules"].as_array().unwrap();
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0]["id"], "crap/threshold-exceeded");
@@ -363,7 +395,7 @@ mod tests {
     fn full_sarif_snapshot() {
         let result = make_multi_function_result();
         let view = make_view_default(&result);
-        let out = format_sarif(&view, "0.2.2");
+        let out = format_sarif_t(&view, "0.2.2");
         insta::assert_snapshot!(out);
     }
 
@@ -404,7 +436,7 @@ mod tests {
         // column 32 inclusive becomes SARIF endColumn 33.
         let result = result_with_single(verdict_with_columns(5, 32));
         let view = make_view_default(&result);
-        let v = parse(&format_sarif(&view, "test-version"));
+        let v = parse(&format_sarif_t(&view, "test-version"));
         let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
         assert_eq!(
             region["startColumn"], 5,
@@ -422,7 +454,7 @@ mod tests {
         // must not surface meaningless columns to GitHub Code Scanning.
         let result = result_with_single(verdict_with_columns(0, 0));
         let view = make_view_default(&result);
-        let v = parse(&format_sarif(&view, "test-version"));
+        let v = parse(&format_sarif_t(&view, "test-version"));
         let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
         assert!(
             region.get("startColumn").is_none(),
@@ -442,7 +474,7 @@ mod tests {
         for (sc, ec) in [(5usize, 0usize), (0, 32)] {
             let result = result_with_single(verdict_with_columns(sc, ec));
             let view = make_view_default(&result);
-            let v = parse(&format_sarif(&view, "test-version"));
+            let v = parse(&format_sarif_t(&view, "test-version"));
             let region = &v["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
             assert!(
                 region.get("startColumn").is_none() && region.get("endColumn").is_none(),
@@ -455,9 +487,23 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     use super::*;
-    use crate::adapters::reporters::test_fixtures::make_view_default;
+    use crate::adapters::reporters::test_fixtures::{
+        TEST_RULE_HELP_URI, TEST_TOOL_INFO_URI, TEST_TOOL_NAME, make_view_default,
+    };
     use crate::test_strategies::arb_analysis_result;
     use proptest::prelude::*;
+
+    /// Local wrapper for proptests — mirrors `tests::format_sarif_t`
+    /// (sibling module, not visible across the `mod` boundary).
+    fn format_sarif_t(view: &AnalysisView<'_>, tool_version: &str) -> String {
+        format_sarif(
+            view,
+            TEST_TOOL_NAME,
+            tool_version,
+            TEST_TOOL_INFO_URI,
+            TEST_RULE_HELP_URI,
+        )
+    }
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
@@ -465,7 +511,7 @@ mod proptests {
         #[test]
         fn prop_format_sarif_always_valid_json(result in arb_analysis_result()) {
             let view = make_view_default(&result);
-            let out = format_sarif(&view, "0.2.2");
+            let out = format_sarif_t(&view,"0.2.2");
             let _: serde_json::Value = serde_json::from_str(&out)
                 .expect("format_sarif must produce parseable JSON");
         }
@@ -473,7 +519,7 @@ mod proptests {
         #[test]
         fn prop_sarif_results_count_matches_exceeders(result in arb_analysis_result()) {
             let view = make_view_default(&result);
-            let out = format_sarif(&view, "0.2.2");
+            let out = format_sarif_t(&view,"0.2.2");
             let v: serde_json::Value = serde_json::from_str(&out).unwrap();
             let results = v["runs"][0]["results"].as_array().unwrap();
             let expected = result.functions.iter().filter(|fv| fv.exceeds).count();
@@ -483,7 +529,7 @@ mod proptests {
         #[test]
         fn prop_every_result_has_mandatory_sarif_fields(result in arb_analysis_result()) {
             let view = make_view_default(&result);
-            let out = format_sarif(&view, "0.2.2");
+            let out = format_sarif_t(&view,"0.2.2");
             let v: serde_json::Value = serde_json::from_str(&out).unwrap();
             for r in v["runs"][0]["results"].as_array().unwrap() {
                 prop_assert!(r["ruleId"].is_string());
@@ -500,7 +546,7 @@ mod proptests {
         #[test]
         fn prop_severity_is_one_of_three_values(result in arb_analysis_result()) {
             let view = make_view_default(&result);
-            let out = format_sarif(&view, "0.2.2");
+            let out = format_sarif_t(&view,"0.2.2");
             let v: serde_json::Value = serde_json::from_str(&out).unwrap();
             for r in v["runs"][0]["results"].as_array().unwrap() {
                 let level = r["level"].as_str().unwrap();

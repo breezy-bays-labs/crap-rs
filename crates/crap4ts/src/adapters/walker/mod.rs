@@ -3,8 +3,7 @@
 //! The real implementation will use `oxc::parser` to walk the AST and
 //! count decision points for cognitive / cyclomatic complexity, mirror-
 //! ing `crates/crap4rs/src/adapters/complexity/mod.rs`. It lands in
-//! the follow-up `crap-rs/2026XXXX-typescript-adapter` pipeline (see
-//! breezy-bays-labs/crap4rs#137 follow-up).
+//! the follow-up TypeScript-adapter pipeline.
 //!
 //! ALPHA: invoking `extract(...)` runtime-panics with `unimplemented!`.
 //! The struct exists so the trait bound is wired and the binary's
@@ -39,9 +38,7 @@ impl ComplexityPort for OxcWalker {
         _file_path: &str,
         _metric: ComplexityMetric,
     ) -> Result<Vec<FunctionComplexity>, CrapError> {
-        unimplemented!(
-            "oxc walker lands in the typescript-adapter follow-up pipeline (see crap4rs#137)"
-        )
+        unimplemented!("oxc walker lands in the typescript-adapter follow-up pipeline")
     }
 }
 
