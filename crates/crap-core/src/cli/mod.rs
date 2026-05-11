@@ -622,14 +622,20 @@ pub struct Cli {
 
 // ── Entry point ─────────────────────────────────────────────────────
 
-/// Parse process args and produce a `Cli`. Splits in half from `run`
-/// so the binary `main.rs` can consult `cli.input.src` (config-aware)
-/// before constructing its `LcovParser` (which needs the source root
-/// at construction time per the LCOV adapter's path-stripping
-/// invariant). `run` then consumes the parsed `Cli` directly.
+/// Parse process args into `Cli`, splicing the adapter's runtime
+/// metadata into clap's help / `--version` output.
 ///
-/// `tool_version` (e.g. `crap4rs`'s `0.4.0`) and `long_version`
-/// (e.g. `0.4.0 (abc1234 2026-05-09)`) are spliced into clap's help
+/// Split out from `run` purely to keep the parse step monomorphic and
+/// off the binary's hot path on `--help` / `--version` (clap intercepts
+/// those before `parse_args` returns). The adapter binary supplies its
+/// coverage adapter to `run` as a factory closure that's invoked once
+/// after CLI/config-file merging resolves the effective source root —
+/// pre-construction was the #150 footgun, since
+/// `cli.input.src` is the raw CLI value (`None` if the caller put
+/// `src = "…"` only in `crap4rs.toml`).
+///
+/// `tool_version` (e.g. `crap4rs`'s `0.5.0`) and `long_version`
+/// (e.g. `0.5.0 (abc1234 2026-05-09)`) are spliced into clap's help
 /// and `--version` output at runtime so the binary's build-script
 /// metadata reaches the help text — the derive macro's `version`
 /// reads `CARGO_PKG_VERSION` at lib-crate compile time (crap-core's
@@ -685,22 +691,43 @@ fn build_command(tool_version: &str, long_version: &str) -> clap::Command {
         .long_version(long_version_static)
 }
 
-/// Run the CRAP CLI pipeline end-to-end. Generic over `P:
-/// ParseDiagnostic` so the same orchestrator drives every adapter
-/// crate's binary (per ADR D9, mixed-dispatch).
+/// Run the CRAP CLI pipeline end-to-end.
+///
+/// Takes a `coverage_factory` closure rather than a constructed
+/// coverage adapter so the parser receives the effective source root
+/// *after* CLI / config-file / preset merging — pre-construction
+/// canonicalized against the bare CLI value (or the default `src`) and
+/// the LCOV parser silently stripped the wrong prefix from `SF:`
+/// records (#150). The factory is invoked once inside `run` after
+/// `merge_effective_inputs` resolves the final `src`, receives the
+/// **canonicalized** effective source root (so adapter factories stay
+/// dumb — orchestration owns the canonicalize concern), and is
+/// short-circuited entirely on the `completions` subcommand (clap's
+/// `--help` / `--version` exit even earlier, inside `parse_args`).
+///
+/// Generic over `P: ParseDiagnostic` so the same orchestrator drives
+/// every adapter crate's binary (per ADR D9, mixed-dispatch). The
+/// `'static` bound on `P` is the standard trait-object well-formedness
+/// requirement when the closure returns `Box<dyn …>`; concrete adapter
+/// diagnostic types (`LcovParseDiagnostic`, `IstanbulParseDiagnostic`)
+/// satisfy it trivially.
 ///
 /// `tool_version` is the binary's own version (e.g. `crap4rs`'s
-/// `CARGO_PKG_VERSION` resolves to `0.4.0`, not crap-core's `0.1.0`).
+/// `CARGO_PKG_VERSION` resolves to `0.5.0`, not crap-core's `0.1.0`).
 /// It feeds the JSON envelope's `tool_version` field, the SARIF run
 /// metadata, the markdown header, the HTML report header, and clap's
 /// long-version splice when the caller threads it through.
-pub fn run<P: ParseDiagnostic + std::fmt::Display>(
+pub fn run<P, F>(
     cli: Cli,
     complexity: &dyn ComplexityPort,
-    coverage: &dyn CoveragePort<Diagnostic = P>,
+    coverage_factory: F,
     tool_version: &str,
-) -> ExitCode {
-    match run_inner(cli, complexity, coverage, tool_version) {
+) -> ExitCode
+where
+    P: ParseDiagnostic + std::fmt::Display + 'static,
+    F: FnOnce(&Path) -> Box<dyn CoveragePort<Diagnostic = P>>,
+{
+    match run_inner(cli, complexity, coverage_factory, tool_version) {
         Ok(true) => ExitCode::from(0),
         Ok(false) => ExitCode::from(1),
         Err(e) => {
@@ -710,18 +737,22 @@ pub fn run<P: ParseDiagnostic + std::fmt::Display>(
     }
 }
 
-fn run_inner<P: ParseDiagnostic + std::fmt::Display>(
+fn run_inner<P, F>(
     mut cli: Cli,
     complexity: &dyn ComplexityPort,
-    coverage: &dyn CoveragePort<Diagnostic = P>,
+    coverage_factory: F,
     tool_version: &str,
-) -> Result<bool> {
+) -> Result<bool>
+where
+    P: ParseDiagnostic + std::fmt::Display + 'static,
+    F: FnOnce(&Path) -> Box<dyn CoveragePort<Diagnostic = P>>,
+{
     if let Some(Command::Completions { shell }) = cli.command {
         emit_completions(shell, &current_bin_name());
         return Ok(true);
     }
 
-    let prep = prepare_pipeline(&mut cli, complexity, coverage)?;
+    let prep = prepare_pipeline(&mut cli, complexity, coverage_factory)?;
 
     // Build the spec, then shape the result through the View pipeline.
     // V1b: `--only-failing` flows through `Filters::only_failing` here.
@@ -870,11 +901,20 @@ fn apply_diagnostics<P: ParseDiagnostic + std::fmt::Display>(
 /// Validates inputs, merges effective config, runs the analyzer, and
 /// resolves the optional baseline delta. The bulk of `run_inner`'s
 /// pre-render work lives here so `run_inner` itself stays a flat dispatch.
-fn prepare_pipeline<P: ParseDiagnostic + std::fmt::Display>(
+///
+/// Constructs the coverage adapter via `coverage_factory` *after*
+/// `merge_effective_inputs` resolves the final source root, so the
+/// LCOV parser strips the correct prefix from `SF:` records even when
+/// `src` comes from `crap4rs.toml` rather than the CLI (#150).
+fn prepare_pipeline<P, F>(
     cli: &mut Cli,
     complexity: &dyn ComplexityPort,
-    coverage: &dyn CoveragePort<Diagnostic = P>,
-) -> Result<PipelinePrep<P>> {
+    coverage_factory: F,
+) -> Result<PipelinePrep<P>>
+where
+    P: ParseDiagnostic + std::fmt::Display + 'static,
+    F: FnOnce(&Path) -> Box<dyn CoveragePort<Diagnostic = P>>,
+{
     validate_display_flags(cli)?;
     apply_color(cli.display.color);
 
@@ -890,9 +930,22 @@ fn prepare_pipeline<P: ParseDiagnostic + std::fmt::Display>(
 
     let inputs = merge_effective_inputs(cli, &file_config);
     let coverage_path = validate_runtime_inputs(cli, &inputs)?;
+
+    // Canonicalize the effective `src` (post-config-merge) and hand
+    // it to the adapter's factory closure. Falls back to the raw path
+    // when the directory does not exist on disk — `validate_runtime_inputs`
+    // already gated on existence, but the closure is invoked unconditionally
+    // because some adapters (Istanbul) do not strip a prefix and consume the
+    // raw path. Mirrors `core::canonicalize_src`.
+    let src_canonical = inputs
+        .src
+        .canonicalize()
+        .unwrap_or_else(|_| inputs.src.clone());
+    let coverage = coverage_factory(&src_canonical);
+
     let options = build_analyze_options(cli, &inputs, coverage_path);
 
-    let analysis = crate::core::analyze(&options, complexity, coverage)?;
+    let analysis = crate::core::analyze(&options, complexity, &*coverage)?;
     apply_diagnostics(cli, &analysis.diagnostics);
 
     // Resolve --baseline (issue #81): load a previously-emitted JSON
