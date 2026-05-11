@@ -7,6 +7,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-10
+
+The workspace-extraction milestone. `crap4rs` becomes one of three
+crates in a workspace alongside the new language-agnostic
+[`crap-core`](https://crates.io/crates/crap-core) library and the
+alpha [`crap4ts`](https://github.com/breezy-bays-labs/crap4ts) shell
+for the future TypeScript adapter. **No breaking changes for `cargo
+install crap4rs` users**; **no required source changes for `cargo add
+crap4rs` library users** — every v0.4 public path resolves through a
+backward-compatibility shim re-export (per
+[ADR D10](https://github.com/breezy-bays-labs/ops/tree/main/decisions/crap-rs)).
+
+The CLI binary, output formats, JSON envelope schema (version 2,
+unchanged), SARIF output, scorecard-row producer, and `/cut-the-crap`
+agent skill all behave identically to v0.4.0. The wire-envelope
+snapshot canary is byte-identical to the v0.4.0 baseline (the
+language-agnostic adapters relocated to `crap-core` but emit the same
+bytes).
+
+The repository renames from `breezy-bays-labs/crap4rs` to
+`breezy-bays-labs/crap-rs` shortly after this release ships. GitHub's
+auto-redirect carries existing URL references for at least one year.
+The crates.io package name `crap4rs` is unchanged.
+
+### Added
+- **`crap-core` 0.1.0** — language-agnostic shared library extracted
+  from crap4rs. Contains domain types (`AnalysisResult`,
+  `ScoredFunction`, `RiskLevel`, `ContributorKind`, CRAP formula,
+  delta + summary), port traits (`ComplexityPort`, `CoveragePort`,
+  `DiffPort`, `ParseDiagnostic`), the eight reporters (JSON, SARIF,
+  CSV, markdown, HTML, scorecard-row, table, advice-summary), the
+  baseline / config / diff adapters, the `walker` orchestration, and
+  the CLI dispatch shell. Designed for future TypeScript / multi-
+  language adapters to bind against the same domain core. See PRs
+  [#146](https://github.com/breezy-bays-labs/crap4rs/pull/146) (domain
+  + ports), [#149](https://github.com/breezy-bays-labs/crap4rs/pull/149)
+  (adapters), [#151](https://github.com/breezy-bays-labs/crap4rs/pull/151)
+  (core + cli).
+- **`crap4ts` 2.0.0-alpha.1** — TypeScript adapter shell crate
+  scaffolding the napi-rs `cdylib` + Rust `bin` surface for the future
+  Node.js / TypeScript binding. Walker and Istanbul coverage parser
+  are stub `unimplemented!()` adapters; the real walker pipeline ships
+  in a future pipeline. **NOT published to crates.io or npm**
+  (`package.json` is `"private": true` and release-publishing is
+  disabled). See PR
+  [#153](https://github.com/breezy-bays-labs/crap4rs/pull/153). The
+  v1.x line of the legacy TypeScript implementation at
+  [`breezy-bays-labs/crap4ts`](https://github.com/breezy-bays-labs/crap4ts)
+  enters maintenance-only mode.
+- **Mixed dispatch architecture (ADR D9)** — generics on data
+  containers (`AnalysisDiagnostics<P>`, `ParseOutput<P>`,
+  `AnalysisOutput<P>`, `BaselineSnapshot<P>`, `JsonConfig<'a, P>`,
+  `DeltaContext<'a, P>`); trait objects on port orchestration
+  (`&dyn ComplexityPort`, `&dyn CoveragePort<Diagnostic = P>`); free
+  functions for reporters preserved per
+  [`adapters.md`](https://github.com/breezy-bays-labs/ops) rule 1
+  (Reporter trait NOT introduced).
+- **Backward-compat shim modules (ADR D10)** — `crap4rs::domain::*`,
+  `crap4rs::ports::*`, `crap4rs::core::*`, `crap4rs::cli::*`, and
+  `crap4rs::adapters::{baseline, config, diff, reporters}::*` are
+  nested `pub mod` re-exports from `crap_core::*`. Type aliases
+  concretize the `<P>` parameter to `LcovParseDiagnostic` so v0.4
+  consumers' unparameterized usage keeps compiling.
+- **`crap4rs::parse_diagnostic::LcovParseDiagnostic`** — the LCOV-
+  specific concrete `ParseDiagnostic` impl, formerly named
+  `crap4rs::domain::types::ParseDiagnostic`. The old path is preserved
+  as a shim alias for v0.5.x; the alias drops at v1.0.
+
+### Changed
+- **MSRV: 1.88 → 1.93.** Building `crap4rs` from source now requires
+  `rustc >= 1.93`. `cargo binstall crap4rs` and pre-built release
+  artifacts are unaffected (they ship as binaries). The MSRV raise
+  tracks `oxc 0.129`, which the future TypeScript walker pipeline
+  needs; the v0.4 line held at `oxc 0.96` to keep MSRV at 1.88, but
+  the workspace settled the tension by raising MSRV during the build
+  phase (PR
+  [#155](https://github.com/breezy-bays-labs/crap4rs/pull/155)).
+- **`oxc` workspace pin: 0.96 → 0.129** (current at v0.5.0 ship).
+  Used only by the `crap4ts` shell crate at present.
+- **`crap4rs` package version: 0.4.0 → 0.5.0.** `crap-core` ships at
+  `0.1.0`; `crap4ts` ships at `2.0.0-alpha.1` (not published).
+- **Workspace layout.** Source files relocated:
+  - `crap4rs/src/domain/` → `crap-core/src/domain/`
+  - `crap4rs/src/ports/` → `crap-core/src/ports/`
+  - `crap4rs/src/adapters/{reporters,baseline,config,diff}/` →
+    `crap-core/src/adapters/{...}/`
+  - `crap4rs/src/core/` → `crap-core/src/core/`
+  - `crap4rs/src/cli/` → `crap-core/src/cli/`
+  - `crap4rs/src/adapters/{complexity, coverage}/` stay in
+    `crap4rs` (Rust-toolchain coupled; would fail the AST-purity gate
+    in `crap-core`).
+- **CI: self-CRAP runs twice** — once with `--src crates/crap-core/src`
+  and once with `--src crates/crap4rs/src`, both gating PR merge.
+  Mutation testing and BDD harness are split per crate. The wire-
+  envelope canary stays in `crap-core`'s test surface and is
+  intentionally excluded from `cargo mutants` runs.
+
+### Looking ahead — v1.0 narrowings (file followups now)
+The v0.5.0 shim re-exports preserve v0.4 paths but are explicitly
+provisional. Library consumers planning past v0.5.x should anticipate:
+
+- **Restored `#[non_exhaustive]` on 15+ result / diagnostic structs.**
+  Paused during the extraction (S2 struct-literal init in `cli` /
+  `core` / `adapters` blocked the attribute) and re-enabled at v1.0.
+  Tracked in
+  [#147](https://github.com/breezy-bays-labs/crap4rs/issues/147).
+- **Shim re-exports narrow.** Symbols that originated in `crap4rs` but
+  now live in `crap_core` (the domain types, port traits, reporters,
+  baseline / config / diff adapters, orchestrator, CLI dispatch) are
+  candidates for removal from `crap4rs::*`. Add `crap-core` as a
+  direct dependency now and import from there to avoid the v1.0
+  cliff. Full migration recipe in `MIGRATION.md`.
+- **`crap4rs::domain::types::ParseDiagnostic` alias drops.** Use
+  `crap4rs::parse_diagnostic::LcovParseDiagnostic` (concrete impl) or
+  `crap_core::ports::ParseDiagnostic` (the trait) directly.
+- **Type aliases concretizing `<P>` drop.** Aliases like
+  `crap4rs::ports::ParseOutput`,
+  `crap4rs::core::AnalysisOutput`,
+  `crap4rs::domain::types::AnalysisDiagnostics`, and
+  `crap4rs::adapters::baseline::BaselineSnapshot` hide the `<P:
+  ParseDiagnostic>` parameter; at v1.0 the parameter is visible to
+  consumers (concretize to `LcovParseDiagnostic` yourself or use a
+  generic).
+- **Rust-specific hardcoded strings in `crap_core::cli` parameterize
+  per language adapter** (`.rs` extension check, "LCOV" / "Rust"
+  diagnostic labels, clap `Box::leak` removal). Tracked in
+  [#152](https://github.com/breezy-bays-labs/crap4rs/issues/152).
+- **Tool-name parameterization in reporters** —
+  [#148](https://github.com/breezy-bays-labs/crap4rs/issues/148).
+- **LCOV-parser src divergence cleanup** —
+  [#150](https://github.com/breezy-bays-labs/crap4rs/issues/150).
+
+### Migration
+See `MIGRATION.md` for the per-consumer migration recipe. TL;DR:
+
+- **CLI users** (`cargo install crap4rs`): no action required.
+- **Library users** (`cargo add crap4rs`): no required changes;
+  recommended to add `crap-core = "0.1"` as a direct dependency and
+  migrate `crap4rs::{domain, ports, core, cli, adapters::{baseline,
+  config, diff, reporters}}::*` imports to `crap_core::*` to
+  future-proof for v1.0.
+- **Hardcoded `breezy-bays-labs/crap4rs` URLs** (workflows, READMEs):
+  no action required; GitHub auto-redirect carries them >= 1 year.
+
 ## [0.4.0] - 2026-05-04
 
 The agent-loop + multi-output milestone. Bundles 13 issues across three
