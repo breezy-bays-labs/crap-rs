@@ -10,7 +10,7 @@ members = [
 edition = "2024"
 rust-version = "1.93"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/breezy-bays-labs/crap4rs"
+repository = "https://github.com/breezy-bays-labs/crap-rs"
 authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
 
 # ── Workspace dependency catalog ──────────────────────────────────────

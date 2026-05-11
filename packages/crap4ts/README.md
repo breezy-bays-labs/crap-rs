@@ -26,7 +26,7 @@ The `v1.x-maintenance-announcement` release on [`breezy-bays-labs/crap4ts`](http
 
 ## Why a v2
 
-The v2 analyzer shares its CRAP formula, scorecard envelope, and reporter shapes with [`crap4rs`](https://github.com/breezy-bays-labs/crap4rs) by linking the same `crap-core` Rust library. That gives TypeScript projects identical analysis semantics to Rust projects (per-function complexity, line-range matching against coverage data, deltas vs a baseline, JSON / Markdown / SARIF / HTML / scorecard-row reporters) — at native speed, with no separate engine to maintain.
+The v2 analyzer shares its CRAP formula, scorecard envelope, and reporter shapes with [`crap4rs`](https://github.com/breezy-bays-labs/crap-rs) by linking the same `crap-core` Rust library. That gives TypeScript projects identical analysis semantics to Rust projects (per-function complexity, line-range matching against coverage data, deltas vs a baseline, JSON / Markdown / SARIF / HTML / scorecard-row reporters) — at native speed, with no separate engine to maintain.
 
 ## Tracking
 
