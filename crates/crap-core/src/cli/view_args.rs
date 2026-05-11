@@ -92,12 +92,15 @@ fn resolve_coverage_bounds(cli: &Cli) -> Option<(f64, f64)> {
 ///   listing the available preset names. Empty list yields a hint that
 ///   names the adapter's config file.
 ///
-/// `config_file_name` is the adapter-specific conventional file name
-/// (e.g., `"crap4rs.toml"`, `"crap4ts.toml"`) so the error hint points
-/// the user at the right file to create.
+/// `config_path` is the resolved on-disk location the config was loaded
+/// from (from `--config` or auto-discovery); when present, hints point
+/// the user at the exact file. `config_file_name` is the adapter
+/// convention (e.g., `"crap4rs.toml"`) used as the fallback when no
+/// config is loaded.
 pub(super) fn resolve_view_preset(
     cli: &mut Cli,
     file_config: Option<&FileConfig>,
+    config_path: Option<&std::path::Path>,
     config_file_name: &str,
 ) -> Result<()> {
     let Some(name) = cli.input.view.clone() else {
@@ -110,15 +113,25 @@ pub(super) fn resolve_view_preset(
             apply_preset_to_cli(cli, preset);
             Ok(())
         }
-        None => bail!("{}", unknown_preset_message(&name, views, config_file_name)),
+        None => bail!(
+            "{}",
+            unknown_preset_message(&name, views, config_path, config_file_name)
+        ),
     }
 }
 
 fn unknown_preset_message(
     name: &str,
     views: Option<&std::collections::HashMap<String, ViewPreset>>,
+    config_path: Option<&std::path::Path>,
     config_file_name: &str,
 ) -> String {
+    // Prefer the resolved on-disk path when available — points the user
+    // at the exact file to edit (matters when `--config` overrides
+    // auto-discovery or the discovered file lives several parents up).
+    let display = config_path
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| config_file_name.to_string());
     match views {
         Some(map) if !map.is_empty() => {
             let mut names: Vec<&str> = map.keys().map(String::as_str).collect();
@@ -129,10 +142,10 @@ fn unknown_preset_message(
             )
         }
         Some(_) => format!(
-            "unknown view preset `{name}`\n  hint: {config_file_name} defines no [views.<name>] blocks"
+            "unknown view preset `{name}`\n  hint: {display} defines no [views.<name>] blocks"
         ),
         None => format!(
-            "unknown view preset `{name}`\n  hint: --view requires a {config_file_name} with a [views.{name}] block"
+            "unknown view preset `{name}`\n  hint: --view requires a {display} with a [views.{name}] block"
         ),
     }
 }
@@ -351,7 +364,7 @@ mod tests {
     fn resolve_view_preset_no_flag_is_noop() {
         let mut cli = parse(&["--coverage", "lcov.info"]);
         let cfg = config_with_preset("ci", full_preset());
-        resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap();
+        resolve_view_preset(&mut cli, Some(&cfg), None, "test-adapter.toml").unwrap();
         // No `--view` passed → preset must NOT be applied.
         assert_eq!(cli.filter.top, None);
         assert!(cli.filter.sort_by.is_none());
@@ -362,7 +375,7 @@ mod tests {
     fn resolve_view_preset_resolves_named_preset() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
         let cfg = config_with_preset("ci", full_preset());
-        resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap();
+        resolve_view_preset(&mut cli, Some(&cfg), None, "test-adapter.toml").unwrap();
         assert_eq!(cli.filter.top, Some(20));
         assert!(cli.filter.only_failing);
     }
@@ -371,7 +384,7 @@ mod tests {
     fn resolve_view_preset_cli_overrides_resolved_preset() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci", "--top", "5"]);
         let cfg = config_with_preset("ci", full_preset());
-        resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap();
+        resolve_view_preset(&mut cli, Some(&cfg), None, "test-adapter.toml").unwrap();
         assert_eq!(cli.filter.top, Some(5), "CLI --top wins over preset");
         // Other preset fields still applied.
         assert!(cli.filter.only_failing);
@@ -387,7 +400,7 @@ mod tests {
             views,
             ..FileConfig::default()
         };
-        let err = resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap_err();
+        let err = resolve_view_preset(&mut cli, Some(&cfg), None, "test-adapter.toml").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("unknown view preset"),
@@ -409,7 +422,7 @@ mod tests {
     #[test]
     fn resolve_view_preset_no_config_file_explains_requirement() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
-        let err = resolve_view_preset(&mut cli, None, "test-adapter.toml").unwrap_err();
+        let err = resolve_view_preset(&mut cli, None, None, "test-adapter.toml").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("unknown view preset"), "got: {msg}");
         assert!(
@@ -422,9 +435,48 @@ mod tests {
     fn resolve_view_preset_empty_views_block_hints_no_blocks_defined() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
         let cfg = FileConfig::default();
-        let err = resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap_err();
+        let err = resolve_view_preset(&mut cli, Some(&cfg), None, "test-adapter.toml").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("unknown view preset"));
         assert!(msg.contains("no [views"), "empty-block hint missing: {msg}");
+    }
+
+    /// Regression — when the config was loaded from a specific on-disk
+    /// location, the empty-block hint must surface that path so the
+    /// user can `$EDITOR` directly to the right file. Falls back to
+    /// the adapter convention only when no path was resolved.
+    #[test]
+    fn resolve_view_preset_empty_views_block_surfaces_loaded_path() {
+        let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
+        let cfg = FileConfig::default();
+        let loaded = std::path::PathBuf::from("/home/me/project/test-adapter.toml");
+        let err = resolve_view_preset(
+            &mut cli,
+            Some(&cfg),
+            Some(loaded.as_path()),
+            "test-adapter.toml",
+        )
+        .unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("/home/me/project/test-adapter.toml"),
+            "hint must include the resolved on-disk path: {msg}"
+        );
+        // The full path replaces — does not append to — the convention
+        // name (no duplication).
+        assert_eq!(msg.matches("test-adapter.toml").count(), 1);
+    }
+
+    #[test]
+    fn resolve_view_preset_no_config_falls_back_to_convention_name() {
+        // No on-disk path resolved → hint uses the adapter convention.
+        // This guards the regression: `display` only swaps in the path
+        // when one was actually loaded.
+        let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
+        let err = resolve_view_preset(&mut cli, None, None, "test-adapter.toml").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("test-adapter.toml"), "got: {msg}");
+        // No bogus absolute path crept in.
+        assert!(!msg.contains('/'), "no resolved path should appear: {msg}");
     }
 }

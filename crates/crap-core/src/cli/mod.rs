@@ -983,14 +983,22 @@ where
     validate_display_flags(cli)?;
     apply_color(cli.display.color);
 
-    // Load config file (explicit path or auto-discovered)
-    let file_config = load_file_config(cli, meta.config_file_name)?;
+    // Load config file (explicit path or auto-discovered). Path is
+    // kept alongside the loaded config so downstream diagnostics
+    // (e.g., unknown `--view` preset) can point the user at the
+    // exact file to edit.
+    let (file_config, config_path) = load_file_config(cli, meta.config_file_name)?.unzip();
 
     // Resolve `--view <NAME>` before validate_view_args runs
     // so preset fields participate in the same validation pass as CLI
     // flags. `apply_preset_to_cli` mutates `cli` in place: CLI explicit
     // values win on `Option<T>` fields, bools OR-merge.
-    view_args::resolve_view_preset(cli, file_config.as_ref(), meta.config_file_name)?;
+    view_args::resolve_view_preset(
+        cli,
+        file_config.as_ref(),
+        config_path.as_deref(),
+        meta.config_file_name,
+    )?;
     view_args::validate_view_args(cli)?;
 
     let inputs = merge_effective_inputs(cli, &file_config);
@@ -1267,12 +1275,24 @@ fn format_arg_kebab(arg: FormatArg) -> String {
 
 // ── Config loading & merging ───────────────────────────────────────
 
-fn load_file_config(cli: &Cli, config_file_name: &str) -> Result<Option<FileConfig>> {
+/// Load the on-disk config file (explicit `--config` path or
+/// auto-discovered by adapter convention) and return it paired with
+/// the path it came from. The path is threaded into downstream error
+/// hints (e.g., the `--view` unknown-preset diagnostic) so the user
+/// sees the exact file to edit — not just the conventional name.
+fn load_file_config(
+    cli: &Cli,
+    config_file_name: &str,
+) -> Result<Option<(FileConfig, std::path::PathBuf)>> {
     if let Some(path) = &cli.input.config {
-        Ok(Some(config::load_config(path)?))
+        let cfg = config::load_config(path)?;
+        Ok(Some((cfg, path.clone())))
     } else {
         match config::discover_config(config_file_name)? {
-            Some(path) => Ok(Some(config::load_config(&path)?)),
+            Some(path) => {
+                let cfg = config::load_config(&path)?;
+                Ok(Some((cfg, path)))
+            }
             None => Ok(None),
         }
     }
@@ -2210,8 +2230,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let missing = dir.path().join("does_not_exist.info");
 
-        let err =
-            check_coverage_has_data(&missing, &stub_ok(), TEST_COVERAGE_HINT).unwrap_err();
+        let err = check_coverage_has_data(&missing, &stub_ok(), TEST_COVERAGE_HINT).unwrap_err();
         // I/O error surfaces as a `CrapError::Io` (via `?` on `read_to_string`);
         // the user-facing wrapper from `validate_inputs` covers the
         // "coverage file not found" hint path. This test guards the

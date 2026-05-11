@@ -369,9 +369,7 @@ mod tests {
         // walks both blocks and accepts the first valid DA encountered.
         assert!(
             parser()
-                .validate(
-                    "SF:src/a.rs\nend_of_record\nSF:src/b.rs\nDA:1,1\nend_of_record\n"
-                )
+                .validate("SF:src/a.rs\nend_of_record\nSF:src/b.rs\nDA:1,1\nend_of_record\n")
                 .is_ok()
         );
     }
