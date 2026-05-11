@@ -83,8 +83,8 @@ mod tests {
         Applicability, Diagnostic, LineRange, ProposedSplit, RootCause, SplitKind, SuggestedAction,
     };
     use crate::domain::types::{
-        AnalysisResult, AnalysisSummary, ComplexityMetric, CrapScore, FunctionIdentity, RiskLevel,
-        ScoredFunction, SourceSpan,
+        AnalysisResult, AnalysisSummary, ComplexityMetric, ContributorKind, CrapScore,
+        FunctionIdentity, RiskLevel, ScoredFunction, SourceSpan,
     };
     use crate::domain::view::{self, ViewSpec};
 
@@ -200,5 +200,74 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert!(lines[0].contains("b_second"));
         assert!(lines[1].contains("a_first"));
+    }
+
+    /// Byte-level snapshot lock for the advice_summary reporter
+    /// (#142). The format is plain text with no ANSI / no
+    /// terminal-width dependency, so the snapshot is fully
+    /// deterministic by construction.
+    ///
+    /// Covers all four `SuggestedAction` variants (the entire
+    /// `action_kind_label` match) plus the `[actions: none]` branch
+    /// (empty suggested_actions vec) so any future variant
+    /// addition that misses an arm or relabels surfaces here.
+    /// CRAP values are distinct and spread across `RiskLevel`s so
+    /// the default-sort ordering is also pinned by the snapshot.
+    #[test]
+    fn advice_summary_snapshot() {
+        let mut high = make_verdict("complex_handler", "src/cli/mod.rs", 600, 720);
+        high.scored.crap.value = 45.20;
+        high.scored.crap.risk_level = RiskLevel::High;
+        high.diagnostic = Some(Box::new(Diagnostic {
+            coverage_gaps: vec![LineRange::new(605, 612), LineRange::new(640, 660)],
+            complexity_drivers: vec![],
+            suggested_actions: vec![
+                SuggestedAction::AddTestsForLines {
+                    lines: vec![LineRange::new(605, 612)],
+                    applicability: Applicability::default(),
+                },
+                SuggestedAction::ExtractFunction {
+                    candidates: vec![ProposedSplit {
+                        line_range: LineRange::new(640, 700),
+                        complexity_contribution: 12,
+                        branch_path: "match-arms".to_string(),
+                        kind: SplitKind::DeepestNesting,
+                        recommended: true,
+                    }],
+                    applicability: Applicability::default(),
+                },
+            ],
+            root_cause: RootCause::Both,
+        }));
+
+        let mut moderate = make_verdict("parse_record", "src/adapters/coverage/mod.rs", 80, 145);
+        moderate.scored.crap.value = 15.00;
+        moderate.scored.crap.risk_level = RiskLevel::Moderate;
+        moderate.diagnostic = Some(Box::new(Diagnostic {
+            coverage_gaps: vec![],
+            complexity_drivers: vec![],
+            suggested_actions: vec![
+                SuggestedAction::SimplifyBranching {
+                    drivers: vec![ContributorKind::Match, ContributorKind::MatchArm],
+                    applicability: Applicability::default(),
+                },
+                SuggestedAction::AcceptInherentComplexity {
+                    applicability: Applicability::default(),
+                },
+            ],
+            root_cause: RootCause::HighComplexity,
+        }));
+
+        let mut bare = make_verdict("opaque_helper", "src/util.rs", 30, 42);
+        bare.scored.crap.value = 8.50;
+        bare.scored.crap.risk_level = RiskLevel::Acceptable;
+        // No diagnostic populated — exercises the `none` sentinel branch.
+
+        let result = make_result(vec![high, moderate, bare]);
+        let view = view::apply(&result, ViewSpec::default());
+        let mut sink = Vec::new();
+        render_summary(&view, &mut sink).unwrap();
+        let out = String::from_utf8(sink).unwrap();
+        insta::assert_snapshot!(out);
     }
 }

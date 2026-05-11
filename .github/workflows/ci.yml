@@ -364,12 +364,22 @@ jobs:
     # false-positive on serde_derive's proc-macro chain or require a
     # fragile, ever-growing wrapper list — see deny.toml's "AST-library
     # policy" comment for the full rationale.
+    #
+    # Hardened in #145 with two additional checks:
+    #   - Grouped-import multi-line regex (catches `use { syn::Foo };`
+    #     and the multi-line `use {\n    syn::Item,\n};` form that the
+    #     original leading-token regex misses).
+    #   - Direct-dependency `cargo metadata --no-deps` check (catches
+    #     `syn = "2.0"` being added to crates/crap-core/Cargo.toml).
+    #
+    # No untrusted input is interpolated into any `run:` block; every
+    # regex / jq expression is a literal static string.
     name: crap-core AST-library purity
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Reject AST-library imports in crap-core
+      - name: Reject AST-library imports in crap-core (leading-token form)
         # Scope: crap-core ONLY. oxc/swc imports are legitimate in
         # crates/crap4ts/ once that lands; crap4rs uses syn. Do NOT
         # widen the path below to `crates/*/src/` — that would reject
@@ -386,11 +396,51 @@ jobs:
         #     positives like `use syntactic_analysis::X`.
         run: |
           set -euo pipefail
-          if grep -rE '^[[:space:]]*(use|extern[[:space:]]+crate)[[:space:]]+(::)?(syn|quote|proc_macro2?|tree_sitter|swc|oxc)([_:; ]|$)' crates/crap-core/src/; then
-            echo "::error::crap-core must not import AST libraries — see CLAUDE.md and shaping.md"
+          if grep -rnE '^[[:space:]]*(use|extern[[:space:]]+crate)[[:space:]]+(::)?(syn|quote|proc_macro2?|tree_sitter|swc|oxc)([_:; ]|$)' crates/crap-core/src/; then
+            echo "::error::crap-core must not import AST libraries (leading-token form, e.g. \`use syn::Foo;\`) — see CLAUDE.md and shaping.md"
             exit 1
           fi
-          echo "crap-core is AST-library-pure"
+          echo "crap-core leading-token imports: clean"
+      - name: Reject AST-library imports in crap-core (grouped-import form)
+        # Catches `use { syn::Foo };` and the multi-line variant
+        # `use {\n    syn::Item,\n};` which the leading-token regex
+        # above misses (since the first token after `use` is `{`, not
+        # the banned crate). Uses ripgrep's multiline mode (-U) +
+        # PCRE2 for `\b` word boundaries. ripgrep ships on
+        # ubuntu-latest's default toolchain.
+        #
+        # The pattern bounds the match to a single `use { … }` block
+        # via `[^}]*`, so nested braces inside a different scope
+        # cannot drag a false-positive across statements.
+        run: |
+          set -euo pipefail
+          if rg -nU --pcre2 'use\s*\{[^}]*\b(syn|quote|proc_macro2?|tree_sitter|swc|oxc)\b' crates/crap-core/src/; then
+            echo "::error::crap-core must not import AST libraries (grouped-import form, e.g. \`use { syn::Foo };\`) — see CLAUDE.md and shaping.md"
+            exit 1
+          fi
+          echo "crap-core grouped imports: clean"
+      - name: Reject AST-library direct dependencies in crap-core/Cargo.toml
+        # `cargo metadata --no-deps` lists workspace packages with
+        # their declared dependencies but does NOT resolve the
+        # transitive graph — so serde_derive's transitive `syn` does
+        # not false-positive (the documented reason cargo-deny
+        # transitive bans were rejected; see shaping.md "Patterns
+        # NOT copied" #3). Caught case: someone adds
+        # `syn = "2.0"` directly to crates/crap-core/Cargo.toml.
+        run: |
+          set -euo pipefail
+          banned=$(cargo metadata --format-version 1 --no-deps |
+            jq -r '
+              .packages[] |
+              select(.name == "crap-core") |
+              .dependencies[] |
+              select(.name | test("^(syn|quote|proc-macro2|tree-sitter|swc|oxc)$")) |
+              .name')
+          if [ -n "$banned" ]; then
+            echo "::error::crap-core declares banned direct dependency: $banned (see CLAUDE.md and shaping.md)"
+            exit 1
+          fi
+          echo "crap-core direct dependencies: clean"
 
   docs:
     name: cargo doc (warnings as errors)

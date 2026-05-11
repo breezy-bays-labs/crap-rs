@@ -1,0 +1,8 @@
+---
+source: crates/crap-core/src/adapters/reporters/advice_summary.rs
+assertion_line: 271
+expression: out
+---
+[crap=45.20] src/cli/mod.rs:600-720 complex_handler [actions: add_tests_for_lines,extract_function]
+[crap=15.00] src/adapters/coverage/mod.rs:80-145 parse_record [actions: simplify_branching,accept_inherent_complexity]
+[crap=8.50] src/util.rs:30-42 opaque_helper [actions: none]
