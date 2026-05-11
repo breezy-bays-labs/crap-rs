@@ -48,7 +48,8 @@ use crap4rs::adapters::baseline::{load, BaselineSnapshot, BaselineError};
 Symbols that originally lived in `crap4rs` but now live in `crap-core`
 will require a direct `crap-core` dependency. The full list of types
 slated for narrowing is in the PR body for v0.5.0
-([crap4rs#138](https://github.com/breezy-bays-labs/crap4rs/pull/<S6>)),
+([crap4rs#156](https://github.com/breezy-bays-labs/crap4rs/pull/156),
+which closes [#138](https://github.com/breezy-bays-labs/crap4rs/issues/138)),
 but the headline categories are:
 
 | Category | v0.4 path | v0.5.0 path (still works) | Recommended v0.5.0+ path |

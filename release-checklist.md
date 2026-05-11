@@ -34,8 +34,9 @@ symbol, record one of three dispositions:
   v0.5+ symbol; the alias drops at the next major.
 
 The full audit table for the v0.5.0 release lives in the PR body for
-[crap4rs#138](https://github.com/breezy-bays-labs/crap4rs/pull/<S6>) —
-copy that format for future audits. The audit is a CAO C2
+[crap4rs#156](https://github.com/breezy-bays-labs/crap4rs/pull/156)
+(which closes [#138](https://github.com/breezy-bays-labs/crap4rs/issues/138))
+— copy that format for future audits. The audit is a CAO C2
 future-proofing gate; library consumers read the resulting table to
 plan their migration ahead of the next major.
 
@@ -176,8 +177,16 @@ keeps its own `version`. Do not attempt to centralize it under
 
 ## Cross-references
 
-- `~/.claude/projects/-Users-cmbays-github-crap4rs/memory/feedback_release_tag_merge_commit.md`
-  — origin story of the tag-ordering rule (v0.4.0 misfire, 2026-05-04).
+- The tag-ordering rule has a documented origin: the v0.4.0 release on
+  2026-05-04, where the `v0.4.0` tag landed at the last commit before
+  PR [#127](https://github.com/breezy-bays-labs/crap4rs/pull/127)
+  merged (Cargo.toml = 0.3.0 at the tagged commit). The release
+  workflow built 0.3.0 binaries labelled as v0.4.0, uploaded them to
+  the v0.4.0 GitHub release, and `cargo publish` errored with
+  "version already exists." Recovery: delete release + tag, re-tag the
+  merge commit, push tag, workflow re-fires correctly. Encoded in the
+  "Standard release sequence" and "Release-with-rename sequence"
+  blocks above so future cuts don't repeat it.
 - `CHANGELOG.md` — entries follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 - `MIGRATION.md` — per-release migration notes for `cargo add crap4rs`
   library consumers.
