@@ -63,11 +63,11 @@ fn format_actions(verdict: &FunctionVerdict) -> String {
 
 fn action_kind_label(action: &crate::domain::diagnostic::SuggestedAction) -> &'static str {
     use crate::domain::diagnostic::SuggestedAction::*;
-    // `SuggestedAction` is `#[non_exhaustive]` paused per D10 amendment
-    // (#147 restores at v1.0). Now that this reporter lives in crap-core
+    // `SuggestedAction` has `#[non_exhaustive]` paused per ADR D10
+    // (restored at v1.0). Now that this reporter lives in crap-core
     // alongside the enum, the match is in-crate and exhaustive — no
     // wildcard arm needed. v1.0 new variants will require explicit
-    // arms here; #147 covers that update path.
+    // arms here.
     match action {
         AddTestsForLines { .. } => "add_tests_for_lines",
         ExtractFunction { .. } => "extract_function",
@@ -202,10 +202,10 @@ mod tests {
         assert!(lines[1].contains("a_first"));
     }
 
-    /// Byte-level snapshot lock for the advice_summary reporter
-    /// (#142). The format is plain text with no ANSI / no
-    /// terminal-width dependency, so the snapshot is fully
-    /// deterministic by construction.
+    /// Byte-level snapshot lock for the advice_summary reporter.
+    /// The format is plain text with no ANSI / no terminal-width
+    /// dependency, so the snapshot is fully deterministic by
+    /// construction.
     ///
     /// Covers all four `SuggestedAction` variants (the entire
     /// `action_kind_label` match) plus the `[actions: none]` branch

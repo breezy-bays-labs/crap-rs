@@ -14,9 +14,9 @@ use std::fmt;
 /// SARIF reporters convert inclusive → exclusive end at serialization
 /// time; consumers of `SourceSpan` directly get the intuitive bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5: cli/core constructors live in
-// crap4rs through S3/S4 and need cross-crate struct-literal init.
-// Restored at v1.0 once those constructors land in crap-core.
+// `#[non_exhaustive]` paused for v0.5: cross-crate struct-literal
+// constructors need access to the field set. Restored at v1.0 once
+// constructors no longer cross crate boundaries.
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
@@ -388,13 +388,13 @@ pub struct AnalysisResult {
 /// Statistics about the analysis process, surfaced by `--verbose`.
 ///
 /// Generic over `P: ParseDiagnostic` so adapter-specific parse
-/// diagnostics (`LcovParseDiagnostic` in `crap4rs`, future
-/// `IstanbulParseDiagnostic` in `crap4ts`) thread through one shared
-/// shape. The numeric counts (`files_found`, `files_unparseable`,
-/// `functions_extracted`, `functions_matched`, `functions_no_coverage`,
-/// `files_analyzed`, `files_zero_coverage`) are language-agnostic; only
-/// the `parse_diagnostics` payload varies by adapter. Decomposition
-/// per CAO B2 + ADR D9 — see ADR D4 amendment (2026-05-09).
+/// diagnostics (e.g. `LcovParseDiagnostic`, `IstanbulParseDiagnostic`)
+/// thread through one shared shape. The numeric counts (`files_found`,
+/// `files_unparseable`, `functions_extracted`, `functions_matched`,
+/// `functions_no_coverage`, `files_analyzed`, `files_zero_coverage`)
+/// are language-agnostic; only the `parse_diagnostics` payload varies
+/// by adapter. Decomposition per CAO B2 + ADR D9 — see ADR D4
+/// amendment (2026-05-09).
 ///
 /// `#[serde(bound = "")]` suppresses serde's auto-generated
 /// `P: Serialize`/`P: Deserialize<'de>` bounds — the trait bound
@@ -403,12 +403,13 @@ pub struct AnalysisResult {
 /// owned-deserialize requirement and trip up trait resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-// `#[non_exhaustive]` paused for v0.5: cli/core in crap4rs construct
-// `AnalysisDiagnostics<LcovParseDiagnostic>` via struct literal until
-// they relocate to crap-core in S3/S4. Restored at v1.0.
+// `#[non_exhaustive]` paused for v0.5: adapter shims construct
+// `AnalysisDiagnostics<P>` via struct literal across crate boundaries
+// (e.g., the v0.4 LcovParseDiagnostic concretization). Restored at v1.0
+// once construction is funneled through a builder.
 pub struct AnalysisDiagnostics<P: crate::ports::ParseDiagnostic> {
     /// Non-fatal parse issues from the coverage parser. Concrete shape
-    /// is adapter-specific (LCOV-flavored for crap4rs).
+    /// is adapter-specific (e.g., LCOV-flavored for the Rust adapter).
     pub parse_diagnostics: Vec<P>,
     /// Number of source files discovered.
     pub files_found: usize,

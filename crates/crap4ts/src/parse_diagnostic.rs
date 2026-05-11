@@ -4,9 +4,9 @@
 //! the language-agnostic `AnalysisDiagnostics<P>` and `ParseOutput<P>`
 //! shapes. Mirrors `crap4rs::parse_diagnostic::LcovParseDiagnostic` —
 //! the variants are Istanbul-flavoured placeholders. The Istanbul JSON
-//! parser is a stub in S5, so these variants are not constructed by
-//! any code path today; they exist so the trait bound + serde
-//! envelope are real (not phantom) before the parser lands.
+//! parser is a stub today, so these variants are not constructed by
+//! any code path; they exist so the trait bound + serde envelope are
+//! real (not phantom) before the parser lands.
 
 use crap_core::ports::ParseDiagnostic;
 use serde::{Deserialize, Serialize};

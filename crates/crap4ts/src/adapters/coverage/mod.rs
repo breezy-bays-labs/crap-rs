@@ -37,9 +37,7 @@ impl CoveragePort for IstanbulCoverage {
     type Diagnostic = IstanbulParseDiagnostic;
 
     fn parse(&self, _data: &str) -> Result<ParseOutput<Self::Diagnostic>, CrapError> {
-        unimplemented!(
-            "Istanbul JSON parser lands in the typescript-adapter follow-up pipeline (see crap4rs#137)"
-        )
+        unimplemented!("Istanbul JSON parser lands in the typescript-adapter follow-up pipeline")
     }
 }
 

@@ -27,6 +27,31 @@ pub(crate) mod test_fixtures {
     };
     use crate::domain::view::{self, AnalysisView, ViewSpec};
 
+    /// Synthetic `tool_name` used by every in-crate reporter test.
+    ///
+    /// crap-core is adapter-agnostic — production callers supply
+    /// `env!("CARGO_PKG_NAME")` (`"crap4rs"`, `"crap4ts"`, …) from the
+    /// binary. Inside the library, tests assert behavior of the
+    /// parameterization itself, so a clearly synthetic placeholder
+    /// keeps snapshots deterministic, makes the abstraction obvious
+    /// to a reader of the snapshot, and forces an explicit choice if
+    /// a future change drifts back toward a hardcoded adapter name.
+    pub const TEST_TOOL_NAME: &str = "test-adapter";
+
+    /// Synthetic `tool_version`. Stays at `"0.4.0"` so version-string
+    /// snapshot diffs are confined to the `tool_name` parameterization
+    /// (i.e., only the prefix `"crap4rs v…"` → `"test-adapter v…"`
+    /// changes, not the version digits).
+    pub const TEST_TOOL_VERSION: &str = "0.4.0";
+
+    /// Synthetic `tool_info_uri` for SARIF tests. Used in place of the
+    /// previously-hardcoded `https://github.com/breezy-bays-labs/crap4rs`.
+    pub const TEST_TOOL_INFO_URI: &str = "https://example.com/test-adapter";
+
+    /// Synthetic `rule_help_uri` for SARIF tests. Used in place of the
+    /// previously-hardcoded `https://github.com/breezy-bays-labs/crap4rs#crap-formula`.
+    pub const TEST_RULE_HELP_URI: &str = "https://example.com/test-adapter#crap";
+
     /// Build a default-spec view from the given analysis. Convenience for
     /// reporter tests that just want to assert on the default-spec output
     /// (the V1a walking-skeleton invariant).

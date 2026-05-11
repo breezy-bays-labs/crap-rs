@@ -4,11 +4,11 @@
 //! This crate exposes the LCOV/`syn` adapter pipeline. Domain types,
 //! port traits, language-agnostic adapters (reporters, baseline, config,
 //! diff), the orchestrator (`core::analyze`), and the CLI dispatch shell
-//! (`cli`) all live in `crap_core` post-S4 (#136). The v0.4.0 public
-//! surface is preserved as `pub mod` shims that mirror the original
-//! module structure but re-export from `crap_core` (per ADR D10 —
-//! public-API shim-module pattern). v0.5.x library consumers' existing
-//! imports compile unchanged; v1.0 will narrow the shims.
+//! (`cli`) all live in `crap_core`. The v0.4.0 public surface is
+//! preserved here as `pub mod` shims that mirror the original module
+//! structure but re-export from `crap_core` (per ADR D10 — public-API
+//! shim-module pattern). v0.5.x library consumers' existing imports
+//! compile unchanged; v1.0 will narrow the shims.
 
 pub mod adapters;
 pub mod parse_diagnostic;
@@ -70,11 +70,12 @@ pub mod ports {
 }
 
 pub mod core {
-    //! v0.4 shim — relocated to `crap_core::core` in S4 (#136). The
-    //! orchestrator's signature gained `<P: ParseDiagnostic>` plus
-    //! injected `&dyn ComplexityPort` + `&dyn CoveragePort<Diagnostic
-    //! = P>` parameters; the v0.4 alias re-exports under the
-    //! LCOV-concretized name so existing consumers keep compiling.
+    //! v0.4 shim — `crap_core::core` is the new home. The
+    //! orchestrator's signature is generic over `<P: ParseDiagnostic>`
+    //! and takes injected `&dyn ComplexityPort` + `&dyn
+    //! CoveragePort<Diagnostic = P>` parameters; the v0.4 alias
+    //! re-exports under the LCOV-concretized name so existing
+    //! consumers keep compiling.
 
     pub use crap_core::core::AnalyzeOptions;
     pub use crap_core::core::analyze;
@@ -86,12 +87,12 @@ pub mod core {
 }
 
 pub mod cli {
-    //! v0.4 shim — relocated to `crap_core::cli` in S4 (#136). The
-    //! orchestrator `cli::run` gained `<P: ParseDiagnostic + Display>`
-    //! plus injected port parameters and threaded `tool_version` /
-    //! `long_version` strings (per S4 lesson 7 — env vars set by the
-    //! binary's build.rs don't reach crap-core's compile, so the
-    //! caller passes them at runtime). The bare path
+    //! v0.4 shim — `crap_core::cli` is the new home. The orchestrator
+    //! `cli::run` is generic over `<P: ParseDiagnostic + Display>` and
+    //! takes injected ports plus an `AdapterMeta` carrying caller-
+    //! supplied `tool_name` / `tool_version` / `long_version` strings
+    //! (env vars set by the binary's build.rs don't reach crap-core's
+    //! compile, so the binary passes them at runtime). The bare path
     //! `crap4rs::cli::Args` resolves through this shim.
 
     pub use crap_core::cli::{

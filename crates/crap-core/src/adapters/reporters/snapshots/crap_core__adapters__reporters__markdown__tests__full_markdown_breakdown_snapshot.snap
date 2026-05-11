@@ -1,8 +1,8 @@
 ---
-source: src/adapters/reporters/markdown.rs
+source: crates/crap-core/src/adapters/reporters/markdown.rs
 expression: out
 ---
-# crap4rs v0.4.0 — CRAP Score Analysis
+# test-adapter v0.4.0 — CRAP Score Analysis
 
 ## Summary
 

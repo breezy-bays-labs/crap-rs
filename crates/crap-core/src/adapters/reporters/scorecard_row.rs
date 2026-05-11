@@ -1,17 +1,15 @@
 //! Scorecard-row reporter — emits a single mokumo `Row::CrapDelta` JSON
-//! object to stdout. Issue #111.
+//! object to stdout.
 //!
 //! The wire shape mirrors mokumo's locked schema fragment at
 //! `breezy-bays-labs/mokumo/.config/scorecard/schema.json#/definitions/Row`
-//! (CrapDelta member of the `oneOf`, schema_version=2). We replicate the
-//! shape locally via private serde structs rather than depending on
-//! mokumo's `scorecard` crate so crap4rs stays mokumo-decoupled — the
-//! scorecard schema is the contract, not mokumo's Rust crate.
-//!
-//! See `~/Github/ops/pipelines/crap4rs/crap4rs-20260503-scorecard-row-rollout.md`
-//! for the V3-symmetric audit and Model P (producer-mints-status)
-//! rationale. The integration test at `tests/scorecard_row_integration.rs`
-//! validates output against a vendored copy of mokumo's schema.
+//! (CrapDelta member of the `oneOf`, schema_version=2). We replicate
+//! the shape locally via private serde structs rather than depending
+//! on mokumo's `scorecard` crate so the analyzer stays mokumo-
+//! decoupled — the scorecard schema is the contract, not mokumo's
+//! Rust crate. Model P (producer-mints-status) is the locked
+//! convention; integration tests in adapter crates validate output
+//! against a vendored copy of mokumo's schema.
 
 use serde::Serialize;
 
@@ -175,7 +173,7 @@ mod tests {
         assert_eq!(out1, out2, "format is deterministic");
     }
 
-    // ── Byte-level snapshot locks (#143) ───────────────────────────────
+    // ── Byte-level snapshot locks ───────────────────────────────
     //
     // Complement the existing `scorecard_row_integration.rs` schema
     // validation (which gates the shape against mokumo's

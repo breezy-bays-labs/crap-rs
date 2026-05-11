@@ -1,6 +1,6 @@
 //! crap4rs adapters — Rust-specific bindings + v0.4 backward-compat
 //! shims for the language-agnostic adapters that relocated to
-//! `crap_core::adapters` in S3 (#135).
+//! `crap_core::adapters` in the migration.
 //!
 //! Two families live here in source form:
 //! - **`complexity`**: `syn`-based AST walker that extracts

@@ -1,4 +1,6 @@
-//! Config file adapter — loads `crap4rs.toml` and converts to domain types.
+//! Config file adapter — loads the adapter's TOML config (file name
+//! supplied by the binary via `AdapterMeta::config_file_name`) and
+//! converts to domain types.
 //!
 //! Handles TOML parsing and config file discovery. All CLI-representable
 //! options are supported. Per-path threshold overrides use glob patterns.
@@ -27,7 +29,7 @@ pub struct FileConfig {
     pub src: Option<PathBuf>,
     pub exclude: Option<Vec<String>>,
     pub overrides: Vec<ThresholdOverride>,
-    /// Saved view presets keyed by preset name (issue #80).
+    /// Saved view presets keyed by preset name.
     ///
     /// Each `[views.<name>]` block in TOML deserializes into a
     /// [`ViewPreset`]; the CLI layer resolves `--view <name>` against
@@ -36,7 +38,7 @@ pub struct FileConfig {
     pub views: HashMap<String, ViewPreset>,
 }
 
-/// Saved view preset (issue #80).
+/// Saved view preset.
 ///
 /// All fields are optional — `None` means "preset does not assert this
 /// field, defer to CLI / defaults." Booleans are `Option<bool>` so the
@@ -93,15 +95,16 @@ struct RawViewPreset {
 
 // ── Public API ─────────────────────────────────────────────────────
 
-/// Default config file name.
-pub const CONFIG_FILE_NAME: &str = "crap4rs.toml";
-
-/// Discover the config file in the current working directory.
+/// Discover the adapter's config file in the current working directory.
 ///
-/// Returns `Ok(Some(path))` if `crap4rs.toml` exists, `Ok(None)` if absent.
+/// `name` is the adapter-specific file name (e.g., `"crap4rs.toml"` for
+/// the Rust adapter; `"crap4ts.toml"` for the TS adapter). Supplied by
+/// the binary via `AdapterMeta.config_file_name`.
+///
+/// Returns `Ok(Some(path))` if the file exists, `Ok(None)` if absent.
 /// Returns `Err` on permission errors or other filesystem failures.
-pub fn discover_config() -> Result<Option<PathBuf>> {
-    let path = PathBuf::from(CONFIG_FILE_NAME);
+pub fn discover_config(name: &str) -> Result<Option<PathBuf>> {
+    let path = PathBuf::from(name);
     match std::fs::metadata(&path) {
         Ok(m) if m.is_file() => Ok(Some(path)),
         Ok(_) => Ok(None), // exists but not a file (directory, symlink to dir, etc.)
@@ -225,7 +228,7 @@ fn parse_group_key(preset_name: &str, s: &str) -> Result<GroupKey> {
 }
 
 /// Validate the preset's coverage bounds in isolation (fail-fast at config
-/// load per issue #80). Either-side-only is allowed and the absent side is
+/// load). Either-side-only is allowed and the absent side is
 /// defaulted to `0` / `100` for the relational check, mirroring CLI
 /// `validate_view_args` so a preset that would resolve to an invalid range
 /// is rejected at TOML parse time rather than at `--view` resolution.
@@ -239,11 +242,11 @@ fn validate_preset_coverage_range(
     }
     let lo = min.unwrap_or(0.0);
     let hi = max.unwrap_or(100.0);
-    // `CoverageRangeError` is `#[non_exhaustive]` paused per D10
-    // amendment (#147 restores at v1.0). Now that this adapter lives in
-    // crap-core alongside the enum, the match is in-crate and
-    // exhaustive — no wildcard arm needed. v1.0 new variants will
-    // require an explicit arm here.
+    // `CoverageRangeError` has `#[non_exhaustive]` paused per ADR D10
+    // (restored at v1.0). Now that this adapter lives in crap-core
+    // alongside the enum, the match is in-crate and exhaustive — no
+    // wildcard arm needed. v1.0 new variants will require an
+    // explicit arm here.
     match CoverageRange::new(lo, hi) {
         Ok(_) => Ok(()),
         Err(CoverageRangeError::OutOfRange { value }) => anyhow::bail!(
@@ -475,7 +478,7 @@ threshold = 0.0
         assert!(err.to_string().contains("failed to parse config file"));
     }
 
-    // ── ViewPreset tests (issue #80) ───────────────────────────────────
+    // ── ViewPreset tests ───────────────────────────────────
 
     #[test]
     fn parse_no_views_table_yields_empty_map() {

@@ -1,6 +1,5 @@
 ---
 source: crates/crap-core/tests/wire_envelope_snapshot.rs
-assertion_line: 94
 expression: pretty
 ---
 {
@@ -5232,9 +5231,9 @@ expression: pretty
             "qualified_name": "main",
             "span": {
               "end_column": 1,
-              "end_line": 23,
+              "end_line": 94,
               "start_column": 1,
-              "start_line": 14
+              "start_line": 72
             }
           }
         },
@@ -10645,9 +10644,9 @@ expression: pretty
             "qualified_name": "main",
             "span": {
               "end_column": 1,
-              "end_line": 23,
+              "end_line": 94,
               "start_column": 1,
-              "start_line": 14
+              "start_line": 72
             }
           }
         },

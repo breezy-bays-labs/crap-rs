@@ -1,6 +1,5 @@
 ---
 source: crates/crap-core/src/adapters/reporters/html.rs
-assertion_line: 662
 expression: html
 ---
 <!DOCTYPE html>
@@ -8,7 +7,7 @@ expression: html
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>crap4rs v0.4.0 — CRAP Score Analysis</title>
+<title>test-adapter v0.4.0 — CRAP Score Analysis</title>
 <style>
 
 :root {
@@ -168,7 +167,7 @@ details.contributors ul {
 </head>
 <body>
 <header>
-<h1>crap4rs v0.4.0 — CRAP Score Analysis</h1>
+<h1>test-adapter v0.4.0 — CRAP Score Analysis</h1>
 <p class="threshold">Threshold: <strong>8.00</strong></p>
 </header>
 <section class="summary">

@@ -16,11 +16,10 @@ use serde::Serialize;
 
 /// Configuration for the JSON envelope metadata.
 ///
-/// Generic over `P: ParseDiagnostic` — relocated to crap-core in S3
-/// (#135), where `AnalysisDiagnostics<P>` is generic across adapters.
-/// crap4rs concretizes via the `JsonConfig<'a>` type alias in
-/// `crap4rs::adapters::reporters::json` so v0.4 callers' type paths
-/// stay byte-identical.
+/// Generic over `P: ParseDiagnostic` since `AnalysisDiagnostics<P>`
+/// is generic across adapters. crap4rs concretizes via the
+/// `JsonConfig<'a>` type alias in `crap4rs::adapters::reporters::json`
+/// so v0.4 callers' type paths stay byte-identical.
 #[derive(Debug)]
 pub struct JsonConfig<'a, P: ParseDiagnostic> {
     pub tool_version: String,
@@ -64,9 +63,9 @@ pub struct DeltaContext<'a, P: ParseDiagnostic> {
 ///   threshold, diff_ref, result, view
 /// Per ADR D2 the schema is additive across minor versions; the
 /// `schema_version` bump from 1 → 2 in 0.4.0 reflects the
-/// `ComplexityContributor.column` 0-based → 1-based convention shift
-/// (#107). Older v1 baselines remain loadable for delta reporting
-/// (matching is identity-keyed, not column-keyed).
+/// `ComplexityContributor.column` 0-based → 1-based convention shift.
+/// Older v1 baselines remain loadable for delta reporting (matching
+/// is identity-keyed, not column-keyed).
 #[derive(Serialize)]
 #[serde(bound = "")]
 struct JsonEnvelope<'a, P: ParseDiagnostic> {
@@ -209,8 +208,8 @@ mod tests {
     /// Concrete `P` for in-module tests — the JSON reporter's behavior
     /// is `P`-agnostic for the cases asserted here (no test reaches
     /// into per-variant fields of a parse diagnostic). Pinning to the
-    /// dummy stub keeps the assertions byte-identical to crap4rs's
-    /// pre-S3 unit suite.
+    /// dummy stub decouples these tests from any specific adapter's
+    /// diagnostic shape.
     type TestJsonConfig = JsonConfig<'static, DummyParseDiagnostic>;
 
     fn default_config() -> TestJsonConfig {
@@ -557,10 +556,9 @@ mod tests {
         // through regardless of how `parse_diagnostics` flatten. The
         // LCOV-specific per-variant wire shape is asserted in the
         // crap4rs-side companion test
-        // `tests/json_reporter_lcov_diagnostics.rs::diagnostics_included_when_present`
-        // (relocated in S3 — moved with the reporter so the LCOV
-        // assertion lives next to LcovParseDiagnostic, not in
-        // crap-core which is `P`-generic).
+        // `tests/json_reporter_lcov_diagnostics.rs::diagnostics_included_when_present`,
+        // which lives next to LcovParseDiagnostic rather than in
+        // crap-core (which is `P`-generic).
         use crate::domain::types::AnalysisDiagnostics;
 
         let diag: AnalysisDiagnostics<DummyParseDiagnostic> = AnalysisDiagnostics {

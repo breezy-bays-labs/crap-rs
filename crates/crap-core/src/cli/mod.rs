@@ -3,11 +3,11 @@
 //! Parses args with clap, validates inputs, delegates to `core::analyze()`.
 //! No business logic lives here.
 //!
-//! Relocated from `crap4rs::cli` in S4 (#136). The orchestrator
 //! `cli::run<P>` is generic over the coverage adapter's parse-diagnostic
-//! type so the same dispatch shell drives every adapter binary
-//! (`crap4rs`, future `crap4ts`). Per-binary main.rs supplies the
-//! complexity + coverage ports as `&dyn` trait objects (ADR D9).
+//! type so the same dispatch shell drives every adapter binary. The
+//! per-binary main.rs supplies the complexity + coverage ports as `&dyn`
+//! trait objects (ADR D9) plus an `AdapterMeta` carrying the binary's
+//! name, version, help copy, extensions, and config-file name.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -69,11 +69,11 @@ pub enum FormatArg {
     /// Agent-oriented JSON with Diagnostic remediation hints (experimental)
     Advice,
     /// Single mokumo-scorecard `Row::CrapDelta` JSON object — for scorecard
-    /// aggregator consumption (mokumo schema_version=2). Issue #111.
+    /// aggregator consumption (mokumo schema_version=2).
     ScorecardRow,
     /// Self-contained HTML dashboard with summary stats, risk
     /// distribution, and per-file collapsible function tables. Inline
-    /// CSS, no external assets, mobile-responsive. Issue #71.
+    /// CSS, no external assets, mobile-responsive.
     Html,
 }
 
@@ -81,7 +81,7 @@ pub enum FormatArg {
 ///
 /// Parsed from `--format X` (stdout) or `--format X:FILE` (write to file).
 /// `--format` accepts a comma-separated list of these specs so a single
-/// analysis pass can fan out to multiple shapes (issue #100).
+/// analysis pass can fan out to multiple shapes.
 #[derive(Debug, Clone)]
 pub struct FormatSpec {
     pub format: FormatArg,
@@ -108,7 +108,7 @@ fn parse_format_spec(s: &str) -> Result<FormatSpec, String> {
     s.parse()
 }
 
-/// Sort key for the displayed view (issue #68).
+/// Sort key for the displayed view.
 ///
 /// CLI-side wrapper that keeps `clap::ValueEnum` out of the domain.
 /// `From<SortKeyArg> for SortKey` is the boundary; `build_view_spec`
@@ -136,12 +136,12 @@ impl From<SortKeyArg> for SortKey {
     }
 }
 
-/// Reverse mapping for saved view presets (issue #80) — preset stores
+/// Reverse mapping for saved view presets — preset stores
 /// domain `SortKey`, but `FilterArgs.sort_by` is the clap-side wrapper.
 ///
 /// `SortKey` is `#[non_exhaustive]` for cross-crate consumers, but
-/// post-S4 (#136) the cli module lives in the same crate as the domain
-/// `SortKey` definition, so the compiler treats the match as exhaustive
+/// the cli module lives in the same crate as the domain `SortKey`
+/// definition, so the compiler treats the match as exhaustive
 /// without a wildcard arm. New domain variants must still land with a
 /// paired CLI variant in the same PR — clippy's missing-pattern error
 /// is now the loud failure point (the formerly-required wildcard arm
@@ -157,7 +157,7 @@ impl From<SortKey> for SortKeyArg {
     }
 }
 
-/// Group key for the displayed view (issue #64).
+/// Group key for the displayed view.
 ///
 /// Today only `file` is supported. The wrapper keeps `clap::ValueEnum`
 /// out of the domain; `From<GroupByArg> for GroupKey` is the boundary.
@@ -175,8 +175,8 @@ impl From<GroupByArg> for GroupKey {
     }
 }
 
-/// Reverse mapping for saved view presets (issue #80). See `From<SortKey>`
-/// above for the wildcard-arm rationale (post-S4 in-crate exhaustive).
+/// Reverse mapping for saved view presets. See `From<SortKey>`
+/// above for the wildcard-arm rationale.
 impl From<GroupKey> for GroupByArg {
     fn from(key: GroupKey) -> Self {
         match key {
@@ -185,7 +185,7 @@ impl From<GroupKey> for GroupByArg {
     }
 }
 
-/// Sort key for the delta block (issue #81).
+/// Sort key for the delta block.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum DeltaSortKeyArg {
     /// Magnitude of change descending — regressions first (default)
@@ -210,7 +210,7 @@ impl From<DeltaSortKeyArg> for crate::domain::delta::DeltaSortKey {
     }
 }
 
-/// Change-kind subset for `--delta-only` (issue #81).
+/// Change-kind subset for `--delta-only`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum DeltaKindArg {
     Added,
@@ -243,7 +243,7 @@ pub enum ColorArg {
 
 // ── Arg groups ──────────────────────────────────────────────────────
 
-/// Shell name for completion script generation (#69).
+/// Shell name for completion script generation.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ShellArg {
     Bash,
@@ -254,8 +254,8 @@ pub enum ShellArg {
     Nushell,
 }
 
-/// Top-level subcommands. Optional — when absent, crap4rs runs the
-/// default analysis path that requires `--coverage`.
+/// Top-level subcommands. Optional — when absent, the analyzer runs
+/// the default analysis path that requires `--coverage`.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Generate a shell completion script to stdout.
@@ -268,12 +268,12 @@ pub enum Command {
 #[derive(Debug, Args)]
 #[command(next_help_heading = "Input")]
 pub struct InputArgs {
-    /// Path to LCOV coverage file (from `cargo llvm-cov --lcov`).
-    /// Required for analysis; not required for `crap4rs completions`.
+    /// Path to the coverage file (adapter-specific format).
+    /// Required for analysis; not required for the `completions` subcommand.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
     pub coverage: Option<PathBuf>,
 
-    /// Root directory of Rust source files to analyze [default: src]
+    /// Root directory of source files to analyze [default: src]
     #[arg(long, value_name = "DIR", value_hint = ValueHint::DirPath)]
     pub src: Option<PathBuf>,
 
@@ -281,11 +281,11 @@ pub struct InputArgs {
     #[arg(long, value_enum)]
     pub metric: Option<MetricArg>,
 
-    /// Path to config file (default: auto-discover crap4rs.toml)
+    /// Path to config file (default: auto-discover the adapter's config TOML)
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
     pub config: Option<PathBuf>,
 
-    /// Resolve and apply a saved view preset from `crap4rs.toml`.
+    /// Resolve and apply a saved view preset from the adapter's config TOML.
     ///
     /// The preset's fields (`top`, `min_coverage`, `max_coverage`, `sort`,
     /// `only_failing`, `no_fail`, `group_by`, `minimal_view`) are folded
@@ -296,14 +296,14 @@ pub struct InputArgs {
     #[arg(long, value_name = "NAME")]
     pub view: Option<String>,
 
-    /// Path to a previously-emitted crap4rs JSON envelope, used as the
-    /// baseline for delta analysis.
+    /// Path to a previously-emitted JSON envelope, used as the baseline
+    /// for delta analysis.
     ///
-    /// Crap4rs runs the current analysis as usual, then compares against
-    /// the baseline's `result` block to produce a `delta` block in the
-    /// output (see `--format json`, `--format markdown` for rendering).
-    /// Generate the baseline file by piping a previous run:
-    /// `crap4rs --coverage lcov.info --format json > baseline.json`.
+    /// The analyzer runs the current analysis as usual, then compares
+    /// against the baseline's `result` block to produce a `delta` block
+    /// in the output (see `--format json`, `--format markdown` for
+    /// rendering). Generate the baseline file by piping a previous run:
+    /// `<binary> --coverage <file> --format json > baseline.json`.
     ///
     /// **Delta is informational by default.** Pass `--delta-gate` to
     /// make the delta contribute to the exit code (fails on new
@@ -322,7 +322,7 @@ pub struct OutputArgs {
     /// destinations (`--format json:envelope.json,markdown:report.md`).
     /// Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file).
     /// Multi-format invocations require every entry to specify a file —
-    /// stdout cannot multiplex (issue #100).
+    /// stdout cannot multiplex.
     #[arg(
         short,
         long,
@@ -403,7 +403,7 @@ pub struct FilterArgs {
     /// Git ref to diff against — only analyze functions in changed files/hunks
     ///
     /// Scopes analysis to functions in files that changed since the given ref.
-    /// Useful for CI PR gating: `crap4rs --coverage lcov.info --diff main`
+    /// Useful for CI PR gating: `<binary> --coverage <file> --diff main`
     #[arg(long, value_name = "REF")]
     pub diff: Option<String>,
 
@@ -538,70 +538,38 @@ pub struct DisplayArgs {
 
 // ── Top-level CLI ───────────────────────────────────────────────────
 
-// `long_version` is overridden at runtime in `cli::run` so the binary's
-// build script (`crap4rs/build.rs`) can splice the git hash + build date
-// into the Rust adapter's `--version` output without forcing crap-core
-// to read an env var that's only set during crap4rs's compile. The
-// derive's `version` here resolves to the **adapter** crate's
-// `CARGO_PKG_VERSION` because clap captures the env at the macro
-// expansion site — that's the binary crate's version when compiling
-// the binary, but the lib crate's version when compiling the lib.
-// Production callers always reach `cli::run` through the binary, so
-// `--version` displays the adapter's version. Tests that go through
+// `long_version` is overridden at runtime in `cli::run` so each binary's
+// build script can splice the git hash + build date into its `--version`
+// output without forcing crap-core to read an env var that's only set
+// during the binary's compile. The derive's `version` here resolves to
+// the **adapter** crate's `CARGO_PKG_VERSION` because clap captures the
+// env at the macro expansion site — that's the binary crate's version
+// when compiling the binary, but the lib crate's version when compiling
+// the lib. Production callers always reach `cli::run` through the binary,
+// so `--version` displays the adapter's version. Tests that go through
 // the lib see crap-core's version, which is fine for tests.
 //
-// Threading per S4 lesson 7 (tool-version threading): consumer-visible
-// version strings flow as parameters from the bin where `env!` resolves
-// against the bin's package, not against this module's home crate.
+// Consumer-visible version strings flow as parameters via `AdapterMeta`
+// from the binary where `env!` resolves against the bin's package, not
+// against this module's home crate.
 
+// `about` / `long_about` / `after_help` are intentionally generic
+// here — adapter-flavored copy (language name, AST library, coverage
+// toolchain, runnable examples) is injected at runtime by
+// `build_command` from `AdapterMeta`. Library tests that
+// `try_parse_from` `Cli` directly see this generic default; the
+// binary always overrides.
 #[derive(Debug, Parser)]
 #[command(
     version,
     author,
-    about = "CRAP score analyzer for Rust",
-    long_about = "CRAP (Change Risk Anti-Patterns) score analyzer for Rust codebases.\n\n\
-                  Combines complexity analysis (via syn) with line coverage data \
-                  (LCOV from cargo-llvm-cov) to identify functions that are both \
-                  complex and under-tested.\n\n\
-                  Default metric is cognitive complexity (not cyclomatic), which \
-                  better captures Rust idioms like match arms and nested control flow.",
-    after_help = "\
-EXAMPLES:
-  crap4rs --coverage lcov.info
-  crap4rs --coverage lcov.info --threshold 15 --metric cyclomatic
-  crap4rs --coverage lcov.info --format json | jq '.functions[] | select(.exceeds)'
-  crap4rs --coverage lcov.info --only-failing
-  crap4rs --coverage lcov.info --exclude \"tests/**\" --exclude \"benches/**\"
-
-INVESTIGATION PATTERNS:
-  # First-run scan: keep the report short
-  crap4rs --coverage lcov.info --top 20
-
-  # Worst partially-covered functions, sorted by coverage ascending,
-  # never fail the build — useful when investigating an untested codebase
-  crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail
-
-  # Saved view preset: bake a flag set under [views.ci] in crap4rs.toml,
-  # then invoke it by name. CLI flags override preset values.
-  crap4rs --coverage lcov.info --view ci
-
-  # GitHub Code Scanning: emit SARIF and let upload-sarif annotate the PR
-  # diff inline. Use --no-fail so the gate exit code doesn't skip the
-  # upload step on regressions.
-  crap4rs --coverage lcov.info --format sarif --no-fail > crap.sarif
-
-COMPARING TWO ANALYSES (issue #81):
-  # Capture a baseline (e.g., from main):
-  crap4rs --coverage lcov.info --format json > baseline.json
-
-  # Then compare the working tree to it (informational by default):
-  crap4rs --coverage lcov.info --baseline baseline.json
-
-  # CI usage: fail the build when new threshold violations land
-  crap4rs --coverage lcov.info --baseline baseline.json --delta-gate
-
-  # PR-comment scorecard (markdown — drop into the comment body verbatim)
-  crap4rs --coverage lcov.info --baseline baseline.json --format markdown"
+    about = "CRAP score analyzer",
+    long_about = "CRAP (Change Risk Anti-Patterns) score analyzer. \
+                  Combines complexity analysis with line-coverage data to \
+                  identify functions that are both complex and under-tested. \
+                  Adapter-specific binaries (crap4rs for Rust, crap4ts for \
+                  TypeScript) wire language-specific complexity walkers and \
+                  coverage parsers behind the same orchestrator."
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -622,6 +590,73 @@ pub struct Cli {
 
 // ── Entry point ─────────────────────────────────────────────────────
 
+/// Adapter-supplied runtime metadata that crap-core threads through
+/// `parse_args`, `run`, and the reporter call sites.
+///
+/// Carried by reference, so all fields are `&'a str` / `&'a [&'a str]`
+/// — the binary owns the storage (typically `env!(...)` literals or
+/// `build.rs`-stamped strings, all `'static`). The struct is `Copy`
+/// for trivial threading; clone-by-copy is fine because the borrows
+/// already point at the binary's static storage.
+///
+/// Reporters keep a flat `(tool_name, tool_version)` call boundary —
+/// the struct only travels through orchestration code.
+#[derive(Debug, Clone, Copy)]
+pub struct AdapterMeta<'a> {
+    /// Adapter binary name (e.g., `"crap4rs"`, `"crap4ts"`). Drives
+    /// clap's `--version` output, the `name` field in SARIF, and the
+    /// header line in table/markdown/html reporters.
+    pub tool_name: &'a str,
+    /// Short version string (e.g., `"0.5.0"`). Threaded to every
+    /// reporter alongside `tool_name`.
+    pub tool_version: &'a str,
+    /// Long version string for `--version --long` (e.g.,
+    /// `"0.5.0 (abc1234 2026-05-09)"`).
+    pub long_version: &'a str,
+    /// Short adapter-flavored help text (one-line, shown by `--help`).
+    pub about: &'a str,
+    /// Long adapter-flavored help text (multi-paragraph, shown by
+    /// `--help` in full mode).
+    pub long_about: &'a str,
+    /// `after_help` block with adapter-specific examples
+    /// (`crap4rs --coverage lcov.info ...` etc.). May be empty.
+    pub after_help: &'a str,
+    /// Coverage-tool hint shown when `--coverage` points at a file
+    /// with no `SF:` / `DA:` records. Adapter-specific because the
+    /// remediation depends on the coverage toolchain (Rust: `cargo
+    /// llvm-cov --lcov`; TS: `c8 --reporter=lcov`).
+    pub coverage_hint: &'a str,
+    /// File extensions the walker should pick up (e.g.,
+    /// `&["rs"]` for crap4rs; `&["ts","tsx","js","jsx","mjs","cjs"]`
+    /// for crap4ts). Carried as `&[&str]` so the binary can supply a
+    /// `&'static` literal slice; copied into `AnalyzeOptions.extensions`
+    /// at the orchestration boundary.
+    pub extensions: &'a [&'a str],
+    /// Adapter repo URL spliced into SARIF's
+    /// `runs[0].tool.driver.informationUri`. Adapter-specific so
+    /// crap4ts SARIF output links to crap4ts's repo, not crap4rs's.
+    pub tool_info_uri: &'a str,
+    /// Adapter rule-help URL spliced into SARIF's
+    /// `runs[0].tool.driver.rules[0].helpUri`. Adapter-specific for
+    /// the same reason as `tool_info_uri`.
+    pub rule_help_uri: &'a str,
+    /// Conventional config file name the adapter binary auto-discovers
+    /// in the working directory (e.g., `"crap4rs.toml"` for the Rust
+    /// adapter; `"crap4ts.toml"` for the TS adapter). Threaded through
+    /// to `discover_config` and surfaced in `--view <preset>`
+    /// error hints so users see the right file name to create.
+    pub config_file_name: &'a str,
+}
+
+impl<'a> AdapterMeta<'a> {
+    /// Allocate an owned `Vec<String>` from `extensions` for inclusion
+    /// in `AnalyzeOptions` (which owns its config rather than borrowing
+    /// from the meta, decoupling analysis lifetime from CLI lifetime).
+    pub fn extensions_owned(&self) -> Vec<String> {
+        self.extensions.iter().map(|e| (*e).to_string()).collect()
+    }
+}
+
 /// Parse process args into `Cli`, splicing the adapter's runtime
 /// metadata into clap's help / `--version` output.
 ///
@@ -630,65 +665,76 @@ pub struct Cli {
 /// those before `parse_args` returns). The adapter binary supplies its
 /// coverage adapter to `run` as a factory closure that's invoked once
 /// after CLI/config-file merging resolves the effective source root —
-/// pre-construction was the #150 footgun, since
-/// `cli.input.src` is the raw CLI value (`None` if the caller put
-/// `src = "…"` only in `crap4rs.toml`).
+/// pre-construction lets the coverage parser strip the wrong prefix
+/// from per-file records when `cli.input.src` is `None` because `src`
+/// came from the adapter's config TOML rather than the CLI.
 ///
-/// `tool_version` (e.g. `crap4rs`'s `0.5.0`) and `long_version`
-/// (e.g. `0.5.0 (abc1234 2026-05-09)`) are spliced into clap's help
-/// and `--version` output at runtime so the binary's build-script
-/// metadata reaches the help text — the derive macro's `version`
-/// reads `CARGO_PKG_VERSION` at lib-crate compile time (crap-core's
-/// `0.1.0`), and `CRAP4RS_LONG_VERSION` is only set during the
-/// binary's compile.
-///
-/// `clap::Command::{version,long_version}` take
-/// `IntoResettable<Str>` which implements `From<&'static str>` but
-/// not `From<String>`. The strings live for the program's lifetime,
-/// so leaking once at startup is the cheapest path that satisfies
-/// clap's expected lifetime. The leak is fixed-size and one-shot.
-pub fn parse_args(tool_version: &str, long_version: &str) -> Cli {
-    let cmd = build_command(tool_version, long_version);
+/// `AdapterMeta::{tool_version, long_version, about, long_about,
+/// after_help}` flow into clap's help / `--version` output at runtime
+/// so the binary's build-script metadata reaches the help text — the
+/// derive macro's `version` reads `CARGO_PKG_VERSION` at lib-crate
+/// compile time (crap-core's `0.1.0`); the adapter binary's own
+/// `CARGO_PKG_VERSION` and `<ADAPTER>_LONG_VERSION` only resolve in
+/// the binary's compile and reach us by parameter.
+pub fn parse_args(meta: &AdapterMeta<'_>) -> Cli {
+    let cmd = build_command(meta);
     let matches = cmd.get_matches();
     Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit())
 }
 
-/// Read the adapter binary's name from `argv[0]`. The clap-derive
-/// `Cli::command()` defaults to `CARGO_PKG_NAME` of the lib crate
-/// (crap-core) which would print `--version` lines as
-/// `crap-core 0.4.0 ...` and shape generated completion scripts to
-/// the wrong identifier; runtime detection ensures the displayed
-/// name matches whichever adapter binary (`crap4rs`, future
-/// `crap4ts`) actually ran.
-fn current_bin_name() -> String {
+/// Read the adapter binary's name from `argv[0]`, falling back to
+/// `meta.tool_name` when argv[0] is unavailable (extreme edge cases
+/// like execve with empty argv). The clap-derive `Cli::command()`
+/// defaults to `CARGO_PKG_NAME` of the lib crate (crap-core), which
+/// would print `--version` lines with the wrong identifier and shape
+/// generated completion scripts for the wrong binary; runtime
+/// detection ensures the displayed name matches whichever adapter
+/// binary actually ran.
+fn current_bin_name(meta_fallback: &str) -> String {
     std::env::args()
         .next()
         .and_then(|first| {
             // `file_stem()` (not `file_name()`) so Windows builds drop
-            // the `.exe` suffix — without it `--version` prints
-            // `crap4rs.exe 0.4.0` and breaks scripts (and the
-            // version-stamp integration tests) that match `^crap4rs `.
+            // the `.exe` suffix — without it `--version` would print
+            // `<binary>.exe <version>` and break scripts (and the
+            // version-stamp integration tests) that match `^<binary> `.
             // No-op on Linux/macOS.
             std::path::PathBuf::from(first)
                 .file_stem()
                 .map(|os| os.to_string_lossy().into_owned())
         })
-        .unwrap_or_else(|| "crap4rs".to_string())
+        .unwrap_or_else(|| meta_fallback.to_string())
 }
 
 /// Build the clap `Command` with the binary's runtime metadata
 /// spliced in. Used by `parse_args`; `emit_completions` reads the
 /// bin name through `current_bin_name` directly because
 /// `clap_complete::generate` takes the bin name as a separate arg.
-fn build_command(tool_version: &str, long_version: &str) -> clap::Command {
-    let bin_static: &'static str = Box::leak(current_bin_name().into_boxed_str());
-    let version_static: &'static str = Box::leak(tool_version.to_string().into_boxed_str());
-    let long_version_static: &'static str = Box::leak(long_version.to_string().into_boxed_str());
-    Cli::command()
+///
+/// `version` / `long_version` / `name` / `bin_name` go through
+/// `Box::leak` because clap 4.6.0's `clap::builder::Str` implements
+/// `From<&'static str>` but **not** `From<String>` — the strings must
+/// outlive the parsed `Command`, which lives for the program's
+/// lifetime. The leak is fixed-size (≤ 4 small strings) and one-shot
+/// at startup. `about` / `long_about` / `after_help` accept
+/// `Into<StyledStr>` directly so `String` works there without
+/// leaking.
+fn build_command(meta: &AdapterMeta<'_>) -> clap::Command {
+    let bin_static: &'static str = Box::leak(current_bin_name(meta.tool_name).into_boxed_str());
+    let version_static: &'static str = Box::leak(meta.tool_version.to_string().into_boxed_str());
+    let long_version_static: &'static str =
+        Box::leak(meta.long_version.to_string().into_boxed_str());
+    let mut cmd = Cli::command()
         .name(bin_static)
         .bin_name(bin_static)
         .version(version_static)
         .long_version(long_version_static)
+        .about(meta.about.to_string())
+        .long_about(meta.long_about.to_string());
+    if !meta.after_help.is_empty() {
+        cmd = cmd.after_help(meta.after_help.to_string());
+    }
+    cmd
 }
 
 /// Run the CRAP CLI pipeline end-to-end.
@@ -698,7 +744,7 @@ fn build_command(tool_version: &str, long_version: &str) -> clap::Command {
 /// *after* CLI / config-file / preset merging — pre-construction
 /// canonicalized against the bare CLI value (or the default `src`) and
 /// the LCOV parser silently stripped the wrong prefix from `SF:`
-/// records (#150). The factory is invoked once inside `run` after
+/// records. The factory is invoked once inside `run` after
 /// `merge_effective_inputs` resolves the final `src`, receives the
 /// **canonicalized** effective source root (so adapter factories stay
 /// dumb — orchestration owns the canonicalize concern), and is
@@ -712,22 +758,24 @@ fn build_command(tool_version: &str, long_version: &str) -> clap::Command {
 /// diagnostic types (`LcovParseDiagnostic`, `IstanbulParseDiagnostic`)
 /// satisfy it trivially.
 ///
-/// `tool_version` is the binary's own version (e.g. `crap4rs`'s
-/// `CARGO_PKG_VERSION` resolves to `0.5.0`, not crap-core's `0.1.0`).
-/// It feeds the JSON envelope's `tool_version` field, the SARIF run
-/// metadata, the markdown header, the HTML report header, and clap's
-/// long-version splice when the caller threads it through.
+/// `meta` carries the adapter binary's runtime identity (name,
+/// version, help copy, extensions, config-file name, SARIF URIs).
+/// The binary's own `tool_version` (e.g. crap4rs's `CARGO_PKG_VERSION`
+/// resolves to `0.5.0`, not crap-core's `0.1.0`) feeds the JSON
+/// envelope's `tool_version` field, the SARIF run metadata, the
+/// markdown / HTML headers, and clap's long-version splice. See
+/// `AdapterMeta` for the per-field rationale.
 pub fn run<P, F>(
     cli: Cli,
     complexity: &dyn ComplexityPort,
     coverage_factory: F,
-    tool_version: &str,
+    meta: &AdapterMeta<'_>,
 ) -> ExitCode
 where
     P: ParseDiagnostic + std::fmt::Display + 'static,
     F: FnOnce(&Path) -> Box<dyn CoveragePort<Diagnostic = P>>,
 {
-    match run_inner(cli, complexity, coverage_factory, tool_version) {
+    match run_inner(cli, complexity, coverage_factory, meta) {
         Ok(true) => ExitCode::from(0),
         Ok(false) => ExitCode::from(1),
         Err(e) => {
@@ -741,18 +789,18 @@ fn run_inner<P, F>(
     mut cli: Cli,
     complexity: &dyn ComplexityPort,
     coverage_factory: F,
-    tool_version: &str,
+    meta: &AdapterMeta<'_>,
 ) -> Result<bool>
 where
     P: ParseDiagnostic + std::fmt::Display + 'static,
     F: FnOnce(&Path) -> Box<dyn CoveragePort<Diagnostic = P>>,
 {
     if let Some(Command::Completions { shell }) = cli.command {
-        emit_completions(shell, &current_bin_name());
+        emit_completions(shell, &current_bin_name(meta.tool_name));
         return Ok(true);
     }
 
-    let prep = prepare_pipeline(&mut cli, complexity, coverage_factory)?;
+    let prep = prepare_pipeline(&mut cli, complexity, coverage_factory, meta)?;
 
     // Build the spec, then shape the result through the View pipeline.
     // V1b: `--only-failing` flows through `Filters::only_failing` here.
@@ -780,14 +828,14 @@ where
             prep.delta_state.as_ref(),
             &prep.analysis,
             &prep.inputs,
-            tool_version,
+            meta,
         )?;
     }
 
     // Exit code derives from `view.full.passed` — i.e., the underlying
     // analysis. The View shapes the display, never the gate.
     //
-    // Delta is informational by default (issue #81 §gate semantics).
+    // Delta is informational by default.
     // `--delta-gate` opts in: a passing analysis with delta regressions
     // that introduce new violations will exit 1 when `--delta-gate` is
     // set. `--no-fail` overrides BOTH gates — truth lives in JSON
@@ -848,18 +896,28 @@ fn merge_effective_inputs(cli: &Cli, file_config: &Option<FileConfig>) -> Effect
     }
 }
 
-fn validate_runtime_inputs<'a>(cli: &'a Cli, inputs: &EffectiveInputs) -> Result<&'a Path> {
+fn validate_runtime_inputs<'a>(
+    cli: &'a Cli,
+    inputs: &EffectiveInputs,
+    meta: &AdapterMeta<'_>,
+) -> Result<&'a Path> {
     // `--coverage` is required on the analysis path; subcommands like
     // `completions` skip this branch. Clap can't express "required
     // unless subcommand X" in derive, so we enforce it here.
     let Some(coverage_path) = cli.input.coverage.as_deref() else {
         bail!(
-            "--coverage <FILE> is required (run `crap4rs --help` for usage, or `crap4rs completions <SHELL>` for shell completion scripts)"
+            "--coverage <FILE> is required (run `{name} --help` for usage, or `{name} completions <SHELL>` for shell completion scripts)",
+            name = meta.tool_name,
         );
     };
 
-    validate_inputs(coverage_path, &inputs.src, inputs.threshold)?;
-    preflight_checks(coverage_path, &inputs.src)?;
+    validate_inputs(
+        coverage_path,
+        &inputs.src,
+        inputs.threshold,
+        meta.coverage_hint,
+    )?;
+    preflight_checks(coverage_path, &inputs.src, meta)?;
 
     if let Some(diff_ref) = cli.filter.diff.as_deref() {
         validate_diff_ref(diff_ref)?;
@@ -869,7 +927,12 @@ fn validate_runtime_inputs<'a>(cli: &'a Cli, inputs: &EffectiveInputs) -> Result
     Ok(coverage_path)
 }
 
-fn build_analyze_options(cli: &Cli, inputs: &EffectiveInputs, coverage: &Path) -> AnalyzeOptions {
+fn build_analyze_options(
+    cli: &Cli,
+    inputs: &EffectiveInputs,
+    coverage: &Path,
+    meta: &AdapterMeta<'_>,
+) -> AnalyzeOptions {
     AnalyzeOptions {
         src: inputs.src.clone(),
         coverage: coverage.to_path_buf(),
@@ -878,6 +941,7 @@ fn build_analyze_options(cli: &Cli, inputs: &EffectiveInputs, coverage: &Path) -
         exclude: inputs.exclude.clone(),
         respect_gitignore: !cli.filter.no_gitignore,
         diff_ref: cli.filter.diff.clone(),
+        extensions: meta.extensions_owned(),
         compute_diagnostics: cli
             .output
             .format
@@ -904,12 +968,14 @@ fn apply_diagnostics<P: ParseDiagnostic + std::fmt::Display>(
 ///
 /// Constructs the coverage adapter via `coverage_factory` *after*
 /// `merge_effective_inputs` resolves the final source root, so the
-/// LCOV parser strips the correct prefix from `SF:` records even when
-/// `src` comes from `crap4rs.toml` rather than the CLI (#150).
+/// coverage parser strips the correct prefix from per-file records
+/// even when `src` came from the adapter's config TOML rather than
+/// the CLI.
 fn prepare_pipeline<P, F>(
     cli: &mut Cli,
     complexity: &dyn ComplexityPort,
     coverage_factory: F,
+    meta: &AdapterMeta<'_>,
 ) -> Result<PipelinePrep<P>>
 where
     P: ParseDiagnostic + std::fmt::Display + 'static,
@@ -919,17 +985,17 @@ where
     apply_color(cli.display.color);
 
     // Load config file (explicit path or auto-discovered)
-    let file_config = load_file_config(cli)?;
+    let file_config = load_file_config(cli, meta.config_file_name)?;
 
-    // Resolve `--view <NAME>` (issue #80) before validate_view_args runs
+    // Resolve `--view <NAME>` before validate_view_args runs
     // so preset fields participate in the same validation pass as CLI
     // flags. `apply_preset_to_cli` mutates `cli` in place: CLI explicit
     // values win on `Option<T>` fields, bools OR-merge.
-    view_args::resolve_view_preset(cli, file_config.as_ref())?;
+    view_args::resolve_view_preset(cli, file_config.as_ref(), meta.config_file_name)?;
     view_args::validate_view_args(cli)?;
 
     let inputs = merge_effective_inputs(cli, &file_config);
-    let coverage_path = validate_runtime_inputs(cli, &inputs)?;
+    let coverage_path = validate_runtime_inputs(cli, &inputs, meta)?;
 
     // Canonicalize the effective `src` (post-config-merge) and hand
     // it to the adapter's factory closure. `validate_runtime_inputs`
@@ -940,12 +1006,12 @@ where
     let src_canonical = crate::core::canonicalize_src(&inputs.src);
     let coverage = coverage_factory(&src_canonical);
 
-    let options = build_analyze_options(cli, &inputs, coverage_path);
+    let options = build_analyze_options(cli, &inputs, coverage_path, meta);
 
     let analysis = crate::core::analyze(&options, complexity, &*coverage)?;
     apply_diagnostics(cli, &analysis.diagnostics);
 
-    // Resolve --baseline (issue #81): load a previously-emitted JSON
+    // Resolve --baseline: load a previously-emitted JSON
     // envelope and compute the AnalysisDelta. None when --baseline is
     // absent — the JSON envelope omits the `delta` block entirely so
     // existing consumers see byte-identical output.
@@ -967,7 +1033,7 @@ fn format_as_json<P: ParseDiagnostic>(
     delta_state: Option<&DeltaState<P>>,
     analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
-    tool_version: &str,
+    meta: &AdapterMeta<'_>,
 ) -> Result<String> {
     let delta_ctx = delta_state.zip(delta_view).map(|(s, dv)| DeltaContext {
         view: dv,
@@ -976,7 +1042,7 @@ fn format_as_json<P: ParseDiagnostic>(
         baseline_diagnostics: s.snapshot.diagnostics.as_ref(),
     });
     let config = reporters::json::JsonConfig {
-        tool_version: tool_version.to_string(),
+        tool_version: meta.tool_version.to_string(),
         metric: inputs.metric,
         threshold: inputs.threshold,
         timestamp: now_unix_epoch(),
@@ -989,7 +1055,7 @@ fn format_as_json<P: ParseDiagnostic>(
 }
 
 /// ScorecardRow projects the unshaped analysis + delta into a mokumo
-/// `Row::CrapDelta` JSON object (issue #111). View shaping does NOT
+/// `Row::CrapDelta` JSON object. View shaping does NOT
 /// alter scorecard-row — the aggregator consumes truth, not a filtered
 /// subset.
 fn format_as_scorecard_row<P: ParseDiagnostic>(
@@ -1008,8 +1074,8 @@ fn format_as_scorecard_row<P: ParseDiagnostic>(
     reporters::format_scorecard_row(&row_data)
 }
 
-// 8-arg dispatch is the cost of threading `<P>` + `tool_version` through
-// the format match without restructuring the per-reporter call sites
+// 8-arg dispatch is the cost of threading `<P>` + `meta` through the
+// format match without restructuring the per-reporter call sites
 // (which carry heterogeneous, irreducible signatures per `adapters.md`
 // rule 1). Bundling them into a context struct would shadow the per-arm
 // argument list that's the whole point of this match. Tracked under v1.0
@@ -1023,7 +1089,7 @@ fn render_format<P: ParseDiagnostic>(
     delta_state: Option<&DeltaState<P>>,
     analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
-    tool_version: &str,
+    meta: &AdapterMeta<'_>,
 ) -> Result<String> {
     Ok(match spec.format {
         FormatArg::Table => reporters::format_table_with_explain(
@@ -1032,17 +1098,12 @@ fn render_format<P: ParseDiagnostic>(
             inputs.threshold,
             cli.display.breakdown,
             cli.display.explain,
-            tool_version,
+            meta.tool_name,
+            meta.tool_version,
         ),
-        FormatArg::Json | FormatArg::Advice => format_as_json(
-            cli,
-            view,
-            delta_view,
-            delta_state,
-            analysis,
-            inputs,
-            tool_version,
-        )?,
+        FormatArg::Json | FormatArg::Advice => {
+            format_as_json(cli, view, delta_view, delta_state, analysis, inputs, meta)?
+        }
         FormatArg::Markdown => reporters::format_markdown(
             view,
             delta_view,
@@ -1051,7 +1112,8 @@ fn render_format<P: ParseDiagnostic>(
             cli.display.explain,
             cli.display.md_full_table,
             cli.display.md_top,
-            tool_version,
+            meta.tool_name,
+            meta.tool_version,
         ),
         FormatArg::Csv => reporters::format_csv(view, delta_view, inputs.metric),
         // SARIF is a gate translation, not a display: it iterates
@@ -1059,11 +1121,19 @@ fn render_format<P: ParseDiagnostic>(
         // was shaped. `--top`, `--sort-by`, `--only-failing`, and
         // `--baseline` do NOT alter SARIF output — PR annotations
         // must reflect truth.
-        FormatArg::Sarif => reporters::format_sarif(view, tool_version),
+        FormatArg::Sarif => reporters::format_sarif(
+            view,
+            meta.tool_name,
+            meta.tool_version,
+            meta.tool_info_uri,
+            meta.rule_help_uri,
+        ),
         FormatArg::ScorecardRow => {
             format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
         }
-        FormatArg::Html => reporters::format_html(view, inputs.threshold, tool_version),
+        FormatArg::Html => {
+            reporters::format_html(view, inputs.threshold, meta.tool_name, meta.tool_version)
+        }
     })
 }
 
@@ -1074,7 +1144,7 @@ fn print_formatted_output<P: ParseDiagnostic>(
     delta_state: Option<&DeltaState<P>>,
     analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
-    tool_version: &str,
+    meta: &AdapterMeta<'_>,
 ) -> Result<()> {
     for spec in &cli.output.format {
         let output = render_format(
@@ -1085,7 +1155,7 @@ fn print_formatted_output<P: ParseDiagnostic>(
             delta_state,
             analysis,
             inputs,
-            tool_version,
+            meta,
         )?;
         match &spec.output {
             Some(path) => std::fs::write(path, &output)
@@ -1162,7 +1232,7 @@ fn validate_display_flags(cli: &Cli) -> Result<()> {
 }
 
 /// Multi-format invocations require every entry to specify a file —
-/// stdout cannot multiplex (issue #100).
+/// stdout cannot multiplex.
 fn validate_format_destinations(specs: &[FormatSpec]) -> Result<()> {
     if specs.len() > 1 {
         let stdout_specs: Vec<_> = specs
@@ -1192,11 +1262,11 @@ fn format_arg_kebab(arg: FormatArg) -> String {
 
 // ── Config loading & merging ───────────────────────────────────────
 
-fn load_file_config(cli: &Cli) -> Result<Option<FileConfig>> {
+fn load_file_config(cli: &Cli, config_file_name: &str) -> Result<Option<FileConfig>> {
     if let Some(path) = &cli.input.config {
         Ok(Some(config::load_config(path)?))
     } else {
-        match config::discover_config()? {
+        match config::discover_config(config_file_name)? {
             Some(path) => Ok(Some(config::load_config(&path)?)),
             None => Ok(None),
         }
@@ -1257,17 +1327,17 @@ fn validate_inputs(
     coverage: &std::path::Path,
     src: &std::path::Path,
     threshold: f64,
+    coverage_hint: &str,
 ) -> Result<()> {
     match std::fs::metadata(coverage) {
         Ok(m) if m.is_file() => {}
         Ok(_) => bail!(
             "coverage path is not a file: {}\n  \
-             hint: pass --coverage pointing to an LCOV file, not a directory",
+             hint: pass --coverage pointing to a coverage file, not a directory",
             coverage.display()
         ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
-            "coverage file not found: {}\n  \
-             hint: run `cargo llvm-cov --lcov --output-path lcov.info` first",
+            "coverage file not found: {}\n  hint: {coverage_hint}",
             coverage.display()
         ),
         Err(e) => bail!(
@@ -1280,12 +1350,12 @@ fn validate_inputs(
         Ok(m) if m.is_dir() => {}
         Ok(_) => bail!(
             "source path is not a directory: {}\n  \
-             hint: pass --src <DIR> pointing to your Rust source root",
+             hint: pass --src <DIR> pointing to your source root",
             src.display()
         ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
             "source directory not found: {}\n  \
-             hint: pass --src <DIR> pointing to your Rust source root",
+             hint: pass --src <DIR> pointing to your source root",
             src.display()
         ),
         Err(e) => bail!(
@@ -1344,13 +1414,17 @@ fn preflight_git_worktree(src: &Path) -> Result<()> {
 
 // ── Pre-flight checks ──────────────────────────────────────────────
 
-fn preflight_checks(coverage: &std::path::Path, src: &std::path::Path) -> Result<()> {
-    check_coverage_has_data(coverage)?;
-    check_src_has_rust_files(src)?;
+fn preflight_checks(
+    coverage: &std::path::Path,
+    src: &std::path::Path,
+    meta: &AdapterMeta<'_>,
+) -> Result<()> {
+    check_coverage_has_data(coverage, meta.coverage_hint)?;
+    check_src_has_source_files(src, meta.extensions)?;
     Ok(())
 }
 
-fn check_coverage_has_data(path: &std::path::Path) -> Result<()> {
+fn check_coverage_has_data(path: &std::path::Path, coverage_hint: &str) -> Result<()> {
     use std::io::{BufRead, BufReader};
 
     let file = std::fs::File::open(path)?;
@@ -1373,35 +1447,65 @@ fn check_coverage_has_data(path: &std::path::Path) -> Result<()> {
         }
     }
     bail!(
-        "no coverage data found in {}\n  \
-         hint: ensure tests ran with coverage enabled (`cargo llvm-cov --lcov`)",
-        path.display()
+        "no coverage data found in {}\n  hint: {}",
+        path.display(),
+        coverage_hint,
     );
 }
 
-fn check_src_has_rust_files(path: &std::path::Path) -> Result<()> {
-    fn has_rs_files(dir: &std::path::Path) -> std::io::Result<bool> {
+/// Verify the source directory contains at least one file whose
+/// extension is in `extensions`. Adapter-specific (e.g.,
+/// `&["rs"]` for crap4rs, `&["ts","tsx","js","jsx","mjs","cjs"]` for
+/// crap4ts).
+fn check_src_has_source_files(path: &std::path::Path, extensions: &[&str]) -> Result<()> {
+    fn has_source_files(dir: &std::path::Path, extensions: &[&str]) -> std::io::Result<bool> {
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let ft = entry.file_type()?;
-            if ft.is_file() && entry.path().extension().is_some_and(|ext| ext == "rs") {
+            if ft.is_file()
+                && let Some(ext) = entry.path().extension()
+                && extensions.iter().any(|e| ext == *e)
+            {
                 return Ok(true);
             }
-            if ft.is_dir() && has_rs_files(&entry.path())? {
+            if ft.is_dir() && has_source_files(&entry.path(), extensions)? {
                 return Ok(true);
             }
         }
         Ok(false)
     }
 
-    if !has_rs_files(path)? {
+    if !has_source_files(path, extensions)? {
+        let pretty = format_extensions_list(extensions);
         bail!(
-            "no Rust source files found in {}\n  \
-             hint: check that --src points to a directory containing .rs files",
-            path.display()
+            "no source files found in {}\n  \
+             hint: check that --src points to a directory containing {} files",
+            path.display(),
+            pretty,
         );
     }
     Ok(())
+}
+
+/// Render a list of bare extensions (`["rs"]`, `["ts","tsx","js"]`)
+/// as a human-readable comma-separated list of dotted extensions:
+/// `".rs"`, `".ts", ".tsx", or ".js"`. Used in the
+/// `check_src_has_source_files` hint.
+fn format_extensions_list(extensions: &[&str]) -> String {
+    match extensions {
+        [] => "supported".to_string(),
+        [only] => format!(".{only}"),
+        [first, rest @ .., last] => {
+            let mut out = format!(".{first}");
+            for e in rest {
+                out.push_str(", .");
+                out.push_str(e);
+            }
+            out.push_str(", or .");
+            out.push_str(last);
+            out
+        }
+    }
 }
 
 // ── Timestamp ──────────────────────────────────────────────────────
@@ -1520,7 +1624,11 @@ mod tests {
     use std::path::Path;
 
     fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
-        let mut full = vec!["crap4rs"];
+        // argv[0] is a clap placeholder — kept adapter-agnostic
+        // (`"test-adapter"`, not any real adapter binary's name) so
+        // crap-core source has zero hardcoded references to its
+        // consumers.
+        let mut full = vec!["test-adapter"];
         full.extend_from_slice(args);
         Cli::try_parse_from(full)
     }
@@ -1761,15 +1869,17 @@ mod tests {
     }
 
     #[test]
-    fn validate_missing_coverage_file() {
+    fn validate_missing_coverage_file_uses_adapter_hint() {
         let err = validate_inputs(
             Path::new("nonexistent.info"),
             Path::new("src"),
             DEFAULT_THRESHOLD,
+            "run `cargo llvm-cov --lcov --output-path lcov.info` first",
         )
         .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("coverage file not found"));
+        // Adapter-supplied hint flows through; crap-core itself stays neutral.
         assert!(msg.contains("cargo llvm-cov"));
     }
 
@@ -1779,6 +1889,7 @@ mod tests {
             Path::new("Cargo.toml"),
             Path::new("nonexistent_dir"),
             DEFAULT_THRESHOLD,
+            "test-hint",
         )
         .unwrap_err();
         let msg = format!("{err:#}");
@@ -1787,22 +1898,29 @@ mod tests {
 
     #[test]
     fn validate_negative_threshold() {
-        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), -5.0).unwrap_err();
+        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), -5.0, "test-hint")
+            .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
 
     #[test]
     fn validate_zero_threshold() {
-        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), 0.0).unwrap_err();
+        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), 0.0, "test-hint")
+            .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
 
     #[test]
     fn validate_infinity_threshold() {
-        let err =
-            validate_inputs(Path::new("Cargo.toml"), Path::new("src"), f64::INFINITY).unwrap_err();
+        let err = validate_inputs(
+            Path::new("Cargo.toml"),
+            Path::new("src"),
+            f64::INFINITY,
+            "test-hint",
+        )
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
@@ -1813,6 +1931,7 @@ mod tests {
             Path::new("Cargo.toml"),
             Path::new("Cargo.toml"),
             DEFAULT_THRESHOLD,
+            "test-hint",
         )
         .unwrap_err();
         let msg = format!("{err:#}");
@@ -1821,8 +1940,13 @@ mod tests {
 
     #[test]
     fn validate_coverage_is_dir_not_file() {
-        let err =
-            validate_inputs(Path::new("src"), Path::new("src"), DEFAULT_THRESHOLD).unwrap_err();
+        let err = validate_inputs(
+            Path::new("src"),
+            Path::new("src"),
+            DEFAULT_THRESHOLD,
+            "test-hint",
+        )
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("coverage path is not a file"));
     }
@@ -2073,16 +2197,22 @@ mod tests {
 
     // ── Pre-flight check tests ─────────────────────────────────────────
 
+    // Synthetic adapter values for tests — match the placeholder used
+    // throughout the in-crate test suite. Real adapters supply real
+    // values via `AdapterMeta`.
+    const TEST_COVERAGE_HINT: &str =
+        "ensure tests ran with coverage enabled (test-tool's `--coverage` flag)";
+
     #[test]
     fn preflight_empty_coverage_file() {
         let dir = tempfile::tempdir().unwrap();
         let cov = dir.path().join("empty.info");
         std::fs::write(&cov, "").unwrap();
 
-        let err = check_coverage_has_data(&cov).unwrap_err();
+        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("no coverage data found"));
-        assert!(msg.contains("cargo llvm-cov"));
+        assert!(msg.contains(TEST_COVERAGE_HINT));
     }
 
     #[test]
@@ -2091,7 +2221,7 @@ mod tests {
         let cov = dir.path().join("no_da.info");
         std::fs::write(&cov, "SF:src/main.rs\nend_of_record\n").unwrap();
 
-        let err = check_coverage_has_data(&cov).unwrap_err();
+        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("no coverage data found"));
     }
@@ -2102,7 +2232,7 @@ mod tests {
         let cov = dir.path().join("good.info");
         std::fs::write(&cov, "SF:src/main.rs\nDA:1,5\nend_of_record\n").unwrap();
 
-        assert!(check_coverage_has_data(&cov).is_ok());
+        assert!(check_coverage_has_data(&cov, TEST_COVERAGE_HINT).is_ok());
     }
 
     #[test]
@@ -2111,7 +2241,7 @@ mod tests {
         let cov = dir.path().join("orphan_da.info");
         std::fs::write(&cov, "DA:1,5\nend_of_record\n").unwrap();
 
-        let err = check_coverage_has_data(&cov).unwrap_err();
+        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("no coverage data found"));
     }
@@ -2122,46 +2252,70 @@ mod tests {
         let cov = dir.path().join("bad_da.info");
         std::fs::write(&cov, "SF:src/main.rs\nDA:not_a_number\nend_of_record\n").unwrap();
 
-        let err = check_coverage_has_data(&cov).unwrap_err();
+        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("no coverage data found"));
     }
 
     #[test]
-    fn preflight_src_dir_no_rust_files() {
+    fn preflight_src_dir_no_matching_extension() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("readme.txt"), "hello").unwrap();
 
-        let err = check_src_has_rust_files(dir.path()).unwrap_err();
+        let err = check_src_has_source_files(dir.path(), &["rs"]).unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("no Rust source files found"));
+        assert!(msg.contains("no source files found"));
+        assert!(msg.contains(".rs"));
     }
 
     #[test]
     fn preflight_src_dir_empty() {
         let dir = tempfile::tempdir().unwrap();
 
-        let err = check_src_has_rust_files(dir.path()).unwrap_err();
+        let err = check_src_has_source_files(dir.path(), &["rs"]).unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("no Rust source files found"));
+        assert!(msg.contains("no source files found"));
     }
 
     #[test]
-    fn preflight_src_dir_with_rs_files_passes() {
+    fn preflight_src_dir_with_matching_files_passes() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("main.rs"), "fn main() {}").unwrap();
 
-        assert!(check_src_has_rust_files(dir.path()).is_ok());
+        assert!(check_src_has_source_files(dir.path(), &["rs"]).is_ok());
     }
 
     #[test]
-    fn preflight_src_dir_nested_rs_files_passes() {
+    fn preflight_src_dir_nested_files_passes() {
         let dir = tempfile::tempdir().unwrap();
         let nested = dir.path().join("sub");
         std::fs::create_dir(&nested).unwrap();
         std::fs::write(nested.join("lib.rs"), "pub fn foo() {}").unwrap();
 
-        assert!(check_src_has_rust_files(dir.path()).is_ok());
+        assert!(check_src_has_source_files(dir.path(), &["rs"]).is_ok());
+    }
+
+    /// regression — preflight honors arbitrary extensions, not
+    /// just `.rs`. Mirrors the walker test (`crap_core::core::walker::
+    /// discover_source_files_finds_typescript_extensions`).
+    #[test]
+    fn preflight_src_dir_with_typescript_files_passes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("app.ts"), "export const x = 1;").unwrap();
+
+        assert!(check_src_has_source_files(dir.path(), &["ts", "tsx"]).is_ok());
+    }
+
+    /// regression — hint surfaces the configured extensions so
+    /// users see "containing .ts, .tsx, or .js files" for crap4ts and
+    /// "containing .rs files" for crap4rs.
+    #[test]
+    fn preflight_src_dir_hint_lists_extensions() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let err = check_src_has_source_files(dir.path(), &["ts", "tsx", "js"]).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains(".ts, .tsx, or .js"), "unexpected hint: {msg}");
     }
 
     // ── --strict / --lenient flag tests ───────────────────────────────

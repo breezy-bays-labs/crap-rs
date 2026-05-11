@@ -275,7 +275,7 @@ fn view_with_no_config_file_exits_2() {
     assert!(stderr.contains("unknown view preset"));
     assert!(
         stderr.contains("crap4rs.toml"),
-        "should mention config file: {stderr}"
+        "should mention adapter config file: {stderr}"
     );
 }
 

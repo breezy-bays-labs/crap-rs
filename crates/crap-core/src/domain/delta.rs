@@ -734,11 +734,11 @@ mod tests {
 
     #[test]
     fn removed_rows_are_emitted_in_identity_key_order() {
-        // Removed-row determinism (CodeRabbit PR #97): pair_identities
-        // collects leftover baseline entries from a HashMap; iterating
-        // the map directly produces non-deterministic order. Sort by
-        // (file_path, qualified_name) before emission so consumers
-        // that don't apply a tie-breaking sort see a stable order.
+        // Removed-row determinism: pair_identities collects leftover
+        // baseline entries from a HashMap; iterating the map directly
+        // produces non-deterministic order. Sort by (file_path,
+        // qualified_name) before emission so consumers that don't
+        // apply a tie-breaking sort see a stable order.
         let baseline = make_result(vec![
             make_verdict("zeta.rs", "zeta_fn", 5.0, false),
             make_verdict("alpha.rs", "alpha_fn", 5.0, false),

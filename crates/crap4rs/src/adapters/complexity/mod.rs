@@ -1338,7 +1338,7 @@ mod tests {
         );
     }
 
-    /// Regression guard for #116: trait default body + concrete impl that
+    /// Regression guard: trait default body + concrete impl that
     /// overrides the same-named method must yield two FunctionComplexity
     /// entries with disjoint spans. The walker uses separate visitors
     /// (`visit_trait_item_fn` for the default, `visit_impl_item_fn` for the

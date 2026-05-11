@@ -6,10 +6,10 @@
 //! produces results. Per-adapter language coupling stays in the caller's
 //! crate (`crap4rs::adapters::complexity`, `crap4rs::adapters::coverage`).
 //!
-//! Relocated from `crap4rs::core` in S4 (#136). `analyze` is generic over
-//! `<P: ParseDiagnostic>` so the same orchestrator powers both the LCOV
-//! adapter (crap4rs) and future siblings (crap4ts's Istanbul adapter), per
-//! ADR D9 (mixed-dispatch-strategy).
+//! `analyze` is generic over `<P: ParseDiagnostic>` so the same
+//! orchestrator powers both the LCOV adapter (crap4rs) and future
+//! siblings (crap4ts's Istanbul adapter), per ADR D9
+//! (mixed-dispatch-strategy).
 
 pub mod walker;
 
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 
-use self::walker::discover_rust_files;
+use self::walker::discover_source_files;
 
 use crate::adapters::diff::GitDiffAdapter;
 use crate::domain::crap::compute_crap;
@@ -34,9 +34,10 @@ use crate::ports::{ComplexityPort, CoveragePort, DiffPort, ParseDiagnostic, Pars
 /// Options for running a CRAP analysis.
 #[derive(Debug)]
 pub struct AnalyzeOptions {
-    /// Root directory of Rust source files to analyze.
+    /// Root directory of source files to analyze.
     pub src: PathBuf,
-    /// Path to the LCOV coverage file.
+    /// Path to the coverage file (adapter-specific format: LCOV for
+    /// crap4rs, Istanbul JSON for crap4ts, etc.).
     pub coverage: PathBuf,
     /// Threshold configuration with optional per-path overrides.
     pub threshold_config: ThresholdConfig,
@@ -50,6 +51,13 @@ pub struct AnalyzeOptions {
     pub respect_gitignore: bool,
     /// Git ref to diff against. When set, only changed functions are analyzed.
     pub diff_ref: Option<String>,
+    /// File extensions the walker should pick up. Adapter-specific
+    /// (`["rs"]` for crap4rs; `["ts","tsx","js","jsx","mjs","cjs"]`
+    /// for crap4ts). `Default::default()` is `vec!["rs"]` so existing
+    /// library tests and snapshot baselines stay byte-identical
+    /// without an explicit set; the CLI boundary fills this from
+    /// `AdapterMeta::extensions`.
+    pub extensions: Vec<String>,
     /// When `true`, populate `FunctionVerdict.diagnostic` for every
     /// over-threshold verdict via `domain::diagnostic::compute_diagnostic`.
     /// CLI sets this for `--format advice` and `--format sarif`. The
@@ -92,6 +100,10 @@ impl Default for AnalyzeOptions {
             exclude: Vec::new(),
             respect_gitignore: true,
             diff_ref: None,
+            // `["rs"]` is the default for library tests that don't
+            // construct a full `AdapterMeta`. Adapter binaries
+            // override via `AdapterMeta::extensions`.
+            extensions: vec!["rs".to_string()],
             compute_diagnostics: false,
         }
     }
@@ -220,13 +232,15 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
     }
 
     fn discover_sources(&self) -> Result<DiscoveredSources> {
-        let source_files = discover_rust_files(
+        let extensions: Vec<&str> = self.options.extensions.iter().map(String::as_str).collect();
+        let source_files = discover_source_files(
             &self.options.src,
             &self.options.exclude,
             self.options.respect_gitignore,
+            &extensions,
         )?;
         let files_found = source_files.len();
-        ensure_source_files_found(&source_files, &self.options.src)?;
+        ensure_source_files_found(&source_files, &self.options.src, &extensions)?;
 
         Ok(DiscoveredSources {
             source_files,
@@ -346,9 +360,8 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
 /// Falls back to the raw path on failure (e.g., the directory was
 /// validated to exist by `validate_runtime_inputs` but vanished in a
 /// TOCTOU window before this call). The fallback is observable via
-/// stderr — silent regression would re-introduce a `#150`-flavored
-/// path-strip mismatch for adapters that depend on the canonical
-/// root.
+/// stderr — silent regression would re-introduce a path-strip
+/// mismatch for adapters that depend on the canonical root.
 ///
 /// `pub(crate)` so `cli::prepare_pipeline` can late-bind coverage
 /// adapter construction against the same path that
@@ -364,12 +377,37 @@ pub(crate) fn canonicalize_src(src: &Path) -> PathBuf {
     })
 }
 
-fn ensure_source_files_found(source_files: &[PathBuf], src: &Path) -> Result<()> {
+fn ensure_source_files_found(
+    source_files: &[PathBuf],
+    src: &Path,
+    extensions: &[&str],
+) -> Result<()> {
     if source_files.is_empty() {
+        // Render a comma-separated list of dotted extensions for the
+        // hint, matching the wording used by `cli::check_src_has_source_files`.
+        // Kept inline (no shared helper) because the diagnostic lives
+        // in `crap-core::core` while the CLI helper lives in
+        // `crap-core::cli` — pulling them into a shared module is
+        // v1.0-follow-up if a third caller emerges.
+        let pretty = match extensions {
+            [] => "supported".to_string(),
+            [only] => format!(".{only}"),
+            [first, rest @ .., last] => {
+                let mut out = format!(".{first}");
+                for e in rest {
+                    out.push_str(", .");
+                    out.push_str(e);
+                }
+                out.push_str(", or .");
+                out.push_str(last);
+                out
+            }
+        };
         bail!(
-            "no Rust source files found in {}\n  \
-             hint: check that --src points to a directory containing .rs files",
-            src.display()
+            "no source files found in {}\n  \
+             hint: check that --src points to a directory containing {} files",
+            src.display(),
+            pretty,
         );
     }
     Ok(())
@@ -401,7 +439,7 @@ fn ensure_functions_extracted(all_complexities: &[FunctionComplexity], src: &Pat
     if all_complexities.is_empty() {
         bail!(
             "no functions extracted from source files in {}\n  \
-             hint: check that source files contain valid Rust function definitions",
+             hint: check that source files contain valid function definitions for the selected adapter",
             src.display()
         );
     }
@@ -659,19 +697,18 @@ fn empty_passing_result() -> AnalysisResult {
     }
 }
 
-// `discover_rust_files` relocated to
-// `crap_core::core::walker::discover_rust_files` in S3 (#135). The
-// import at the top of this file binds the name back into local scope
-// so the call sites in `discover_sources` keep compiling.
+// The walker lives at `crap_core::core::walker::discover_source_files`;
+// the import at the top of this file binds the name into local scope
+// for the call sites in `discover_sources`. The `.rs` filter is
+// parameter-driven via `AnalyzeOptions::extensions`.
 
 #[cfg(test)]
 mod tests {
     //! Language-agnostic core tests. The end-to-end pipeline tests that
     //! exercise `analyze` over real LCOV + Rust source live in
-    //! `crap4rs/tests/analyze_pipeline_tests.rs` (S4 #136 — the analyze
-    //! signature gained `&dyn ComplexityPort` + `&dyn CoveragePort` ports
-    //! and the test fixtures need the LCOV/syn adapters that live in the
-    //! crap4rs adapter crate).
+    //! `crap4rs/tests/analyze_pipeline_tests.rs` — `analyze` takes
+    //! `&dyn ComplexityPort` + `&dyn CoveragePort`, and the LCOV/syn
+    //! adapters that satisfy those traits live in the crap4rs crate.
     use super::*;
     use crate::domain::threshold::ThresholdOverride;
 

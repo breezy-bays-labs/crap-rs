@@ -90,8 +90,16 @@ fn resolve_coverage_bounds(cli: &Cli) -> Option<(f64, f64)> {
 /// - If `--view ci` was passed but no config file is loaded OR the config
 ///   has no preset by that name: bail with `exit 2` ("unknown preset")
 ///   listing the available preset names. Empty list yields a hint that
-///   `crap4rs.toml` defines no `[views]` blocks.
-pub(super) fn resolve_view_preset(cli: &mut Cli, file_config: Option<&FileConfig>) -> Result<()> {
+///   names the adapter's config file.
+///
+/// `config_file_name` is the adapter-specific conventional file name
+/// (e.g., `"crap4rs.toml"`, `"crap4ts.toml"`) so the error hint points
+/// the user at the right file to create.
+pub(super) fn resolve_view_preset(
+    cli: &mut Cli,
+    file_config: Option<&FileConfig>,
+    config_file_name: &str,
+) -> Result<()> {
     let Some(name) = cli.input.view.clone() else {
         return Ok(());
     };
@@ -102,13 +110,14 @@ pub(super) fn resolve_view_preset(cli: &mut Cli, file_config: Option<&FileConfig
             apply_preset_to_cli(cli, preset);
             Ok(())
         }
-        None => bail!("{}", unknown_preset_message(&name, views)),
+        None => bail!("{}", unknown_preset_message(&name, views, config_file_name)),
     }
 }
 
 fn unknown_preset_message(
     name: &str,
     views: Option<&std::collections::HashMap<String, ViewPreset>>,
+    config_file_name: &str,
 ) -> String {
     match views {
         Some(map) if !map.is_empty() => {
@@ -120,15 +129,15 @@ fn unknown_preset_message(
             )
         }
         Some(_) => format!(
-            "unknown view preset `{name}`\n  hint: crap4rs.toml defines no [views.<name>] blocks"
+            "unknown view preset `{name}`\n  hint: {config_file_name} defines no [views.<name>] blocks"
         ),
         None => format!(
-            "unknown view preset `{name}`\n  hint: --view requires a crap4rs.toml with a [views.{name}] block"
+            "unknown view preset `{name}`\n  hint: --view requires a {config_file_name} with a [views.{name}] block"
         ),
     }
 }
 
-/// Fold a saved-view preset (issue #80) into the parsed CLI before
+/// Fold a saved-view preset into the parsed CLI before
 /// `validate_view_args` and `build_view_spec` run.
 ///
 /// **Override priority:** defaults < preset < CLI flags. For
@@ -166,7 +175,11 @@ mod tests {
     use crate::domain::view::{GroupKey, SortKey};
 
     fn parse(args: &[&str]) -> Cli {
-        let mut full = vec!["crap4rs"];
+        // argv[0] is a clap placeholder — kept adapter-agnostic
+        // (`"test-adapter"`, not any real adapter binary's name) so
+        // crap-core source has zero hardcoded references to its
+        // consumers.
+        let mut full = vec!["test-adapter"];
         full.extend_from_slice(args);
         <Cli as clap::Parser>::try_parse_from(full).expect("test args parse")
     }
@@ -323,7 +336,7 @@ mod tests {
         assert_eq!(cli.filter.max_coverage, Some(50.0), "CLI max wins");
     }
 
-    // ── resolve_view_preset (#80) ──────────────────────────────────────
+    // ── resolve_view_preset ──────────────────────────────────────
 
     fn config_with_preset(name: &str, preset: ViewPreset) -> FileConfig {
         let mut views = std::collections::HashMap::new();
@@ -338,7 +351,7 @@ mod tests {
     fn resolve_view_preset_no_flag_is_noop() {
         let mut cli = parse(&["--coverage", "lcov.info"]);
         let cfg = config_with_preset("ci", full_preset());
-        resolve_view_preset(&mut cli, Some(&cfg)).unwrap();
+        resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap();
         // No `--view` passed → preset must NOT be applied.
         assert_eq!(cli.filter.top, None);
         assert!(cli.filter.sort_by.is_none());
@@ -349,7 +362,7 @@ mod tests {
     fn resolve_view_preset_resolves_named_preset() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
         let cfg = config_with_preset("ci", full_preset());
-        resolve_view_preset(&mut cli, Some(&cfg)).unwrap();
+        resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap();
         assert_eq!(cli.filter.top, Some(20));
         assert!(cli.filter.only_failing);
     }
@@ -358,7 +371,7 @@ mod tests {
     fn resolve_view_preset_cli_overrides_resolved_preset() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci", "--top", "5"]);
         let cfg = config_with_preset("ci", full_preset());
-        resolve_view_preset(&mut cli, Some(&cfg)).unwrap();
+        resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap();
         assert_eq!(cli.filter.top, Some(5), "CLI --top wins over preset");
         // Other preset fields still applied.
         assert!(cli.filter.only_failing);
@@ -374,7 +387,7 @@ mod tests {
             views,
             ..FileConfig::default()
         };
-        let err = resolve_view_preset(&mut cli, Some(&cfg)).unwrap_err();
+        let err = resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("unknown view preset"),
@@ -396,12 +409,12 @@ mod tests {
     #[test]
     fn resolve_view_preset_no_config_file_explains_requirement() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
-        let err = resolve_view_preset(&mut cli, None).unwrap_err();
+        let err = resolve_view_preset(&mut cli, None, "test-adapter.toml").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("unknown view preset"), "got: {msg}");
         assert!(
-            msg.contains("crap4rs.toml"),
-            "should mention config file: {msg}"
+            msg.contains("test-adapter.toml"),
+            "should mention the adapter's config file by name: {msg}"
         );
     }
 
@@ -409,7 +422,7 @@ mod tests {
     fn resolve_view_preset_empty_views_block_hints_no_blocks_defined() {
         let mut cli = parse(&["--coverage", "lcov.info", "--view", "ci"]);
         let cfg = FileConfig::default();
-        let err = resolve_view_preset(&mut cli, Some(&cfg)).unwrap_err();
+        let err = resolve_view_preset(&mut cli, Some(&cfg), "test-adapter.toml").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("unknown view preset"));
         assert!(msg.contains("no [views"), "empty-block hint missing: {msg}");

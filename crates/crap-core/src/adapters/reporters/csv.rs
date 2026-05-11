@@ -65,11 +65,11 @@ fn format_csv_delta(view: &DeltaView<'_>, metric: ComplexityMetric) -> String {
 }
 
 fn row_for_change(change: &FunctionChange, metric: ComplexityMetric) -> String {
-    // `FunctionChange` is `#[non_exhaustive]` paused per D10 amendment
-    // (#147 restores at v1.0). Now that this reporter lives in crap-core
+    // `FunctionChange` has `#[non_exhaustive]` paused per ADR D10
+    // (restored at v1.0). Now that this reporter lives in crap-core
     // alongside the enum, the match is in-crate and exhaustive — no
     // wildcard arm needed. v1.0 new variants will require explicit
-    // arms here; #147 covers that update path.
+    // arms here.
     let baseline_cells = match change {
         FunctionChange::Removed { baseline } | FunctionChange::Modified { baseline, .. } => {
             let s = &baseline.scored;

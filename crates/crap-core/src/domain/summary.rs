@@ -139,7 +139,7 @@ fn median_u32_sorted(sorted: &[u32]) -> f64 {
     }
 }
 
-// ── Per-file aggregation (issue #64 — `--group-by file`) ────────────
+// ── Per-file aggregation (`--group-by file`) ────────────────────────
 
 /// Per-file aggregate over a `FunctionVerdict` partition.
 ///
@@ -336,11 +336,10 @@ fn median_of(scores: &mut [f64]) -> f64 {
     }
 }
 
-// ── CrapDeltaRowData (scorecard-row producer, issue #111) ───────────
+// ── CrapDeltaRowData (scorecard-row producer) ────────────
 
 /// Status mirrors mokumo's `Row::CrapDelta::status` (Green/Yellow/Red).
-/// Producer-mints-status under Model P — see crap4rs gap doc at
-/// `~/Github/ops/pipelines/crap4rs/crap4rs-20260503-scorecard-row-rollout.md`.
+/// Producer-mints-status under Model P.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum CrapDeltaStatus {
@@ -366,10 +365,9 @@ impl CrapDeltaStatus {
 
 /// Language-agnostic record carrying the structured signal a producer
 /// projects into a mokumo `Row::CrapDelta` JSON object. Lives in
-/// `domain/summary.rs` (pure-domain — no `syn`, no LCOV) so it ships
-/// into `crap-core` as a rename-only move during the future unification
-/// (ops#231). The reporter at `adapters/reporters/scorecard_row.rs`
-/// wires this record into the locked V3-symmetric wire shape.
+/// `domain/summary.rs` (pure-domain — no `syn`, no LCOV). The
+/// reporter at `adapters/reporters/scorecard_row.rs` wires this
+/// record into the locked V3-symmetric wire shape.
 #[derive(Debug, Clone, Serialize)]
 pub struct CrapDeltaRowData {
     pub status: CrapDeltaStatus,
