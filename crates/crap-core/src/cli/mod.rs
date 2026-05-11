@@ -917,7 +917,6 @@ fn validate_runtime_inputs<'a>(
         inputs.threshold,
         meta.coverage_hint,
     )?;
-    preflight_checks(coverage_path, &inputs.src, meta)?;
 
     if let Some(diff_ref) = cli.filter.diff.as_deref() {
         validate_diff_ref(diff_ref)?;
@@ -1005,6 +1004,12 @@ where
     // observable instead of silent.
     let src_canonical = crate::core::canonicalize_src(&inputs.src);
     let coverage = coverage_factory(&src_canonical);
+
+    // Adapter-aware pre-flight runs after construction so
+    // `CoveragePort::validate` can apply its own structural check
+    // (LCOV: SF/DA records; future Istanbul: non-empty statementMap)
+    // before the full parse pass. See ADR D-coverage-validate.
+    preflight_checks(coverage_path, &*coverage, meta)?;
 
     let options = build_analyze_options(cli, &inputs, coverage_path, meta);
 
@@ -1414,98 +1419,38 @@ fn preflight_git_worktree(src: &Path) -> Result<()> {
 
 // ── Pre-flight checks ──────────────────────────────────────────────
 
-fn preflight_checks(
+/// Adapter-aware coverage pre-flight: read the coverage file once and
+/// delegate the structural check to `CoveragePort::validate`. The
+/// source-directory check is handled by `core::ensure_source_files_found`
+/// during the analyze pipeline — see ADR D-preflight-walker-reconcile.
+fn preflight_checks<P>(
     coverage: &std::path::Path,
-    src: &std::path::Path,
+    coverage_port: &dyn CoveragePort<Diagnostic = P>,
     meta: &AdapterMeta<'_>,
-) -> Result<()> {
-    check_coverage_has_data(coverage, meta.coverage_hint)?;
-    check_src_has_source_files(src, meta.extensions)?;
-    Ok(())
+) -> Result<()>
+where
+    P: ParseDiagnostic,
+{
+    check_coverage_has_data(coverage, coverage_port, meta.coverage_hint)
 }
 
-fn check_coverage_has_data(path: &std::path::Path, coverage_hint: &str) -> Result<()> {
-    use std::io::{BufRead, BufReader};
-
-    let file = std::fs::File::open(path)?;
-    let reader = BufReader::new(file);
-    let mut in_sf_block = false;
-
-    for line in reader.lines() {
-        let line = line?;
-        if line.starts_with("SF:") {
-            in_sf_block = true;
-            continue;
-        }
-        if in_sf_block
-            && let Some(rest) = line.strip_prefix("DA:")
-            && let Some((line_no, hits)) = rest.split_once(',')
-            && line_no.parse::<usize>().is_ok()
-            && hits.split(',').next().unwrap_or("").parse::<u64>().is_ok()
-        {
-            return Ok(());
-        }
-    }
-    bail!(
-        "no coverage data found in {}\n  hint: {}",
-        path.display(),
-        coverage_hint,
-    );
-}
-
-/// Verify the source directory contains at least one file whose
-/// extension is in `extensions`. Adapter-specific (e.g.,
-/// `&["rs"]` for crap4rs, `&["ts","tsx","js","jsx","mjs","cjs"]` for
-/// crap4ts).
-fn check_src_has_source_files(path: &std::path::Path, extensions: &[&str]) -> Result<()> {
-    fn has_source_files(dir: &std::path::Path, extensions: &[&str]) -> std::io::Result<bool> {
-        for entry in std::fs::read_dir(dir)? {
-            let entry = entry?;
-            let ft = entry.file_type()?;
-            if ft.is_file()
-                && let Some(ext) = entry.path().extension()
-                && extensions.iter().any(|e| ext == *e)
-            {
-                return Ok(true);
-            }
-            if ft.is_dir() && has_source_files(&entry.path(), extensions)? {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
-
-    if !has_source_files(path, extensions)? {
-        let pretty = format_extensions_list(extensions);
+fn check_coverage_has_data<P>(
+    path: &std::path::Path,
+    coverage_port: &dyn CoveragePort<Diagnostic = P>,
+    coverage_hint: &str,
+) -> Result<()>
+where
+    P: ParseDiagnostic,
+{
+    let data = std::fs::read_to_string(path)?;
+    if coverage_port.validate(&data).is_err() {
         bail!(
-            "no source files found in {}\n  \
-             hint: check that --src points to a directory containing {} files",
+            "no coverage data found in {}\n  hint: {}",
             path.display(),
-            pretty,
+            coverage_hint,
         );
     }
     Ok(())
-}
-
-/// Render a list of bare extensions (`["rs"]`, `["ts","tsx","js"]`)
-/// as a human-readable comma-separated list of dotted extensions:
-/// `".rs"`, `".ts", ".tsx", or ".js"`. Used in the
-/// `check_src_has_source_files` hint.
-fn format_extensions_list(extensions: &[&str]) -> String {
-    match extensions {
-        [] => "supported".to_string(),
-        [only] => format!(".{only}"),
-        [first, rest @ .., last] => {
-            let mut out = format!(".{first}");
-            for e in rest {
-                out.push_str(", .");
-                out.push_str(e);
-            }
-            out.push_str(", or .");
-            out.push_str(last);
-            out
-        }
-    }
 }
 
 // ── Timestamp ──────────────────────────────────────────────────────
@@ -2203,119 +2148,82 @@ mod tests {
     const TEST_COVERAGE_HINT: &str =
         "ensure tests ran with coverage enabled (test-tool's `--coverage` flag)";
 
+    /// Stub `CoveragePort` whose `validate` returns whatever the caller
+    /// configured. `parse` panics — these tests exercise the CLI-layer
+    /// preflight wrapper, not the adapter's parsing path.
+    struct StubCoveragePort {
+        validate_result: Result<(), String>,
+    }
+
+    impl CoveragePort for StubCoveragePort {
+        type Diagnostic = crate::test_strategies::DummyParseDiagnostic;
+
+        fn parse(
+            &self,
+            _data: &str,
+        ) -> Result<crate::ports::ParseOutput<Self::Diagnostic>, crate::domain::types::CrapError>
+        {
+            unreachable!("preflight tests never invoke parse")
+        }
+
+        fn validate(&self, _data: &str) -> Result<(), String> {
+            self.validate_result.clone()
+        }
+    }
+
+    fn stub_ok() -> StubCoveragePort {
+        StubCoveragePort {
+            validate_result: Ok(()),
+        }
+    }
+
+    fn stub_err(reason: &str) -> StubCoveragePort {
+        StubCoveragePort {
+            validate_result: Err(reason.to_string()),
+        }
+    }
+
     #[test]
-    fn preflight_empty_coverage_file() {
+    fn preflight_surfaces_hint_when_adapter_reports_no_data() {
         let dir = tempfile::tempdir().unwrap();
         let cov = dir.path().join("empty.info");
         std::fs::write(&cov, "").unwrap();
 
-        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
+        let err =
+            check_coverage_has_data(&cov, &stub_err("no records"), TEST_COVERAGE_HINT).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("no coverage data found"));
         assert!(msg.contains(TEST_COVERAGE_HINT));
     }
 
     #[test]
-    fn preflight_coverage_no_da_lines() {
+    fn preflight_passes_when_adapter_accepts_data() {
         let dir = tempfile::tempdir().unwrap();
-        let cov = dir.path().join("no_da.info");
-        std::fs::write(&cov, "SF:src/main.rs\nend_of_record\n").unwrap();
+        let cov = dir.path().join("ok.info");
+        std::fs::write(&cov, "any contents — adapter decides").unwrap();
 
-        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(msg.contains("no coverage data found"));
+        assert!(check_coverage_has_data(&cov, &stub_ok(), TEST_COVERAGE_HINT).is_ok());
     }
 
     #[test]
-    fn preflight_coverage_with_da_lines_passes() {
+    fn preflight_propagates_io_errors_for_missing_files() {
         let dir = tempfile::tempdir().unwrap();
-        let cov = dir.path().join("good.info");
-        std::fs::write(&cov, "SF:src/main.rs\nDA:1,5\nend_of_record\n").unwrap();
+        let missing = dir.path().join("does_not_exist.info");
 
-        assert!(check_coverage_has_data(&cov, TEST_COVERAGE_HINT).is_ok());
-    }
-
-    #[test]
-    fn preflight_coverage_da_outside_sf_block_rejected() {
-        let dir = tempfile::tempdir().unwrap();
-        let cov = dir.path().join("orphan_da.info");
-        std::fs::write(&cov, "DA:1,5\nend_of_record\n").unwrap();
-
-        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(msg.contains("no coverage data found"));
-    }
-
-    #[test]
-    fn preflight_coverage_malformed_da_rejected() {
-        let dir = tempfile::tempdir().unwrap();
-        let cov = dir.path().join("bad_da.info");
-        std::fs::write(&cov, "SF:src/main.rs\nDA:not_a_number\nend_of_record\n").unwrap();
-
-        let err = check_coverage_has_data(&cov, TEST_COVERAGE_HINT).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(msg.contains("no coverage data found"));
-    }
-
-    #[test]
-    fn preflight_src_dir_no_matching_extension() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("readme.txt"), "hello").unwrap();
-
-        let err = check_src_has_source_files(dir.path(), &["rs"]).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(msg.contains("no source files found"));
-        assert!(msg.contains(".rs"));
-    }
-
-    #[test]
-    fn preflight_src_dir_empty() {
-        let dir = tempfile::tempdir().unwrap();
-
-        let err = check_src_has_source_files(dir.path(), &["rs"]).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(msg.contains("no source files found"));
-    }
-
-    #[test]
-    fn preflight_src_dir_with_matching_files_passes() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("main.rs"), "fn main() {}").unwrap();
-
-        assert!(check_src_has_source_files(dir.path(), &["rs"]).is_ok());
-    }
-
-    #[test]
-    fn preflight_src_dir_nested_files_passes() {
-        let dir = tempfile::tempdir().unwrap();
-        let nested = dir.path().join("sub");
-        std::fs::create_dir(&nested).unwrap();
-        std::fs::write(nested.join("lib.rs"), "pub fn foo() {}").unwrap();
-
-        assert!(check_src_has_source_files(dir.path(), &["rs"]).is_ok());
-    }
-
-    /// regression — preflight honors arbitrary extensions, not
-    /// just `.rs`. Mirrors the walker test (`crap_core::core::walker::
-    /// discover_source_files_finds_typescript_extensions`).
-    #[test]
-    fn preflight_src_dir_with_typescript_files_passes() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("app.ts"), "export const x = 1;").unwrap();
-
-        assert!(check_src_has_source_files(dir.path(), &["ts", "tsx"]).is_ok());
-    }
-
-    /// regression — hint surfaces the configured extensions so
-    /// users see "containing .ts, .tsx, or .js files" for crap4ts and
-    /// "containing .rs files" for crap4rs.
-    #[test]
-    fn preflight_src_dir_hint_lists_extensions() {
-        let dir = tempfile::tempdir().unwrap();
-
-        let err = check_src_has_source_files(dir.path(), &["ts", "tsx", "js"]).unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(msg.contains(".ts, .tsx, or .js"), "unexpected hint: {msg}");
+        let err =
+            check_coverage_has_data(&missing, &stub_ok(), TEST_COVERAGE_HINT).unwrap_err();
+        // I/O error surfaces as a `CrapError::Io` (via `?` on `read_to_string`);
+        // the user-facing wrapper from `validate_inputs` covers the
+        // "coverage file not found" hint path. This test guards the
+        // boundary: an unreadable file must NOT silently pass preflight.
+        let kind = err
+            .downcast_ref::<std::io::Error>()
+            .map(|e| e.kind())
+            .or_else(|| {
+                err.chain()
+                    .find_map(|e| e.downcast_ref::<std::io::Error>().map(|e| e.kind()))
+            });
+        assert_eq!(kind, Some(std::io::ErrorKind::NotFound));
     }
 
     // ── --strict / --lenient flag tests ───────────────────────────────

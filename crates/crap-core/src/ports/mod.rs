@@ -57,6 +57,24 @@ pub struct ParseOutput<P: ParseDiagnostic> {
 pub trait CoveragePort {
     type Diagnostic: ParseDiagnostic;
     fn parse(&self, data: &str) -> Result<ParseOutput<Self::Diagnostic>, CrapError>;
+
+    /// Adapter-aware pre-flight check: does `data` contain at least one
+    /// usable coverage record? Runs before the analyzer dispatches to
+    /// `parse`, so the CLI can surface a helpful "your coverage file
+    /// has no data points" diagnostic before a full parse pass.
+    ///
+    /// Default implementation returns `Ok(())` (skip validation) —
+    /// adapters with a cheap structural signature override. The LCOV
+    /// adapter checks for `SF:` + `DA:` records; the Istanbul adapter
+    /// will check for non-empty `statementMap` once implemented.
+    ///
+    /// The returned `Err(String)` is the structural reason
+    /// (e.g., `"no SF/DA records"`); the CLI layer pairs it with the
+    /// coverage path and adapter-specific generation hint
+    /// (`AdapterMeta::coverage_hint`) before surfacing to the user.
+    fn validate(&self, _data: &str) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 /// Port for computing which files/regions changed relative to a git ref.

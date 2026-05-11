@@ -384,11 +384,9 @@ fn ensure_source_files_found(
 ) -> Result<()> {
     if source_files.is_empty() {
         // Render a comma-separated list of dotted extensions for the
-        // hint, matching the wording used by `cli::check_src_has_source_files`.
-        // Kept inline (no shared helper) because the diagnostic lives
-        // in `crap-core::core` while the CLI helper lives in
-        // `crap-core::cli` — pulling them into a shared module is
-        // v1.0-follow-up if a third caller emerges.
+        // hint. Single source of truth — `cli/mod.rs` previously had a
+        // duplicate pre-flight walk that emitted identical wording; that
+        // duplicate was retired once both paths agreed (issue #163).
         let pretty = match extensions {
             [] => "supported".to_string(),
             [only] => format!(".{only}"),

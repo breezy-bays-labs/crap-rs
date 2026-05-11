@@ -67,6 +67,32 @@ impl CoveragePort for LcovParser {
         flush_block(&mut state);
         Ok(build_parse_output(state))
     }
+
+    /// LCOV-flavoured pre-flight: scan for at least one well-formed
+    /// `DA:line,hits` line inside an `SF:` block. Mirrors the structural
+    /// shape that `parse` consumes; orphan `DA:` records outside an
+    /// `SF:` block and malformed line/hit pairs are rejected.
+    ///
+    /// Linear single-pass over `data` — cheap relative to the full
+    /// parse, which builds maps and emits per-record diagnostics.
+    fn validate(&self, data: &str) -> Result<(), String> {
+        let mut in_sf_block = false;
+        for line in data.lines() {
+            if line.starts_with("SF:") {
+                in_sf_block = true;
+                continue;
+            }
+            if in_sf_block
+                && let Some(rest) = line.strip_prefix("DA:")
+                && let Some((line_no, hits)) = rest.split_once(',')
+                && line_no.parse::<usize>().is_ok()
+                && hits.split(',').next().unwrap_or("").parse::<u64>().is_ok()
+            {
+                return Ok(());
+            }
+        }
+        Err("no SF/DA records".to_string())
+    }
 }
 
 fn handle_parse_line(parser: &LcovParser, state: &mut ParseState, line: &str, line_number: usize) {
@@ -296,6 +322,58 @@ mod tests {
         let output = parse("");
         assert!(output.coverage.is_empty());
         assert!(output.diagnostics.is_empty());
+    }
+
+    // ── validate (preflight) ──────────────────────────────────────────
+
+    #[test]
+    fn validate_empty_input_rejected() {
+        assert!(parser().validate("").is_err());
+    }
+
+    #[test]
+    fn validate_no_da_lines_rejected() {
+        assert!(
+            parser()
+                .validate("SF:src/main.rs\nend_of_record\n")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn validate_da_outside_sf_block_rejected() {
+        assert!(parser().validate("DA:1,5\nend_of_record\n").is_err());
+    }
+
+    #[test]
+    fn validate_malformed_da_rejected() {
+        assert!(
+            parser()
+                .validate("SF:src/main.rs\nDA:not_a_number\nend_of_record\n")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn validate_single_da_inside_sf_block_passes() {
+        assert!(
+            parser()
+                .validate("SF:src/main.rs\nDA:1,5\nend_of_record\n")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn validate_first_da_in_second_block_passes() {
+        // First SF: has no DA — second SF: provides one. validate
+        // walks both blocks and accepts the first valid DA encountered.
+        assert!(
+            parser()
+                .validate(
+                    "SF:src/a.rs\nend_of_record\nSF:src/b.rs\nDA:1,1\nend_of_record\n"
+                )
+                .is_ok()
+        );
     }
 
     #[test]
