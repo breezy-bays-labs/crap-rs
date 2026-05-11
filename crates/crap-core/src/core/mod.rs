@@ -439,7 +439,7 @@ fn ensure_functions_extracted(all_complexities: &[FunctionComplexity], src: &Pat
     if all_complexities.is_empty() {
         bail!(
             "no functions extracted from source files in {}\n  \
-             hint: check that source files contain valid Rust function definitions",
+             hint: check that source files contain valid function definitions for the selected adapter",
             src.display()
         );
     }

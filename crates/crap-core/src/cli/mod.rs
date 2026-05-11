@@ -911,7 +911,12 @@ fn validate_runtime_inputs<'a>(
         );
     };
 
-    validate_inputs(coverage_path, &inputs.src, inputs.threshold)?;
+    validate_inputs(
+        coverage_path,
+        &inputs.src,
+        inputs.threshold,
+        meta.coverage_hint,
+    )?;
     preflight_checks(coverage_path, &inputs.src, meta)?;
 
     if let Some(diff_ref) = cli.filter.diff.as_deref() {
@@ -1322,17 +1327,17 @@ fn validate_inputs(
     coverage: &std::path::Path,
     src: &std::path::Path,
     threshold: f64,
+    coverage_hint: &str,
 ) -> Result<()> {
     match std::fs::metadata(coverage) {
         Ok(m) if m.is_file() => {}
         Ok(_) => bail!(
             "coverage path is not a file: {}\n  \
-             hint: pass --coverage pointing to an LCOV file, not a directory",
+             hint: pass --coverage pointing to a coverage file, not a directory",
             coverage.display()
         ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
-            "coverage file not found: {}\n  \
-             hint: run `cargo llvm-cov --lcov --output-path lcov.info` first",
+            "coverage file not found: {}\n  hint: {coverage_hint}",
             coverage.display()
         ),
         Err(e) => bail!(
@@ -1345,12 +1350,12 @@ fn validate_inputs(
         Ok(m) if m.is_dir() => {}
         Ok(_) => bail!(
             "source path is not a directory: {}\n  \
-             hint: pass --src <DIR> pointing to your Rust source root",
+             hint: pass --src <DIR> pointing to your source root",
             src.display()
         ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
             "source directory not found: {}\n  \
-             hint: pass --src <DIR> pointing to your Rust source root",
+             hint: pass --src <DIR> pointing to your source root",
             src.display()
         ),
         Err(e) => bail!(
@@ -1864,15 +1869,17 @@ mod tests {
     }
 
     #[test]
-    fn validate_missing_coverage_file() {
+    fn validate_missing_coverage_file_uses_adapter_hint() {
         let err = validate_inputs(
             Path::new("nonexistent.info"),
             Path::new("src"),
             DEFAULT_THRESHOLD,
+            "run `cargo llvm-cov --lcov --output-path lcov.info` first",
         )
         .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("coverage file not found"));
+        // Adapter-supplied hint flows through; crap-core itself stays neutral.
         assert!(msg.contains("cargo llvm-cov"));
     }
 
@@ -1882,6 +1889,7 @@ mod tests {
             Path::new("Cargo.toml"),
             Path::new("nonexistent_dir"),
             DEFAULT_THRESHOLD,
+            "test-hint",
         )
         .unwrap_err();
         let msg = format!("{err:#}");
@@ -1890,22 +1898,29 @@ mod tests {
 
     #[test]
     fn validate_negative_threshold() {
-        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), -5.0).unwrap_err();
+        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), -5.0, "test-hint")
+            .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
 
     #[test]
     fn validate_zero_threshold() {
-        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), 0.0).unwrap_err();
+        let err = validate_inputs(Path::new("Cargo.toml"), Path::new("src"), 0.0, "test-hint")
+            .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
 
     #[test]
     fn validate_infinity_threshold() {
-        let err =
-            validate_inputs(Path::new("Cargo.toml"), Path::new("src"), f64::INFINITY).unwrap_err();
+        let err = validate_inputs(
+            Path::new("Cargo.toml"),
+            Path::new("src"),
+            f64::INFINITY,
+            "test-hint",
+        )
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("threshold must be a finite positive number"));
     }
@@ -1916,6 +1931,7 @@ mod tests {
             Path::new("Cargo.toml"),
             Path::new("Cargo.toml"),
             DEFAULT_THRESHOLD,
+            "test-hint",
         )
         .unwrap_err();
         let msg = format!("{err:#}");
@@ -1924,8 +1940,13 @@ mod tests {
 
     #[test]
     fn validate_coverage_is_dir_not_file() {
-        let err =
-            validate_inputs(Path::new("src"), Path::new("src"), DEFAULT_THRESHOLD).unwrap_err();
+        let err = validate_inputs(
+            Path::new("src"),
+            Path::new("src"),
+            DEFAULT_THRESHOLD,
+            "test-hint",
+        )
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("coverage path is not a file"));
     }
