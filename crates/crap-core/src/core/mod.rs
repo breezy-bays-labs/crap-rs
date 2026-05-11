@@ -341,8 +341,27 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
     }
 }
 
-fn canonicalize_src(src: &Path) -> PathBuf {
-    src.canonicalize().unwrap_or_else(|_| src.to_path_buf())
+/// Canonicalize the effective source root.
+///
+/// Falls back to the raw path on failure (e.g., the directory was
+/// validated to exist by `validate_runtime_inputs` but vanished in a
+/// TOCTOU window before this call). The fallback is observable via
+/// stderr — silent regression would re-introduce a `#150`-flavored
+/// path-strip mismatch for adapters that depend on the canonical
+/// root.
+///
+/// `pub(crate)` so `cli::prepare_pipeline` can late-bind coverage
+/// adapter construction against the same path that
+/// `AnalysisContext::new` uses internally — single source of truth
+/// for canonicalization semantics.
+pub(crate) fn canonicalize_src(src: &Path) -> PathBuf {
+    src.canonicalize().unwrap_or_else(|e| {
+        eprintln!(
+            "warning: failed to canonicalize {}: {e}; coverage path-strip may misalign",
+            src.display()
+        );
+        src.to_path_buf()
+    })
 }
 
 fn ensure_source_files_found(source_files: &[PathBuf], src: &Path) -> Result<()> {
