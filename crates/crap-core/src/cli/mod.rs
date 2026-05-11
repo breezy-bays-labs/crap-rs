@@ -932,15 +932,12 @@ where
     let coverage_path = validate_runtime_inputs(cli, &inputs)?;
 
     // Canonicalize the effective `src` (post-config-merge) and hand
-    // it to the adapter's factory closure. Falls back to the raw path
-    // when the directory does not exist on disk — `validate_runtime_inputs`
-    // already gated on existence, but the closure is invoked unconditionally
-    // because some adapters (Istanbul) do not strip a prefix and consume the
-    // raw path. Mirrors `core::canonicalize_src`.
-    let src_canonical = inputs
-        .src
-        .canonicalize()
-        .unwrap_or_else(|_| inputs.src.clone());
+    // it to the adapter's factory closure. `validate_runtime_inputs`
+    // already gated on existence; `canonicalize_src`'s fallback path
+    // is purely defensive against TOCTOU between the two `metadata`
+    // calls and emits a warning on the error arm so the regression is
+    // observable instead of silent.
+    let src_canonical = crate::core::canonicalize_src(&inputs.src);
     let coverage = coverage_factory(&src_canonical);
 
     let options = build_analyze_options(cli, &inputs, coverage_path);

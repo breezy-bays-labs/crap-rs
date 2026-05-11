@@ -46,10 +46,11 @@ fn setup_dir(dir: &Path) -> std::path::PathBuf {
     let src_canonical = src.canonicalize().expect("canonicalize custom src dir");
     let lib_rs_absolute = src_canonical.join("lib.rs");
 
-    let lcov = format!(
-        "SF:{}\nDA:1,1\nDA:2,1\nDA:3,1\nend_of_record\n",
-        lib_rs_absolute.display()
-    );
+    // `cargo-llvm-cov` emits forward-slash `SF:` paths even on
+    // Windows; normalize here so the fixture stays portable if
+    // Windows joins the CI matrix later.
+    let lib_rs_sf = lib_rs_absolute.to_string_lossy().replace('\\', "/");
+    let lcov = format!("SF:{lib_rs_sf}\nDA:1,1\nDA:2,1\nDA:3,1\nend_of_record\n");
     std::fs::write(dir.join("lcov.info"), lcov).expect("write lcov.info fixture");
 
     let toml = format!("src = \"{CUSTOM_SRC_DIR}\"\n");
