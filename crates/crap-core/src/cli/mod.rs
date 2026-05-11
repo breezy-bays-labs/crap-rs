@@ -593,67 +593,114 @@ pub struct Cli {
 /// Adapter-supplied runtime metadata that crap-core threads through
 /// `parse_args`, `run`, and the reporter call sites.
 ///
-/// Carried by reference, so all fields are `&'a str` / `&'a [&'a str]`
-/// — the binary owns the storage (typically `env!(...)` literals or
-/// `build.rs`-stamped strings, all `'static`). The struct is `Copy`
-/// for trivial threading; clone-by-copy is fine because the borrows
-/// already point at the binary's static storage.
+/// All fields are `&'static` because every production caller supplies
+/// `env!(...)` / `build.rs`-stamped literals or `const &[&str]` slices.
+/// Tests construct from `&'static str` literals too. The lifetime
+/// parameter was dropped in #161 — no caller ever needed non-static
+/// metadata, and the `<'a>` ripple polluted 15 function signatures for
+/// no payoff. The struct stays `Copy` so threading is trivial.
 ///
 /// Reporters keep a flat `(tool_name, tool_version)` call boundary —
 /// the struct only travels through orchestration code.
 #[derive(Debug, Clone, Copy)]
-pub struct AdapterMeta<'a> {
+pub struct AdapterMeta {
     /// Adapter binary name (e.g., `"crap4rs"`, `"crap4ts"`). Drives
     /// clap's `--version` output, the `name` field in SARIF, and the
     /// header line in table/markdown/html reporters.
-    pub tool_name: &'a str,
+    pub tool_name: &'static str,
     /// Short version string (e.g., `"0.5.0"`). Threaded to every
     /// reporter alongside `tool_name`.
-    pub tool_version: &'a str,
+    pub tool_version: &'static str,
     /// Long version string for `--version --long` (e.g.,
     /// `"0.5.0 (abc1234 2026-05-09)"`).
-    pub long_version: &'a str,
+    pub long_version: &'static str,
     /// Short adapter-flavored help text (one-line, shown by `--help`).
-    pub about: &'a str,
+    pub about: &'static str,
     /// Long adapter-flavored help text (multi-paragraph, shown by
     /// `--help` in full mode).
-    pub long_about: &'a str,
+    pub long_about: &'static str,
     /// `after_help` block with adapter-specific examples
     /// (`crap4rs --coverage lcov.info ...` etc.). May be empty.
-    pub after_help: &'a str,
+    pub after_help: &'static str,
     /// Coverage-tool hint shown when `--coverage` points at a file
     /// with no `SF:` / `DA:` records. Adapter-specific because the
     /// remediation depends on the coverage toolchain (Rust: `cargo
     /// llvm-cov --lcov`; TS: `c8 --reporter=lcov`).
-    pub coverage_hint: &'a str,
+    pub coverage_hint: &'static str,
     /// File extensions the walker should pick up (e.g.,
     /// `&["rs"]` for crap4rs; `&["ts","tsx","js","jsx","mjs","cjs"]`
-    /// for crap4ts). Carried as `&[&str]` so the binary can supply a
-    /// `&'static` literal slice; copied into `AnalyzeOptions.extensions`
-    /// at the orchestration boundary.
-    pub extensions: &'a [&'a str],
+    /// for crap4ts). Adapter binaries supply a `const &[&str]`; copied
+    /// into `AnalyzeOptions.extensions` at the orchestration boundary.
+    pub extensions: &'static [&'static str],
     /// Adapter repo URL spliced into SARIF's
     /// `runs[0].tool.driver.informationUri`. Adapter-specific so
     /// crap4ts SARIF output links to crap4ts's repo, not crap4rs's.
-    pub tool_info_uri: &'a str,
+    pub tool_info_uri: &'static str,
     /// Adapter rule-help URL spliced into SARIF's
     /// `runs[0].tool.driver.rules[0].helpUri`. Adapter-specific for
     /// the same reason as `tool_info_uri`.
-    pub rule_help_uri: &'a str,
+    pub rule_help_uri: &'static str,
     /// Conventional config file name the adapter binary auto-discovers
     /// in the working directory (e.g., `"crap4rs.toml"` for the Rust
     /// adapter; `"crap4ts.toml"` for the TS adapter). Threaded through
     /// to `discover_config` and surfaced in `--view <preset>`
     /// error hints so users see the right file name to create.
-    pub config_file_name: &'a str,
+    pub config_file_name: &'static str,
 }
 
-impl<'a> AdapterMeta<'a> {
+impl AdapterMeta {
     /// Allocate an owned `Vec<String>` from `extensions` for inclusion
     /// in `AnalyzeOptions` (which owns its config rather than borrowing
     /// from the meta, decoupling analysis lifetime from CLI lifetime).
     pub fn extensions_owned(&self) -> Vec<String> {
         self.extensions.iter().map(|e| (*e).to_string()).collect()
+    }
+
+    /// Trip on construction with empty required strings. `extensions`
+    /// is allowed to be empty — `core::ensure_source_files_found`
+    /// surfaces a parser-neutral diagnostic when no files match. Other
+    /// fields are mandatory for help/SARIF/`--version` rendering, and a
+    /// silent empty string here would produce malformed output that's
+    /// hard to trace back to the meta. Debug-only so release builds
+    /// stay zero-cost; production binaries should never hit these
+    /// (their meta is `env!()` / `const`).
+    pub(crate) fn debug_assert_required_fields(&self) {
+        debug_assert!(
+            !self.tool_name.is_empty(),
+            "AdapterMeta.tool_name must not be empty"
+        );
+        debug_assert!(
+            !self.tool_version.is_empty(),
+            "AdapterMeta.tool_version must not be empty"
+        );
+        debug_assert!(
+            !self.long_version.is_empty(),
+            "AdapterMeta.long_version must not be empty"
+        );
+        debug_assert!(
+            !self.about.is_empty(),
+            "AdapterMeta.about must not be empty"
+        );
+        debug_assert!(
+            !self.long_about.is_empty(),
+            "AdapterMeta.long_about must not be empty"
+        );
+        debug_assert!(
+            !self.coverage_hint.is_empty(),
+            "AdapterMeta.coverage_hint must not be empty"
+        );
+        debug_assert!(
+            !self.tool_info_uri.is_empty(),
+            "AdapterMeta.tool_info_uri must not be empty"
+        );
+        debug_assert!(
+            !self.rule_help_uri.is_empty(),
+            "AdapterMeta.rule_help_uri must not be empty"
+        );
+        debug_assert!(
+            !self.config_file_name.is_empty(),
+            "AdapterMeta.config_file_name must not be empty"
+        );
     }
 }
 
@@ -676,7 +723,8 @@ impl<'a> AdapterMeta<'a> {
 /// compile time (crap-core's `0.1.0`); the adapter binary's own
 /// `CARGO_PKG_VERSION` and `<ADAPTER>_LONG_VERSION` only resolve in
 /// the binary's compile and reach us by parameter.
-pub fn parse_args(meta: &AdapterMeta<'_>) -> Cli {
+pub fn parse_args(meta: &AdapterMeta) -> Cli {
+    meta.debug_assert_required_fields();
     let cmd = build_command(meta);
     let matches = cmd.get_matches();
     Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit())
@@ -711,24 +759,18 @@ fn current_bin_name(meta_fallback: &str) -> String {
 /// bin name through `current_bin_name` directly because
 /// `clap_complete::generate` takes the bin name as a separate arg.
 ///
-/// `version` / `long_version` / `name` / `bin_name` go through
-/// `Box::leak` because clap 4.6.0's `clap::builder::Str` implements
-/// `From<&'static str>` but **not** `From<String>` — the strings must
-/// outlive the parsed `Command`, which lives for the program's
-/// lifetime. The leak is fixed-size (≤ 4 small strings) and one-shot
-/// at startup. `about` / `long_about` / `after_help` accept
-/// `Into<StyledStr>` directly so `String` works there without
-/// leaking.
-fn build_command(meta: &AdapterMeta<'_>) -> clap::Command {
-    let bin_static: &'static str = Box::leak(current_bin_name(meta.tool_name).into_boxed_str());
-    let version_static: &'static str = Box::leak(meta.tool_version.to_string().into_boxed_str());
-    let long_version_static: &'static str =
-        Box::leak(meta.long_version.to_string().into_boxed_str());
+/// All metadata fields accept owned `String` directly thanks to clap's
+/// `string` feature, which adds `impl From<String> for clap::builder::Str`.
+/// Without the feature, `name` / `bin_name` / `version` / `long_version`
+/// require `&'static str` and the only way to satisfy that from a
+/// runtime-built `String` is `Box::leak` — see #161.
+fn build_command(meta: &AdapterMeta) -> clap::Command {
+    let bin_name = current_bin_name(meta.tool_name);
     let mut cmd = Cli::command()
-        .name(bin_static)
-        .bin_name(bin_static)
-        .version(version_static)
-        .long_version(long_version_static)
+        .name(bin_name.clone())
+        .bin_name(bin_name)
+        .version(meta.tool_version.to_string())
+        .long_version(meta.long_version.to_string())
         .about(meta.about.to_string())
         .long_about(meta.long_about.to_string());
     if !meta.after_help.is_empty() {
@@ -769,7 +811,7 @@ pub fn run<P, F>(
     cli: Cli,
     complexity: &dyn ComplexityPort,
     coverage_factory: F,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> ExitCode
 where
     P: ParseDiagnostic + std::fmt::Display + 'static,
@@ -789,7 +831,7 @@ fn run_inner<P, F>(
     mut cli: Cli,
     complexity: &dyn ComplexityPort,
     coverage_factory: F,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> Result<bool>
 where
     P: ParseDiagnostic + std::fmt::Display + 'static,
@@ -899,7 +941,7 @@ fn merge_effective_inputs(cli: &Cli, file_config: &Option<FileConfig>) -> Effect
 fn validate_runtime_inputs<'a>(
     cli: &'a Cli,
     inputs: &EffectiveInputs,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> Result<&'a Path> {
     // `--coverage` is required on the analysis path; subcommands like
     // `completions` skip this branch. Clap can't express "required
@@ -930,7 +972,7 @@ fn build_analyze_options(
     cli: &Cli,
     inputs: &EffectiveInputs,
     coverage: &Path,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> AnalyzeOptions {
     AnalyzeOptions {
         src: inputs.src.clone(),
@@ -974,7 +1016,7 @@ fn prepare_pipeline<P, F>(
     cli: &mut Cli,
     complexity: &dyn ComplexityPort,
     coverage_factory: F,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> Result<PipelinePrep<P>>
 where
     P: ParseDiagnostic + std::fmt::Display + 'static,
@@ -1046,7 +1088,7 @@ fn format_as_json<P: ParseDiagnostic>(
     delta_state: Option<&DeltaState<P>>,
     analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> Result<String> {
     let delta_ctx = delta_state.zip(delta_view).map(|(s, dv)| DeltaContext {
         view: dv,
@@ -1102,7 +1144,7 @@ fn render_format<P: ParseDiagnostic>(
     delta_state: Option<&DeltaState<P>>,
     analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> Result<String> {
     Ok(match spec.format {
         FormatArg::Table => reporters::format_table_with_explain(
@@ -1157,7 +1199,7 @@ fn print_formatted_output<P: ParseDiagnostic>(
     delta_state: Option<&DeltaState<P>>,
     analysis: &AnalysisOutput<P>,
     inputs: &EffectiveInputs,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> Result<()> {
     for spec in &cli.output.format {
         let output = render_format(
@@ -1446,7 +1488,7 @@ fn preflight_git_worktree(src: &Path) -> Result<()> {
 fn preflight_checks<P>(
     coverage: &std::path::Path,
     coverage_port: &dyn CoveragePort<Diagnostic = P>,
-    meta: &AdapterMeta<'_>,
+    meta: &AdapterMeta,
 ) -> Result<()>
 where
     P: ParseDiagnostic,
@@ -2459,5 +2501,77 @@ mod tests {
         assert!(compute_exit_code::<
             crate::test_strategies::DummyParseDiagnostic,
         >(&cli, false, None));
+    }
+
+    // ── AdapterMeta unit tests (#161) ──────────────────────────────
+
+    fn fake_meta() -> AdapterMeta {
+        AdapterMeta {
+            tool_name: "fake-adapter",
+            tool_version: "9.9.9",
+            long_version: "9.9.9 (test 2099-01-01)",
+            about: "Fake adapter for tests",
+            long_about: "Fake adapter for tests — verifies AdapterMeta plumbing without binding crap-core to any real adapter.",
+            after_help: "",
+            coverage_hint: "no coverage tool — fake adapter",
+            extensions: &["fake"],
+            tool_info_uri: "https://example.invalid/fake-adapter",
+            rule_help_uri: "https://example.invalid/fake-adapter#rules",
+            config_file_name: "fake-adapter.toml",
+        }
+    }
+
+    #[test]
+    fn adapter_meta_extensions_owned_roundtrips_to_owned_strings() {
+        let meta = AdapterMeta {
+            extensions: &["ts", "tsx", "js"],
+            ..fake_meta()
+        };
+        let owned = meta.extensions_owned();
+        assert_eq!(
+            owned,
+            vec!["ts".to_string(), "tsx".to_string(), "js".to_string()]
+        );
+        // Round-trip via Vec<&str> back to a slice-equivalent shape.
+        let back: Vec<&str> = owned.iter().map(String::as_str).collect();
+        assert_eq!(back, &["ts", "tsx", "js"]);
+    }
+
+    #[test]
+    fn adapter_meta_extensions_owned_handles_empty_slice() {
+        // `extensions` is allowed to be empty; the diagnostic surfaces
+        // downstream in `core::ensure_source_files_found`.
+        let meta = AdapterMeta {
+            extensions: &[],
+            ..fake_meta()
+        };
+        assert!(meta.extensions_owned().is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "tool_name must not be empty")]
+    fn adapter_meta_debug_assert_trips_on_empty_tool_name() {
+        let meta = AdapterMeta {
+            tool_name: "",
+            ..fake_meta()
+        };
+        meta.debug_assert_required_fields();
+    }
+
+    #[test]
+    #[should_panic(expected = "config_file_name must not be empty")]
+    fn adapter_meta_debug_assert_trips_on_empty_config_file_name() {
+        let meta = AdapterMeta {
+            config_file_name: "",
+            ..fake_meta()
+        };
+        meta.debug_assert_required_fields();
+    }
+
+    #[test]
+    fn adapter_meta_debug_assert_passes_on_all_fields_set() {
+        // Smoke test: a meta with every required field populated should
+        // pass the debug_assert sweep without panicking.
+        fake_meta().debug_assert_required_fields();
     }
 }

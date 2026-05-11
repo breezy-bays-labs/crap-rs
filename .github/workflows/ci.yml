@@ -441,6 +441,44 @@ jobs:
             exit 1
           fi
           echo "crap-core direct dependencies: clean"
+      - name: Reject adapter-name string literals in crap-core
+        # Structural protection against silent re-coupling: if a future
+        # change re-introduces `"crap4rs"` or `"crap4ts"` as a string
+        # literal in crap-core source, that's a regression — adapter
+        # names belong in `AdapterMeta` supplied by the binary, never
+        # baked into the language-agnostic library (#161).
+        #
+        # Doc comments and code comments (`///`, `//!`, `//`, leading
+        # `*` in block comments) are allowed to mention the adapter
+        # names — those are legitimate references in the API surface
+        # docstrings. The awk filter strips rg's `path:lineno:` prefix
+        # and only fires on lines whose content (after optional
+        # whitespace) does NOT start with a comment marker.
+        #
+        # No untrusted-input interpolation: literals and patterns are
+        # static; `rg`/`awk` invocations contain no `${{ github.* }}`
+        # references.
+        run: |
+          set -euo pipefail
+          hits=$(rg -nF -e '"crap4rs"' -e '"crap4ts"' crates/crap-core/src 2>/dev/null || true)
+          if [ -z "$hits" ]; then
+            echo "crap-core adapter-name literals: clean"
+            exit 0
+          fi
+          non_comment_hits=$(echo "$hits" | awk -F: '
+            {
+              content = ""
+              for (i = 3; i <= NF; i++) content = content (i > 3 ? ":" : "") $i
+              gsub(/^[ \t]+/, "", content)
+              if (content !~ /^(\/\/|\*)/) print
+            }
+          ')
+          if [ -n "$non_comment_hits" ]; then
+            echo "::error::crap-core must not contain \"crap4rs\" / \"crap4ts\" string literals — adapter names belong in AdapterMeta from the binary (see #161)"
+            echo "$non_comment_hits"
+            exit 1
+          fi
+          echo "crap-core adapter-name literals: clean (comment-only references allowed)"
 
   docs:
     name: cargo doc (warnings as errors)

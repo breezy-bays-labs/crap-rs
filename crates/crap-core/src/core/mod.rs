@@ -100,10 +100,12 @@ impl Default for AnalyzeOptions {
             exclude: Vec::new(),
             respect_gitignore: true,
             diff_ref: None,
-            // `["rs"]` is the default for library tests that don't
-            // construct a full `AdapterMeta`. Adapter binaries
-            // override via `AdapterMeta::extensions`.
-            extensions: vec!["rs".to_string()],
+            // Empty by default — adapter-language coupling stays in
+            // each binary's `AdapterMeta::extensions`. Library tests
+            // that construct `AnalyzeOptions` directly must set this
+            // explicitly; `ensure_source_files_found` surfaces a
+            // parser-neutral diagnostic when nothing matches (#161).
+            extensions: Vec::new(),
             compute_diagnostics: false,
         }
     }

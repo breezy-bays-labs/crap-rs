@@ -26,7 +26,7 @@ authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
 crap-core = { path = "crates/crap-core", version = "0.1.0" }
 
 # ── CLI (crap4rs only today) ──
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "string"] }
 clap_complete = "4"
 clap_complete_nushell = "4"
 

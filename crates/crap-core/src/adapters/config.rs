@@ -690,4 +690,36 @@ sort = "path"
         );
         assert_eq!(config.views["path_sort"].sort, Some(SortKey::Path));
     }
+
+    // ── discover_config parameterization (#161) ───────────────────
+
+    #[test]
+    fn discover_config_honors_caller_supplied_name() {
+        // Verifies the `name` parameter actually drives lookup — a
+        // regression would silently fall back to a hardcoded constant
+        // (e.g., the v0.4 `crap4rs.toml` literal) and make the second
+        // adapter (`crap4ts.toml`) invisible to discovery.
+        let dir = tempfile::tempdir().unwrap();
+        let cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        // Both adapters' conventional config names: only the one
+        // actually on disk should be returned, and the lookup must be
+        // param-driven (not constant).
+        std::fs::write(dir.path().join("crap4ts.toml"), "threshold = 7.0\n").unwrap();
+
+        let rust_lookup = discover_config("crap4rs.toml").unwrap();
+        let ts_lookup = discover_config("crap4ts.toml").unwrap();
+        let alt_lookup = discover_config("custom-tool.toml").unwrap();
+
+        std::env::set_current_dir(cwd).unwrap();
+
+        assert_eq!(rust_lookup, None, "absent crap4rs.toml must return None");
+        assert_eq!(
+            ts_lookup,
+            Some(PathBuf::from("crap4ts.toml")),
+            "present crap4ts.toml must be discovered by name"
+        );
+        assert_eq!(alt_lookup, None, "absent custom name must return None");
+    }
 }
