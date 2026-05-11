@@ -1462,10 +1462,18 @@ fn check_coverage_has_data<P>(
 where
     P: ParseDiagnostic,
 {
-    let data = std::fs::read_to_string(path)?;
-    if coverage_port.validate(&data).is_err() {
+    // The adapter's `validate` streams the file itself (LCOV) or
+    // slurps (Istanbul, post-implementation) — whichever is cheaper
+    // for that format. We do NOT pre-read here: `core::analyze` will
+    // read the file again for the full parse pass, and slurping twice
+    // for large workspaces (100 MB+ LCOV) is a memory regression.
+    //
+    // The validation reason (e.g. `"no SF/DA records"`) is surfaced
+    // alongside the path so the user knows whether the file was
+    // syntactically empty, malformed, or just missing data points.
+    if let Err(reason) = coverage_port.validate(path) {
         bail!(
-            "no coverage data found in {}\n  hint: {}",
+            "no coverage data found in {} ({reason})\n  hint: {}",
             path.display(),
             coverage_hint,
         );
@@ -2186,7 +2194,7 @@ mod tests {
             unreachable!("preflight tests never invoke parse")
         }
 
-        fn validate(&self, _data: &str) -> Result<(), String> {
+        fn validate(&self, _path: &std::path::Path) -> Result<(), String> {
             self.validate_result.clone()
         }
     }
@@ -2213,6 +2221,10 @@ mod tests {
             check_coverage_has_data(&cov, &stub_err("no records"), TEST_COVERAGE_HINT).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("no coverage data found"));
+        // The adapter's structural reason is surfaced alongside the
+        // path so the user knows whether the file was empty,
+        // malformed, or just missing data points.
+        assert!(msg.contains("no records"), "expected reason in msg: {msg}");
         assert!(msg.contains(TEST_COVERAGE_HINT));
     }
 
@@ -2223,26 +2235,6 @@ mod tests {
         std::fs::write(&cov, "any contents — adapter decides").unwrap();
 
         assert!(check_coverage_has_data(&cov, &stub_ok(), TEST_COVERAGE_HINT).is_ok());
-    }
-
-    #[test]
-    fn preflight_propagates_io_errors_for_missing_files() {
-        let dir = tempfile::tempdir().unwrap();
-        let missing = dir.path().join("does_not_exist.info");
-
-        let err = check_coverage_has_data(&missing, &stub_ok(), TEST_COVERAGE_HINT).unwrap_err();
-        // I/O error surfaces as a `CrapError::Io` (via `?` on `read_to_string`);
-        // the user-facing wrapper from `validate_inputs` covers the
-        // "coverage file not found" hint path. This test guards the
-        // boundary: an unreadable file must NOT silently pass preflight.
-        let kind = err
-            .downcast_ref::<std::io::Error>()
-            .map(|e| e.kind())
-            .or_else(|| {
-                err.chain()
-                    .find_map(|e| e.downcast_ref::<std::io::Error>().map(|e| e.kind()))
-            });
-        assert_eq!(kind, Some(std::io::ErrorKind::NotFound));
     }
 
     // ── --strict / --lenient flag tests ───────────────────────────────

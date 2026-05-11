@@ -3564,61 +3564,77 @@ expression: pretty
       {
         "exceeds": true,
         "scored": {
-          "complexity": 8,
+          "complexity": 10,
           "complexity_metric": "cognitive",
           "contributors": [
             {
-              "column": 9,
-              "end_line": 93,
+              "column": 73,
+              "end_line": 84,
               "increment": 1,
-              "kind": "for-loop",
-              "line": 80,
+              "kind": "try",
+              "line": 84,
               "nesting_depth": 0
             },
             {
-              "column": 13,
-              "end_line": 84,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 81,
-              "nesting_depth": 1
+              "column": 9,
+              "end_line": 101,
+              "increment": 1,
+              "kind": "for-loop",
+              "line": 87,
+              "nesting_depth": 0
             },
             {
-              "column": 17,
-              "end_line": 83,
+              "column": 68,
+              "end_line": 88,
               "increment": 1,
-              "kind": "continue",
-              "line": 83,
-              "nesting_depth": 2
+              "kind": "try",
+              "line": 88,
+              "nesting_depth": 1
             },
             {
               "column": 13,
               "end_line": 92,
               "increment": 2,
               "kind": "if-branch",
-              "line": 85,
+              "line": 89,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 86,
+              "end_line": 91,
+              "increment": 1,
+              "kind": "continue",
+              "line": 91,
+              "nesting_depth": 2
+            },
+            {
+              "column": 13,
+              "end_line": 100,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 93,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 94,
               "increment": 1,
               "kind": "logical-operator",
-              "line": 86,
+              "line": 94,
               "nesting_depth": 1
             }
           ],
           "coverage_percent": 0.0,
           "crap": {
             "risk_level": "high",
-            "value": 72.0
+            "value": 110.0
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "LcovParser::validate",
             "span": {
               "end_column": 5,
-              "end_line": 95,
+              "end_line": 103,
               "start_column": 5,
               "start_line": 71
             }
@@ -3634,26 +3650,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 102,
+              "end_line": 110,
               "increment": 1,
               "kind": "if-branch",
-              "line": 99,
+              "line": 107,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 107,
+              "end_line": 115,
               "increment": 1,
               "kind": "if-branch",
-              "line": 104,
+              "line": 112,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 111,
+              "end_line": 119,
               "increment": 1,
               "kind": "if-branch",
-              "line": 109,
+              "line": 117,
               "nesting_depth": 0
             }
           ],
@@ -3667,9 +3683,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 112,
+              "end_line": 120,
               "start_column": 1,
-              "start_line": 98
+              "start_line": 106
             }
           }
         },
@@ -3683,10 +3699,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 124,
+              "end_line": 132,
               "increment": 1,
               "kind": "if-branch",
-              "line": 117,
+              "line": 125,
               "nesting_depth": 0
             }
           ],
@@ -3700,9 +3716,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 125,
+              "end_line": 133,
               "start_column": 1,
-              "start_line": 114
+              "start_line": 122
             }
           }
         },
@@ -3716,18 +3732,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 130,
+              "end_line": 138,
               "increment": 1,
               "kind": "if-branch",
-              "line": 128,
+              "line": 136,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 135,
+              "end_line": 143,
               "increment": 1,
               "kind": "match",
-              "line": 132,
+              "line": 140,
               "nesting_depth": 0
             }
           ],
@@ -3741,9 +3757,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 136,
+              "end_line": 144,
               "start_column": 1,
-              "start_line": 127
+              "start_line": 135
             }
           }
         },
@@ -3757,18 +3773,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 141,
+              "end_line": 149,
               "increment": 1,
               "kind": "if-branch",
-              "line": 139,
+              "line": 147,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 148,
+              "end_line": 156,
               "increment": 1,
               "kind": "match",
-              "line": 143,
+              "line": 151,
               "nesting_depth": 0
             }
           ],
@@ -3782,9 +3798,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 149,
+              "end_line": 157,
               "start_column": 1,
-              "start_line": 138
+              "start_line": 146
             }
           }
         },
@@ -3806,9 +3822,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 158,
+              "end_line": 166,
               "start_column": 1,
-              "start_line": 151
+              "start_line": 159
             }
           }
         },
@@ -3822,42 +3838,42 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 163,
+              "end_line": 171,
               "increment": 1,
               "kind": "try",
-              "line": 163,
+              "line": 171,
               "nesting_depth": 0
             },
             {
               "column": 52,
-              "end_line": 165,
+              "end_line": 173,
               "increment": 1,
               "kind": "try",
-              "line": 165,
+              "line": 173,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 166,
+              "end_line": 174,
               "increment": 1,
               "kind": "try",
-              "line": 166,
+              "line": 174,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 169,
+              "end_line": 177,
               "increment": 1,
               "kind": "if-branch",
-              "line": 167,
+              "line": 175,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 170,
+              "end_line": 178,
               "increment": 1,
               "kind": "try",
-              "line": 170,
+              "line": 178,
               "nesting_depth": 0
             }
           ],
@@ -3871,9 +3887,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 172,
+              "end_line": 180,
               "start_column": 1,
-              "start_line": 160
+              "start_line": 168
             }
           }
         },
@@ -3887,54 +3903,14 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 179,
-              "increment": 1,
-              "kind": "try",
-              "line": 179,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 180,
-              "increment": 1,
-              "kind": "try",
-              "line": 180,
-              "nesting_depth": 0
-            },
-            {
-              "column": 44,
-              "end_line": 181,
-              "increment": 1,
-              "kind": "try",
-              "line": 181,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 182,
-              "increment": 1,
-              "kind": "try",
-              "line": 182,
-              "nesting_depth": 0
-            },
-            {
-              "column": 58,
-              "end_line": 184,
-              "increment": 1,
-              "kind": "try",
-              "line": 184,
-              "nesting_depth": 0
-            },
-            {
-              "column": 5,
               "end_line": 187,
               "increment": 1,
-              "kind": "if-branch",
-              "line": 185,
+              "kind": "try",
+              "line": 187,
               "nesting_depth": 0
             },
             {
-              "column": 55,
+              "column": 43,
               "end_line": 188,
               "increment": 1,
               "kind": "try",
@@ -3942,7 +3918,7 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 57,
+              "column": 44,
               "end_line": 189,
               "increment": 1,
               "kind": "try",
@@ -3950,19 +3926,59 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 17,
-              "end_line": 194,
+              "column": 43,
+              "end_line": 190,
               "increment": 1,
-              "kind": "if-branch",
+              "kind": "try",
               "line": 190,
               "nesting_depth": 0
             },
             {
-              "column": 54,
-              "end_line": 193,
+              "column": 58,
+              "end_line": 192,
               "increment": 1,
               "kind": "try",
+              "line": 192,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 195,
+              "increment": 1,
+              "kind": "if-branch",
               "line": 193,
+              "nesting_depth": 0
+            },
+            {
+              "column": 55,
+              "end_line": 196,
+              "increment": 1,
+              "kind": "try",
+              "line": 196,
+              "nesting_depth": 0
+            },
+            {
+              "column": 57,
+              "end_line": 197,
+              "increment": 1,
+              "kind": "try",
+              "line": 197,
+              "nesting_depth": 0
+            },
+            {
+              "column": 17,
+              "end_line": 202,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 198,
+              "nesting_depth": 0
+            },
+            {
+              "column": 54,
+              "end_line": 201,
+              "increment": 1,
+              "kind": "try",
+              "line": 201,
               "nesting_depth": 1
             }
           ],
@@ -3976,9 +3992,9 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 197,
+              "end_line": 205,
               "start_column": 1,
-              "start_line": 174
+              "start_line": 182
             }
           }
         },
@@ -3992,10 +4008,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 203,
+              "end_line": 211,
               "increment": 1,
               "kind": "let-else",
-              "line": 200,
+              "line": 208,
               "nesting_depth": 0
             }
           ],
@@ -4009,9 +4025,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 208,
+              "end_line": 216,
               "start_column": 1,
-              "start_line": 199
+              "start_line": 207
             }
           }
         },
@@ -4025,18 +4041,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 217,
+              "end_line": 225,
               "increment": 1,
               "kind": "if-branch",
-              "line": 215,
+              "line": 223,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 222,
+              "end_line": 230,
               "increment": 1,
               "kind": "for-loop",
-              "line": 220,
+              "line": 228,
               "nesting_depth": 0
             }
           ],
@@ -4050,9 +4066,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 223,
+              "end_line": 231,
               "start_column": 1,
-              "start_line": 210
+              "start_line": 218
             }
           }
         },
@@ -4066,18 +4082,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 232,
+              "end_line": 240,
               "increment": 1,
               "kind": "if-branch",
-              "line": 230,
+              "line": 238,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 237,
+              "end_line": 245,
               "increment": 1,
               "kind": "for-loop",
-              "line": 235,
+              "line": 243,
               "nesting_depth": 0
             }
           ],
@@ -4091,9 +4107,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 238,
+              "end_line": 246,
               "start_column": 1,
-              "start_line": 225
+              "start_line": 233
             }
           }
         },
@@ -4115,9 +4131,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 245,
+              "end_line": 253,
               "start_column": 1,
-              "start_line": 240
+              "start_line": 248
             }
           }
         },
@@ -4139,9 +4155,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 256,
+              "end_line": 264,
               "start_column": 1,
-              "start_line": 247
+              "start_line": 255
             }
           }
         },
@@ -4155,10 +4171,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 264,
+              "end_line": 272,
               "increment": 1,
               "kind": "match",
-              "line": 259,
+              "line": 267,
               "nesting_depth": 0
             }
           ],
@@ -4172,9 +4188,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 265,
+              "end_line": 273,
               "start_column": 1,
-              "start_line": 258
+              "start_line": 266
             }
           }
         },
@@ -4196,9 +4212,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 270,
+              "end_line": 278,
               "start_column": 1,
-              "start_line": 267
+              "start_line": 275
             }
           }
         },
@@ -4220,9 +4236,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 298,
+              "end_line": 306,
               "start_column": 1,
-              "start_line": 272
+              "start_line": 280
             }
           }
         },
@@ -4244,9 +4260,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 305,
+              "end_line": 313,
               "start_column": 1,
-              "start_line": 300
+              "start_line": 308
             }
           }
         },
@@ -4268,9 +4284,9 @@ expression: pretty
             "qualified_name": "parser",
             "span": {
               "end_column": 5,
-              "end_line": 314,
+              "end_line": 322,
               "start_column": 5,
-              "start_line": 312
+              "start_line": 320
             }
           }
         },
@@ -4292,9 +4308,9 @@ expression: pretty
             "qualified_name": "parse",
             "span": {
               "end_column": 5,
-              "end_line": 318,
+              "end_line": 326,
               "start_column": 5,
-              "start_line": 316
+              "start_line": 324
             }
           }
         },
@@ -4316,9 +4332,33 @@ expression: pretty
             "qualified_name": "empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 325,
+              "end_line": 333,
               "start_column": 5,
-              "start_line": 320
+              "start_line": 328
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_str",
+            "span": {
+              "end_column": 5,
+              "end_line": 347,
+              "start_column": 5,
+              "start_line": 337
             }
           }
         },
@@ -4340,9 +4380,9 @@ expression: pretty
             "qualified_name": "validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 332,
+              "end_line": 352,
               "start_column": 5,
-              "start_line": 329
+              "start_line": 349
             }
           }
         },
@@ -4364,9 +4404,9 @@ expression: pretty
             "qualified_name": "validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 341,
+              "end_line": 357,
               "start_column": 5,
-              "start_line": 334
+              "start_line": 354
             }
           }
         },
@@ -4388,9 +4428,9 @@ expression: pretty
             "qualified_name": "validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 346,
+              "end_line": 362,
               "start_column": 5,
-              "start_line": 343
+              "start_line": 359
             }
           }
         },
@@ -4412,9 +4452,9 @@ expression: pretty
             "qualified_name": "validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 355,
+              "end_line": 367,
               "start_column": 5,
-              "start_line": 348
+              "start_line": 364
             }
           }
         },
@@ -4436,9 +4476,9 @@ expression: pretty
             "qualified_name": "validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 364,
+              "end_line": 372,
               "start_column": 5,
-              "start_line": 357
+              "start_line": 369
             }
           }
         },
@@ -4460,9 +4500,33 @@ expression: pretty
             "qualified_name": "validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 375,
+              "end_line": 382,
               "start_column": 5,
-              "start_line": 366
+              "start_line": 374
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_missing_path_returns_open_error",
+            "span": {
+              "end_column": 5,
+              "end_line": 394,
+              "start_column": 5,
+              "start_line": 384
             }
           }
         },
@@ -4484,9 +4548,9 @@ expression: pretty
             "qualified_name": "single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 385,
+              "end_line": 404,
               "start_column": 5,
-              "start_line": 377
+              "start_line": 396
             }
           }
         },
@@ -4508,9 +4572,9 @@ expression: pretty
             "qualified_name": "multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 395,
+              "end_line": 414,
               "start_column": 5,
-              "start_line": 387
+              "start_line": 406
             }
           }
         },
@@ -4532,9 +4596,9 @@ expression: pretty
             "qualified_name": "multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 404,
+              "end_line": 423,
               "start_column": 5,
-              "start_line": 397
+              "start_line": 416
             }
           }
         },
@@ -4556,9 +4620,9 @@ expression: pretty
             "qualified_name": "hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 412,
+              "end_line": 431,
               "start_column": 5,
-              "start_line": 406
+              "start_line": 425
             }
           }
         },
@@ -4578,78 +4642,6 @@ expression: pretty
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "path_normalization_strips_prefix",
-            "span": {
-              "end_column": 5,
-              "end_line": 418,
-              "start_column": 5,
-              "start_line": 414
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 2.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "non_matching_path_passes_through",
-            "span": {
-              "end_column": 5,
-              "end_line": 424,
-              "start_column": 5,
-              "start_line": 420
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 2.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "backslash_normalized_to_forward_slash",
-            "span": {
-              "end_column": 5,
-              "end_line": 431,
-              "start_column": 5,
-              "start_line": 426
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 2.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
               "end_line": 437,
@@ -4673,12 +4665,84 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "non_matching_path_passes_through",
+            "span": {
+              "end_column": 5,
+              "end_line": 443,
+              "start_column": 5,
+              "start_line": 439
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "backslash_normalized_to_forward_slash",
+            "span": {
+              "end_column": 5,
+              "end_line": 450,
+              "start_column": 5,
+              "start_line": 445
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "path_boundary_not_confused_by_prefix_substring",
+            "span": {
+              "end_column": 5,
+              "end_line": 456,
+              "start_column": 5,
+              "start_line": 452
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 451,
+              "end_line": 470,
               "start_column": 5,
-              "start_line": 439
+              "start_line": 458
             }
           }
         },
@@ -4700,9 +4764,9 @@ expression: pretty
             "qualified_name": "duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 460,
+              "end_line": 479,
               "start_column": 5,
-              "start_line": 453
+              "start_line": 472
             }
           }
         },
@@ -4724,9 +4788,9 @@ expression: pretty
             "qualified_name": "duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 472,
+              "end_line": 491,
               "start_column": 5,
-              "start_line": 462
+              "start_line": 481
             }
           }
         },
@@ -4740,10 +4804,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 488,
+              "end_line": 507,
               "increment": 1,
               "kind": "match",
-              "line": 479,
+              "line": 498,
               "nesting_depth": 0
             }
           ],
@@ -4757,9 +4821,9 @@ expression: pretty
             "qualified_name": "malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 489,
+              "end_line": 508,
               "start_column": 5,
-              "start_line": 474
+              "start_line": 493
             }
           }
         },
@@ -4781,9 +4845,9 @@ expression: pretty
             "qualified_name": "malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 497,
+              "end_line": 516,
               "start_column": 5,
-              "start_line": 491
+              "start_line": 510
             }
           }
         },
@@ -4805,9 +4869,9 @@ expression: pretty
             "qualified_name": "da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 507,
+              "end_line": 526,
               "start_column": 5,
-              "start_line": 499
+              "start_line": 518
             }
           }
         },
@@ -4829,9 +4893,9 @@ expression: pretty
             "qualified_name": "da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 517,
+              "end_line": 536,
               "start_column": 5,
-              "start_line": 509
+              "start_line": 528
             }
           }
         },
@@ -4845,10 +4909,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 532,
+              "end_line": 551,
               "increment": 1,
               "kind": "match",
-              "line": 523,
+              "line": 542,
               "nesting_depth": 0
             }
           ],
@@ -4862,9 +4926,9 @@ expression: pretty
             "qualified_name": "da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 533,
+              "end_line": 552,
               "start_column": 5,
-              "start_line": 519
+              "start_line": 538
             }
           }
         },
@@ -4886,9 +4950,9 @@ expression: pretty
             "qualified_name": "end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 544,
+              "end_line": 563,
               "start_column": 5,
-              "start_line": 535
+              "start_line": 554
             }
           }
         },
@@ -4910,9 +4974,9 @@ expression: pretty
             "qualified_name": "unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 551,
+              "end_line": 570,
               "start_column": 5,
-              "start_line": 546
+              "start_line": 565
             }
           }
         },
@@ -4934,9 +4998,9 @@ expression: pretty
             "qualified_name": "empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 562,
+              "end_line": 581,
               "start_column": 5,
-              "start_line": 553
+              "start_line": 572
             }
           }
         },
@@ -4958,9 +5022,9 @@ expression: pretty
             "qualified_name": "da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 571,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 564
+              "start_line": 583
             }
           }
         },
@@ -4982,9 +5046,9 @@ expression: pretty
             "qualified_name": "non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 585,
+              "end_line": 604,
               "start_column": 5,
-              "start_line": 573
+              "start_line": 592
             }
           }
         },
@@ -5006,9 +5070,9 @@ expression: pretty
             "qualified_name": "brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 597,
+              "end_line": 616,
               "start_column": 5,
-              "start_line": 589
+              "start_line": 608
             }
           }
         },
@@ -5030,9 +5094,9 @@ expression: pretty
             "qualified_name": "brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 604,
+              "end_line": 623,
               "start_column": 5,
-              "start_line": 599
+              "start_line": 618
             }
           }
         },
@@ -5054,9 +5118,9 @@ expression: pretty
             "qualified_name": "brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 611,
+              "end_line": 630,
               "start_column": 5,
-              "start_line": 606
+              "start_line": 625
             }
           }
         },
@@ -5078,9 +5142,9 @@ expression: pretty
             "qualified_name": "brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 618,
+              "end_line": 637,
               "start_column": 5,
-              "start_line": 613
+              "start_line": 632
             }
           }
         },
@@ -5102,9 +5166,9 @@ expression: pretty
             "qualified_name": "duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 628,
+              "end_line": 647,
               "start_column": 5,
-              "start_line": 620
+              "start_line": 639
             }
           }
         },
@@ -5126,9 +5190,9 @@ expression: pretty
             "qualified_name": "brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 636,
+              "end_line": 655,
               "start_column": 5,
-              "start_line": 630
+              "start_line": 649
             }
           }
         },
@@ -5142,10 +5206,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 651,
+              "end_line": 670,
               "increment": 1,
               "kind": "match",
-              "line": 642,
+              "line": 661,
               "nesting_depth": 0
             }
           ],
@@ -5159,9 +5223,9 @@ expression: pretty
             "qualified_name": "malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 652,
+              "end_line": 671,
               "start_column": 5,
-              "start_line": 638
+              "start_line": 657
             }
           }
         },
@@ -5183,9 +5247,9 @@ expression: pretty
             "qualified_name": "brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 663,
+              "end_line": 682,
               "start_column": 5,
-              "start_line": 654
+              "start_line": 673
             }
           }
         },
@@ -5207,9 +5271,9 @@ expression: pretty
             "qualified_name": "brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 674,
+              "end_line": 693,
               "start_column": 5,
-              "start_line": 665
+              "start_line": 684
             }
           }
         },
@@ -5223,10 +5287,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 693,
+              "end_line": 712,
               "increment": 1,
               "kind": "for-loop",
-              "line": 691,
+              "line": 710,
               "nesting_depth": 0
             }
           ],
@@ -5240,9 +5304,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 703,
+              "end_line": 722,
               "start_column": 5,
-              "start_line": 676
+              "start_line": 695
             }
           }
         },
@@ -5264,9 +5328,9 @@ expression: pretty
             "qualified_name": "brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 713,
+              "end_line": 732,
               "start_column": 5,
-              "start_line": 705
+              "start_line": 724
             }
           }
         },
@@ -5288,9 +5352,9 @@ expression: pretty
             "qualified_name": "no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 719,
+              "end_line": 738,
               "start_column": 5,
-              "start_line": 715
+              "start_line": 734
             }
           }
         },
@@ -5312,9 +5376,9 @@ expression: pretty
             "qualified_name": "arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 729,
+              "end_line": 748,
               "start_column": 5,
-              "start_line": 727
+              "start_line": 746
             }
           }
         },
@@ -5328,10 +5392,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 737,
+              "end_line": 756,
               "increment": 2,
               "kind": "for-loop",
-              "line": 734,
+              "line": 753,
               "nesting_depth": 1
             }
           ],
@@ -5345,9 +5409,9 @@ expression: pretty
             "qualified_name": "arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 741,
+              "end_line": 760,
               "start_column": 5,
-              "start_line": 731
+              "start_line": 750
             }
           }
         },
@@ -5369,9 +5433,9 @@ expression: pretty
             "qualified_name": "arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 745,
+              "end_line": 764,
               "start_column": 5,
-              "start_line": 743
+              "start_line": 762
             }
           }
         },
@@ -5557,13 +5621,13 @@ expression: pretty
     ],
     "passed": false,
     "summary": {
-      "average_complexity": 1.515,
+      "average_complexity": 1.5198019801980198,
       "average_coverage": 0.0,
-      "average_crap": 5.57,
+      "average_crap": 5.7227722772277225,
       "distribution": {
         "acceptable": 29,
         "high": 6,
-        "low": 151,
+        "low": 153,
         "moderate": 14
       },
       "exceeding_threshold": 6,
@@ -5577,15 +5641,15 @@ expression: pretty
       "median_crap": 2.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 200,
+      "total_functions": 202,
       "worst_function": {
         "file_path": "adapters/coverage/mod.rs",
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 197,
+          "end_line": 205,
           "start_column": 1,
-          "start_line": 174
+          "start_line": 182
         }
       }
     }
@@ -5595,7 +5659,7 @@ expression: pretty
   "timestamp": "[STRIPPED:timestamp]",
   "tool_version": "[STRIPPED:tool_version]",
   "view": {
-    "eligible_count": 200,
+    "eligible_count": 202,
     "grouped": null,
     "shown": [
       {
@@ -5606,54 +5670,14 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 179,
-              "increment": 1,
-              "kind": "try",
-              "line": 179,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 180,
-              "increment": 1,
-              "kind": "try",
-              "line": 180,
-              "nesting_depth": 0
-            },
-            {
-              "column": 44,
-              "end_line": 181,
-              "increment": 1,
-              "kind": "try",
-              "line": 181,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 182,
-              "increment": 1,
-              "kind": "try",
-              "line": 182,
-              "nesting_depth": 0
-            },
-            {
-              "column": 58,
-              "end_line": 184,
-              "increment": 1,
-              "kind": "try",
-              "line": 184,
-              "nesting_depth": 0
-            },
-            {
-              "column": 5,
               "end_line": 187,
               "increment": 1,
-              "kind": "if-branch",
-              "line": 185,
+              "kind": "try",
+              "line": 187,
               "nesting_depth": 0
             },
             {
-              "column": 55,
+              "column": 43,
               "end_line": 188,
               "increment": 1,
               "kind": "try",
@@ -5661,7 +5685,7 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 57,
+              "column": 44,
               "end_line": 189,
               "increment": 1,
               "kind": "try",
@@ -5669,19 +5693,59 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 17,
-              "end_line": 194,
+              "column": 43,
+              "end_line": 190,
               "increment": 1,
-              "kind": "if-branch",
+              "kind": "try",
               "line": 190,
               "nesting_depth": 0
             },
             {
-              "column": 54,
-              "end_line": 193,
+              "column": 58,
+              "end_line": 192,
               "increment": 1,
               "kind": "try",
+              "line": 192,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 195,
+              "increment": 1,
+              "kind": "if-branch",
               "line": 193,
+              "nesting_depth": 0
+            },
+            {
+              "column": 55,
+              "end_line": 196,
+              "increment": 1,
+              "kind": "try",
+              "line": 196,
+              "nesting_depth": 0
+            },
+            {
+              "column": 57,
+              "end_line": 197,
+              "increment": 1,
+              "kind": "try",
+              "line": 197,
+              "nesting_depth": 0
+            },
+            {
+              "column": 17,
+              "end_line": 202,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 198,
+              "nesting_depth": 0
+            },
+            {
+              "column": 54,
+              "end_line": 201,
+              "increment": 1,
+              "kind": "try",
+              "line": 201,
               "nesting_depth": 1
             }
           ],
@@ -5695,9 +5759,90 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 197,
+              "end_line": 205,
               "start_column": 1,
-              "start_line": 174
+              "start_line": 182
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": true,
+        "scored": {
+          "complexity": 10,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 73,
+              "end_line": 84,
+              "increment": 1,
+              "kind": "try",
+              "line": 84,
+              "nesting_depth": 0
+            },
+            {
+              "column": 9,
+              "end_line": 101,
+              "increment": 1,
+              "kind": "for-loop",
+              "line": 87,
+              "nesting_depth": 0
+            },
+            {
+              "column": 68,
+              "end_line": 88,
+              "increment": 1,
+              "kind": "try",
+              "line": 88,
+              "nesting_depth": 1
+            },
+            {
+              "column": 13,
+              "end_line": 92,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 89,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 91,
+              "increment": 1,
+              "kind": "continue",
+              "line": 91,
+              "nesting_depth": 2
+            },
+            {
+              "column": 13,
+              "end_line": 100,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 93,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 94,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 94,
+              "nesting_depth": 1
+            }
+          ],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "high",
+            "value": 110.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "LcovParser::validate",
+            "span": {
+              "end_column": 5,
+              "end_line": 103,
+              "start_column": 5,
+              "start_line": 71
             }
           }
         },
@@ -5755,71 +5900,6 @@ expression: pretty
               "end_line": 629,
               "start_column": 1,
               "start_line": 591
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": true,
-        "scored": {
-          "complexity": 8,
-          "complexity_metric": "cognitive",
-          "contributors": [
-            {
-              "column": 9,
-              "end_line": 93,
-              "increment": 1,
-              "kind": "for-loop",
-              "line": 80,
-              "nesting_depth": 0
-            },
-            {
-              "column": 13,
-              "end_line": 84,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 81,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
-              "end_line": 83,
-              "increment": 1,
-              "kind": "continue",
-              "line": 83,
-              "nesting_depth": 2
-            },
-            {
-              "column": 13,
-              "end_line": 92,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 85,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
-              "end_line": 86,
-              "increment": 1,
-              "kind": "logical-operator",
-              "line": 86,
-              "nesting_depth": 1
-            }
-          ],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "high",
-            "value": 72.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "LcovParser::validate",
-            "span": {
-              "end_column": 5,
-              "end_line": 95,
-              "start_column": 5,
-              "start_line": 71
             }
           }
         },
@@ -5931,42 +6011,42 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 163,
+              "end_line": 171,
               "increment": 1,
               "kind": "try",
-              "line": 163,
+              "line": 171,
               "nesting_depth": 0
             },
             {
               "column": 52,
-              "end_line": 165,
+              "end_line": 173,
               "increment": 1,
               "kind": "try",
-              "line": 165,
+              "line": 173,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 166,
+              "end_line": 174,
               "increment": 1,
               "kind": "try",
-              "line": 166,
+              "line": 174,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 169,
+              "end_line": 177,
               "increment": 1,
               "kind": "if-branch",
-              "line": 167,
+              "line": 175,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 170,
+              "end_line": 178,
               "increment": 1,
               "kind": "try",
-              "line": 170,
+              "line": 178,
               "nesting_depth": 0
             }
           ],
@@ -5980,9 +6060,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 172,
+              "end_line": 180,
               "start_column": 1,
-              "start_line": 160
+              "start_line": 168
             }
           }
         },
@@ -6160,26 +6240,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 102,
+              "end_line": 110,
               "increment": 1,
               "kind": "if-branch",
-              "line": 99,
+              "line": 107,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 107,
+              "end_line": 115,
               "increment": 1,
               "kind": "if-branch",
-              "line": 104,
+              "line": 112,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 111,
+              "end_line": 119,
               "increment": 1,
               "kind": "if-branch",
-              "line": 109,
+              "line": 117,
               "nesting_depth": 0
             }
           ],
@@ -6193,9 +6273,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 112,
+              "end_line": 120,
               "start_column": 1,
-              "start_line": 98
+              "start_line": 106
             }
           }
         },
@@ -6373,18 +6453,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 130,
+              "end_line": 138,
               "increment": 1,
               "kind": "if-branch",
-              "line": 128,
+              "line": 136,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 135,
+              "end_line": 143,
               "increment": 1,
               "kind": "match",
-              "line": 132,
+              "line": 140,
               "nesting_depth": 0
             }
           ],
@@ -6398,9 +6478,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 136,
+              "end_line": 144,
               "start_column": 1,
-              "start_line": 127
+              "start_line": 135
             }
           }
         },
@@ -6414,18 +6494,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 141,
+              "end_line": 149,
               "increment": 1,
               "kind": "if-branch",
-              "line": 139,
+              "line": 147,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 148,
+              "end_line": 156,
               "increment": 1,
               "kind": "match",
-              "line": 143,
+              "line": 151,
               "nesting_depth": 0
             }
           ],
@@ -6439,9 +6519,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 149,
+              "end_line": 157,
               "start_column": 1,
-              "start_line": 138
+              "start_line": 146
             }
           }
         },
@@ -6455,18 +6535,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 217,
+              "end_line": 225,
               "increment": 1,
               "kind": "if-branch",
-              "line": 215,
+              "line": 223,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 222,
+              "end_line": 230,
               "increment": 1,
               "kind": "for-loop",
-              "line": 220,
+              "line": 228,
               "nesting_depth": 0
             }
           ],
@@ -6480,9 +6560,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 223,
+              "end_line": 231,
               "start_column": 1,
-              "start_line": 210
+              "start_line": 218
             }
           }
         },
@@ -6496,18 +6576,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 232,
+              "end_line": 240,
               "increment": 1,
               "kind": "if-branch",
-              "line": 230,
+              "line": 238,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 237,
+              "end_line": 245,
               "increment": 1,
               "kind": "for-loop",
-              "line": 235,
+              "line": 243,
               "nesting_depth": 0
             }
           ],
@@ -6521,9 +6601,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 238,
+              "end_line": 246,
               "start_column": 1,
-              "start_line": 225
+              "start_line": 233
             }
           }
         },
@@ -6537,10 +6617,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 737,
+              "end_line": 756,
               "increment": 2,
               "kind": "for-loop",
-              "line": 734,
+              "line": 753,
               "nesting_depth": 1
             }
           ],
@@ -6554,9 +6634,9 @@ expression: pretty
             "qualified_name": "arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 741,
+              "end_line": 760,
               "start_column": 5,
-              "start_line": 731
+              "start_line": 750
             }
           }
         },
@@ -7263,10 +7343,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 124,
+              "end_line": 132,
               "increment": 1,
               "kind": "if-branch",
-              "line": 117,
+              "line": 125,
               "nesting_depth": 0
             }
           ],
@@ -7280,9 +7360,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 125,
+              "end_line": 133,
               "start_column": 1,
-              "start_line": 114
+              "start_line": 122
             }
           }
         },
@@ -7296,10 +7376,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 203,
+              "end_line": 211,
               "increment": 1,
               "kind": "let-else",
-              "line": 200,
+              "line": 208,
               "nesting_depth": 0
             }
           ],
@@ -7313,9 +7393,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 208,
+              "end_line": 216,
               "start_column": 1,
-              "start_line": 199
+              "start_line": 207
             }
           }
         },
@@ -7329,10 +7409,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 264,
+              "end_line": 272,
               "increment": 1,
               "kind": "match",
-              "line": 259,
+              "line": 267,
               "nesting_depth": 0
             }
           ],
@@ -7346,9 +7426,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 265,
+              "end_line": 273,
               "start_column": 1,
-              "start_line": 258
+              "start_line": 266
             }
           }
         },
@@ -7362,10 +7442,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 488,
+              "end_line": 507,
               "increment": 1,
               "kind": "match",
-              "line": 479,
+              "line": 498,
               "nesting_depth": 0
             }
           ],
@@ -7379,9 +7459,9 @@ expression: pretty
             "qualified_name": "malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 489,
+              "end_line": 508,
               "start_column": 5,
-              "start_line": 474
+              "start_line": 493
             }
           }
         },
@@ -7395,10 +7475,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 532,
+              "end_line": 551,
               "increment": 1,
               "kind": "match",
-              "line": 523,
+              "line": 542,
               "nesting_depth": 0
             }
           ],
@@ -7412,9 +7492,9 @@ expression: pretty
             "qualified_name": "da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 533,
+              "end_line": 552,
               "start_column": 5,
-              "start_line": 519
+              "start_line": 538
             }
           }
         },
@@ -7428,10 +7508,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 651,
+              "end_line": 670,
               "increment": 1,
               "kind": "match",
-              "line": 642,
+              "line": 661,
               "nesting_depth": 0
             }
           ],
@@ -7445,9 +7525,9 @@ expression: pretty
             "qualified_name": "malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 652,
+              "end_line": 671,
               "start_column": 5,
-              "start_line": 638
+              "start_line": 657
             }
           }
         },
@@ -7461,10 +7541,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 693,
+              "end_line": 712,
               "increment": 1,
               "kind": "for-loop",
-              "line": 691,
+              "line": 710,
               "nesting_depth": 0
             }
           ],
@@ -7478,9 +7558,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 703,
+              "end_line": 722,
               "start_column": 5,
-              "start_line": 676
+              "start_line": 695
             }
           }
         },
@@ -9911,9 +9991,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 158,
+              "end_line": 166,
               "start_column": 1,
-              "start_line": 151
+              "start_line": 159
             }
           }
         },
@@ -9935,9 +10015,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 245,
+              "end_line": 253,
               "start_column": 1,
-              "start_line": 240
+              "start_line": 248
             }
           }
         },
@@ -9959,9 +10039,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 256,
+              "end_line": 264,
               "start_column": 1,
-              "start_line": 247
+              "start_line": 255
             }
           }
         },
@@ -9983,9 +10063,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 270,
+              "end_line": 278,
               "start_column": 1,
-              "start_line": 267
+              "start_line": 275
             }
           }
         },
@@ -10007,9 +10087,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 298,
+              "end_line": 306,
               "start_column": 1,
-              "start_line": 272
+              "start_line": 280
             }
           }
         },
@@ -10031,9 +10111,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 305,
+              "end_line": 313,
               "start_column": 1,
-              "start_line": 300
+              "start_line": 308
             }
           }
         },
@@ -10055,9 +10135,9 @@ expression: pretty
             "qualified_name": "parser",
             "span": {
               "end_column": 5,
-              "end_line": 314,
+              "end_line": 322,
               "start_column": 5,
-              "start_line": 312
+              "start_line": 320
             }
           }
         },
@@ -10079,9 +10159,9 @@ expression: pretty
             "qualified_name": "parse",
             "span": {
               "end_column": 5,
-              "end_line": 318,
+              "end_line": 326,
               "start_column": 5,
-              "start_line": 316
+              "start_line": 324
             }
           }
         },
@@ -10103,9 +10183,33 @@ expression: pretty
             "qualified_name": "empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 325,
+              "end_line": 333,
               "start_column": 5,
-              "start_line": 320
+              "start_line": 328
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_str",
+            "span": {
+              "end_column": 5,
+              "end_line": 347,
+              "start_column": 5,
+              "start_line": 337
             }
           }
         },
@@ -10127,9 +10231,9 @@ expression: pretty
             "qualified_name": "validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 332,
+              "end_line": 352,
               "start_column": 5,
-              "start_line": 329
+              "start_line": 349
             }
           }
         },
@@ -10151,9 +10255,9 @@ expression: pretty
             "qualified_name": "validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 341,
+              "end_line": 357,
               "start_column": 5,
-              "start_line": 334
+              "start_line": 354
             }
           }
         },
@@ -10175,9 +10279,9 @@ expression: pretty
             "qualified_name": "validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 346,
+              "end_line": 362,
               "start_column": 5,
-              "start_line": 343
+              "start_line": 359
             }
           }
         },
@@ -10199,9 +10303,9 @@ expression: pretty
             "qualified_name": "validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 355,
+              "end_line": 367,
               "start_column": 5,
-              "start_line": 348
+              "start_line": 364
             }
           }
         },
@@ -10223,9 +10327,9 @@ expression: pretty
             "qualified_name": "validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 364,
+              "end_line": 372,
               "start_column": 5,
-              "start_line": 357
+              "start_line": 369
             }
           }
         },
@@ -10247,9 +10351,33 @@ expression: pretty
             "qualified_name": "validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 375,
+              "end_line": 382,
               "start_column": 5,
-              "start_line": 366
+              "start_line": 374
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_missing_path_returns_open_error",
+            "span": {
+              "end_column": 5,
+              "end_line": 394,
+              "start_column": 5,
+              "start_line": 384
             }
           }
         },
@@ -10271,9 +10399,9 @@ expression: pretty
             "qualified_name": "single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 385,
+              "end_line": 404,
               "start_column": 5,
-              "start_line": 377
+              "start_line": 396
             }
           }
         },
@@ -10295,9 +10423,9 @@ expression: pretty
             "qualified_name": "multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 395,
+              "end_line": 414,
               "start_column": 5,
-              "start_line": 387
+              "start_line": 406
             }
           }
         },
@@ -10319,9 +10447,9 @@ expression: pretty
             "qualified_name": "multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 404,
+              "end_line": 423,
               "start_column": 5,
-              "start_line": 397
+              "start_line": 416
             }
           }
         },
@@ -10343,9 +10471,9 @@ expression: pretty
             "qualified_name": "hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 412,
+              "end_line": 431,
               "start_column": 5,
-              "start_line": 406
+              "start_line": 425
             }
           }
         },
@@ -10365,78 +10493,6 @@ expression: pretty
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "path_normalization_strips_prefix",
-            "span": {
-              "end_column": 5,
-              "end_line": 418,
-              "start_column": 5,
-              "start_line": 414
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 2.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "non_matching_path_passes_through",
-            "span": {
-              "end_column": 5,
-              "end_line": 424,
-              "start_column": 5,
-              "start_line": 420
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 2.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "backslash_normalized_to_forward_slash",
-            "span": {
-              "end_column": 5,
-              "end_line": 431,
-              "start_column": 5,
-              "start_line": 426
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 2.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
               "end_line": 437,
@@ -10460,12 +10516,84 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "non_matching_path_passes_through",
+            "span": {
+              "end_column": 5,
+              "end_line": 443,
+              "start_column": 5,
+              "start_line": 439
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "backslash_normalized_to_forward_slash",
+            "span": {
+              "end_column": 5,
+              "end_line": 450,
+              "start_column": 5,
+              "start_line": 445
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "path_boundary_not_confused_by_prefix_substring",
+            "span": {
+              "end_column": 5,
+              "end_line": 456,
+              "start_column": 5,
+              "start_line": 452
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 451,
+              "end_line": 470,
               "start_column": 5,
-              "start_line": 439
+              "start_line": 458
             }
           }
         },
@@ -10487,9 +10615,9 @@ expression: pretty
             "qualified_name": "duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 460,
+              "end_line": 479,
               "start_column": 5,
-              "start_line": 453
+              "start_line": 472
             }
           }
         },
@@ -10511,9 +10639,9 @@ expression: pretty
             "qualified_name": "duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 472,
+              "end_line": 491,
               "start_column": 5,
-              "start_line": 462
+              "start_line": 481
             }
           }
         },
@@ -10535,9 +10663,9 @@ expression: pretty
             "qualified_name": "malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 497,
+              "end_line": 516,
               "start_column": 5,
-              "start_line": 491
+              "start_line": 510
             }
           }
         },
@@ -10559,9 +10687,9 @@ expression: pretty
             "qualified_name": "da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 507,
+              "end_line": 526,
               "start_column": 5,
-              "start_line": 499
+              "start_line": 518
             }
           }
         },
@@ -10583,9 +10711,9 @@ expression: pretty
             "qualified_name": "da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 517,
+              "end_line": 536,
               "start_column": 5,
-              "start_line": 509
+              "start_line": 528
             }
           }
         },
@@ -10607,9 +10735,9 @@ expression: pretty
             "qualified_name": "end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 544,
+              "end_line": 563,
               "start_column": 5,
-              "start_line": 535
+              "start_line": 554
             }
           }
         },
@@ -10631,9 +10759,9 @@ expression: pretty
             "qualified_name": "unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 551,
+              "end_line": 570,
               "start_column": 5,
-              "start_line": 546
+              "start_line": 565
             }
           }
         },
@@ -10655,9 +10783,9 @@ expression: pretty
             "qualified_name": "empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 562,
+              "end_line": 581,
               "start_column": 5,
-              "start_line": 553
+              "start_line": 572
             }
           }
         },
@@ -10679,9 +10807,9 @@ expression: pretty
             "qualified_name": "da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 571,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 564
+              "start_line": 583
             }
           }
         },
@@ -10703,9 +10831,9 @@ expression: pretty
             "qualified_name": "non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 585,
+              "end_line": 604,
               "start_column": 5,
-              "start_line": 573
+              "start_line": 592
             }
           }
         },
@@ -10727,9 +10855,9 @@ expression: pretty
             "qualified_name": "brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 597,
+              "end_line": 616,
               "start_column": 5,
-              "start_line": 589
+              "start_line": 608
             }
           }
         },
@@ -10751,9 +10879,9 @@ expression: pretty
             "qualified_name": "brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 604,
+              "end_line": 623,
               "start_column": 5,
-              "start_line": 599
+              "start_line": 618
             }
           }
         },
@@ -10775,9 +10903,9 @@ expression: pretty
             "qualified_name": "brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 611,
+              "end_line": 630,
               "start_column": 5,
-              "start_line": 606
+              "start_line": 625
             }
           }
         },
@@ -10799,9 +10927,9 @@ expression: pretty
             "qualified_name": "brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 618,
+              "end_line": 637,
               "start_column": 5,
-              "start_line": 613
+              "start_line": 632
             }
           }
         },
@@ -10823,9 +10951,9 @@ expression: pretty
             "qualified_name": "duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 628,
+              "end_line": 647,
               "start_column": 5,
-              "start_line": 620
+              "start_line": 639
             }
           }
         },
@@ -10847,9 +10975,9 @@ expression: pretty
             "qualified_name": "brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 636,
+              "end_line": 655,
               "start_column": 5,
-              "start_line": 630
+              "start_line": 649
             }
           }
         },
@@ -10871,9 +10999,9 @@ expression: pretty
             "qualified_name": "brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 663,
+              "end_line": 682,
               "start_column": 5,
-              "start_line": 654
+              "start_line": 673
             }
           }
         },
@@ -10895,9 +11023,9 @@ expression: pretty
             "qualified_name": "brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 674,
+              "end_line": 693,
               "start_column": 5,
-              "start_line": 665
+              "start_line": 684
             }
           }
         },
@@ -10919,9 +11047,9 @@ expression: pretty
             "qualified_name": "brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 713,
+              "end_line": 732,
               "start_column": 5,
-              "start_line": 705
+              "start_line": 724
             }
           }
         },
@@ -10943,9 +11071,9 @@ expression: pretty
             "qualified_name": "no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 719,
+              "end_line": 738,
               "start_column": 5,
-              "start_line": 715
+              "start_line": 734
             }
           }
         },
@@ -10967,9 +11095,9 @@ expression: pretty
             "qualified_name": "arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 729,
+              "end_line": 748,
               "start_column": 5,
-              "start_line": 727
+              "start_line": 746
             }
           }
         },
@@ -10991,9 +11119,9 @@ expression: pretty
             "qualified_name": "arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 745,
+              "end_line": 764,
               "start_column": 5,
-              "start_line": 743
+              "start_line": 762
             }
           }
         },
@@ -11145,13 +11273,13 @@ expression: pretty
       }
     ],
     "shown_summary": {
-      "average_complexity": 1.515,
+      "average_complexity": 1.5198019801980198,
       "average_coverage": 0.0,
-      "average_crap": 5.57,
+      "average_crap": 5.7227722772277225,
       "distribution": {
         "acceptable": 29,
         "high": 6,
-        "low": 151,
+        "low": 153,
         "moderate": 14
       },
       "exceeding_threshold": 6,
@@ -11165,15 +11293,15 @@ expression: pretty
       "median_crap": 2.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 200,
+      "total_functions": 202,
       "worst_function": {
         "file_path": "adapters/coverage/mod.rs",
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 197,
+          "end_line": 205,
           "start_column": 1,
-          "start_line": 174
+          "start_line": 182
         }
       }
     },

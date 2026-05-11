@@ -58,10 +58,19 @@ pub trait CoveragePort {
     type Diagnostic: ParseDiagnostic;
     fn parse(&self, data: &str) -> Result<ParseOutput<Self::Diagnostic>, CrapError>;
 
-    /// Adapter-aware pre-flight check: does `data` contain at least one
-    /// usable coverage record? Runs before the analyzer dispatches to
-    /// `parse`, so the CLI can surface a helpful "your coverage file
-    /// has no data points" diagnostic before a full parse pass.
+    /// Adapter-aware pre-flight check: does the file at `path` contain
+    /// at least one usable coverage record? Runs before the analyzer
+    /// dispatches to `parse`, so the CLI can surface a helpful "your
+    /// coverage file has no data points" diagnostic before the full
+    /// parse pass.
+    ///
+    /// Takes `&Path` (not `&str`) so adapters can stream the file
+    /// line-by-line and short-circuit on the first valid record — the
+    /// LCOV format easily exceeds 100 MB on large workspaces and
+    /// loading the whole file into memory twice (once here, once in
+    /// `parse`) would double peak RSS for no semantic gain. Adapters
+    /// that need random access (Istanbul JSON, post-implementation)
+    /// can still slurp via `read_to_string` internally.
     ///
     /// Default implementation returns `Ok(())` (skip validation) —
     /// adapters with a cheap structural signature override. The LCOV
@@ -72,7 +81,7 @@ pub trait CoveragePort {
     /// (e.g., `"no SF/DA records"`); the CLI layer pairs it with the
     /// coverage path and adapter-specific generation hint
     /// (`AdapterMeta::coverage_hint`) before surfacing to the user.
-    fn validate(&self, _data: &str) -> Result<(), String> {
+    fn validate(&self, _path: &Path) -> Result<(), String> {
         Ok(())
     }
 }

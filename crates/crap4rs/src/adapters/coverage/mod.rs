@@ -68,16 +68,24 @@ impl CoveragePort for LcovParser {
         Ok(build_parse_output(state))
     }
 
-    /// LCOV-flavoured pre-flight: scan for at least one well-formed
-    /// `DA:line,hits` line inside an `SF:` block. Mirrors the structural
+    /// LCOV-flavoured pre-flight: stream the file line-by-line via
+    /// `BufReader` and short-circuit on the first well-formed
+    /// `DA:line,hits` inside an `SF:` block. Mirrors the structural
     /// shape that `parse` consumes; orphan `DA:` records outside an
     /// `SF:` block and malformed line/hit pairs are rejected.
     ///
-    /// Linear single-pass over `data` — cheap relative to the full
-    /// parse, which builds maps and emits per-record diagnostics.
-    fn validate(&self, data: &str) -> Result<(), String> {
+    /// Streams (rather than slurping) because LCOV files easily exceed
+    /// 100 MB on large workspaces and `parse` will read the file again
+    /// shortly after — doubling peak RSS would be a regression from the
+    /// pre-D5 single-pass preflight.
+    fn validate(&self, path: &Path) -> Result<(), String> {
+        use std::io::{BufRead, BufReader};
+        let file = std::fs::File::open(path)
+            .map_err(|e| format!("cannot open {}: {e}", path.display()))?;
+        let reader = BufReader::new(file);
         let mut in_sf_block = false;
-        for line in data.lines() {
+        for line in reader.lines() {
+            let line = line.map_err(|e| format!("read error: {e}"))?;
             if line.starts_with("SF:") {
                 in_sf_block = true;
                 continue;
@@ -326,41 +334,41 @@ mod tests {
 
     // ── validate (preflight) ──────────────────────────────────────────
 
+    /// Materialise `contents` into a tempfile and run `validate` against
+    /// its path. The adapter streams the file via `BufReader` so we
+    /// must hand it a real on-disk path; using `&str` directly would
+    /// skip the streaming behaviour Gemini flagged as the regression
+    /// trigger.
+    fn validate_str(contents: &str) -> Result<(), String> {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("preflight.info");
+        std::fs::write(&path, contents).unwrap();
+        parser().validate(&path)
+    }
+
     #[test]
     fn validate_empty_input_rejected() {
-        assert!(parser().validate("").is_err());
+        assert!(validate_str("").is_err());
     }
 
     #[test]
     fn validate_no_da_lines_rejected() {
-        assert!(
-            parser()
-                .validate("SF:src/main.rs\nend_of_record\n")
-                .is_err()
-        );
+        assert!(validate_str("SF:src/main.rs\nend_of_record\n").is_err());
     }
 
     #[test]
     fn validate_da_outside_sf_block_rejected() {
-        assert!(parser().validate("DA:1,5\nend_of_record\n").is_err());
+        assert!(validate_str("DA:1,5\nend_of_record\n").is_err());
     }
 
     #[test]
     fn validate_malformed_da_rejected() {
-        assert!(
-            parser()
-                .validate("SF:src/main.rs\nDA:not_a_number\nend_of_record\n")
-                .is_err()
-        );
+        assert!(validate_str("SF:src/main.rs\nDA:not_a_number\nend_of_record\n").is_err());
     }
 
     #[test]
     fn validate_single_da_inside_sf_block_passes() {
-        assert!(
-            parser()
-                .validate("SF:src/main.rs\nDA:1,5\nend_of_record\n")
-                .is_ok()
-        );
+        assert!(validate_str("SF:src/main.rs\nDA:1,5\nend_of_record\n").is_ok());
     }
 
     #[test]
@@ -368,10 +376,21 @@ mod tests {
         // First SF: has no DA — second SF: provides one. validate
         // walks both blocks and accepts the first valid DA encountered.
         assert!(
-            parser()
-                .validate("SF:src/a.rs\nend_of_record\nSF:src/b.rs\nDA:1,1\nend_of_record\n")
+            validate_str("SF:src/a.rs\nend_of_record\nSF:src/b.rs\nDA:1,1\nend_of_record\n")
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn validate_missing_path_returns_open_error() {
+        // Adapter owns I/O — file-not-found surfaces as the structured
+        // `Err(String)` from `validate`, not as an `io::Error`
+        // propagated from a separate slurp step. Lets the CLI compose
+        // it with the hint via the same path as "no records".
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("nope.info");
+        let err = parser().validate(&missing).unwrap_err();
+        assert!(err.contains("cannot open"), "got: {err}");
     }
 
     #[test]
