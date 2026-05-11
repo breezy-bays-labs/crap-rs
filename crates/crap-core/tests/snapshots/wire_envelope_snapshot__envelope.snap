@@ -1,5 +1,6 @@
 ---
 source: crates/crap-core/tests/wire_envelope_snapshot.rs
+assertion_line: 94
 expression: pretty
 ---
 {
@@ -3561,6 +3562,87 @@ expression: pretty
         "threshold": 25.0
       },
       {
+        "exceeds": true,
+        "scored": {
+          "complexity": 10,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 73,
+              "end_line": 84,
+              "increment": 1,
+              "kind": "try",
+              "line": 84,
+              "nesting_depth": 0
+            },
+            {
+              "column": 9,
+              "end_line": 101,
+              "increment": 1,
+              "kind": "for-loop",
+              "line": 87,
+              "nesting_depth": 0
+            },
+            {
+              "column": 68,
+              "end_line": 88,
+              "increment": 1,
+              "kind": "try",
+              "line": 88,
+              "nesting_depth": 1
+            },
+            {
+              "column": 13,
+              "end_line": 92,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 89,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 91,
+              "increment": 1,
+              "kind": "continue",
+              "line": 91,
+              "nesting_depth": 2
+            },
+            {
+              "column": 13,
+              "end_line": 100,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 93,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 94,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 94,
+              "nesting_depth": 1
+            }
+          ],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "high",
+            "value": 110.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "LcovParser::validate",
+            "span": {
+              "end_column": 5,
+              "end_line": 103,
+              "start_column": 5,
+              "start_line": 71
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
         "exceeds": false,
         "scored": {
           "complexity": 4,
@@ -3568,26 +3650,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 76,
+              "end_line": 110,
               "increment": 1,
               "kind": "if-branch",
-              "line": 73,
+              "line": 107,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 81,
+              "end_line": 115,
               "increment": 1,
               "kind": "if-branch",
-              "line": 78,
+              "line": 112,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 85,
+              "end_line": 119,
               "increment": 1,
               "kind": "if-branch",
-              "line": 83,
+              "line": 117,
               "nesting_depth": 0
             }
           ],
@@ -3601,9 +3683,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 86,
+              "end_line": 120,
               "start_column": 1,
-              "start_line": 72
+              "start_line": 106
             }
           }
         },
@@ -3617,10 +3699,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 98,
+              "end_line": 132,
               "increment": 1,
               "kind": "if-branch",
-              "line": 91,
+              "line": 125,
               "nesting_depth": 0
             }
           ],
@@ -3634,9 +3716,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 99,
+              "end_line": 133,
               "start_column": 1,
-              "start_line": 88
+              "start_line": 122
             }
           }
         },
@@ -3650,18 +3732,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 104,
+              "end_line": 138,
               "increment": 1,
               "kind": "if-branch",
-              "line": 102,
+              "line": 136,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 109,
+              "end_line": 143,
               "increment": 1,
               "kind": "match",
-              "line": 106,
+              "line": 140,
               "nesting_depth": 0
             }
           ],
@@ -3675,9 +3757,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 110,
+              "end_line": 144,
               "start_column": 1,
-              "start_line": 101
+              "start_line": 135
             }
           }
         },
@@ -3691,18 +3773,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 115,
+              "end_line": 149,
               "increment": 1,
               "kind": "if-branch",
-              "line": 113,
+              "line": 147,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 122,
+              "end_line": 156,
               "increment": 1,
               "kind": "match",
-              "line": 117,
+              "line": 151,
               "nesting_depth": 0
             }
           ],
@@ -3716,9 +3798,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 123,
+              "end_line": 157,
               "start_column": 1,
-              "start_line": 112
+              "start_line": 146
             }
           }
         },
@@ -3740,9 +3822,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 132,
+              "end_line": 166,
               "start_column": 1,
-              "start_line": 125
+              "start_line": 159
             }
           }
         },
@@ -3756,42 +3838,42 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 137,
+              "end_line": 171,
               "increment": 1,
               "kind": "try",
-              "line": 137,
+              "line": 171,
               "nesting_depth": 0
             },
             {
               "column": 52,
-              "end_line": 139,
+              "end_line": 173,
               "increment": 1,
               "kind": "try",
-              "line": 139,
+              "line": 173,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 140,
+              "end_line": 174,
               "increment": 1,
               "kind": "try",
-              "line": 140,
+              "line": 174,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 143,
+              "end_line": 177,
               "increment": 1,
               "kind": "if-branch",
-              "line": 141,
+              "line": 175,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 144,
+              "end_line": 178,
               "increment": 1,
               "kind": "try",
-              "line": 144,
+              "line": 178,
               "nesting_depth": 0
             }
           ],
@@ -3805,9 +3887,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 146,
+              "end_line": 180,
               "start_column": 1,
-              "start_line": 134
+              "start_line": 168
             }
           }
         },
@@ -3821,82 +3903,82 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 153,
+              "end_line": 187,
               "increment": 1,
               "kind": "try",
-              "line": 153,
+              "line": 187,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 154,
+              "end_line": 188,
               "increment": 1,
               "kind": "try",
-              "line": 154,
+              "line": 188,
               "nesting_depth": 0
             },
             {
               "column": 44,
-              "end_line": 155,
+              "end_line": 189,
               "increment": 1,
               "kind": "try",
-              "line": 155,
+              "line": 189,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 156,
+              "end_line": 190,
               "increment": 1,
               "kind": "try",
-              "line": 156,
+              "line": 190,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 158,
+              "end_line": 192,
               "increment": 1,
               "kind": "try",
-              "line": 158,
+              "line": 192,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 161,
+              "end_line": 195,
               "increment": 1,
               "kind": "if-branch",
-              "line": 159,
+              "line": 193,
               "nesting_depth": 0
             },
             {
               "column": 55,
-              "end_line": 162,
+              "end_line": 196,
               "increment": 1,
               "kind": "try",
-              "line": 162,
+              "line": 196,
               "nesting_depth": 0
             },
             {
               "column": 57,
-              "end_line": 163,
+              "end_line": 197,
               "increment": 1,
               "kind": "try",
-              "line": 163,
+              "line": 197,
               "nesting_depth": 0
             },
             {
               "column": 17,
-              "end_line": 168,
+              "end_line": 202,
               "increment": 1,
               "kind": "if-branch",
-              "line": 164,
+              "line": 198,
               "nesting_depth": 0
             },
             {
               "column": 54,
-              "end_line": 167,
+              "end_line": 201,
               "increment": 1,
               "kind": "try",
-              "line": 167,
+              "line": 201,
               "nesting_depth": 1
             }
           ],
@@ -3910,9 +3992,9 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 171,
+              "end_line": 205,
               "start_column": 1,
-              "start_line": 148
+              "start_line": 182
             }
           }
         },
@@ -3926,10 +4008,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 177,
+              "end_line": 211,
               "increment": 1,
               "kind": "let-else",
-              "line": 174,
+              "line": 208,
               "nesting_depth": 0
             }
           ],
@@ -3943,9 +4025,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 182,
+              "end_line": 216,
               "start_column": 1,
-              "start_line": 173
+              "start_line": 207
             }
           }
         },
@@ -3959,18 +4041,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 191,
+              "end_line": 225,
               "increment": 1,
               "kind": "if-branch",
-              "line": 189,
+              "line": 223,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 196,
+              "end_line": 230,
               "increment": 1,
               "kind": "for-loop",
-              "line": 194,
+              "line": 228,
               "nesting_depth": 0
             }
           ],
@@ -3984,9 +4066,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 197,
+              "end_line": 231,
               "start_column": 1,
-              "start_line": 184
+              "start_line": 218
             }
           }
         },
@@ -4000,18 +4082,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 206,
+              "end_line": 240,
               "increment": 1,
               "kind": "if-branch",
-              "line": 204,
+              "line": 238,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 211,
+              "end_line": 245,
               "increment": 1,
               "kind": "for-loop",
-              "line": 209,
+              "line": 243,
               "nesting_depth": 0
             }
           ],
@@ -4025,9 +4107,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 212,
+              "end_line": 246,
               "start_column": 1,
-              "start_line": 199
+              "start_line": 233
             }
           }
         },
@@ -4049,9 +4131,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 219,
+              "end_line": 253,
               "start_column": 1,
-              "start_line": 214
+              "start_line": 248
             }
           }
         },
@@ -4073,9 +4155,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 230,
+              "end_line": 264,
               "start_column": 1,
-              "start_line": 221
+              "start_line": 255
             }
           }
         },
@@ -4089,10 +4171,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 238,
+              "end_line": 272,
               "increment": 1,
               "kind": "match",
-              "line": 233,
+              "line": 267,
               "nesting_depth": 0
             }
           ],
@@ -4106,9 +4188,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 239,
+              "end_line": 273,
               "start_column": 1,
-              "start_line": 232
+              "start_line": 266
             }
           }
         },
@@ -4130,9 +4212,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 244,
+              "end_line": 278,
               "start_column": 1,
-              "start_line": 241
+              "start_line": 275
             }
           }
         },
@@ -4154,9 +4236,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 272,
+              "end_line": 306,
               "start_column": 1,
-              "start_line": 246
+              "start_line": 280
             }
           }
         },
@@ -4178,9 +4260,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 279,
+              "end_line": 313,
               "start_column": 1,
-              "start_line": 274
+              "start_line": 308
             }
           }
         },
@@ -4202,9 +4284,9 @@ expression: pretty
             "qualified_name": "parser",
             "span": {
               "end_column": 5,
-              "end_line": 288,
+              "end_line": 322,
               "start_column": 5,
-              "start_line": 286
+              "start_line": 320
             }
           }
         },
@@ -4226,9 +4308,9 @@ expression: pretty
             "qualified_name": "parse",
             "span": {
               "end_column": 5,
-              "end_line": 292,
+              "end_line": 326,
               "start_column": 5,
-              "start_line": 290
+              "start_line": 324
             }
           }
         },
@@ -4250,9 +4332,201 @@ expression: pretty
             "qualified_name": "empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 299,
+              "end_line": 333,
               "start_column": 5,
-              "start_line": 294
+              "start_line": 328
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_str",
+            "span": {
+              "end_column": 5,
+              "end_line": 347,
+              "start_column": 5,
+              "start_line": 337
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_empty_input_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 352,
+              "start_column": 5,
+              "start_line": 349
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_no_da_lines_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 357,
+              "start_column": 5,
+              "start_line": 354
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_da_outside_sf_block_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 362,
+              "start_column": 5,
+              "start_line": 359
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_malformed_da_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 367,
+              "start_column": 5,
+              "start_line": 364
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_single_da_inside_sf_block_passes",
+            "span": {
+              "end_column": 5,
+              "end_line": 372,
+              "start_column": 5,
+              "start_line": 369
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_first_da_in_second_block_passes",
+            "span": {
+              "end_column": 5,
+              "end_line": 382,
+              "start_column": 5,
+              "start_line": 374
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_missing_path_returns_open_error",
+            "span": {
+              "end_column": 5,
+              "end_line": 394,
+              "start_column": 5,
+              "start_line": 384
             }
           }
         },
@@ -4274,9 +4548,9 @@ expression: pretty
             "qualified_name": "single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 309,
+              "end_line": 404,
               "start_column": 5,
-              "start_line": 301
+              "start_line": 396
             }
           }
         },
@@ -4298,9 +4572,9 @@ expression: pretty
             "qualified_name": "multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 319,
+              "end_line": 414,
               "start_column": 5,
-              "start_line": 311
+              "start_line": 406
             }
           }
         },
@@ -4322,9 +4596,9 @@ expression: pretty
             "qualified_name": "multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 328,
+              "end_line": 423,
               "start_column": 5,
-              "start_line": 321
+              "start_line": 416
             }
           }
         },
@@ -4346,9 +4620,9 @@ expression: pretty
             "qualified_name": "hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 336,
+              "end_line": 431,
               "start_column": 5,
-              "start_line": 330
+              "start_line": 425
             }
           }
         },
@@ -4370,9 +4644,9 @@ expression: pretty
             "qualified_name": "path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 342,
+              "end_line": 437,
               "start_column": 5,
-              "start_line": 338
+              "start_line": 433
             }
           }
         },
@@ -4394,9 +4668,9 @@ expression: pretty
             "qualified_name": "non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 348,
+              "end_line": 443,
               "start_column": 5,
-              "start_line": 344
+              "start_line": 439
             }
           }
         },
@@ -4418,9 +4692,9 @@ expression: pretty
             "qualified_name": "backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 355,
+              "end_line": 450,
               "start_column": 5,
-              "start_line": 350
+              "start_line": 445
             }
           }
         },
@@ -4442,9 +4716,9 @@ expression: pretty
             "qualified_name": "path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 361,
+              "end_line": 456,
               "start_column": 5,
-              "start_line": 357
+              "start_line": 452
             }
           }
         },
@@ -4466,9 +4740,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 375,
+              "end_line": 470,
               "start_column": 5,
-              "start_line": 363
+              "start_line": 458
             }
           }
         },
@@ -4490,9 +4764,9 @@ expression: pretty
             "qualified_name": "duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 384,
+              "end_line": 479,
               "start_column": 5,
-              "start_line": 377
+              "start_line": 472
             }
           }
         },
@@ -4514,9 +4788,9 @@ expression: pretty
             "qualified_name": "duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 396,
+              "end_line": 491,
               "start_column": 5,
-              "start_line": 386
+              "start_line": 481
             }
           }
         },
@@ -4530,10 +4804,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 412,
+              "end_line": 507,
               "increment": 1,
               "kind": "match",
-              "line": 403,
+              "line": 498,
               "nesting_depth": 0
             }
           ],
@@ -4547,9 +4821,9 @@ expression: pretty
             "qualified_name": "malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 413,
+              "end_line": 508,
               "start_column": 5,
-              "start_line": 398
+              "start_line": 493
             }
           }
         },
@@ -4571,9 +4845,9 @@ expression: pretty
             "qualified_name": "malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 421,
+              "end_line": 516,
               "start_column": 5,
-              "start_line": 415
+              "start_line": 510
             }
           }
         },
@@ -4595,9 +4869,9 @@ expression: pretty
             "qualified_name": "da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 431,
+              "end_line": 526,
               "start_column": 5,
-              "start_line": 423
+              "start_line": 518
             }
           }
         },
@@ -4619,9 +4893,9 @@ expression: pretty
             "qualified_name": "da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 441,
+              "end_line": 536,
               "start_column": 5,
-              "start_line": 433
+              "start_line": 528
             }
           }
         },
@@ -4635,10 +4909,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 456,
+              "end_line": 551,
               "increment": 1,
               "kind": "match",
-              "line": 447,
+              "line": 542,
               "nesting_depth": 0
             }
           ],
@@ -4652,9 +4926,9 @@ expression: pretty
             "qualified_name": "da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 457,
+              "end_line": 552,
               "start_column": 5,
-              "start_line": 443
+              "start_line": 538
             }
           }
         },
@@ -4676,9 +4950,9 @@ expression: pretty
             "qualified_name": "end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 468,
+              "end_line": 563,
               "start_column": 5,
-              "start_line": 459
+              "start_line": 554
             }
           }
         },
@@ -4700,9 +4974,9 @@ expression: pretty
             "qualified_name": "unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 475,
+              "end_line": 570,
               "start_column": 5,
-              "start_line": 470
+              "start_line": 565
             }
           }
         },
@@ -4724,9 +4998,9 @@ expression: pretty
             "qualified_name": "empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 486,
+              "end_line": 581,
               "start_column": 5,
-              "start_line": 477
+              "start_line": 572
             }
           }
         },
@@ -4748,9 +5022,9 @@ expression: pretty
             "qualified_name": "da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 495,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 488
+              "start_line": 583
             }
           }
         },
@@ -4772,9 +5046,9 @@ expression: pretty
             "qualified_name": "non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 509,
+              "end_line": 604,
               "start_column": 5,
-              "start_line": 497
+              "start_line": 592
             }
           }
         },
@@ -4796,9 +5070,9 @@ expression: pretty
             "qualified_name": "brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 521,
+              "end_line": 616,
               "start_column": 5,
-              "start_line": 513
+              "start_line": 608
             }
           }
         },
@@ -4820,9 +5094,9 @@ expression: pretty
             "qualified_name": "brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 528,
+              "end_line": 623,
               "start_column": 5,
-              "start_line": 523
+              "start_line": 618
             }
           }
         },
@@ -4844,9 +5118,9 @@ expression: pretty
             "qualified_name": "brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 535,
+              "end_line": 630,
               "start_column": 5,
-              "start_line": 530
+              "start_line": 625
             }
           }
         },
@@ -4868,9 +5142,9 @@ expression: pretty
             "qualified_name": "brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 542,
+              "end_line": 637,
               "start_column": 5,
-              "start_line": 537
+              "start_line": 632
             }
           }
         },
@@ -4892,9 +5166,9 @@ expression: pretty
             "qualified_name": "duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 552,
+              "end_line": 647,
               "start_column": 5,
-              "start_line": 544
+              "start_line": 639
             }
           }
         },
@@ -4916,9 +5190,9 @@ expression: pretty
             "qualified_name": "brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 560,
+              "end_line": 655,
               "start_column": 5,
-              "start_line": 554
+              "start_line": 649
             }
           }
         },
@@ -4932,10 +5206,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 575,
+              "end_line": 670,
               "increment": 1,
               "kind": "match",
-              "line": 566,
+              "line": 661,
               "nesting_depth": 0
             }
           ],
@@ -4949,9 +5223,9 @@ expression: pretty
             "qualified_name": "malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 576,
+              "end_line": 671,
               "start_column": 5,
-              "start_line": 562
+              "start_line": 657
             }
           }
         },
@@ -4973,9 +5247,9 @@ expression: pretty
             "qualified_name": "brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 587,
+              "end_line": 682,
               "start_column": 5,
-              "start_line": 578
+              "start_line": 673
             }
           }
         },
@@ -4997,9 +5271,9 @@ expression: pretty
             "qualified_name": "brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 598,
+              "end_line": 693,
               "start_column": 5,
-              "start_line": 589
+              "start_line": 684
             }
           }
         },
@@ -5013,10 +5287,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 617,
+              "end_line": 712,
               "increment": 1,
               "kind": "for-loop",
-              "line": 615,
+              "line": 710,
               "nesting_depth": 0
             }
           ],
@@ -5030,9 +5304,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 627,
+              "end_line": 722,
               "start_column": 5,
-              "start_line": 600
+              "start_line": 695
             }
           }
         },
@@ -5054,9 +5328,9 @@ expression: pretty
             "qualified_name": "brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 637,
+              "end_line": 732,
               "start_column": 5,
-              "start_line": 629
+              "start_line": 724
             }
           }
         },
@@ -5078,9 +5352,9 @@ expression: pretty
             "qualified_name": "no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 643,
+              "end_line": 738,
               "start_column": 5,
-              "start_line": 639
+              "start_line": 734
             }
           }
         },
@@ -5102,9 +5376,9 @@ expression: pretty
             "qualified_name": "arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 653,
+              "end_line": 748,
               "start_column": 5,
-              "start_line": 651
+              "start_line": 746
             }
           }
         },
@@ -5118,10 +5392,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 661,
+              "end_line": 756,
               "increment": 2,
               "kind": "for-loop",
-              "line": 658,
+              "line": 753,
               "nesting_depth": 1
             }
           ],
@@ -5135,9 +5409,9 @@ expression: pretty
             "qualified_name": "arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 665,
+              "end_line": 760,
               "start_column": 5,
-              "start_line": 655
+              "start_line": 750
             }
           }
         },
@@ -5159,9 +5433,9 @@ expression: pretty
             "qualified_name": "arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 669,
+              "end_line": 764,
               "start_column": 5,
-              "start_line": 667
+              "start_line": 762
             }
           }
         },
@@ -5347,16 +5621,16 @@ expression: pretty
     ],
     "passed": false,
     "summary": {
-      "average_complexity": 1.4974093264248705,
+      "average_complexity": 1.5198019801980198,
       "average_coverage": 0.0,
-      "average_crap": 5.33678756476684,
+      "average_crap": 5.7227722772277225,
       "distribution": {
         "acceptable": 29,
-        "high": 5,
-        "low": 145,
+        "high": 6,
+        "low": 153,
         "moderate": 14
       },
-      "exceeding_threshold": 5,
+      "exceeding_threshold": 6,
       "max_complexity": 11,
       "max_crap": {
         "risk_level": "high",
@@ -5367,15 +5641,15 @@ expression: pretty
       "median_crap": 2.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 193,
+      "total_functions": 202,
       "worst_function": {
         "file_path": "adapters/coverage/mod.rs",
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 171,
+          "end_line": 205,
           "start_column": 1,
-          "start_line": 148
+          "start_line": 182
         }
       }
     }
@@ -5385,7 +5659,7 @@ expression: pretty
   "timestamp": "[STRIPPED:timestamp]",
   "tool_version": "[STRIPPED:tool_version]",
   "view": {
-    "eligible_count": 193,
+    "eligible_count": 202,
     "grouped": null,
     "shown": [
       {
@@ -5396,82 +5670,82 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 153,
+              "end_line": 187,
               "increment": 1,
               "kind": "try",
-              "line": 153,
+              "line": 187,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 154,
+              "end_line": 188,
               "increment": 1,
               "kind": "try",
-              "line": 154,
+              "line": 188,
               "nesting_depth": 0
             },
             {
               "column": 44,
-              "end_line": 155,
+              "end_line": 189,
               "increment": 1,
               "kind": "try",
-              "line": 155,
+              "line": 189,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 156,
+              "end_line": 190,
               "increment": 1,
               "kind": "try",
-              "line": 156,
+              "line": 190,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 158,
+              "end_line": 192,
               "increment": 1,
               "kind": "try",
-              "line": 158,
+              "line": 192,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 161,
+              "end_line": 195,
               "increment": 1,
               "kind": "if-branch",
-              "line": 159,
+              "line": 193,
               "nesting_depth": 0
             },
             {
               "column": 55,
-              "end_line": 162,
+              "end_line": 196,
               "increment": 1,
               "kind": "try",
-              "line": 162,
+              "line": 196,
               "nesting_depth": 0
             },
             {
               "column": 57,
-              "end_line": 163,
+              "end_line": 197,
               "increment": 1,
               "kind": "try",
-              "line": 163,
+              "line": 197,
               "nesting_depth": 0
             },
             {
               "column": 17,
-              "end_line": 168,
+              "end_line": 202,
               "increment": 1,
               "kind": "if-branch",
-              "line": 164,
+              "line": 198,
               "nesting_depth": 0
             },
             {
               "column": 54,
-              "end_line": 167,
+              "end_line": 201,
               "increment": 1,
               "kind": "try",
-              "line": 167,
+              "line": 201,
               "nesting_depth": 1
             }
           ],
@@ -5485,9 +5759,90 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 171,
+              "end_line": 205,
               "start_column": 1,
-              "start_line": 148
+              "start_line": 182
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": true,
+        "scored": {
+          "complexity": 10,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 73,
+              "end_line": 84,
+              "increment": 1,
+              "kind": "try",
+              "line": 84,
+              "nesting_depth": 0
+            },
+            {
+              "column": 9,
+              "end_line": 101,
+              "increment": 1,
+              "kind": "for-loop",
+              "line": 87,
+              "nesting_depth": 0
+            },
+            {
+              "column": 68,
+              "end_line": 88,
+              "increment": 1,
+              "kind": "try",
+              "line": 88,
+              "nesting_depth": 1
+            },
+            {
+              "column": 13,
+              "end_line": 92,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 89,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 91,
+              "increment": 1,
+              "kind": "continue",
+              "line": 91,
+              "nesting_depth": 2
+            },
+            {
+              "column": 13,
+              "end_line": 100,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 93,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 94,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 94,
+              "nesting_depth": 1
+            }
+          ],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "high",
+            "value": 110.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "LcovParser::validate",
+            "span": {
+              "end_column": 5,
+              "end_line": 103,
+              "start_column": 5,
+              "start_line": 71
             }
           }
         },
@@ -5656,42 +6011,42 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 137,
+              "end_line": 171,
               "increment": 1,
               "kind": "try",
-              "line": 137,
+              "line": 171,
               "nesting_depth": 0
             },
             {
               "column": 52,
-              "end_line": 139,
+              "end_line": 173,
               "increment": 1,
               "kind": "try",
-              "line": 139,
+              "line": 173,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 140,
+              "end_line": 174,
               "increment": 1,
               "kind": "try",
-              "line": 140,
+              "line": 174,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 143,
+              "end_line": 177,
               "increment": 1,
               "kind": "if-branch",
-              "line": 141,
+              "line": 175,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 144,
+              "end_line": 178,
               "increment": 1,
               "kind": "try",
-              "line": 144,
+              "line": 178,
               "nesting_depth": 0
             }
           ],
@@ -5705,9 +6060,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 146,
+              "end_line": 180,
               "start_column": 1,
-              "start_line": 134
+              "start_line": 168
             }
           }
         },
@@ -5885,26 +6240,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 76,
+              "end_line": 110,
               "increment": 1,
               "kind": "if-branch",
-              "line": 73,
+              "line": 107,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 81,
+              "end_line": 115,
               "increment": 1,
               "kind": "if-branch",
-              "line": 78,
+              "line": 112,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 85,
+              "end_line": 119,
               "increment": 1,
               "kind": "if-branch",
-              "line": 83,
+              "line": 117,
               "nesting_depth": 0
             }
           ],
@@ -5918,9 +6273,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 86,
+              "end_line": 120,
               "start_column": 1,
-              "start_line": 72
+              "start_line": 106
             }
           }
         },
@@ -6098,18 +6453,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 104,
+              "end_line": 138,
               "increment": 1,
               "kind": "if-branch",
-              "line": 102,
+              "line": 136,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 109,
+              "end_line": 143,
               "increment": 1,
               "kind": "match",
-              "line": 106,
+              "line": 140,
               "nesting_depth": 0
             }
           ],
@@ -6123,9 +6478,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 110,
+              "end_line": 144,
               "start_column": 1,
-              "start_line": 101
+              "start_line": 135
             }
           }
         },
@@ -6139,18 +6494,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 115,
+              "end_line": 149,
               "increment": 1,
               "kind": "if-branch",
-              "line": 113,
+              "line": 147,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 122,
+              "end_line": 156,
               "increment": 1,
               "kind": "match",
-              "line": 117,
+              "line": 151,
               "nesting_depth": 0
             }
           ],
@@ -6164,9 +6519,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 123,
+              "end_line": 157,
               "start_column": 1,
-              "start_line": 112
+              "start_line": 146
             }
           }
         },
@@ -6180,18 +6535,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 191,
+              "end_line": 225,
               "increment": 1,
               "kind": "if-branch",
-              "line": 189,
+              "line": 223,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 196,
+              "end_line": 230,
               "increment": 1,
               "kind": "for-loop",
-              "line": 194,
+              "line": 228,
               "nesting_depth": 0
             }
           ],
@@ -6205,9 +6560,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 197,
+              "end_line": 231,
               "start_column": 1,
-              "start_line": 184
+              "start_line": 218
             }
           }
         },
@@ -6221,18 +6576,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 206,
+              "end_line": 240,
               "increment": 1,
               "kind": "if-branch",
-              "line": 204,
+              "line": 238,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 211,
+              "end_line": 245,
               "increment": 1,
               "kind": "for-loop",
-              "line": 209,
+              "line": 243,
               "nesting_depth": 0
             }
           ],
@@ -6246,9 +6601,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 212,
+              "end_line": 246,
               "start_column": 1,
-              "start_line": 199
+              "start_line": 233
             }
           }
         },
@@ -6262,10 +6617,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 661,
+              "end_line": 756,
               "increment": 2,
               "kind": "for-loop",
-              "line": 658,
+              "line": 753,
               "nesting_depth": 1
             }
           ],
@@ -6279,9 +6634,9 @@ expression: pretty
             "qualified_name": "arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 665,
+              "end_line": 760,
               "start_column": 5,
-              "start_line": 655
+              "start_line": 750
             }
           }
         },
@@ -6988,10 +7343,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 98,
+              "end_line": 132,
               "increment": 1,
               "kind": "if-branch",
-              "line": 91,
+              "line": 125,
               "nesting_depth": 0
             }
           ],
@@ -7005,9 +7360,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 99,
+              "end_line": 133,
               "start_column": 1,
-              "start_line": 88
+              "start_line": 122
             }
           }
         },
@@ -7021,10 +7376,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 177,
+              "end_line": 211,
               "increment": 1,
               "kind": "let-else",
-              "line": 174,
+              "line": 208,
               "nesting_depth": 0
             }
           ],
@@ -7038,9 +7393,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 182,
+              "end_line": 216,
               "start_column": 1,
-              "start_line": 173
+              "start_line": 207
             }
           }
         },
@@ -7054,10 +7409,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 238,
+              "end_line": 272,
               "increment": 1,
               "kind": "match",
-              "line": 233,
+              "line": 267,
               "nesting_depth": 0
             }
           ],
@@ -7071,9 +7426,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 239,
+              "end_line": 273,
               "start_column": 1,
-              "start_line": 232
+              "start_line": 266
             }
           }
         },
@@ -7087,10 +7442,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 412,
+              "end_line": 507,
               "increment": 1,
               "kind": "match",
-              "line": 403,
+              "line": 498,
               "nesting_depth": 0
             }
           ],
@@ -7104,9 +7459,9 @@ expression: pretty
             "qualified_name": "malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 413,
+              "end_line": 508,
               "start_column": 5,
-              "start_line": 398
+              "start_line": 493
             }
           }
         },
@@ -7120,10 +7475,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 456,
+              "end_line": 551,
               "increment": 1,
               "kind": "match",
-              "line": 447,
+              "line": 542,
               "nesting_depth": 0
             }
           ],
@@ -7137,9 +7492,9 @@ expression: pretty
             "qualified_name": "da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 457,
+              "end_line": 552,
               "start_column": 5,
-              "start_line": 443
+              "start_line": 538
             }
           }
         },
@@ -7153,10 +7508,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 575,
+              "end_line": 670,
               "increment": 1,
               "kind": "match",
-              "line": 566,
+              "line": 661,
               "nesting_depth": 0
             }
           ],
@@ -7170,9 +7525,9 @@ expression: pretty
             "qualified_name": "malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 576,
+              "end_line": 671,
               "start_column": 5,
-              "start_line": 562
+              "start_line": 657
             }
           }
         },
@@ -7186,10 +7541,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 617,
+              "end_line": 712,
               "increment": 1,
               "kind": "for-loop",
-              "line": 615,
+              "line": 710,
               "nesting_depth": 0
             }
           ],
@@ -7203,9 +7558,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 627,
+              "end_line": 722,
               "start_column": 5,
-              "start_line": 600
+              "start_line": 695
             }
           }
         },
@@ -9636,9 +9991,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 132,
+              "end_line": 166,
               "start_column": 1,
-              "start_line": 125
+              "start_line": 159
             }
           }
         },
@@ -9660,9 +10015,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 219,
+              "end_line": 253,
               "start_column": 1,
-              "start_line": 214
+              "start_line": 248
             }
           }
         },
@@ -9684,9 +10039,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 230,
+              "end_line": 264,
               "start_column": 1,
-              "start_line": 221
+              "start_line": 255
             }
           }
         },
@@ -9708,9 +10063,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 244,
+              "end_line": 278,
               "start_column": 1,
-              "start_line": 241
+              "start_line": 275
             }
           }
         },
@@ -9732,9 +10087,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 272,
+              "end_line": 306,
               "start_column": 1,
-              "start_line": 246
+              "start_line": 280
             }
           }
         },
@@ -9756,9 +10111,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 279,
+              "end_line": 313,
               "start_column": 1,
-              "start_line": 274
+              "start_line": 308
             }
           }
         },
@@ -9780,9 +10135,9 @@ expression: pretty
             "qualified_name": "parser",
             "span": {
               "end_column": 5,
-              "end_line": 288,
+              "end_line": 322,
               "start_column": 5,
-              "start_line": 286
+              "start_line": 320
             }
           }
         },
@@ -9804,9 +10159,9 @@ expression: pretty
             "qualified_name": "parse",
             "span": {
               "end_column": 5,
-              "end_line": 292,
+              "end_line": 326,
               "start_column": 5,
-              "start_line": 290
+              "start_line": 324
             }
           }
         },
@@ -9828,9 +10183,201 @@ expression: pretty
             "qualified_name": "empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 299,
+              "end_line": 333,
               "start_column": 5,
-              "start_line": 294
+              "start_line": 328
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_str",
+            "span": {
+              "end_column": 5,
+              "end_line": 347,
+              "start_column": 5,
+              "start_line": 337
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_empty_input_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 352,
+              "start_column": 5,
+              "start_line": 349
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_no_da_lines_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 357,
+              "start_column": 5,
+              "start_line": 354
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_da_outside_sf_block_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 362,
+              "start_column": 5,
+              "start_line": 359
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_malformed_da_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 367,
+              "start_column": 5,
+              "start_line": 364
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_single_da_inside_sf_block_passes",
+            "span": {
+              "end_column": 5,
+              "end_line": 372,
+              "start_column": 5,
+              "start_line": 369
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_first_da_in_second_block_passes",
+            "span": {
+              "end_column": 5,
+              "end_line": 382,
+              "start_column": 5,
+              "start_line": 374
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "validate_missing_path_returns_open_error",
+            "span": {
+              "end_column": 5,
+              "end_line": 394,
+              "start_column": 5,
+              "start_line": 384
             }
           }
         },
@@ -9852,9 +10399,9 @@ expression: pretty
             "qualified_name": "single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 309,
+              "end_line": 404,
               "start_column": 5,
-              "start_line": 301
+              "start_line": 396
             }
           }
         },
@@ -9876,9 +10423,9 @@ expression: pretty
             "qualified_name": "multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 319,
+              "end_line": 414,
               "start_column": 5,
-              "start_line": 311
+              "start_line": 406
             }
           }
         },
@@ -9900,9 +10447,9 @@ expression: pretty
             "qualified_name": "multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 328,
+              "end_line": 423,
               "start_column": 5,
-              "start_line": 321
+              "start_line": 416
             }
           }
         },
@@ -9924,9 +10471,9 @@ expression: pretty
             "qualified_name": "hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 336,
+              "end_line": 431,
               "start_column": 5,
-              "start_line": 330
+              "start_line": 425
             }
           }
         },
@@ -9948,9 +10495,9 @@ expression: pretty
             "qualified_name": "path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 342,
+              "end_line": 437,
               "start_column": 5,
-              "start_line": 338
+              "start_line": 433
             }
           }
         },
@@ -9972,9 +10519,9 @@ expression: pretty
             "qualified_name": "non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 348,
+              "end_line": 443,
               "start_column": 5,
-              "start_line": 344
+              "start_line": 439
             }
           }
         },
@@ -9996,9 +10543,9 @@ expression: pretty
             "qualified_name": "backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 355,
+              "end_line": 450,
               "start_column": 5,
-              "start_line": 350
+              "start_line": 445
             }
           }
         },
@@ -10020,9 +10567,9 @@ expression: pretty
             "qualified_name": "path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 361,
+              "end_line": 456,
               "start_column": 5,
-              "start_line": 357
+              "start_line": 452
             }
           }
         },
@@ -10044,9 +10591,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 375,
+              "end_line": 470,
               "start_column": 5,
-              "start_line": 363
+              "start_line": 458
             }
           }
         },
@@ -10068,9 +10615,9 @@ expression: pretty
             "qualified_name": "duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 384,
+              "end_line": 479,
               "start_column": 5,
-              "start_line": 377
+              "start_line": 472
             }
           }
         },
@@ -10092,9 +10639,9 @@ expression: pretty
             "qualified_name": "duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 396,
+              "end_line": 491,
               "start_column": 5,
-              "start_line": 386
+              "start_line": 481
             }
           }
         },
@@ -10116,9 +10663,9 @@ expression: pretty
             "qualified_name": "malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 421,
+              "end_line": 516,
               "start_column": 5,
-              "start_line": 415
+              "start_line": 510
             }
           }
         },
@@ -10140,9 +10687,9 @@ expression: pretty
             "qualified_name": "da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 431,
+              "end_line": 526,
               "start_column": 5,
-              "start_line": 423
+              "start_line": 518
             }
           }
         },
@@ -10164,9 +10711,9 @@ expression: pretty
             "qualified_name": "da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 441,
+              "end_line": 536,
               "start_column": 5,
-              "start_line": 433
+              "start_line": 528
             }
           }
         },
@@ -10188,9 +10735,9 @@ expression: pretty
             "qualified_name": "end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 468,
+              "end_line": 563,
               "start_column": 5,
-              "start_line": 459
+              "start_line": 554
             }
           }
         },
@@ -10212,9 +10759,9 @@ expression: pretty
             "qualified_name": "unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 475,
+              "end_line": 570,
               "start_column": 5,
-              "start_line": 470
+              "start_line": 565
             }
           }
         },
@@ -10236,9 +10783,9 @@ expression: pretty
             "qualified_name": "empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 486,
+              "end_line": 581,
               "start_column": 5,
-              "start_line": 477
+              "start_line": 572
             }
           }
         },
@@ -10260,9 +10807,9 @@ expression: pretty
             "qualified_name": "da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 495,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 488
+              "start_line": 583
             }
           }
         },
@@ -10284,9 +10831,9 @@ expression: pretty
             "qualified_name": "non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 509,
+              "end_line": 604,
               "start_column": 5,
-              "start_line": 497
+              "start_line": 592
             }
           }
         },
@@ -10308,9 +10855,9 @@ expression: pretty
             "qualified_name": "brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 521,
+              "end_line": 616,
               "start_column": 5,
-              "start_line": 513
+              "start_line": 608
             }
           }
         },
@@ -10332,9 +10879,9 @@ expression: pretty
             "qualified_name": "brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 528,
+              "end_line": 623,
               "start_column": 5,
-              "start_line": 523
+              "start_line": 618
             }
           }
         },
@@ -10356,9 +10903,9 @@ expression: pretty
             "qualified_name": "brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 535,
+              "end_line": 630,
               "start_column": 5,
-              "start_line": 530
+              "start_line": 625
             }
           }
         },
@@ -10380,9 +10927,9 @@ expression: pretty
             "qualified_name": "brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 542,
+              "end_line": 637,
               "start_column": 5,
-              "start_line": 537
+              "start_line": 632
             }
           }
         },
@@ -10404,9 +10951,9 @@ expression: pretty
             "qualified_name": "duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 552,
+              "end_line": 647,
               "start_column": 5,
-              "start_line": 544
+              "start_line": 639
             }
           }
         },
@@ -10428,9 +10975,9 @@ expression: pretty
             "qualified_name": "brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 560,
+              "end_line": 655,
               "start_column": 5,
-              "start_line": 554
+              "start_line": 649
             }
           }
         },
@@ -10452,9 +10999,9 @@ expression: pretty
             "qualified_name": "brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 587,
+              "end_line": 682,
               "start_column": 5,
-              "start_line": 578
+              "start_line": 673
             }
           }
         },
@@ -10476,9 +11023,9 @@ expression: pretty
             "qualified_name": "brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 598,
+              "end_line": 693,
               "start_column": 5,
-              "start_line": 589
+              "start_line": 684
             }
           }
         },
@@ -10500,9 +11047,9 @@ expression: pretty
             "qualified_name": "brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 637,
+              "end_line": 732,
               "start_column": 5,
-              "start_line": 629
+              "start_line": 724
             }
           }
         },
@@ -10524,9 +11071,9 @@ expression: pretty
             "qualified_name": "no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 643,
+              "end_line": 738,
               "start_column": 5,
-              "start_line": 639
+              "start_line": 734
             }
           }
         },
@@ -10548,9 +11095,9 @@ expression: pretty
             "qualified_name": "arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 653,
+              "end_line": 748,
               "start_column": 5,
-              "start_line": 651
+              "start_line": 746
             }
           }
         },
@@ -10572,9 +11119,9 @@ expression: pretty
             "qualified_name": "arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 669,
+              "end_line": 764,
               "start_column": 5,
-              "start_line": 667
+              "start_line": 762
             }
           }
         },
@@ -10726,16 +11273,16 @@ expression: pretty
       }
     ],
     "shown_summary": {
-      "average_complexity": 1.4974093264248705,
+      "average_complexity": 1.5198019801980198,
       "average_coverage": 0.0,
-      "average_crap": 5.33678756476684,
+      "average_crap": 5.7227722772277225,
       "distribution": {
         "acceptable": 29,
-        "high": 5,
-        "low": 145,
+        "high": 6,
+        "low": 153,
         "moderate": 14
       },
-      "exceeding_threshold": 5,
+      "exceeding_threshold": 6,
       "max_complexity": 11,
       "max_crap": {
         "risk_level": "high",
@@ -10746,15 +11293,15 @@ expression: pretty
       "median_crap": 2.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 193,
+      "total_functions": 202,
       "worst_function": {
         "file_path": "adapters/coverage/mod.rs",
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 171,
+          "end_line": 205,
           "start_column": 1,
-          "start_line": 148
+          "start_line": 182
         }
       }
     },
