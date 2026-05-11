@@ -53,10 +53,13 @@ pub struct AnalyzeOptions {
     pub diff_ref: Option<String>,
     /// File extensions the walker should pick up. Adapter-specific
     /// (`["rs"]` for crap4rs; `["ts","tsx","js","jsx","mjs","cjs"]`
-    /// for crap4ts). `Default::default()` is `vec!["rs"]` so existing
-    /// library tests and snapshot baselines stay byte-identical
-    /// without an explicit set; the CLI boundary fills this from
-    /// `AdapterMeta::extensions`.
+    /// for crap4ts). `Default::default()` is `Vec::new()` since #161 —
+    /// the adapter-language coupling lives in each binary's
+    /// `AdapterMeta::extensions`, threaded into `AnalyzeOptions` at
+    /// the CLI boundary. Library tests that construct `AnalyzeOptions`
+    /// directly must set this explicitly;
+    /// `core::ensure_source_files_found` surfaces a parser-neutral
+    /// diagnostic when no files match.
     pub extensions: Vec<String>,
     /// When `true`, populate `FunctionVerdict.diagnostic` for every
     /// over-threshold verdict via `domain::diagnostic::compute_diagnostic`.

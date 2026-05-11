@@ -759,22 +759,25 @@ fn current_bin_name(meta_fallback: &str) -> String {
 /// bin name through `current_bin_name` directly because
 /// `clap_complete::generate` takes the bin name as a separate arg.
 ///
-/// All metadata fields accept owned `String` directly thanks to clap's
-/// `string` feature, which adds `impl From<String> for clap::builder::Str`.
-/// Without the feature, `name` / `bin_name` / `version` / `long_version`
-/// require `&'static str` and the only way to satisfy that from a
-/// runtime-built `String` is `Box::leak` — see #161.
+/// `name` / `bin_name` need clap's `string` feature
+/// (`impl From<String> for clap::builder::Str`) because
+/// `current_bin_name` constructs the bin name at runtime from
+/// `argv[0]` and returns `String` — without the feature, the only way
+/// to satisfy `From<&'static str>` from a runtime `String` is
+/// `Box::leak` (the pre-#161 workaround). The remaining fields are
+/// `&'static str` on `AdapterMeta`, so they pass through clap's
+/// default `Into<Str>` impl with zero heap allocations.
 fn build_command(meta: &AdapterMeta) -> clap::Command {
     let bin_name = current_bin_name(meta.tool_name);
     let mut cmd = Cli::command()
         .name(bin_name.clone())
         .bin_name(bin_name)
-        .version(meta.tool_version.to_string())
-        .long_version(meta.long_version.to_string())
-        .about(meta.about.to_string())
-        .long_about(meta.long_about.to_string());
+        .version(meta.tool_version)
+        .long_version(meta.long_version)
+        .about(meta.about)
+        .long_about(meta.long_about);
     if !meta.after_help.is_empty() {
-        cmd = cmd.after_help(meta.after_help.to_string());
+        cmd = cmd.after_help(meta.after_help);
     }
     cmd
 }

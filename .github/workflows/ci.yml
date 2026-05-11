@@ -448,12 +448,13 @@ jobs:
         # names belong in `AdapterMeta` supplied by the binary, never
         # baked into the language-agnostic library (#161).
         #
-        # Doc comments and code comments (`///`, `//!`, `//`, leading
-        # `*` in block comments) are allowed to mention the adapter
-        # names — those are legitimate references in the API surface
-        # docstrings. The awk filter strips rg's `path:lineno:` prefix
-        # and only fires on lines whose content (after optional
-        # whitespace) does NOT start with a comment marker.
+        # Doc comments and code comments (`///`, `//!`, `//`, `/*`
+        # block openers, leading `*` continuation lines) are allowed
+        # to mention the adapter names — those are legitimate
+        # references in the API surface docstrings. The awk filter
+        # strips rg's `path:lineno:` prefix and only fires on lines
+        # whose content (after optional whitespace) does NOT start
+        # with a comment marker.
         #
         # No untrusted-input interpolation: literals and patterns are
         # static; `rg`/`awk` invocations contain no `${{ github.* }}`
@@ -470,7 +471,7 @@ jobs:
               content = ""
               for (i = 3; i <= NF; i++) content = content (i > 3 ? ":" : "") $i
               gsub(/^[ \t]+/, "", content)
-              if (content !~ /^(\/\/|\*)/) print
+              if (content !~ /^(\/\/|\/\*|\*)/) print
             }
           ')
           if [ -n "$non_comment_hits" ]; then

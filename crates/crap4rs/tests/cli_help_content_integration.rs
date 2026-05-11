@@ -16,6 +16,16 @@ fn run_help(flag: &str) -> String {
         .arg(flag)
         .output()
         .expect("failed to run crap4rs binary");
+    // Without this guard, a non-zero exit (e.g., clap parse failure
+    // from a future regression) would surface as a confusing
+    // "expected substring not found" downstream rather than the
+    // actual command failure.
+    assert!(
+        out.status.success(),
+        "crap4rs {flag} exited with {:?}\nstderr: {}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr),
+    );
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 

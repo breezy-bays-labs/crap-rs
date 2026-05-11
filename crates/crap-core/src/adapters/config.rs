@@ -699,25 +699,27 @@ sort = "path"
         // regression would silently fall back to a hardcoded constant
         // (e.g., the v0.4 `crap4rs.toml` literal) and make the second
         // adapter (`crap4ts.toml`) invisible to discovery.
+        //
+        // `discover_config` interprets `name` as a path (it calls
+        // `PathBuf::from(name)` and feeds it to `std::fs::metadata`),
+        // so passing tempdir-qualified paths avoids any process-wide
+        // CWD mutation. This keeps the test safe under nextest's
+        // parallel execution model.
         let dir = tempfile::tempdir().unwrap();
-        let cwd = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-
-        // Both adapters' conventional config names: only the one
-        // actually on disk should be returned, and the lookup must be
-        // param-driven (not constant).
         std::fs::write(dir.path().join("crap4ts.toml"), "threshold = 7.0\n").unwrap();
 
-        let rust_lookup = discover_config("crap4rs.toml").unwrap();
-        let ts_lookup = discover_config("crap4ts.toml").unwrap();
-        let alt_lookup = discover_config("custom-tool.toml").unwrap();
+        let rust_path = dir.path().join("crap4rs.toml");
+        let ts_path = dir.path().join("crap4ts.toml");
+        let alt_path = dir.path().join("custom-tool.toml");
 
-        std::env::set_current_dir(cwd).unwrap();
+        let rust_lookup = discover_config(rust_path.to_str().unwrap()).unwrap();
+        let ts_lookup = discover_config(ts_path.to_str().unwrap()).unwrap();
+        let alt_lookup = discover_config(alt_path.to_str().unwrap()).unwrap();
 
         assert_eq!(rust_lookup, None, "absent crap4rs.toml must return None");
         assert_eq!(
             ts_lookup,
-            Some(PathBuf::from("crap4ts.toml")),
+            Some(ts_path.clone()),
             "present crap4ts.toml must be discovered by name"
         );
         assert_eq!(alt_lookup, None, "absent custom name must return None");
