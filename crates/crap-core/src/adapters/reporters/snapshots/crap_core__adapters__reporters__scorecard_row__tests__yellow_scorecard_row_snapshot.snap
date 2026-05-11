@@ -1,0 +1,15 @@
+---
+source: crates/crap-core/src/adapters/reporters/scorecard_row.rs
+assertion_line: 201
+expression: out
+---
+{
+  "type": "CrapDelta",
+  "id": "crap_delta",
+  "label": "CRAP Δ",
+  "anchor": "crap-delta",
+  "status": "Yellow",
+  "threshold": 15,
+  "delta_count": 0,
+  "delta_text": "5 → 5 (regressions on existing functions)"
+}

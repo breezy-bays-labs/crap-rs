@@ -636,4 +636,29 @@ mod tests {
         assert!(!html.contains("src/lib.rs"));
         assert!(!html.contains("src/adapters/coverage/mod.rs"));
     }
+
+    /// Byte-level snapshot lock for the HTML reporter (#141).
+    ///
+    /// Complements the existing structural asserts (`PASS`/`FAIL`
+    /// badge, risk-class strings, self-contained markup) with a
+    /// full-document anchor so future format edits are reviewable
+    /// rather than silent. Mirrors the per-reporter pattern from
+    /// `json`, `markdown`, `sarif`, `csv`, `table`.
+    ///
+    /// Uses `make_multi_function_result` (3 functions spanning
+    /// Low/Moderate/High risk + a failing summary) and the default
+    /// view spec — the same fixture every other reporter snapshot
+    /// pins so cross-reporter diffs stay readable.
+    ///
+    /// Tool version pinned to "0.4.0" to match the surrounding
+    /// suite; the value is interpolated into the document header so
+    /// any unpinned ad-hoc version would churn the snapshot on every
+    /// crate-version bump.
+    #[test]
+    fn full_html_snapshot() {
+        let result = make_multi_function_result();
+        let view = make_view_default(&result);
+        let html = format_html(&view, 8.0, "0.4.0");
+        insta::assert_snapshot!(html);
+    }
 }

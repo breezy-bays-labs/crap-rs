@@ -1,0 +1,16 @@
+---
+source: crates/crap-core/src/adapters/reporters/scorecard_row.rs
+assertion_line: 207
+expression: out
+---
+{
+  "type": "CrapDelta",
+  "id": "crap_delta",
+  "label": "CRAP Δ",
+  "anchor": "crap-delta",
+  "status": "Red",
+  "threshold": 15,
+  "delta_count": 2,
+  "delta_text": "5 → 7 (+2)",
+  "failure_detail_md": "**New CRAP threshold violations (>15):**\n- `foo` — `a.rs:1` — CRAP 22.0 (newly added)\n"
+}

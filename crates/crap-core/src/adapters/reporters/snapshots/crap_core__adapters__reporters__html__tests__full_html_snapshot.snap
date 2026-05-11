@@ -1,0 +1,222 @@
+---
+source: crates/crap-core/src/adapters/reporters/html.rs
+assertion_line: 662
+expression: html
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crap4rs v0.4.0 — CRAP Score Analysis</title>
+<style>
+
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #57606a;
+  --border: #d0d7de;
+  --row-alt: #f6f8fa;
+  --risk-low: #16a34a;
+  --risk-acceptable: #ca8a04;
+  --risk-moderate: #ea580c;
+  --risk-high: #dc2626;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+    --row-alt: #161b22;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.45;
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+header h1 { margin: 0 0 0.25rem 0; font-size: 1.5rem; }
+header .threshold { color: var(--muted); font-size: 0.9rem; }
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+}
+.badge-pass { background: var(--risk-low); }
+.badge-fail { background: var(--risk-high); }
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.stat {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+.stat .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 0.25rem; }
+.distribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1.5rem 0;
+}
+.dist-pill {
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.dist-low { background: var(--risk-low); }
+.dist-acceptable { background: var(--risk-acceptable); }
+.dist-moderate { background: var(--risk-moderate); }
+.dist-high { background: var(--risk-high); }
+details.file {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  background: var(--bg);
+}
+details.file > summary {
+  cursor: pointer;
+  padding: 0.6rem 0.85rem;
+  font-weight: 500;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  user-select: none;
+}
+details.file > summary::before {
+  content: "▶";
+  font-size: 0.7rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+details.file[open] > summary::before { transform: rotate(90deg); }
+details.file > summary .file-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+details.file > summary .file-meta { color: var(--muted); font-size: 0.85rem; margin-left: auto; }
+table.functions {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+table.functions th, table.functions td {
+  text-align: left;
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.functions th {
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--row-alt);
+}
+table.functions td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+table.functions td.fn-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.risk {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.risk-low { background: var(--risk-low); }
+.risk-acceptable { background: var(--risk-acceptable); }
+.risk-moderate { background: var(--risk-moderate); }
+.risk-high { background: var(--risk-high); }
+.exceeds { color: var(--risk-high); font-weight: 600; }
+details.contributors {
+  margin-top: 0.4rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--border);
+}
+details.contributors > summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--muted);
+  user-select: none;
+}
+details.contributors ul {
+  margin: 0.4rem 0 0.2rem 0;
+  padding-left: 1.2rem;
+  font-size: 0.82rem;
+}
+.empty { color: var(--muted); font-style: italic; }
+@media (max-width: 640px) {
+  body { padding: 1rem; }
+  table.functions th:nth-child(2),
+  table.functions td:nth-child(2) { display: none; }
+}
+
+</style>
+</head>
+<body>
+<header>
+<h1>crap4rs v0.4.0 — CRAP Score Analysis</h1>
+<p class="threshold">Threshold: <strong>8.00</strong></p>
+</header>
+<section class="summary">
+<h2>Summary <span class="badge badge-fail">FAIL</span></h2>
+<div class="summary-grid">
+<div class="stat"><div class="label">Functions</div><div class="value">3</div></div>
+<div class="stat"><div class="label">Files</div><div class="value">3</div></div>
+<div class="stat"><div class="label">Exceeding threshold</div><div class="value">2</div></div>
+<div class="stat"><div class="label">Average CRAP</div><div class="value">21.07</div></div>
+<div class="stat"><div class="label">Median CRAP</div><div class="value">15.00</div></div>
+<div class="stat"><div class="label">Max CRAP</div><div class="value">45.20</div></div>
+</div>
+<div class="distribution" aria-label="Risk distribution">
+<span class="dist-pill dist-low">low: 1</span>
+<span class="dist-pill dist-acceptable">acceptable: 0</span>
+<span class="dist-pill dist-moderate">moderate: 1</span>
+<span class="dist-pill dist-high">high: 1</span>
+</div>
+</section>
+<section class="files">
+<h2>Functions by file</h2>
+<details class="file" open>
+<summary><span class="file-path">src/adapters/coverage/mod.rs</span><span class="file-meta">1 fn · max CRAP 15.00 · 1 over</span></summary>
+<table class="functions">
+<thead><tr><th>Function</th><th>Lines</th><th class="numeric">CC</th><th class="numeric">Cov %</th><th class="numeric">CRAP</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td class="fn-name">parse_record</td><td>1–10</td><td class="numeric">6</td><td class="numeric">72.5</td><td class="numeric exceeds">15.00</td><td><span class="risk risk-moderate">moderate</span></td></tr>
+</tbody>
+</table>
+</details>
+<details class="file" open>
+<summary><span class="file-path">src/domain/crap.rs</span><span class="file-meta">1 fn · max CRAP 45.20 · 1 over</span></summary>
+<table class="functions">
+<thead><tr><th>Function</th><th>Lines</th><th class="numeric">CC</th><th class="numeric">Cov %</th><th class="numeric">CRAP</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td class="fn-name">complex_fn</td><td>1–10</td><td class="numeric">20</td><td class="numeric">30.0</td><td class="numeric exceeds">45.20</td><td><span class="risk risk-high">high</span></td></tr>
+</tbody>
+</table>
+</details>
+<details class="file">
+<summary><span class="file-path">src/lib.rs</span><span class="file-meta">1 fn · max CRAP 3.00 · 0 over</span></summary>
+<table class="functions">
+<thead><tr><th>Function</th><th>Lines</th><th class="numeric">CC</th><th class="numeric">Cov %</th><th class="numeric">CRAP</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td class="fn-name">simple_fn</td><td>1–10</td><td class="numeric">2</td><td class="numeric">95.0</td><td class="numeric">3.00</td><td><span class="risk risk-low">low</span></td></tr>
+</tbody>
+</table>
+</details>
+</section>
+</body>
+</html>

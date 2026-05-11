@@ -174,4 +174,36 @@ mod tests {
         let out2 = format_scorecard_row(&red_data());
         assert_eq!(out1, out2, "format is deterministic");
     }
+
+    // ── Byte-level snapshot locks (#143) ───────────────────────────────
+    //
+    // Complement the existing `scorecard_row_integration.rs` schema
+    // validation (which gates the shape against mokumo's
+    // `Row::CrapDelta` JSON Schema) with insta snapshots that pin the
+    // exact serialization — pretty-printer settings, field ordering,
+    // failure-detail rendering. Schema + insta together = belt +
+    // suspenders.
+    //
+    // One snapshot per `CrapDeltaStatus` because each carries a
+    // structurally distinct payload (green/yellow omit
+    // `failure_detail_md`; red includes it). Without/with-delta is
+    // covered by the green vs red split (delta_count 0 vs 2).
+
+    #[test]
+    fn green_scorecard_row_snapshot() {
+        let out = format_scorecard_row(&green_data());
+        insta::assert_snapshot!(out);
+    }
+
+    #[test]
+    fn yellow_scorecard_row_snapshot() {
+        let out = format_scorecard_row(&yellow_data());
+        insta::assert_snapshot!(out);
+    }
+
+    #[test]
+    fn red_scorecard_row_snapshot() {
+        let out = format_scorecard_row(&red_data());
+        insta::assert_snapshot!(out);
+    }
 }
