@@ -215,7 +215,16 @@ mod tests {
     /// the default-sort ordering is also pinned by the snapshot.
     #[test]
     fn advice_summary_snapshot() {
+        // Pin threshold to 8.0 across all verdicts to match the
+        // `make_multi_function_result` convention used by sibling
+        // reporter tests. The value does not appear in
+        // advice_summary's output (`format_line` only includes
+        // `crap`, `file`, `lines`, `name`, `actions`), so the
+        // snapshot is unaffected — but pinning here keeps future
+        // test edits honest (e.g., a future passing-score case
+        // would otherwise quietly exceed the default 5.0).
         let mut high = make_verdict("complex_handler", "src/cli/mod.rs", 600, 720);
+        high.threshold = 8.0;
         high.scored.crap.value = 45.20;
         high.scored.crap.risk_level = RiskLevel::High;
         high.diagnostic = Some(Box::new(Diagnostic {
@@ -241,6 +250,7 @@ mod tests {
         }));
 
         let mut moderate = make_verdict("parse_record", "src/adapters/coverage/mod.rs", 80, 145);
+        moderate.threshold = 8.0;
         moderate.scored.crap.value = 15.00;
         moderate.scored.crap.risk_level = RiskLevel::Moderate;
         moderate.diagnostic = Some(Box::new(Diagnostic {
@@ -259,6 +269,7 @@ mod tests {
         }));
 
         let mut bare = make_verdict("opaque_helper", "src/util.rs", 30, 42);
+        bare.threshold = 8.0;
         bare.scored.crap.value = 8.50;
         bare.scored.crap.risk_level = RiskLevel::Acceptable;
         // No diagnostic populated — exercises the `none` sentinel branch.
