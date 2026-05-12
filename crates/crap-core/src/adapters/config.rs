@@ -690,4 +690,38 @@ sort = "path"
         );
         assert_eq!(config.views["path_sort"].sort, Some(SortKey::Path));
     }
+
+    // ── discover_config parameterization (#161) ───────────────────
+
+    #[test]
+    fn discover_config_honors_caller_supplied_name() {
+        // Verifies the `name` parameter actually drives lookup — a
+        // regression would silently fall back to a hardcoded constant
+        // (e.g., the v0.4 `crap4rs.toml` literal) and make the second
+        // adapter (`crap4ts.toml`) invisible to discovery.
+        //
+        // `discover_config` interprets `name` as a path (it calls
+        // `PathBuf::from(name)` and feeds it to `std::fs::metadata`),
+        // so passing tempdir-qualified paths avoids any process-wide
+        // CWD mutation. This keeps the test safe under nextest's
+        // parallel execution model.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("crap4ts.toml"), "threshold = 7.0\n").unwrap();
+
+        let rust_path = dir.path().join("crap4rs.toml");
+        let ts_path = dir.path().join("crap4ts.toml");
+        let alt_path = dir.path().join("custom-tool.toml");
+
+        let rust_lookup = discover_config(rust_path.to_str().unwrap()).unwrap();
+        let ts_lookup = discover_config(ts_path.to_str().unwrap()).unwrap();
+        let alt_lookup = discover_config(alt_path.to_str().unwrap()).unwrap();
+
+        assert_eq!(rust_lookup, None, "absent crap4rs.toml must return None");
+        assert_eq!(
+            ts_lookup,
+            Some(ts_path.clone()),
+            "present crap4ts.toml must be discovered by name"
+        );
+        assert_eq!(alt_lookup, None, "absent custom name must return None");
+    }
 }

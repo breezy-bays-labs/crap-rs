@@ -83,6 +83,7 @@ fn analyze_returns_results_for_simple_project() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -110,6 +111,7 @@ fn analyze_simple_fn_fully_covered_has_low_crap() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -141,6 +143,7 @@ fn analyze_branching_fn_partial_coverage_higher_crap() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -172,6 +175,7 @@ fn analyze_pass_when_all_below_threshold() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -199,6 +203,7 @@ fn analyze_at_exact_threshold_does_not_exceed() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -230,6 +235,7 @@ fn analyze_fail_when_above_threshold() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -255,6 +261,7 @@ fn analyze_no_functions_extracted_errors() {
         src: src_dir,
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -277,6 +284,7 @@ fn analyze_empty_src_dir_errors() {
     let opts = AnalyzeOptions {
         src: src_dir,
         coverage: dir.path().join("lcov.info"),
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -295,6 +303,7 @@ fn analyze_missing_coverage_file_errors() {
     let opts = AnalyzeOptions {
         src: src_dir,
         coverage: dir.path().join("nonexistent.info"),
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -329,6 +338,7 @@ fn analyze_exclude_pattern_filters_files() {
         coverage: dir.path().join("lcov.info"),
         exclude: vec!["tests/**".to_string()],
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -353,6 +363,7 @@ fn analyze_with_cyclomatic_metric() {
         src,
         coverage: dir.path().join("lcov.info"),
         metric: ComplexityMetric::Cyclomatic,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -376,6 +387,7 @@ fn summary_computed_correctly() {
             global: DEFAULT_THRESHOLD,
             ..ThresholdConfig::default()
         },
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -402,6 +414,7 @@ fn analyze_diff_ref_none_is_backward_compat() {
         coverage: dir.path().join("lcov.info"),
         diff_ref: None,
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -427,6 +440,7 @@ fn analyze_returns_diagnostics() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -464,6 +478,7 @@ fn analyze_diagnostics_counts_no_coverage_functions() {
         src: src_dir,
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -494,6 +509,7 @@ fn analyze_diagnostics_surfaces_parse_diagnostics() {
         src: src_dir,
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -521,6 +537,7 @@ fn analyze_with_per_path_overrides() {
         metric: ComplexityMetric::Cognitive,
         exclude: Vec::new(),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 
@@ -576,6 +593,7 @@ pub fn with_branch(x: i32) -> &'static str {
         src: src_dir,
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     };
 

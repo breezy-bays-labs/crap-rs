@@ -67,6 +67,7 @@ fn make_opts(dir: &Path, diff_ref: Option<&str>) -> AnalyzeOptions {
         exclude: Vec::new(),
         respect_gitignore: false,
         diff_ref: diff_ref.map(String::from),
+        extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
     }
 }
