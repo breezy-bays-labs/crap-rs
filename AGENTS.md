@@ -54,8 +54,9 @@ breezy-bays-labs/mokumo#370) can dogfood on us without false positives.
    `@unwired` — not "wired with empty step defs". Forced empty step
    defs to skip past unwired Background blocks are forbidden:
    `cli_ergonomics_cucumber.rs` once carried four of these (PR #167)
-   and they were removed in #168 by tagging the Background scenarios
-   `@unwired` instead.
+   and they were removed in #168 by tagging the scenarios that
+   depended on the Background as `@unwired` (so the harness's
+   `@wired` filter skips them) and deleting the Background itself.
 
 4. **`Background:` blocks must be executable.** A `Background` runs
    before every scenario in a feature, so a non-executable Background

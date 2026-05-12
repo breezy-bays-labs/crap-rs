@@ -21,6 +21,19 @@ Feature: CLI ergonomics — shaping the report from the command line
   # Self-CRAP regression invariant (per shaping.md):
   #   The view module must not introduce any function with cognitive
   #   complexity above 15. CI gate enforces.
+  #
+  # Implicit context for @unwired scenarios (placeholder vocabulary):
+  #   Most @unwired scenarios below reference TOTAL_FUNCTIONS and
+  #   VIOLATING_FUNCTIONS as placeholder counts, and assume a project
+  #   exists with an LCOV file at "lcov.info". A non-executable
+  #   `Background:` block previously documented this; it was deleted
+  #   in crap-rs#168 (BDD hygiene chore) because Background blocks
+  #   must be executable (AGENTS.md § BDD hygiene rule 4). When these
+  #   scenarios are wired (tracked at crap-rs#169), the implementer
+  #   will replace the placeholders with scenario-specific Given
+  #   steps that set up concrete fixture-derived counts — just like
+  #   the @wired `--summary` scenarios do with their `Given a
+  #   synthetic project where ...` step.
 
   # ── --top: truncate (issue #62) ────────────────────────────────────
 
