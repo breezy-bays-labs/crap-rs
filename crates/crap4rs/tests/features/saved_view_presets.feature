@@ -28,7 +28,9 @@ Feature: --view saved presets (Bundle D, issue #80)
 
   # ── Resolution ─────────────────────────────────────────────────────
 
+  @unwired
   Scenario: --view ci applies every preset field to the view
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --view ci --format json`
     Then `view.spec.limit` is `20`
     And `view.spec.filters.coverage_range` covers `[0, 90]`
@@ -39,17 +41,23 @@ Feature: --view saved presets (Bundle D, issue #80)
 
   # ── Override priority ──────────────────────────────────────────────
 
+  @unwired
   Scenario: --top on the CLI overrides the preset's top
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --view ci --top 5 --format json`
     Then `view.spec.limit` is `5`
     And `view.spec.filters.only_failing` is true (other preset fields preserved)
 
+  @unwired
   Scenario: --no-fail OR-merges with the preset
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     Given the analysis has threshold violations
     When the operator runs `crap4rs --coverage lcov.info --view ci --no-fail`
     Then the process exits 0 (CLI --no-fail wins)
 
+  @unwired
   Scenario: Multiple presets coexist independently
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --view investigate --format json`
     Then `view.spec.sort` is `"complexity"`
     And `view.spec.limit` is `10`
@@ -57,21 +65,27 @@ Feature: --view saved presets (Bundle D, issue #80)
 
   # ── Validation errors ──────────────────────────────────────────────
 
+  @unwired
   Scenario: Unknown preset name exits 2 with available list
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --view nonsense`
     Then the process exits 2
     And stderr contains "unknown view preset"
     And stderr contains "ci"
     And stderr contains "investigate"
 
+  @unwired
   Scenario: --view with no crap4rs.toml exits 2 with hint
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     Given no `crap4rs.toml` exists
     When the operator runs `crap4rs --coverage lcov.info --view ci`
     Then the process exits 2
     And stderr contains "unknown view preset"
     And stderr contains "crap4rs.toml"
 
+  @unwired
   Scenario: Invalid preset field fails fast at config load
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     Given `crap4rs.toml` contains:
       """
       [views.bad]
@@ -84,7 +98,9 @@ Feature: --view saved presets (Bundle D, issue #80)
 
   # ── Gate keystone ──────────────────────────────────────────────────
 
+  @unwired
   Scenario: Preset does not change exit code on a failing analysis
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     Given the unfiltered analysis would exit 1 (violations exist)
     And the preset `ci` has `no_fail = false`
     When the operator runs `crap4rs --coverage lcov.info --view ci`
@@ -93,7 +109,9 @@ Feature: --view saved presets (Bundle D, issue #80)
 
   # ── Discoverability ────────────────────────────────────────────────
 
+  @unwired
   Scenario: --help advertises --view
+    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     When the operator runs `crap4rs --help`
     Then the help text mentions "--view"
     And the help text mentions "saved view preset"

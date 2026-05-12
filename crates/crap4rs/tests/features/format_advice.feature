@@ -21,7 +21,9 @@ Feature: --format advice (issue #76)
 
   # ── Envelope shape ─────────────────────────────────────────────────
 
+  @unwired
   Scenario: --format advice emits the canonical envelope on stdout
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then stdout is parseable JSON
     And the document carries top-level `schema_version` "2"
@@ -29,19 +31,25 @@ Feature: --format advice (issue #76)
     And every `view.shown[].diagnostic` is either populated or absent
       (never `null`-with-fields-present)
 
+  @unwired
   Scenario: --format advice exit code matches --format json
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given exceeding functions exist
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then the exit code is 1
 
   # ── Diagnostic gating (R6.4 / F2) ──────────────────────────────────
 
+  @unwired
   Scenario: Under-threshold functions carry no Diagnostic
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then for every `view.shown[]` entry where `verdict.exceeds == false`,
       `verdict.diagnostic` key is absent from the serialised JSON
 
+  @unwired
   Scenario: Over-threshold functions always carry a Diagnostic
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then for every `view.shown[]` entry where `verdict.exceeds == true`,
       `verdict.diagnostic` is populated with all four fields:
@@ -50,7 +58,9 @@ Feature: --format advice (issue #76)
 
   # ── SuggestedAction taxonomy (R1.3) ────────────────────────────────
 
+  @unwired
   Scenario: Low coverage emits AddTestsForLines
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given an over-threshold function with coverage < 100% and acceptable
       complexity
     When the operator runs `crap4rs --coverage lcov.info --format advice`
@@ -60,7 +70,9 @@ Feature: --format advice (issue #76)
       ranges in the function's span
     And that entry carries an `applicability` field
 
+  @unwired
   Scenario: High complexity with viable splits emits ExtractFunction
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given an over-threshold function with full coverage and high
       complexity
     When the operator runs `crap4rs --coverage lcov.info --format advice`
@@ -69,14 +81,18 @@ Feature: --format advice (issue #76)
     And that entry carries a non-empty `candidates: Vec<ProposedSplit>`
     And no `add_tests_for_lines` action is emitted for this function
 
+  @unwired
   Scenario: Both low coverage and high complexity emit both actions
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given an over-threshold function with coverage < 100% and high
       complexity
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then `verdict.diagnostic.suggested_actions[]` contains both
       `add_tests_for_lines` and `extract_function` entries
 
+  @unwired
   Scenario: High complexity with zero viable splits falls back to AcceptInherentComplexity
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given an over-threshold function with full coverage and high
       complexity but no extractable subexpression
     When the operator runs `crap4rs --coverage lcov.info --format advice`
@@ -86,7 +102,9 @@ Feature: --format advice (issue #76)
 
   # ── ProposedSplit shape (R1.4) ─────────────────────────────────────
 
+  @unwired
   Scenario: Each ProposedSplit carries the five wire fields
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given an over-threshold function with high complexity
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then for every `extract_function.candidates[]` entry, all of the
@@ -95,7 +113,9 @@ Feature: --format advice (issue #76)
     And `kind` is one of "deepest_nesting", "largest_subblock",
       "highest_branch_count"
 
+  @unwired
   Scenario: Exactly one ProposedSplit per function has recommended:true
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given an over-threshold function whose `extract_function.candidates`
       list is non-empty
     When the operator runs `crap4rs --coverage lcov.info --format advice`
@@ -103,7 +123,9 @@ Feature: --format advice (issue #76)
       `recommended` true
     And every other entry has `recommended` false
 
+  @unwired
   Scenario Outline: De-duplication priority for same-line-range candidates
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given the walker emits multiple split candidates that resolve to the
       same `line_range` with kinds <kinds_present>
     When the operator runs `crap4rs --coverage lcov.info --format advice`
@@ -119,7 +141,9 @@ Feature: --format advice (issue #76)
 
   # ── root_cause derivation (R1.2) ───────────────────────────────────
 
+  @unwired
   Scenario Outline: root_cause is derived deterministically from the action set
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given an over-threshold function whose `suggested_actions[]`
       contains <actions_present>
     When the operator runs `crap4rs --coverage lcov.info --format advice`
@@ -136,27 +160,35 @@ Feature: --format advice (issue #76)
 
   # ── Composition with View flags (R2.1) ─────────────────────────────
 
+  @unwired
   Scenario: --format advice composes with --top
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given six exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format advice --top 3`
     Then `view.shown[]` length is 3
     And every entry in `view.shown[]` carries a populated `diagnostic`
 
+  @unwired
   Scenario: --format advice composes with --sort-by coverage
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given several exceeding functions with varying coverage
     When the operator runs `crap4rs --coverage lcov.info --format advice --sort-by coverage`
     Then `view.shown[]` is ordered by `verdict.scored.coverage_percent`
       ascending
     And every entry's `diagnostic` is populated
 
+  @unwired
   Scenario: --format advice composes with --min-coverage / --max-coverage
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given a mix of over-threshold functions across the coverage spectrum
     When the operator runs `crap4rs --coverage lcov.info --format advice --min-coverage 80`
     Then `view.shown[]` contains only entries where
       `verdict.scored.coverage_percent >= 80`
     And each surviving entry carries a populated `diagnostic`
 
+  @unwired
   Scenario: --format advice composes with --no-fail
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given exceeding functions exist
     When the operator runs `crap4rs --coverage lcov.info --format advice --no-fail`
     Then the exit code is 0
@@ -165,7 +197,9 @@ Feature: --format advice (issue #76)
 
   # ── Stderr summary (R5.2 / S-8) ────────────────────────────────────
 
+  @unwired
   Scenario: --format advice emits a one-line-per-function summary on stderr
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given exceeding functions exist
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then stdout is parseable JSON
@@ -173,20 +207,26 @@ Feature: --format advice (issue #76)
       `[crap=N.NN] file:line-line qualified::name [actions: …]`
     And stderr lines are ordered to match `view.shown[]`
 
+  @unwired
   Scenario: stdout stays JSON-only when --format advice is set
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then stdout contains no human-readable prose, banners, or table
       borders
     And stdout is parseable as a single JSON value
 
+  @unwired
   Scenario: --format json without advice emits no stderr summary
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --format json`
     Then stderr is empty (apart from operational warnings, if any)
     And stdout's `view.shown[].diagnostic` keys are absent
 
   # ── Naming / determinism (R6.3) ────────────────────────────────────
 
+  @unwired
   Scenario: Diagnostic carries no prose, no human names, no LLM-shaped guesses
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then no `diagnostic.suggested_actions[]` entry contains a `rationale`
       string field
@@ -195,7 +235,9 @@ Feature: --format advice (issue #76)
     And every `branch_path` is a `/`-joined chain of
       `ContributorKind` discriminants only
 
+  @unwired
   Scenario: Same input produces byte-identical advice JSON
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     When the operator runs `crap4rs --coverage lcov.info --format advice`
       twice with the same coverage file
     Then both stdout bytes are identical
@@ -203,7 +245,9 @@ Feature: --format advice (issue #76)
 
   # ── Naming conflict (R6.6 / A1) ────────────────────────────────────
 
+  @unwired
   Scenario: --explain is NOT an alias of --format advice
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     Given the project has at least one over-threshold function
     When the operator runs `crap4rs --coverage lcov.info --explain`
     Then stdout is the human-readable breakdown legend (PR #59
@@ -212,7 +256,9 @@ Feature: --format advice (issue #76)
 
   # ── Stability (R4.1 / G1) ──────────────────────────────────────────
 
+  @unwired
   Scenario: schema_version is 2 in v0.4.0+
+    # tracked: crap-rs#169 — format-advice cucumber harness not yet built
     # #107 bumped 1 → 2 to mark the column-convention shift.
     When the operator runs `crap4rs --coverage lcov.info --format advice`
     Then the document's top-level `schema_version` is "2"
