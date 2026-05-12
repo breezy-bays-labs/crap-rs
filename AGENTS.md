@@ -94,3 +94,73 @@ breezy-bays-labs/mokumo#370) can dogfood on us without false positives.
 - Adding a new harness → use the `@wired` filter pattern from rule 5.
 - Touching `Background:` → re-read rule 4; non-executable Backgrounds
   are the source of most BDD hygiene debt in this repo.
+
+## Mutation testing
+
+`cargo mutants` is the surviving-mutant gate on `domain/view.rs` (the
+highest-complexity function family in `crap-core`). CI runs it
+sequentially on every PR; locally you'll want parallelism so a single
+file's gate finishes in minutes rather than half an hour.
+
+### Local invocation
+
+```bash
+cargo mutants -j 4 --package crap-core --file crates/crap-core/src/domain/view.rs
+```
+
+`-j N` is CLI-only — cargo-mutants 27.x's config schema does not expose
+a `jobs` field. Pick N up to your physical core count. Speedup is
+hardware-dependent: on slower boxes where each mutated build dominates
+wall-clock, `copy_target = true` removes the cold-cache penalty and
+`-j N` cuts runtime substantially. On Apple Silicon and other
+high-core-count boxes, `nextest`'s intra-test parallelism already
+saturates available compute when one mutants worker is active, so the
+marginal gain from `-j N` is smaller (~15-20% on M-series); the
+workflow still matters because it removes the `--in-place` lock-in
+that fragments local runs.
+
+### --in-place is mutually exclusive with -j N
+
+cargo-mutants implements parallelism by copying the source tree to N
+scratch dirs (one per worker). `--in-place` skips the copy and mutates
+the source tree directly, so it forbids `-j > 1` by design. Trying to
+combine them errors out. See <https://mutants.rs/in-place>.
+
+`.cargo/mutants.toml` sets `copy_target = true` so each local worker
+hardlinks the workspace `target/` into its scratch dir — no cold-cache
+rebuild per worker. The flag is ignored under `--in-place` (no copy
+happens), which keeps CI behaviour unchanged.
+
+### Crash recovery
+
+- **Local default (no `--in-place`)**: workers mutate copies. Kill mid-run
+  is safe — your source tree is never touched. Just re-run.
+- **`--in-place` (CI, or local if you opt in)**: a mid-run kill can leave
+  the mutated file dirty on disk. Restore with:
+
+  ```bash
+  git checkout -- crates/crap-core/src/domain/view.rs
+  ```
+
+  If `cargo mutants` exits cleanly (success or failure), it restores
+  the file itself — `git checkout` is only needed after an unclean
+  shutdown.
+
+### CI parity
+
+CI's `mutants` job runs `cargo mutants --package crap-core --file
+crates/crap-core/src/domain/view.rs --no-shuffle --in-place` on a single
+ubuntu-latest worker. `--in-place` keeps the run fast (no tree copy)
+and `--no-shuffle` keeps the mutant order deterministic across reruns,
+which makes flaky-mutant triage tractable. Local `-j N` runs may surface
+the same mutants in a different order — that's expected, not a
+regression.
+
+### Why `additional_cargo_test_args = ["--", "--skip", "envelope"]`
+
+The wire-envelope snapshot test (`crates/crap-core/tests/wire_envelope_snapshot.rs`)
+shells out to the `crap4rs` binary, which `cargo mutants --package
+crap-core` doesn't build. Skipping it under mutants is scoped to mutants
+only; every PR's `Test (linux-x86)` / `Test (macos-arm)` /
+`Test (macos-x86)` job still runs the canary via `cargo nextest run
+--workspace --all-targets`, which DOES build the bin first.
