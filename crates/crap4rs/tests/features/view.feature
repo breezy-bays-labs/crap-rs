@@ -30,7 +30,9 @@ Feature: View — presentation transform on analysis findings
   # integration tests should use proptest to assert across arbitrary
   # AnalysisResults, not just the Background fixture.
 
+  @unwired
   Scenario: Default spec produces a no-op view in CRAP-descending order
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     When the default ViewSpec is applied to the analysis
     Then `view.full` references the original analysis result without copying
     And `view.shown` contains every function from the analysis
@@ -38,30 +40,40 @@ Feature: View — presentation transform on analysis findings
     And `view.eligible_count` equals the total number of functions
     And `view.truncated` is false
 
+  @unwired
   Scenario: Default spec preserves identity set
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     When the default ViewSpec is applied to the analysis
     Then the set of FunctionIdentity values in `view.shown` equals the set in the original analysis
 
+  @unwired
   Scenario: Default spec preserves the gate summary
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     When the default ViewSpec is applied to the analysis
     Then `view.full.summary` equals the original analysis summary exactly
     And `view.shown_summary` equals `view.full.summary`
 
   # ── Filters ────────────────────────────────────────────────────────
 
+  @unwired
   Scenario: only_failing filter retains only functions that exceed the threshold
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `filters.only_failing = true`
     When the spec is applied
     Then `view.shown` contains only functions where `exceeds` is true
     And every function in `view.shown` has CRAP score above the threshold
 
+  @unwired
   Scenario: coverage_range filter retains functions inside the inclusive range
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `filters.coverage_range = CoverageRange::new(50.0, 90.0)`
     When the spec is applied
     Then `view.shown` contains only functions whose `coverage_percent` is between 50.0 and 90.0 inclusive
     And `view.eligible_count` equals the count of matching functions
 
+  @unwired
   Scenario Outline: coverage_range boundaries are inclusive
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with coverage_range from <min> to <max>
     When the spec is applied
     Then a function with coverage_percent <coverage> <inclusion> in `view.shown`
@@ -75,7 +87,9 @@ Feature: View — presentation transform on analysis findings
       | 0.0  | 0.0   | 0.0      | appears   |
       | 100.0 | 100.0 | 100.0   | appears   |
 
+  @unwired
   Scenario: Filters AND-compose
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     # Property-test oracle: for arbitrary filter subsets, the result is
     # the intersection of each filter applied alone.
     Given a ViewSpec with `filters.only_failing = true` and `coverage_range = CoverageRange::new(50.0, 100.0)`
@@ -84,7 +98,9 @@ Feature: View — presentation transform on analysis findings
 
   # ── CoverageRange invariants (constructor) ─────────────────────────
 
+  @unwired
   Scenario Outline: CoverageRange::new validates inputs
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     When `CoverageRange::new(<min>, <max>)` is called
     Then it returns <result>
 
@@ -100,34 +116,46 @@ Feature: View — presentation transform on analysis findings
 
   # ── Sort ───────────────────────────────────────────────────────────
 
+  @unwired
   Scenario: SortKey::Crap orders by CRAP score descending
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `sort = SortKey::Crap`
     When the spec is applied
     Then the CRAP scores in `view.shown` are in non-increasing order
 
+  @unwired
   Scenario: SortKey::Coverage orders by coverage percent ascending
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `sort = SortKey::Coverage`
     When the spec is applied
     Then the coverage percentages in `view.shown` are in non-decreasing order
 
+  @unwired
   Scenario: SortKey::Complexity orders by complexity descending
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `sort = SortKey::Complexity`
     When the spec is applied
     Then the complexity values in `view.shown` are in non-increasing order
 
+  @unwired
   Scenario: SortKey::Path orders alphabetically by file_path, then by CRAP descending within each file
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `sort = SortKey::Path`
     When the spec is applied
     Then `view.shown` is ordered by `file_path` alphabetically ascending
     And within each file, functions are ordered by CRAP score descending
 
+  @unwired
   Scenario: SortKey::Path secondary-sort with multiple files
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given functions in three files: "src/a.rs" (CRAPs 5, 30), "src/b.rs" (CRAP 10), "src/c.rs" (CRAPs 1, 50)
     And a ViewSpec with `sort = SortKey::Path`
     When the spec is applied
     Then `view.shown` order is: src/a.rs::CRAP 30, src/a.rs::CRAP 5, src/b.rs::CRAP 10, src/c.rs::CRAP 50, src/c.rs::CRAP 1
 
+  @unwired
   Scenario: Sort is stable on tied keys
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     # Catches the mutation `sort_by → sort_unstable_by` which would pass
     # all other sort scenarios.
     Given an analysis with two functions having identical CRAP scores
@@ -137,21 +165,27 @@ Feature: View — presentation transform on analysis findings
 
   # ── Truncate ───────────────────────────────────────────────────────
 
+  @unwired
   Scenario: limit truncates the sorted result to N entries
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `limit = Some(3)`
     When the spec is applied
     Then `view.shown.len()` equals 3
     And `view.eligible_count` equals 6
     And `view.truncated` is true
 
+  @unwired
   Scenario: limit greater than the eligible count truncates nothing
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `limit = Some(100)`
     When the spec is applied
     Then `view.shown.len()` equals 6
     And `view.eligible_count` equals 6
     And `view.truncated` is false
 
+  @unwired
   Scenario: limit of None means no truncation
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `limit = None`
     When the spec is applied
     Then `view.shown` contains every eligible function
@@ -159,7 +193,9 @@ Feature: View — presentation transform on analysis findings
 
   # ── Order of operations: filter → sort → truncate ─────────────────
 
+  @unwired
   Scenario: Order is filter, then sort, then truncate
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `filters.only_failing = true`, `sort = SortKey::Coverage`, `limit = Some(2)`
     When the spec is applied
     Then `view.shown` contains 2 functions
@@ -167,7 +203,9 @@ Feature: View — presentation transform on analysis findings
     And `view.shown` is ordered by coverage percent ascending
     And `view.eligible_count` equals the total count of failing functions
 
+  @unwired
   Scenario: Truncation does not change the gate
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given an analysis with 3 functions exceeding threshold
     And a ViewSpec with `limit = Some(1)`
     When the spec is applied
@@ -175,7 +213,9 @@ Feature: View — presentation transform on analysis findings
     But `view.full.passed` is false
     And `view.full.summary.exceeding_threshold` equals 3
 
+  @unwired
   Scenario: Filtering does not change the gate
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given an analysis with 3 functions exceeding threshold
     And a ViewSpec with `filters.coverage_range = CoverageRange::new(99.0, 100.0)`
     When the spec is applied so that `view.shown` is empty
@@ -184,7 +224,9 @@ Feature: View — presentation transform on analysis findings
 
   # ── shown_summary ──────────────────────────────────────────────────
 
+  @unwired
   Scenario: shown_summary is computed over the shown subset
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec with `filters.only_failing = true`
     When the spec is applied
     Then `view.shown_summary.total_functions` equals `view.shown.len()`
@@ -193,7 +235,9 @@ Feature: View — presentation transform on analysis findings
     And `view.shown_summary.median_crap` equals the median of CRAP scores in `view.shown` to within 1e-9
     And `view.shown_summary.distribution` reflects only the functions in `view.shown`
 
+  @unwired
   Scenario: shown_summary differs from full summary when the view filters out functions
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given an analysis with 6 functions, 3 exceeding threshold
     And a ViewSpec with `filters.only_failing = true`
     When the spec is applied
@@ -202,7 +246,9 @@ Feature: View — presentation transform on analysis findings
 
   # ── Edge cases ─────────────────────────────────────────────────────
 
+  @unwired
   Scenario: Empty analysis applied with default spec produces empty view
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given an analysis with zero functions
     When the default ViewSpec is applied
     Then `view.shown` is empty
@@ -210,7 +256,9 @@ Feature: View — presentation transform on analysis findings
     And `view.truncated` is false
     And `view.full.passed` is true
 
+  @unwired
   Scenario: All functions filtered out produces an empty shown
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given an analysis where no function has coverage_percent above 95.0
     And a ViewSpec with `filters.coverage_range = CoverageRange::new(95.0, 100.0)`
     When the spec is applied
@@ -218,7 +266,9 @@ Feature: View — presentation transform on analysis findings
     And `view.eligible_count` equals 0
     And `view.truncated` is false
 
+  @unwired
   Scenario: limit of 0 is treated as no limit
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a ViewSpec built with `--top 0` semantics (limit = None)
     When the spec is applied
     Then `view.shown` contains every eligible function
@@ -226,7 +276,9 @@ Feature: View — presentation transform on analysis findings
 
   # ── view.full immutability ────────────────────────────────────────
 
+  @unwired
   Scenario: applying a view does not modify the analysis
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given an analysis result owned by the caller
     When `view::apply` is called with any ViewSpec
     Then `view.full` references the original analysis result
@@ -236,13 +288,17 @@ Feature: View — presentation transform on analysis findings
   # LCOV adapters can produce coverage_percent = NaN when a function
   # has zero executable lines. The View must handle this deterministically.
 
+  @unwired
   Scenario: NaN coverage is excluded from coverage_range filter
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given a function with `coverage_percent = NaN`
     And a ViewSpec with `filters.coverage_range = CoverageRange::new(0.0, 100.0)`
     When the spec is applied
     Then the function with NaN coverage does not appear in `view.shown`
 
+  @unwired
   Scenario: NaN coverage sorts last under SortKey::Coverage ascending
+    # tracked: crap-rs#169 — view-module cucumber harness not yet built
     Given functions with coverage percentages [10.0, NaN, 50.0, NaN, 90.0]
     And a ViewSpec with `sort = SortKey::Coverage`
     When the spec is applied

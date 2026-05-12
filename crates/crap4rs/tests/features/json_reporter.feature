@@ -5,6 +5,7 @@ Feature: JSON reporter
 
   # ── Envelope Structure ─────────────────────────────────────────────
 
+  @wired
   Scenario: JSON output contains a versioned envelope
     Given an analysis result
     When the JSON is formatted
@@ -15,6 +16,7 @@ Feature: JSON reporter
     And the output contains "metric"
     And the output contains "threshold"
 
+  @wired
   Scenario: Analysis result is nested under "result" key
     Given an analysis result
     When the JSON is formatted
@@ -22,6 +24,7 @@ Feature: JSON reporter
     And the "result" object contains "summary"
     And the "result" object contains "passed"
 
+  @wired
   Scenario: Schema version is an integer
     Given an analysis result
     When the JSON is formatted
@@ -29,6 +32,7 @@ Feature: JSON reporter
 
   # ── Result Content ─────────────────────────────────────────────────
 
+  @wired
   Scenario: Function entries contain all scored fields
     Given an analysis with one function "compute_crap" in "src/domain/crap.rs" with complexity 5, coverage 80.0%, and CRAP score 5.16
     When the JSON is formatted
@@ -41,6 +45,7 @@ Feature: JSON reporter
     And the entry contains "crap" with "risk_level" equal to "acceptable"
     And the entry contains "exceeds" equal to false
 
+  @wired
   Scenario: Summary contains aggregate statistics
     Given an analysis with 10 functions, 2 exceeding threshold
     When the JSON is formatted
@@ -49,6 +54,7 @@ Feature: JSON reporter
     And "result.summary.average_crap" is a number
     And "result.summary.median_crap" is a number
 
+  @wired
   Scenario: Summary contains risk distribution
     Given an analysis with distribution low=5 acceptable=3 moderate=1 high=1
     When the JSON is formatted
@@ -57,11 +63,13 @@ Feature: JSON reporter
     And "result.summary.distribution.moderate" equals 1
     And "result.summary.distribution.high" equals 1
 
+  @wired
   Scenario: Passed reflects threshold compliance
     Given an analysis where all functions are within threshold
     When the JSON is formatted
     Then "result.passed" is true
 
+  @wired
   Scenario: Failed reflects threshold violations
     Given an analysis where 1 function exceeds the threshold
     When the JSON is formatted
@@ -69,6 +77,7 @@ Feature: JSON reporter
 
   # ── Empty Results ──────────────────────────────────────────────────
 
+  @wired
   Scenario: Empty analysis produces valid JSON
     Given an analysis with no functions
     When the JSON is formatted
@@ -79,16 +88,19 @@ Feature: JSON reporter
 
   # ── Envelope Metadata ──────────────────────────────────────────────
 
+  @wired
   Scenario: Metric field reflects the configured complexity metric
     Given the analysis used cognitive complexity
     When the JSON is formatted with metric "cognitive"
     Then "metric" equals "cognitive"
 
+  @wired
   Scenario: Threshold field reflects the configured threshold
     Given the analysis used threshold 8.0
     When the JSON is formatted with threshold 8.0
     Then "threshold" equals 8.0
 
+  @wired
   Scenario: Timestamp is a valid ISO 8601 datetime
     Given an analysis result
     When the JSON is formatted

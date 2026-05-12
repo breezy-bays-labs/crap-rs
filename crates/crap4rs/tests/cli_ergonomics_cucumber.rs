@@ -1,15 +1,12 @@
-//! Cucumber-rs runner for `@summary`-tagged scenarios in
-//! `tests/features/cli_ergonomics.feature` (issue #131).
+//! Cucumber-rs runner for `@wired`-tagged scenarios in
+//! `tests/features/cli_ergonomics.feature` (issues #131, #168).
 //!
-//! Most scenarios in `cli_ergonomics.feature` are spec-only — they
-//! describe behaviour validated indirectly via the `cli_*_integration.rs`
-//! suite. The `@summary` block is wired here so the AC for #131
-//! (one-line CLI verdict) executes through the same .feature file the
-//! spec lives in. Other scenarios in the file are not wired; the
-//! harness uses `filter_run_and_exit` to load only `@summary` tagged
-//! scenarios. New BDD-driven flags can adopt their own tags and
-//! extend this harness (or land siblings) without forcing migration of
-//! the unwired specs.
+//! Most scenarios in `cli_ergonomics.feature` are spec-only and tagged
+//! `@unwired` (see `AGENTS.md` § BDD hygiene + `tests/features/TAGS.toml`).
+//! The seven wired scenarios cover the `--summary` AC for #131 (one-line
+//! CLI verdict); the harness uses `filter_run_and_exit` to execute only
+//! `@wired` scenarios. New flags wire themselves by writing executable
+//! step defs and flipping their scenarios from `@unwired` to `@wired`.
 //!
 //! Each scenario sets up a tempdir with a small synthetic LCOV +
 //! `src/lib.rs` (mirrors `cli_no_fail_integration.rs`'s pattern) and
@@ -18,7 +15,7 @@
 //! scenario commands stay relative to the tempdir cwd.
 //!
 //! The two synthetic fixtures cover the two pass/fail invariants needed
-//! by the seven `@summary` scenarios:
+//! by the seven wired scenarios:
 //! - `WITHIN_*` — three trivial covered fns; every CRAP ≤ 2, so any
 //!   reasonable threshold passes.
 //! - `EXCEEDS_*` — three branchy uncovered fns; CRAPs roughly 20+, so
@@ -102,29 +99,7 @@ fn parse_command(cmd: &str) -> Vec<String> {
     cmd.split_whitespace().skip(1).map(str::to_string).collect()
 }
 
-// ── Background no-op steps ───────────────────────────────────────────
-//
-// `cli_ergonomics.feature` declares a Background that injects four
-// descriptive Given steps (line 25-29) before every scenario. Those
-// steps are aspirational — they describe the implicit project state
-// the broader spec assumes — and have no executable step definitions
-// in the rest of the codebase. To run `@summary` scenarios at all, the
-// Background needs to "pass", so the steps below are intentional
-// no-ops. The real fixture setup happens in the @summary-specific
-// `Given a synthetic project where ...` step below.
-#[given(regex = r#"^a project with an LCOV file at "[^"]+"$"#)]
-fn given_background_lcov(_world: &mut CliWorld) {}
-
-#[given("the project's analysis produces TOTAL_FUNCTIONS functions")]
-fn given_background_total(_world: &mut CliWorld) {}
-
-#[given("VIOLATING_FUNCTIONS of those functions exceed the threshold")]
-fn given_background_violating(_world: &mut CliWorld) {}
-
-#[given("TOTAL_FUNCTIONS > 0 and VIOLATING_FUNCTIONS > 0")]
-fn given_background_positive(_world: &mut CliWorld) {}
-
-// ── Given steps (real) ───────────────────────────────────────────────
+// ── Given steps ──────────────────────────────────────────────────────
 
 #[given("a synthetic project where every function is within threshold")]
 fn given_within(world: &mut CliWorld) {
@@ -242,15 +217,17 @@ async fn main() {
     // writer for plain `cargo test`. Matches `json_reporter_cucumber`.
     //
     // `filter_run_and_exit` loads `cli_ergonomics.feature` but executes
-    // only `@summary`-tagged scenarios; other scenarios are aspirational
-    // specs validated indirectly.
+    // only `@wired`-tagged scenarios; `@unwired` scenarios are
+    // aspirational specs tracked via the umbrella issue (see
+    // `AGENTS.md` § BDD hygiene). Tags inside `sc.tags` are stored
+    // without the `@` prefix — verified empirically.
     //
     // `run_and_exit` (vs `run`) panics on scenario failure, propagating
     // a non-zero exit to CI — see memory `cucumber-run-vs-run-and-exit`.
     CliWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
         .filter_run_and_exit("tests/features/cli_ergonomics.feature", |_, _, scenario| {
-            scenario.tags.iter().any(|t| t == "summary")
+            scenario.tags.iter().any(|t| t == "wired")
         })
         .await;
 }

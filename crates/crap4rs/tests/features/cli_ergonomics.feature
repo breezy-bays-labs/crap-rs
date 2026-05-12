@@ -21,16 +21,25 @@ Feature: CLI ergonomics — shaping the report from the command line
   # Self-CRAP regression invariant (per shaping.md):
   #   The view module must not introduce any function with cognitive
   #   complexity above 15. CI gate enforces.
-
-  Background:
-    Given a project with an LCOV file at "lcov.info"
-    And the project's analysis produces TOTAL_FUNCTIONS functions
-    And VIOLATING_FUNCTIONS of those functions exceed the threshold
-    And TOTAL_FUNCTIONS > 0 and VIOLATING_FUNCTIONS > 0
+  #
+  # Implicit context for @unwired scenarios (placeholder vocabulary):
+  #   Most @unwired scenarios below reference TOTAL_FUNCTIONS and
+  #   VIOLATING_FUNCTIONS as placeholder counts, and assume a project
+  #   exists with an LCOV file at "lcov.info". A non-executable
+  #   `Background:` block previously documented this; it was deleted
+  #   in crap-rs#168 (BDD hygiene chore) because Background blocks
+  #   must be executable (AGENTS.md § BDD hygiene rule 4). When these
+  #   scenarios are wired (tracked at crap-rs#169), the implementer
+  #   will replace the placeholders with scenario-specific Given
+  #   steps that set up concrete fixture-derived counts — just like
+  #   the @wired `--summary` scenarios do with their `Given a
+  #   synthetic project where ...` step.
 
   # ── --top: truncate (issue #62) ────────────────────────────────────
 
+  @unwired
   Scenario: --top N limits the report to the N highest-CRAP functions
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --top 10`
     Then the table contains 10 rows
     And the table rows are the 10 highest-CRAP functions
@@ -38,31 +47,41 @@ Feature: CLI ergonomics — shaping the report from the command line
     And the JSON envelope reports `view.eligible_count` equal to TOTAL_FUNCTIONS
     And the JSON envelope reports `view.truncated` equal to true
 
+  @unwired
   Scenario: --top 0 means no limit
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --top 0`
     Then the report includes every function
     And the JSON envelope reports `view.limit` equal to null
     And the JSON envelope reports `view.truncated` equal to false
 
+  @unwired
   Scenario: --top 1 surfaces only the worst function
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --top 1`
     Then the table contains 1 row
     And that row is the highest-CRAP function in the analysis
     And the JSON envelope reports `view.truncated` equal to true
 
+  @unwired
   Scenario: --top greater than the eligible count truncates nothing
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --top 1000000`
     Then the report includes every function
     And the JSON envelope reports `view.limit` equal to 1000000
     And the JSON envelope reports `view.truncated` equal to false
 
+  @unwired
   Scenario: --top hiding violations does not change the exit code
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --top 5`
     Then the table shows 5 rows
     And the exit code is 1
     And the JSON envelope's `result.passed` is false
 
+  @unwired
   Scenario Outline: --top rejects non-positive-integer values
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info <flags>`
     Then the exit code is 2
     And stderr contains "<message>"
@@ -75,26 +94,36 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── --min-coverage / --max-coverage: range filter (issue #63) ──────
 
+  @unwired
   Scenario: --min-coverage filters out untested functions
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --min-coverage 1`
     Then no function in the report has coverage_percent equal to 0.0
     And the JSON envelope reports `view.filters.coverage_range` as { "min": 1.0, "max": 100.0 }
 
+  @unwired
   Scenario: --max-coverage 0 surfaces only untested functions
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --max-coverage 0`
     Then every function in the report has coverage_percent equal to 0.0
     And the JSON envelope reports `view.filters.coverage_range` as { "min": 0.0, "max": 0.0 }
 
+  @unwired
   Scenario: --min-coverage 100 surfaces only fully-tested functions
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --min-coverage 100`
     Then every function in the report has coverage_percent equal to 100.0
 
+  @unwired
   Scenario: combining --min-coverage and --max-coverage targets partial coverage
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90`
     Then every function in the report has coverage_percent strictly above 0 and at most 90
     And the JSON envelope reports `view.filters.coverage_range` as { "min": 1.0, "max": 90.0 }
 
+  @unwired
   Scenario Outline: invalid coverage ranges produce exit 2 with a clear stderr message
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info <flags>`
     Then the exit code is 2
     And stderr contains "<message>"
@@ -105,7 +134,9 @@ Feature: CLI ergonomics — shaping the report from the command line
       | --max-coverage 105                          | --max-coverage must be in [0, 100]   |
       | --min-coverage 90 --max-coverage 30         | --min-coverage must not exceed --max-coverage |
 
+  @unwired
   Scenario: filter hiding violations does not change the exit code
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --min-coverage 99`
     Then the report contains zero functions
     And the exit code is 1
@@ -113,22 +144,30 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── --sort-by: choose sort dimension (issue #68) ───────────────────
 
+  @unwired
   Scenario: --sort-by crap is the default order (CRAP descending)
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info`
     Then the report is ordered by CRAP score descending
     And the JSON envelope reports `view.sort` equal to "crap"
 
+  @unwired
   Scenario: --sort-by coverage orders by coverage percent ascending
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --sort-by coverage`
     Then the report is ordered by coverage percent ascending
     And the JSON envelope reports `view.sort` equal to "coverage"
 
+  @unwired
   Scenario: --sort-by complexity orders by complexity descending
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --sort-by complexity`
     Then the report is ordered by complexity descending
     And the JSON envelope reports `view.sort` equal to "complexity"
 
+  @unwired
   Scenario: --sort-by path orders alphabetically by file, then CRAP descending within file
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     # Delegates to domain SortKey::Path semantics — see view.feature
     # for the full secondary-sort spec.
     Given the project has functions in src/a.rs (CRAPs 5 and 30), src/b.rs (CRAP 10), src/c.rs (CRAPs 1 and 50)
@@ -136,41 +175,55 @@ Feature: CLI ergonomics — shaping the report from the command line
     Then the report rows appear in order: src/a.rs::CRAP 30, src/a.rs::CRAP 5, src/b.rs::CRAP 10, src/c.rs::CRAP 50, src/c.rs::CRAP 1
     And the JSON envelope reports `view.sort` equal to "path"
 
+  @unwired
   Scenario: --sort-by composes with --top to surface the lowest-coverage targets
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --sort-by coverage --top 10`
     Then the report contains the 10 functions with the lowest coverage percent
     And the rows are ordered by coverage percent ascending
 
   # ── --no-fail: exit-code override (issue #65) ──────────────────────
 
+  @unwired
   Scenario: --no-fail returns 0 even when violations exist
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --no-fail`
     Then the report shows every violating function
     And the exit code is 0
     And the JSON envelope's `result.passed` is false
 
+  @unwired
   Scenario: --no-fail is a no-op when there are no violations
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     Given the project has zero functions exceeding the threshold
     When the operator runs `crap4rs --coverage lcov.info --no-fail`
     Then the exit code is 0
 
+  @unwired
   Scenario: --quiet alone preserves CI exit-1 behavior
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --quiet`
     Then the report is suppressed
     And the exit code is 1
 
+  @unwired
   Scenario: --quiet --no-fail composes to silent success
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --quiet --no-fail`
     Then the report is suppressed
     And the exit code is 0
 
+  @unwired
   Scenario: --quiet also suppresses JSON output
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --quiet --format json`
     Then stdout is empty
 
   # ── --only-failing relocated, summary-semantics fix ────────────────
 
+  @unwired
   Scenario: --only-failing produces a self-consistent summary
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --only-failing`
     Then the report contains only functions that exceed the threshold
     And the JSON envelope's `result.summary.total_functions` equals TOTAL_FUNCTIONS
@@ -181,24 +234,32 @@ Feature: CLI ergonomics — shaping the report from the command line
     And the JSON envelope's `result.summary.distribution` reflects all TOTAL_FUNCTIONS functions
     And the JSON envelope reports `view.filters.only_failing` equal to true
 
+  @unwired
   Scenario: --only-failing on a passing project produces an empty report and exit 0
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     Given the project has zero functions exceeding the threshold
     When the operator runs `crap4rs --coverage lcov.info --only-failing`
     Then the report contains zero functions
     And the exit code is 0
 
+  @unwired
   Scenario: --only-failing composes with --sort-by coverage for the worst-tested-violations investigation
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --only-failing --sort-by coverage`
     Then every function in the report exceeds the threshold
     And the rows are ordered by coverage percent ascending
 
+  @unwired
   Scenario: --only-failing composes with --min-coverage as AND
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --only-failing --min-coverage 50`
     Then every function in the report exceeds the threshold AND has coverage_percent at least 50
 
   # ── JSON envelope shape ───────────────────────────────────────────
 
+  @unwired
   Scenario: view block is always present, even on default invocation
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --format json`
     Then the JSON envelope contains a `view` block
     And `view.filters.only_failing` is false
@@ -210,43 +271,57 @@ Feature: CLI ergonomics — shaping the report from the command line
     And `view.shown` is an array
     And `view.shown_summary` contains every field of `AnalysisSummary` — `total_functions`, `total_files`, `exceeding_threshold`, `average_crap`, `median_crap`, `max_crap`, `worst_function`, and `distribution` — so a future field accidentally dropped from the serialized payload fails the assertion
 
+  @unwired
   Scenario: default invocation has shown_summary equal to result.summary
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --format json`
     Then `view.shown_summary` is equal in every field to `result.summary`
 
+  @unwired
   Scenario: view.shown contains complete FunctionVerdict objects, not indices
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --format json --top 3`
     Then `view.shown` is an array of length 3
     And each entry in `view.shown` contains `scored`, `threshold`, and `exceeds`
     And each entry's `scored` object contains `identity`, `complexity`, `coverage_percent`, `crap`
     And the entries are full objects, not array indices into `result.functions`
 
+  @unwired
   Scenario: view.eligible_count distinguishes filter-narrowing from truncation
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --format json --min-coverage 1 --max-coverage 90 --top 10`
     Then `view.eligible_count` equals the count of functions with coverage_percent in [1, 90]
     And `view.shown.length` equals 10
     And `view.truncated` is true
 
+  @unwired
   Scenario: result block is invariant under any view spec
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --format json` (the baseline)
     And the operator runs `crap4rs --coverage lcov.info --format json --top 5 --sort-by coverage --only-failing` (the shaped view)
     Then the `result` block in both invocations contains the same functions
     And the `result.summary` is identical between the two invocations
     And the `result.passed` is identical between the two invocations
 
+  @unwired
   Scenario: view block declares values according to applied flags
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --format json --top 10 --min-coverage 5 --max-coverage 80 --sort-by complexity`
     Then `view.filters.coverage_range` is { "min": 5.0, "max": 80.0 }
     And `view.sort` is "complexity"
     And `view.limit` is 10
 
+  @unwired
   Scenario: schema_version is 2 with the additive view block
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     # Bumped 1 → 2 in 0.4.0 by #107 (ComplexityContributor.column 0-based → 1-based).
     When the operator runs `crap4rs --coverage lcov.info --format json`
     Then the JSON envelope's `schema_version` is the integer 2
     And the JSON envelope key declaration order is `schema_version, tool_version, language, timestamp, metric, threshold, diff_ref, result, view`
 
+  @unwired
   Scenario: agent consumer reads the JSON envelope to plan refactor scope
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     # Story E from the breadboard. Validates that the envelope contains
     # everything an agent needs without inferring or re-deriving state.
     When the operator runs `crap4rs --coverage lcov.info --format json --only-failing --sort-by crap --top 50`
@@ -258,31 +333,43 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── Display invariant: the optional "View" line ───────────────────
 
+  @unwired
   Scenario: default invocation shows only the Analysis summary line
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info`
     Then the table shows an "Analysis: VIOLATING_FUNCTIONS/TOTAL_FUNCTIONS over threshold" line
     And the table does not show a "View:" line
 
+  @unwired
   Scenario: --sort-by alone does not trigger the View line because sorting reorders without reducing rows
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --sort-by coverage`
     Then the table does not show a "View:" line
 
+  @unwired
   Scenario: --top triggers the View line because rows are truncated
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --top 10`
     Then the table shows an "Analysis:" line referencing the full TOTAL_FUNCTIONS functions
     And the table shows a "View:" line referencing the 10 shown functions
 
+  @unwired
   Scenario: a coverage filter triggers the View line because functions are excluded
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90`
     Then the table shows a "View:" line including "filtered from <eligible_count>"
 
+  @unwired
   Scenario: --only-failing triggers the View line because violations are isolated
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --only-failing`
     Then the table shows a "View:" line referencing the VIOLATING_FUNCTIONS violating functions
 
   # ── Composed investigation example (Story B) ───────────────────────
 
+  @unwired
   Scenario: investigator's flag-set produces a shaped report and exits 0
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail`
     Then the report contains 10 functions
     And every function has coverage_percent in [1, 90]
@@ -293,21 +380,29 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── First-run discoverability (V6) ────────────────────────────────
 
+  @unwired
   Scenario: --help shows a basic first-run example
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --help`
     Then the help text includes the example "crap4rs --coverage lcov.info --top 20"
 
+  @unwired
   Scenario: --help shows an investigation example
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --help`
     Then the help text includes an example using --min-coverage, --max-coverage, --sort-by, --top, and --no-fail together
 
+  @unwired
   Scenario: --only-failing appears under filter flags in --help
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     # User-observable consequence of relocating --only-failing from
     # OutputArgs to FilterArgs (V1b).
     When the operator runs `crap4rs --help`
     Then the help text groups --only-failing alongside --min-coverage, --max-coverage, and --top under filter flags
 
+  @unwired
   Scenario: first-run example from --help produces a tractable report
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs the basic `--help` example `crap4rs --coverage lcov.info --top 20`
     Then the table contains at most 20 rows
     And the table shows a "View:" line indicating truncation from TOTAL_FUNCTIONS
@@ -315,11 +410,15 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── Exit-code matrix summary ───────────────────────────────────────
 
+  @unwired
   Scenario: default invocation on a violating project exits 1
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info`
     Then the exit code is 1
 
+  @unwired
   Scenario Outline: exit-code matrix for flag combinations
+    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
     When the operator runs `crap4rs --coverage lcov.info <flags>`
     Then the exit code is <code>
 
@@ -347,7 +446,7 @@ Feature: CLI ergonomics — shaping the report from the command line
   # LCOV+src layout per scenario (matches `cli_no_fail_integration.rs`).
   # The rest of this feature remains spec-only.
 
-  @summary
+  @wired
   Scenario: --summary on a passing run emits a single PASS line
     Given a synthetic project where every function is within threshold
     When the operator runs `crap4rs --coverage lcov.info --src src --threshold 25 --summary`
@@ -355,7 +454,7 @@ Feature: CLI ergonomics — shaping the report from the command line
     And stdout matches "^PASS: \d+ functions \| 0 above threshold \(25\) \| worst: \d+\.\d \| avg: \d+\.\d$"
     And the exit code is 0
 
-  @summary
+  @wired
   Scenario: --summary on a failing run emits a single FAIL line
     Given a synthetic project where at least one function exceeds threshold
     When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --summary`
@@ -363,7 +462,7 @@ Feature: CLI ergonomics — shaping the report from the command line
     And stdout matches "^FAIL: \d+ functions \| \d+ above threshold \(5\) \| worst: \d+\.\d \| avg: \d+\.\d$"
     And the exit code is 1
 
-  @summary
+  @wired
   Scenario: --summary with --no-fail keeps emitting FAIL but exits 0
     Given a synthetic project where at least one function exceeds threshold
     When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --summary --no-fail`
@@ -371,14 +470,14 @@ Feature: CLI ergonomics — shaping the report from the command line
     And stdout starts with "FAIL:"
     And the exit code is 0
 
-  @summary
+  @wired
   Scenario: --summary with --quiet suppresses output (quiet wins)
     Given a synthetic project where at least one function exceeds threshold
     When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --summary --quiet`
     Then stdout is empty
     And the exit code is 1
 
-  @summary
+  @wired
   Scenario: --summary short-circuits --format json (summary line wins)
     Given a synthetic project where every function is within threshold
     When the operator runs `crap4rs --coverage lcov.info --src src --threshold 25 --summary --format json`
@@ -386,14 +485,14 @@ Feature: CLI ergonomics — shaping the report from the command line
     And stdout starts with "PASS:"
     And stdout does not contain "schema_version"
 
-  @summary
+  @wired
   Scenario: --summary renders fractional threshold with decimals
     Given a synthetic project where every function is within threshold
     When the operator runs `crap4rs --coverage lcov.info --src src --threshold 25.5 --summary`
     Then stdout contains exactly one line
     And stdout contains "above threshold (25.5)"
 
-  @summary
+  @wired
   Scenario: --summary help text includes the format template
     When the operator runs `crap4rs --help`
     Then stdout contains "--summary"
