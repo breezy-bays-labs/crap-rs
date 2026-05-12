@@ -93,3 +93,7 @@ tokio = { workspace = true }
 [[test]]
 name = "json_reporter_cucumber"
 harness = false
+
+[[test]]
+name = "cli_ergonomics_cucumber"
+harness = false

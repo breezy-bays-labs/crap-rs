@@ -380,6 +380,19 @@ pub struct OutputArgs {
     /// with `--format json`.
     #[arg(long)]
     pub minimal_view: bool,
+
+    /// Emit a single-line analysis verdict instead of the full report.
+    ///
+    /// Format: `<STATUS>: <N> functions | <M> above threshold (<T>) | worst: <W> | avg: <A>`
+    /// (e.g., `PASS: 1082 functions | 0 above threshold (25) | worst: 13.0 | avg: 1.6`).
+    /// Short-circuits `--format`: when set, the format dispatch is
+    /// skipped and only the summary line is printed to stdout.
+    /// Composes with `--no-fail` (exit 0 always when set, summary still
+    /// emitted) and `--quiet` (quiet wins — no output, exit code only).
+    /// Matches crap4ts's `--summary` shape byte-for-byte for the shared
+    /// subset so a CI line-template can match either tool.
+    #[arg(long)]
+    pub summary: bool,
 }
 
 #[derive(Debug, Args)]
@@ -1204,6 +1217,17 @@ fn print_formatted_output<P: ParseDiagnostic>(
     inputs: &EffectiveInputs,
     meta: &AdapterMeta,
 ) -> Result<()> {
+    // `--summary` short-circuits `--format` dispatch entirely. `--quiet`
+    // already gates this entire function at the caller (run_inner), so
+    // the precedence is `--quiet > --summary > --format`. Mirrors
+    // crap4ts's implicit precedence (its formatSummaryLine bypasses the
+    // reporter switch when set).
+    if cli.output.summary {
+        let line = reporters::format_summary_line(view.full, inputs.threshold);
+        println!("{line}");
+        return Ok(());
+    }
+
     for spec in &cli.output.format {
         let output = render_format(
             cli,

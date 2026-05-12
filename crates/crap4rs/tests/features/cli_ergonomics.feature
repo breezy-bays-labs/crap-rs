@@ -336,3 +336,65 @@ Feature: CLI ergonomics — shaping the report from the command line
       | --max-coverage 105                                 | 2    |
       | --min-coverage 90 --max-coverage 30                | 2    |
       | --top -3                                           | 2    |
+
+  # ── --summary: one-line CLI output (issue #131) ────────────────────
+  #
+  # crap4ts parity. Format:
+  #   `<STATUS>: <N> functions | <M> above threshold (<T>) | worst: <W> | avg: <A>`
+  # Status from `result.passed`, threshold formatted integer-when-whole,
+  # worst/avg one decimal place. The tagged scenarios below are wired
+  # to the `cli_ergonomics_cucumber` harness, which sets up a synthetic
+  # LCOV+src layout per scenario (matches `cli_no_fail_integration.rs`).
+  # The rest of this feature remains spec-only.
+
+  @summary
+  Scenario: --summary on a passing run emits a single PASS line
+    Given a synthetic project where every function is within threshold
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 25 --summary`
+    Then stdout contains exactly one line
+    And stdout matches "^PASS: \d+ functions \| 0 above threshold \(25\) \| worst: \d+\.\d \| avg: \d+\.\d$"
+    And the exit code is 0
+
+  @summary
+  Scenario: --summary on a failing run emits a single FAIL line
+    Given a synthetic project where at least one function exceeds threshold
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --summary`
+    Then stdout contains exactly one line
+    And stdout matches "^FAIL: \d+ functions \| \d+ above threshold \(5\) \| worst: \d+\.\d \| avg: \d+\.\d$"
+    And the exit code is 1
+
+  @summary
+  Scenario: --summary with --no-fail keeps emitting FAIL but exits 0
+    Given a synthetic project where at least one function exceeds threshold
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --summary --no-fail`
+    Then stdout contains exactly one line
+    And stdout starts with "FAIL:"
+    And the exit code is 0
+
+  @summary
+  Scenario: --summary with --quiet suppresses output (quiet wins)
+    Given a synthetic project where at least one function exceeds threshold
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --summary --quiet`
+    Then stdout is empty
+    And the exit code is 1
+
+  @summary
+  Scenario: --summary short-circuits --format json (summary line wins)
+    Given a synthetic project where every function is within threshold
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 25 --summary --format json`
+    Then stdout contains exactly one line
+    And stdout starts with "PASS:"
+    And stdout does not contain "schema_version"
+
+  @summary
+  Scenario: --summary renders fractional threshold with decimals
+    Given a synthetic project where every function is within threshold
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 25.5 --summary`
+    Then stdout contains exactly one line
+    And stdout contains "above threshold (25.5)"
+
+  @summary
+  Scenario: --summary help text includes the format template
+    When the operator runs `crap4rs --help`
+    Then stdout contains "--summary"
+    And stdout contains "single-line analysis verdict"

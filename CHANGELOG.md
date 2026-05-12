@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--summary` flag emits a single-line analysis verdict to stdout (e.g.
+  `PASS: 1082 functions | 0 above threshold (25) | worst: 13.0 | avg: 1.6`),
+  matching crap4ts's `formatSummaryLine` byte-for-byte. Short-circuits
+  `--format` and composes with `--no-fail` (exit 0 always, summary
+  emitted) and `--quiet` (quiet wins — no output). Closes the
+  2026-05-08 crap4rs ↔ crap4ts parity audit's final gap. (#131)
+
 ## [0.5.0] - 2026-05-10
 
 The workspace-extraction milestone. `crap4rs` becomes one of three

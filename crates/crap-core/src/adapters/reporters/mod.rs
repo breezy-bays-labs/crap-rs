@@ -7,6 +7,7 @@ pub mod json;
 pub mod markdown;
 pub mod sarif;
 pub mod scorecard_row;
+pub mod summary;
 pub mod table;
 
 pub use advice_summary::render_summary as render_advice_summary;
@@ -16,6 +17,7 @@ pub use json::{JsonConfig, format_json};
 pub use markdown::format_markdown;
 pub use sarif::format_sarif;
 pub use scorecard_row::format_scorecard_row;
+pub use summary::format_summary_line;
 pub use table::{format_table, format_table_with_explain};
 
 #[cfg(test)]
