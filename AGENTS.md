@@ -37,10 +37,14 @@ breezy-bays-labs/mokumo#370) can dogfood on us without false positives.
    ```gherkin
    @unwired
    Scenario: --top N limits the report to the N highest-CRAP functions
-     # tracked: crap-rs#168 — wire when cli_ergonomics harness expands beyond @summary
+     # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
      When the operator runs `crap4rs --coverage lcov.info --top 10`
      ...
    ```
+
+   crap-rs#169 is this repo's persistent BDD wiring umbrella; new
+   `.feature` files default to pointing at it unless they have their
+   own per-file wiring issue.
 
    File the tracking issue **before** the tag lands. Same rule for
    `@wip` (issue must name the in-flight PR).
