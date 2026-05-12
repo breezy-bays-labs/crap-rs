@@ -9,12 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `<adapter> init` subcommand generates a starter `crap4rs.toml`
+  (or `crap4ts.toml`) in the current directory. Auto-detects `src/`
+  → `crates/` → falls back to `src` with a hint comment. Interactive
+  by default (one prompt mapping `s|d|l` to strict/default/lenient
+  preset); `--non-interactive` for CI; `--force` to overwrite an
+  existing config. Lives in `crap-core` so both adapters inherit the
+  subcommand via `AdapterMeta` — crap4ts emits TS-flavored
+  `node_modules/**`, `dist/**`, `coverage/**` excludes; crap4rs emits
+  `tests/**`, `benches/**`, `examples/**`. (#73)
 - `--summary` flag emits a single-line analysis verdict to stdout (e.g.
   `PASS: 1082 functions | 0 above threshold (25) | worst: 13.0 | avg: 1.6`),
   matching crap4ts's `formatSummaryLine` byte-for-byte. Short-circuits
   `--format` and composes with `--no-fail` (exit 0 always, summary
   emitted) and `--quiet` (quiet wins — no output). Closes the
   2026-05-08 crap4rs ↔ crap4ts parity audit's final gap. (#131)
+
+### Changed (crap-core public API)
+
+- `AdapterMeta` gains a `default_excludes: &'static [&'static str]`
+  field — required by adapter binaries so `<adapter> init` can emit
+  per-ecosystem exclude defaults. Existing struct-literal
+  constructions in adapter `main.rs` files need this field added;
+  there is no default impl to fall back on (the type stays `Copy` /
+  per-field literal-init to keep zero-cost). Affects only adapter
+  binary crates; library consumers of `crap-core` do not construct
+  `AdapterMeta` directly. (#73)
 
 ## [0.5.0] - 2026-05-10
 
