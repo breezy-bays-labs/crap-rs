@@ -60,6 +60,10 @@ serde = { workspace = true }
 # traits for the envelope, the JSON serialization happens up in
 # crap-core's reporter layer.
 serde_json = { workspace = true }
+# `cli_init_integration` smoke-tests the `crap4ts init` subcommand
+# (crap-rs#73) which crap4ts inherits from crap-core via AdapterMeta.
+# Each scenario writes into a tempdir so the test doesn't pollute cwd.
+tempfile = { workspace = true }
 
 [build-dependencies]
 napi-build = { workspace = true }
