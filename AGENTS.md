@@ -126,10 +126,12 @@ scratch dirs (one per worker). `--in-place` skips the copy and mutates
 the source tree directly, so it forbids `-j > 1` by design. Trying to
 combine them errors out. See <https://mutants.rs/in-place>.
 
-`.cargo/mutants.toml` sets `copy_target = true` so each local worker
-hardlinks the workspace `target/` into its scratch dir — no cold-cache
-rebuild per worker. The flag is ignored under `--in-place` (no copy
-happens), which keeps CI behaviour unchanged.
+`.cargo/mutants.toml` sets `copy_target = true` so each local worker's
+scratch dir gets a copy of the workspace `target/` — workers reuse the
+prebuilt artifacts instead of rebuilding from cold. The trade-off is
+disk usage: each worker holds its own `target/` copy in temp space, so
+free disk should be ≥ `target/` size × N. The flag is ignored under
+`--in-place` (no copy happens), which keeps CI behaviour unchanged.
 
 ### Crash recovery
 
@@ -139,12 +141,14 @@ happens), which keeps CI behaviour unchanged.
   the mutated file dirty on disk. Restore with:
 
   ```bash
-  git checkout -- crates/crap-core/src/domain/view.rs
+  # WARNING: discards any unrelated uncommitted changes to the file.
+  # If you had in-flight edits, stash them first (`git stash push -- <file>`).
+  git restore crates/crap-core/src/domain/view.rs
   ```
 
   If `cargo mutants` exits cleanly (success or failure), it restores
-  the file itself — `git checkout` is only needed after an unclean
-  shutdown.
+  the file itself — manual `git restore` is only needed after an
+  unclean shutdown.
 
 ### CI parity
 
