@@ -14,9 +14,7 @@ use std::fmt;
 /// SARIF reporters convert inclusive → exclusive end at serialization
 /// time; consumers of `SourceSpan` directly get the intuitive bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5: cross-crate struct-literal
-// constructors need access to the field set. Restored at v1.0 once
-// constructors no longer cross crate boundaries.
+#[non_exhaustive]
 pub struct SourceSpan {
     pub start_line: usize,
     pub end_line: usize,
@@ -24,6 +22,20 @@ pub struct SourceSpan {
     pub start_column: usize,
     #[serde(default)]
     pub end_column: usize,
+}
+
+impl SourceSpan {
+    /// Construct a span over `[start_line, end_line]` with explicit
+    /// columns. Adapters that lack column data pass `0` for both — the
+    /// "column unknown" sentinel reporters consult.
+    pub fn new(start_line: usize, end_line: usize, start_column: usize, end_column: usize) -> Self {
+        Self {
+            start_line,
+            end_line,
+            start_column,
+            end_column,
+        }
+    }
 }
 
 // ── Complexity Contributors ──────────────────────────────────────────
@@ -109,7 +121,7 @@ impl fmt::Display for ContributorKind {
 /// these fields treat `end_line == 0` as "use `line` instead", since a
 /// real source position is always >= 1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct ComplexityContributor {
     pub kind: ContributorKind,
     /// 1-based line number of the construct's start (or signal token).
@@ -133,6 +145,30 @@ pub struct ComplexityContributor {
     /// constructs (0 = top-level statement of the function body).
     #[serde(default)]
     pub nesting_depth: u32,
+}
+
+impl ComplexityContributor {
+    /// Construct a contributor with every field. Walker implementations
+    /// (Rust's syn-based walker, future TS oxc walker) call this once per
+    /// construct; the positional argument order matches the field
+    /// declaration order above.
+    pub fn new(
+        kind: ContributorKind,
+        line: usize,
+        column: Option<u32>,
+        increment: u32,
+        end_line: usize,
+        nesting_depth: u32,
+    ) -> Self {
+        Self {
+            kind,
+            line,
+            column,
+            increment,
+            end_line,
+            nesting_depth,
+        }
+    }
 }
 
 // ── Complexity Metric ────────────────────────────────────────────────
@@ -170,7 +206,7 @@ impl fmt::Display for ComplexityMetric {
 
 /// Identifies a function in the source code.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct FunctionIdentity {
     /// Project-relative file path, forward-slash normalized.
     pub file_path: String,
@@ -178,6 +214,19 @@ pub struct FunctionIdentity {
     pub qualified_name: String,
     /// Source location.
     pub span: SourceSpan,
+}
+
+impl FunctionIdentity {
+    /// Construct an identity from its three components. Walkers
+    /// (`crap4rs::adapters::complexity`, future `crap4ts::adapters::walker`)
+    /// build these per function discovered in source.
+    pub fn new(file_path: String, qualified_name: String, span: SourceSpan) -> Self {
+        Self {
+            file_path,
+            qualified_name,
+            span,
+        }
+    }
 }
 
 /// Complexity data extracted from source code for a single function.
@@ -289,7 +338,7 @@ impl fmt::Display for RiskLevel {
 
 /// Computed CRAP score with risk classification.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct CrapScore {
     /// Rounded to 2 decimal places.
     pub value: f64,
@@ -298,7 +347,7 @@ pub struct CrapScore {
 
 /// A function with all metrics computed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct ScoredFunction {
     pub identity: FunctionIdentity,
     pub complexity: u32,
@@ -312,7 +361,7 @@ pub struct ScoredFunction {
 
 /// A scored function compared against a threshold.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct FunctionVerdict {
     pub scored: ScoredFunction,
     pub threshold: f64,
@@ -333,7 +382,7 @@ pub use crate::domain::diagnostic::Diagnostic;
 // ── Analysis Results ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct RiskDistribution {
     pub low: usize,
     pub acceptable: usize,
@@ -342,7 +391,7 @@ pub struct RiskDistribution {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct AnalysisSummary {
     pub total_functions: usize,
     pub total_files: usize,
@@ -376,7 +425,7 @@ pub struct AnalysisSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct AnalysisResult {
     pub functions: Vec<FunctionVerdict>,
     pub summary: AnalysisSummary,
@@ -403,10 +452,7 @@ pub struct AnalysisResult {
 /// owned-deserialize requirement and trip up trait resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "")]
-// `#[non_exhaustive]` paused for v0.5: adapter shims construct
-// `AnalysisDiagnostics<P>` via struct literal across crate boundaries
-// (e.g., the v0.4 LcovParseDiagnostic concretization). Restored at v1.0
-// once construction is funneled through a builder.
+#[non_exhaustive]
 pub struct AnalysisDiagnostics<P: crate::ports::ParseDiagnostic> {
     /// Non-fatal parse issues from the coverage parser. Concrete shape
     /// is adapter-specific (e.g., LCOV-flavored for the Rust adapter).

@@ -93,7 +93,7 @@ use serde::Serialize;
 /// `#[non_exhaustive]` reserves namespace for additive fields (e.g.,
 /// future `min_complexity`, `risk_floor`, secondary sort) without
 /// breaking downstream callers.
-// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ViewSpec {
     /// Eligibility predicates — AND-composed. See [`Filters`].
@@ -147,7 +147,7 @@ impl GroupKey {
 /// `#[non_exhaustive]` reserves namespace for future predicates
 /// (`min_complexity`, `risk_floor`, `path_glob`, etc.) without breaking
 /// downstream construction.
-// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Filters {
     /// When true, retain only verdicts where `exceeds == true`

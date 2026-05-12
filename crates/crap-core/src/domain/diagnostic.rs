@@ -13,7 +13,7 @@ use crate::domain::types::{
 /// convention (per `.claude/rules/domain.md` §5) so coverage gaps and
 /// proposed splits address the same line space as `ComplexityContributor`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct LineRange {
     pub start: usize,
     pub end: usize,
@@ -122,7 +122,7 @@ impl SplitKind {
 /// One AST-derived candidate for `extract_function`. The split is named
 /// only by its line range — agents do prose, the CLI does coordinates.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct ProposedSplit {
     pub line_range: LineRange,
     /// Sum of contributor increments inside `line_range` (cognitive or
@@ -170,7 +170,7 @@ pub enum SuggestedAction {
 /// deserialize when fields are added under `#[non_exhaustive]`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
-// `#[non_exhaustive]` paused for v0.5 (see types::SourceSpan). Restored at v1.0.
+#[non_exhaustive]
 pub struct Diagnostic {
     pub coverage_gaps: Vec<LineRange>,
     pub complexity_drivers: Vec<ComplexityContributor>,
