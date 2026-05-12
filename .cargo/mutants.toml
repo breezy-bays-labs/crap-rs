@@ -11,3 +11,23 @@
 # which run `cargo nextest run --workspace --all-targets` and DO build the
 # crap4rs bin first. Excluding it here is scoped to mutants only.
 additional_cargo_test_args = ["--", "--skip", "envelope"]
+
+# Warm each parallel worker's scratch tree with our /target dir.
+#
+# Local parallel runs (`cargo mutants -j N`) copy the source tree into
+# N scratch dirs — one per worker. By default `/target` is excluded from
+# that copy, so each worker rebuilds every dep from scratch, which
+# dominates the run on a cold cache. `copy_target = true` copies the
+# already-built `/target/` into every scratch dir, so workers can reuse
+# the prebuilt artifacts and only burn CPU on the mutated crate.
+#
+# Trade-off: each worker holds its own `/target/` copy in temp space —
+# disk usage scales with `-j N`. On a workspace where `/target/` is
+# multiple GB this is the dominant cost; mind free disk on `-j 8+`.
+#
+# Ignored under `--in-place` (no copy happens), so this is CI-neutral —
+# the `mutants` job in `.github/workflows/ci.yml` still passes through
+# unchanged. See <https://mutants.rs/in-place> on the --in-place × --jobs
+# incompatibility: parallel workers REQUIRE copies, --in-place forbids
+# them, so `-j N` and `--in-place` are mutually exclusive by design.
+copy_target = true
