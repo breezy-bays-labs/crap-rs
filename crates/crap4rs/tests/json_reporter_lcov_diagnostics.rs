@@ -17,7 +17,6 @@
 use crap4rs::adapters::reporters::{JsonConfig, format_json};
 use crap4rs::domain::types::{AnalysisDiagnostics, AnalysisResult, ComplexityMetric};
 use crap4rs::domain::view::{self, ViewSpec};
-use crap4rs::parse_diagnostic::LcovParseDiagnostic;
 
 fn make_empty_result() -> AnalysisResult {
     // Round-trip an empty envelope's `result` block. Keeps the test
@@ -42,19 +41,25 @@ fn make_empty_result() -> AnalysisResult {
 
 #[test]
 fn diagnostics_included_when_present() {
-    let diag: AnalysisDiagnostics = AnalysisDiagnostics {
-        parse_diagnostics: vec![LcovParseDiagnostic::MalformedRecord {
-            line_number: 5,
-            content: "DA:bad".to_string(),
-        }],
-        files_found: 10,
-        files_unparseable: 1,
-        functions_extracted: 42,
-        functions_matched: 40,
-        functions_no_coverage: 2,
-        files_analyzed: 8,
-        files_zero_coverage: 2,
-    };
+    // Construct via serde round-trip — the documented external escape
+    // hatch for `#[non_exhaustive]` result types (mirrors
+    // `make_empty_result` above). Keeps the test independent of the
+    // domain struct's exact field set; the wire-shape assertion below
+    // is what matters.
+    let diag_json = r#"{
+        "parse_diagnostics": [
+            {"kind": "malformed_record", "line_number": 5, "content": "DA:bad"}
+        ],
+        "files_found": 10,
+        "files_unparseable": 1,
+        "functions_extracted": 42,
+        "functions_matched": 40,
+        "functions_no_coverage": 2,
+        "files_analyzed": 8,
+        "files_zero_coverage": 2
+    }"#;
+    let diag: AnalysisDiagnostics =
+        serde_json::from_str(diag_json).expect("diagnostics JSON should deserialize");
 
     let result = make_empty_result();
     let config = JsonConfig {

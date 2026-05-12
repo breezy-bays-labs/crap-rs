@@ -1,6 +1,5 @@
 ---
 source: crates/crap-core/tests/wire_envelope_snapshot.rs
-assertion_line: 94
 expression: pretty
 ---
 {
@@ -82,7 +81,7 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_item_fn",
             "span": {
               "end_column": 5,
-              "end_line": 80,
+              "end_line": 76,
               "start_column": 5,
               "start_line": 58
             }
@@ -106,9 +105,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_item_impl",
             "span": {
               "end_column": 5,
-              "end_line": 87,
+              "end_line": 83,
               "start_column": 5,
-              "start_line": 82
+              "start_line": 78
             }
           }
         },
@@ -122,10 +121,10 @@ expression: pretty
           "contributors": [
             {
               "column": 25,
-              "end_line": 94,
+              "end_line": 90,
               "increment": 1,
               "kind": "match",
-              "line": 91,
+              "line": 87,
               "nesting_depth": 0
             }
           ],
@@ -139,9 +138,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_impl_item_fn",
             "span": {
               "end_column": 5,
-              "end_line": 112,
+              "end_line": 104,
               "start_column": 5,
-              "start_line": 89
+              "start_line": 85
             }
           }
         },
@@ -155,18 +154,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 137,
+              "end_line": 125,
               "increment": 1,
               "kind": "if-branch",
-              "line": 116,
+              "line": 108,
               "nesting_depth": 0
             },
             {
               "column": 29,
-              "end_line": 121,
+              "end_line": 113,
               "increment": 2,
               "kind": "match",
-              "line": 118,
+              "line": 110,
               "nesting_depth": 1
             }
           ],
@@ -180,9 +179,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_trait_item_fn",
             "span": {
               "end_column": 5,
-              "end_line": 140,
+              "end_line": 128,
               "start_column": 5,
-              "start_line": 114
+              "start_line": 106
             }
           }
         },
@@ -204,9 +203,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_item_trait",
             "span": {
               "end_column": 5,
-              "end_line": 147,
+              "end_line": 135,
               "start_column": 5,
-              "start_line": 142
+              "start_line": 130
             }
           }
         },
@@ -228,9 +227,9 @@ expression: pretty
             "qualified_name": "add_contributor",
             "span": {
               "end_column": 1,
-              "end_line": 171,
+              "end_line": 159,
               "start_column": 1,
-              "start_line": 152
+              "start_line": 140
             }
           }
         },
@@ -252,9 +251,9 @@ expression: pretty
             "qualified_name": "end_line_of",
             "span": {
               "end_column": 1,
-              "end_line": 179,
+              "end_line": 167,
               "start_column": 1,
-              "start_line": 173
+              "start_line": 161
             }
           }
         },
@@ -276,9 +275,9 @@ expression: pretty
             "qualified_name": "span_of",
             "span": {
               "end_column": 1,
-              "end_line": 202,
+              "end_line": 190,
               "start_column": 1,
-              "start_line": 181
+              "start_line": 169
             }
           }
         },
@@ -292,18 +291,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 210,
+              "end_line": 198,
               "increment": 1,
               "kind": "if-branch",
-              "line": 206,
+              "line": 194,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 207,
+              "end_line": 195,
               "increment": 1,
               "kind": "logical-operator",
-              "line": 207,
+              "line": 195,
               "nesting_depth": 0
             }
           ],
@@ -317,9 +316,9 @@ expression: pretty
             "qualified_name": "extract_type_name",
             "span": {
               "end_column": 1,
-              "end_line": 213,
+              "end_line": 201,
               "start_column": 1,
-              "start_line": 204
+              "start_line": 192
             }
           }
         },
@@ -333,10 +332,10 @@ expression: pretty
           "contributors": [
             {
               "column": 15,
-              "end_line": 225,
+              "end_line": 213,
               "increment": 1,
               "kind": "match",
-              "line": 222,
+              "line": 210,
               "nesting_depth": 0
             }
           ],
@@ -350,9 +349,9 @@ expression: pretty
             "qualified_name": "count_complexity",
             "span": {
               "end_column": 1,
-              "end_line": 228,
+              "end_line": 216,
               "start_column": 1,
-              "start_line": 217
+              "start_line": 205
             }
           }
         },
@@ -374,9 +373,9 @@ expression: pretty
             "qualified_name": "count_cognitive_block",
             "span": {
               "end_column": 1,
-              "end_line": 242,
+              "end_line": 230,
               "start_column": 1,
-              "start_line": 232
+              "start_line": 220
             }
           }
         },
@@ -390,26 +389,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 272,
+              "end_line": 260,
               "increment": 1,
               "kind": "match",
-              "line": 249,
+              "line": 237,
               "nesting_depth": 0
             },
             {
               "column": 13,
-              "end_line": 268,
+              "end_line": 256,
               "increment": 2,
               "kind": "if-branch",
-              "line": 253,
+              "line": 241,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 267,
+              "end_line": 255,
               "increment": 3,
               "kind": "if-branch",
-              "line": 255,
+              "line": 243,
               "nesting_depth": 2
             }
           ],
@@ -423,9 +422,9 @@ expression: pretty
             "qualified_name": "count_cognitive_stmt",
             "span": {
               "end_column": 1,
-              "end_line": 273,
+              "end_line": 261,
               "start_column": 1,
-              "start_line": 244
+              "start_line": 232
             }
           }
         },
@@ -439,10 +438,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 302,
+              "end_line": 290,
               "increment": 1,
               "kind": "match",
-              "line": 280,
+              "line": 268,
               "nesting_depth": 0
             }
           ],
@@ -456,9 +455,9 @@ expression: pretty
             "qualified_name": "count_cognitive_expr",
             "span": {
               "end_column": 1,
-              "end_line": 303,
+              "end_line": 291,
               "start_column": 1,
-              "start_line": 275
+              "start_line": 263
             }
           }
         },
@@ -472,18 +471,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 325,
+              "end_line": 313,
               "increment": 1,
               "kind": "for-loop",
-              "line": 320,
+              "line": 308,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 323,
+              "end_line": 311,
               "increment": 2,
               "kind": "if-branch",
-              "line": 321,
+              "line": 309,
               "nesting_depth": 1
             }
           ],
@@ -497,9 +496,9 @@ expression: pretty
             "qualified_name": "count_cognitive_match",
             "span": {
               "end_column": 1,
-              "end_line": 327,
+              "end_line": 315,
               "start_column": 1,
-              "start_line": 305
+              "start_line": 293
             }
           }
         },
@@ -521,9 +520,9 @@ expression: pretty
             "qualified_name": "count_cognitive_while",
             "span": {
               "end_column": 1,
-              "end_line": 346,
+              "end_line": 334,
               "start_column": 1,
-              "start_line": 329
+              "start_line": 317
             }
           }
         },
@@ -545,9 +544,9 @@ expression: pretty
             "qualified_name": "count_cognitive_for_loop",
             "span": {
               "end_column": 1,
-              "end_line": 365,
+              "end_line": 353,
               "start_column": 1,
-              "start_line": 348
+              "start_line": 336
             }
           }
         },
@@ -569,9 +568,9 @@ expression: pretty
             "qualified_name": "count_cognitive_loop",
             "span": {
               "end_column": 1,
-              "end_line": 383,
+              "end_line": 371,
               "start_column": 1,
-              "start_line": 367
+              "start_line": 355
             }
           }
         },
@@ -593,9 +592,9 @@ expression: pretty
             "qualified_name": "count_cognitive_binary",
             "span": {
               "end_column": 1,
-              "end_line": 397,
+              "end_line": 385,
               "start_column": 1,
-              "start_line": 389
+              "start_line": 377
             }
           }
         },
@@ -617,9 +616,9 @@ expression: pretty
             "qualified_name": "count_cognitive_try",
             "span": {
               "end_column": 1,
-              "end_line": 413,
+              "end_line": 401,
               "start_column": 1,
-              "start_line": 399
+              "start_line": 387
             }
           }
         },
@@ -641,9 +640,9 @@ expression: pretty
             "qualified_name": "count_cognitive_break",
             "span": {
               "end_column": 1,
-              "end_line": 429,
+              "end_line": 417,
               "start_column": 1,
-              "start_line": 415
+              "start_line": 403
             }
           }
         },
@@ -665,9 +664,9 @@ expression: pretty
             "qualified_name": "count_cognitive_continue",
             "span": {
               "end_column": 1,
-              "end_line": 445,
+              "end_line": 433,
               "start_column": 1,
-              "start_line": 431
+              "start_line": 419
             }
           }
         },
@@ -681,10 +680,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 455,
+              "end_line": 443,
               "increment": 1,
               "kind": "match",
-              "line": 452,
+              "line": 440,
               "nesting_depth": 0
             }
           ],
@@ -698,9 +697,9 @@ expression: pretty
             "qualified_name": "count_cognitive_return",
             "span": {
               "end_column": 1,
-              "end_line": 456,
+              "end_line": 444,
               "start_column": 1,
-              "start_line": 447
+              "start_line": 435
             }
           }
         },
@@ -722,9 +721,42 @@ expression: pretty
             "qualified_name": "count_cognitive_closure",
             "span": {
               "end_column": 1,
+              "end_line": 454,
+              "start_column": 1,
+              "start_line": 448
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 464,
+              "increment": 1,
+              "kind": "for-loop",
+              "line": 462,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "acceptable",
+            "value": 6.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "count_cognitive_call",
+            "span": {
+              "end_column": 1,
               "end_line": 466,
               "start_column": 1,
-              "start_line": 460
+              "start_line": 456
             }
           }
         },
@@ -752,7 +784,7 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "count_cognitive_call",
+            "qualified_name": "count_cognitive_method_call",
             "span": {
               "end_column": 1,
               "end_line": 478,
@@ -785,45 +817,12 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "count_cognitive_method_call",
+            "qualified_name": "count_cognitive_tuple",
             "span": {
               "end_column": 1,
               "end_line": 490,
               "start_column": 1,
               "start_line": 480
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 2,
-          "complexity_metric": "cognitive",
-          "contributors": [
-            {
-              "column": 5,
-              "end_line": 500,
-              "increment": 1,
-              "kind": "for-loop",
-              "line": 498,
-              "nesting_depth": 0
-            }
-          ],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "acceptable",
-            "value": 6.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "count_cognitive_tuple",
-            "span": {
-              "end_column": 1,
-              "end_line": 502,
-              "start_column": 1,
-              "start_line": 492
             }
           }
         },
@@ -837,26 +836,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 554,
+              "end_line": 542,
               "increment": 1,
               "kind": "if-branch",
-              "line": 527,
+              "line": 515,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 553,
+              "end_line": 541,
               "increment": 2,
               "kind": "match",
-              "line": 528,
+              "line": 516,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 544,
+              "end_line": 532,
               "increment": 3,
               "kind": "if-branch",
-              "line": 542,
+              "line": 530,
               "nesting_depth": 2
             }
           ],
@@ -870,9 +869,9 @@ expression: pretty
             "qualified_name": "count_cognitive_if",
             "span": {
               "end_column": 1,
-              "end_line": 557,
+              "end_line": 545,
               "start_column": 1,
-              "start_line": 504
+              "start_line": 492
             }
           }
         },
@@ -886,18 +885,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 588,
+              "end_line": 576,
               "increment": 1,
               "kind": "match",
-              "line": 564,
+              "line": 552,
               "nesting_depth": 0
             },
             {
               "column": 13,
-              "end_line": 580,
+              "end_line": 568,
               "increment": 2,
               "kind": "if-branch",
-              "line": 578,
+              "line": 566,
               "nesting_depth": 1
             }
           ],
@@ -911,9 +910,9 @@ expression: pretty
             "qualified_name": "count_cognitive_else",
             "span": {
               "end_column": 1,
-              "end_line": 589,
+              "end_line": 577,
               "start_column": 1,
-              "start_line": 559
+              "start_line": 547
             }
           }
         },
@@ -927,34 +926,34 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 601,
+              "end_line": 589,
               "increment": 1,
               "kind": "if-branch",
-              "line": 599,
+              "line": 587,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 626,
+              "end_line": 614,
               "increment": 1,
               "kind": "for-loop",
-              "line": 606,
+              "line": 594,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 625,
+              "end_line": 613,
               "increment": 2,
               "kind": "match",
-              "line": 607,
+              "line": 595,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 619,
+              "end_line": 607,
               "increment": 3,
               "kind": "if-branch",
-              "line": 609,
+              "line": 597,
               "nesting_depth": 2
             }
           ],
@@ -968,9 +967,9 @@ expression: pretty
             "qualified_name": "count_cognitive_binary_chain",
             "span": {
               "end_column": 1,
-              "end_line": 629,
+              "end_line": 617,
               "start_column": 1,
-              "start_line": 591
+              "start_line": 579
             }
           }
         },
@@ -984,10 +983,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 646,
+              "end_line": 634,
               "increment": 1,
               "kind": "match",
-              "line": 640,
+              "line": 628,
               "nesting_depth": 0
             }
           ],
@@ -1001,9 +1000,9 @@ expression: pretty
             "qualified_name": "count_cognitive_binary_operands",
             "span": {
               "end_column": 1,
-              "end_line": 647,
+              "end_line": 635,
               "start_column": 1,
-              "start_line": 631
+              "start_line": 619
             }
           }
         },
@@ -1017,10 +1016,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 661,
+              "end_line": 649,
               "increment": 1,
               "kind": "match",
-              "line": 657,
+              "line": 645,
               "nesting_depth": 0
             }
           ],
@@ -1034,9 +1033,9 @@ expression: pretty
             "qualified_name": "classify_binop",
             "span": {
               "end_column": 1,
-              "end_line": 662,
+              "end_line": 650,
               "start_column": 1,
-              "start_line": 656
+              "start_line": 644
             }
           }
         },
@@ -1050,10 +1049,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 672,
+              "end_line": 660,
               "increment": 1,
               "kind": "match",
-              "line": 665,
+              "line": 653,
               "nesting_depth": 0
             }
           ],
@@ -1067,9 +1066,9 @@ expression: pretty
             "qualified_name": "binop_span",
             "span": {
               "end_column": 1,
-              "end_line": 673,
+              "end_line": 661,
               "start_column": 1,
-              "start_line": 664
+              "start_line": 652
             }
           }
         },
@@ -1091,9 +1090,9 @@ expression: pretty
             "qualified_name": "flatten_binary_ops",
             "span": {
               "end_column": 1,
-              "end_line": 683,
+              "end_line": 671,
               "start_column": 1,
-              "start_line": 675
+              "start_line": 663
             }
           }
         },
@@ -1107,10 +1106,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 690,
+              "end_line": 678,
               "increment": 1,
               "kind": "if-branch",
-              "line": 686,
+              "line": 674,
               "nesting_depth": 0
             }
           ],
@@ -1124,9 +1123,9 @@ expression: pretty
             "qualified_name": "flatten_binary_ops_inner",
             "span": {
               "end_column": 1,
-              "end_line": 691,
+              "end_line": 679,
               "start_column": 1,
-              "start_line": 685
+              "start_line": 673
             }
           }
         },
@@ -1148,9 +1147,9 @@ expression: pretty
             "qualified_name": "count_cyclomatic_block",
             "span": {
               "end_column": 1,
-              "end_line": 700,
+              "end_line": 688,
               "start_column": 1,
-              "start_line": 695
+              "start_line": 683
             }
           }
         },
@@ -1172,9 +1171,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::count_block",
             "span": {
               "end_column": 5,
-              "end_line": 717,
+              "end_line": 705,
               "start_column": 5,
-              "start_line": 709
+              "start_line": 697
             }
           }
         },
@@ -1196,9 +1195,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::bump",
             "span": {
               "end_column": 5,
-              "end_line": 729,
+              "end_line": 717,
               "start_column": 5,
-              "start_line": 719
+              "start_line": 707
             }
           }
         },
@@ -1220,9 +1219,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::with_nesting",
             "span": {
               "end_column": 5,
-              "end_line": 735,
+              "end_line": 723,
               "start_column": 5,
-              "start_line": 731
+              "start_line": 719
             }
           }
         },
@@ -1236,10 +1235,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 744,
+              "end_line": 732,
               "increment": 1,
               "kind": "match",
-              "line": 740,
+              "line": 728,
               "nesting_depth": 0
             }
           ],
@@ -1253,9 +1252,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_stmt",
             "span": {
               "end_column": 5,
-              "end_line": 745,
+              "end_line": 733,
               "start_column": 5,
-              "start_line": 739
+              "start_line": 727
             }
           }
         },
@@ -1269,18 +1268,18 @@ expression: pretty
           "contributors": [
             {
               "column": 38,
-              "end_line": 750,
+              "end_line": 738,
               "increment": 1,
               "kind": "let-else",
-              "line": 748,
+              "line": 736,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 761,
+              "end_line": 749,
               "increment": 1,
               "kind": "if-branch",
-              "line": 753,
+              "line": 741,
               "nesting_depth": 0
             }
           ],
@@ -1294,9 +1293,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_local",
             "span": {
               "end_column": 5,
-              "end_line": 762,
+              "end_line": 750,
               "start_column": 5,
-              "start_line": 747
+              "start_line": 735
             }
           }
         },
@@ -1310,18 +1309,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 782,
+              "end_line": 770,
               "increment": 1,
               "kind": "if-branch",
-              "line": 773,
+              "line": 761,
               "nesting_depth": 0
             },
             {
               "column": 13,
-              "end_line": 781,
+              "end_line": 769,
               "increment": 2,
               "kind": "match",
-              "line": 774,
+              "line": 762,
               "nesting_depth": 1
             }
           ],
@@ -1335,9 +1334,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_if",
             "span": {
               "end_column": 5,
-              "end_line": 783,
+              "end_line": 771,
               "start_column": 5,
-              "start_line": 764
+              "start_line": 752
             }
           }
         },
@@ -1351,18 +1350,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 793,
+              "end_line": 781,
               "increment": 1,
               "kind": "for-loop",
-              "line": 786,
+              "line": 774,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 798,
+              "end_line": 786,
               "increment": 1,
               "kind": "for-loop",
-              "line": 796,
+              "line": 784,
               "nesting_depth": 0
             }
           ],
@@ -1376,9 +1375,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_match",
             "span": {
               "end_column": 5,
-              "end_line": 799,
+              "end_line": 787,
               "start_column": 5,
-              "start_line": 785
+              "start_line": 773
             }
           }
         },
@@ -1392,10 +1391,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 804,
+              "end_line": 792,
               "increment": 1,
               "kind": "if-branch",
-              "line": 802,
+              "line": 790,
               "nesting_depth": 0
             }
           ],
@@ -1409,9 +1408,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_arm",
             "span": {
               "end_column": 5,
-              "end_line": 806,
+              "end_line": 794,
               "start_column": 5,
-              "start_line": 801
+              "start_line": 789
             }
           }
         },
@@ -1433,9 +1432,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_while",
             "span": {
               "end_column": 5,
-              "end_line": 817,
+              "end_line": 805,
               "start_column": 5,
-              "start_line": 808
+              "start_line": 796
             }
           }
         },
@@ -1457,9 +1456,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_for_loop",
             "span": {
               "end_column": 5,
-              "end_line": 828,
+              "end_line": 816,
               "start_column": 5,
-              "start_line": 819
+              "start_line": 807
             }
           }
         },
@@ -1481,9 +1480,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_loop",
             "span": {
               "end_column": 5,
-              "end_line": 838,
+              "end_line": 826,
               "start_column": 5,
-              "start_line": 830
+              "start_line": 818
             }
           }
         },
@@ -1497,10 +1496,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 844,
+              "end_line": 832,
               "increment": 1,
               "kind": "if-branch",
-              "line": 841,
+              "line": 829,
               "nesting_depth": 0
             }
           ],
@@ -1514,9 +1513,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_binary",
             "span": {
               "end_column": 5,
-              "end_line": 847,
+              "end_line": 835,
               "start_column": 5,
-              "start_line": 840
+              "start_line": 828
             }
           }
         },
@@ -1538,9 +1537,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_try",
             "span": {
               "end_column": 5,
-              "end_line": 857,
+              "end_line": 845,
               "start_column": 5,
-              "start_line": 849
+              "start_line": 837
             }
           }
         },
@@ -1554,10 +1553,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 868,
+              "end_line": 856,
               "increment": 1,
               "kind": "if-branch",
-              "line": 866,
+              "line": 854,
               "nesting_depth": 0
             }
           ],
@@ -1571,9 +1570,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_break",
             "span": {
               "end_column": 5,
-              "end_line": 869,
+              "end_line": 857,
               "start_column": 5,
-              "start_line": 859
+              "start_line": 847
             }
           }
         },
@@ -1595,9 +1594,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_continue",
             "span": {
               "end_column": 5,
-              "end_line": 878,
+              "end_line": 866,
               "start_column": 5,
-              "start_line": 871
+              "start_line": 859
             }
           }
         },
@@ -1619,9 +1618,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_closure",
             "span": {
               "end_column": 5,
-              "end_line": 885,
+              "end_line": 873,
               "start_column": 5,
-              "start_line": 880
+              "start_line": 868
             }
           }
         },
@@ -1643,9 +1642,9 @@ expression: pretty
             "qualified_name": "adapter",
             "span": {
               "end_column": 5,
-              "end_line": 896,
+              "end_line": 884,
               "start_column": 5,
-              "start_line": 894
+              "start_line": 882
             }
           }
         },
@@ -1667,9 +1666,9 @@ expression: pretty
             "qualified_name": "load_fixture",
             "span": {
               "end_column": 5,
-              "end_line": 902,
+              "end_line": 890,
               "start_column": 5,
-              "start_line": 898
+              "start_line": 886
             }
           }
         },
@@ -1691,9 +1690,9 @@ expression: pretty
             "qualified_name": "extract_fixture",
             "span": {
               "end_column": 5,
-              "end_line": 909,
+              "end_line": 897,
               "start_column": 5,
-              "start_line": 904
+              "start_line": 892
             }
           }
         },
@@ -1715,9 +1714,9 @@ expression: pretty
             "qualified_name": "find_fn",
             "span": {
               "end_column": 5,
-              "end_line": 922,
+              "end_line": 910,
               "start_column": 5,
-              "start_line": 911
+              "start_line": 899
             }
           }
         },
@@ -1739,9 +1738,9 @@ expression: pretty
             "qualified_name": "baseline_complexity_is_one_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 938,
+              "end_line": 926,
               "start_column": 5,
-              "start_line": 933
+              "start_line": 921
             }
           }
         },
@@ -1763,9 +1762,9 @@ expression: pretty
             "qualified_name": "baseline_complexity_is_one_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 945,
+              "end_line": 933,
               "start_column": 5,
-              "start_line": 940
+              "start_line": 928
             }
           }
         },
@@ -1787,9 +1786,9 @@ expression: pretty
             "qualified_name": "top_level_fn_identity",
             "span": {
               "end_column": 5,
-              "end_line": 956,
+              "end_line": 944,
               "start_column": 5,
-              "start_line": 949
+              "start_line": 937
             }
           }
         },
@@ -1811,9 +1810,9 @@ expression: pretty
             "qualified_name": "impl_method_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 964,
+              "end_line": 952,
               "start_column": 5,
-              "start_line": 958
+              "start_line": 946
             }
           }
         },
@@ -1835,9 +1834,9 @@ expression: pretty
             "qualified_name": "span_accuracy",
             "span": {
               "end_column": 5,
-              "end_line": 987,
+              "end_line": 975,
               "start_column": 5,
-              "start_line": 966
+              "start_line": 954
             }
           }
         },
@@ -1859,9 +1858,9 @@ expression: pretty
             "qualified_name": "span_carries_one_based_columns",
             "span": {
               "end_column": 5,
-              "end_line": 1008,
+              "end_line": 996,
               "start_column": 5,
-              "start_line": 989
+              "start_line": 977
             }
           }
         },
@@ -1883,9 +1882,9 @@ expression: pretty
             "qualified_name": "columns_are_exact_one_based_offsets_unindented",
             "span": {
               "end_column": 5,
-              "end_line": 1038,
+              "end_line": 1026,
               "start_column": 5,
-              "start_line": 1010
+              "start_line": 998
             }
           }
         },
@@ -1907,9 +1906,9 @@ expression: pretty
             "qualified_name": "columns_are_exact_one_based_offsets_indented",
             "span": {
               "end_column": 5,
-              "end_line": 1063,
+              "end_line": 1051,
               "start_column": 5,
-              "start_line": 1040
+              "start_line": 1028
             }
           }
         },
@@ -1931,9 +1930,9 @@ expression: pretty
             "qualified_name": "multiple_fns_returns_all",
             "span": {
               "end_column": 5,
-              "end_line": 1069,
+              "end_line": 1057,
               "start_column": 5,
-              "start_line": 1065
+              "start_line": 1053
             }
           }
         },
@@ -1955,9 +1954,9 @@ expression: pretty
             "qualified_name": "async_fn_detected",
             "span": {
               "end_column": 5,
-              "end_line": 1077,
+              "end_line": 1065,
               "start_column": 5,
-              "start_line": 1071
+              "start_line": 1059
             }
           }
         },
@@ -1979,9 +1978,9 @@ expression: pretty
             "qualified_name": "if_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1087,
+              "end_line": 1075,
               "start_column": 5,
-              "start_line": 1081
+              "start_line": 1069
             }
           }
         },
@@ -2003,9 +2002,9 @@ expression: pretty
             "qualified_name": "nested_if_cognitive_penalty",
             "span": {
               "end_column": 5,
-              "end_line": 1095,
+              "end_line": 1083,
               "start_column": 5,
-              "start_line": 1089
+              "start_line": 1077
             }
           }
         },
@@ -2027,9 +2026,9 @@ expression: pretty
             "qualified_name": "else_is_not_counted_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1104,
+              "end_line": 1092,
               "start_column": 5,
-              "start_line": 1097
+              "start_line": 1085
             }
           }
         },
@@ -2051,9 +2050,9 @@ expression: pretty
             "qualified_name": "match_flat_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1112,
+              "end_line": 1100,
               "start_column": 5,
-              "start_line": 1106
+              "start_line": 1094
             }
           }
         },
@@ -2075,9 +2074,9 @@ expression: pretty
             "qualified_name": "if_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1122,
+              "end_line": 1110,
               "start_column": 5,
-              "start_line": 1116
+              "start_line": 1104
             }
           }
         },
@@ -2099,9 +2098,9 @@ expression: pretty
             "qualified_name": "nested_if_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1130,
+              "end_line": 1118,
               "start_column": 5,
-              "start_line": 1124
+              "start_line": 1112
             }
           }
         },
@@ -2123,9 +2122,9 @@ expression: pretty
             "qualified_name": "match_arms_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1138,
+              "end_line": 1126,
               "start_column": 5,
-              "start_line": 1132
+              "start_line": 1120
             }
           }
         },
@@ -2147,9 +2146,9 @@ expression: pretty
             "qualified_name": "cognitive_gte_cyclomatic_for_nested",
             "span": {
               "end_column": 5,
-              "end_line": 1151,
+              "end_line": 1139,
               "start_column": 5,
-              "start_line": 1140
+              "start_line": 1128
             }
           }
         },
@@ -2171,9 +2170,9 @@ expression: pretty
             "qualified_name": "bool_same_sequence_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1161,
+              "end_line": 1149,
               "start_column": 5,
-              "start_line": 1155
+              "start_line": 1143
             }
           }
         },
@@ -2195,9 +2194,9 @@ expression: pretty
             "qualified_name": "bool_same_sequence_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1169,
+              "end_line": 1157,
               "start_column": 5,
-              "start_line": 1163
+              "start_line": 1151
             }
           }
         },
@@ -2219,9 +2218,9 @@ expression: pretty
             "qualified_name": "bool_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1177,
+              "end_line": 1165,
               "start_column": 5,
-              "start_line": 1171
+              "start_line": 1159
             }
           }
         },
@@ -2243,9 +2242,9 @@ expression: pretty
             "qualified_name": "bool_operator_switch_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1185,
+              "end_line": 1173,
               "start_column": 5,
-              "start_line": 1179
+              "start_line": 1167
             }
           }
         },
@@ -2267,9 +2266,9 @@ expression: pretty
             "qualified_name": "bool_in_condition_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1193,
+              "end_line": 1181,
               "start_column": 5,
-              "start_line": 1187
+              "start_line": 1175
             }
           }
         },
@@ -2291,9 +2290,9 @@ expression: pretty
             "qualified_name": "long_or_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1201,
+              "end_line": 1189,
               "start_column": 5,
-              "start_line": 1195
+              "start_line": 1183
             }
           }
         },
@@ -2315,9 +2314,9 @@ expression: pretty
             "qualified_name": "alternating_operators_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1209,
+              "end_line": 1197,
               "start_column": 5,
-              "start_line": 1203
+              "start_line": 1191
             }
           }
         },
@@ -2339,9 +2338,9 @@ expression: pretty
             "qualified_name": "closure_in_parent_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1222,
+              "end_line": 1210,
               "start_column": 5,
-              "start_line": 1213
+              "start_line": 1201
             }
           }
         },
@@ -2363,9 +2362,9 @@ expression: pretty
             "qualified_name": "try_operator_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1232,
+              "end_line": 1220,
               "start_column": 5,
-              "start_line": 1226
+              "start_line": 1214
             }
           }
         },
@@ -2387,9 +2386,9 @@ expression: pretty
             "qualified_name": "try_operator_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1240,
+              "end_line": 1228,
               "start_column": 5,
-              "start_line": 1234
+              "start_line": 1222
             }
           }
         },
@@ -2411,9 +2410,9 @@ expression: pretty
             "qualified_name": "loop_with_break_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1250,
+              "end_line": 1238,
               "start_column": 5,
-              "start_line": 1244
+              "start_line": 1232
             }
           }
         },
@@ -2435,9 +2434,9 @@ expression: pretty
             "qualified_name": "loop_with_break_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1258,
+              "end_line": 1246,
               "start_column": 5,
-              "start_line": 1252
+              "start_line": 1240
             }
           }
         },
@@ -2459,9 +2458,9 @@ expression: pretty
             "qualified_name": "let_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1268,
+              "end_line": 1256,
               "start_column": 5,
-              "start_line": 1262
+              "start_line": 1250
             }
           }
         },
@@ -2483,9 +2482,9 @@ expression: pretty
             "qualified_name": "let_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1276,
+              "end_line": 1264,
               "start_column": 5,
-              "start_line": 1270
+              "start_line": 1258
             }
           }
         },
@@ -2507,9 +2506,9 @@ expression: pretty
             "qualified_name": "chained_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1286,
+              "end_line": 1274,
               "start_column": 5,
-              "start_line": 1280
+              "start_line": 1268
             }
           }
         },
@@ -2531,9 +2530,9 @@ expression: pretty
             "qualified_name": "chained_try_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1294,
+              "end_line": 1282,
               "start_column": 5,
-              "start_line": 1288
+              "start_line": 1276
             }
           }
         },
@@ -2555,9 +2554,9 @@ expression: pretty
             "qualified_name": "for_iterator_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1302,
+              "end_line": 1290,
               "start_column": 5,
-              "start_line": 1296
+              "start_line": 1284
             }
           }
         },
@@ -2579,9 +2578,9 @@ expression: pretty
             "qualified_name": "for_iterator_try_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1310,
+              "end_line": 1298,
               "start_column": 5,
-              "start_line": 1304
+              "start_line": 1292
             }
           }
         },
@@ -2603,9 +2602,9 @@ expression: pretty
             "qualified_name": "match_scrutinee_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1318,
+              "end_line": 1306,
               "start_column": 5,
-              "start_line": 1312
+              "start_line": 1300
             }
           }
         },
@@ -2627,9 +2626,9 @@ expression: pretty
             "qualified_name": "trait_default_method_found",
             "span": {
               "end_column": 5,
-              "end_line": 1328,
+              "end_line": 1316,
               "start_column": 5,
-              "start_line": 1322
+              "start_line": 1310
             }
           }
         },
@@ -2651,9 +2650,9 @@ expression: pretty
             "qualified_name": "trait_method_without_default_not_found",
             "span": {
               "end_column": 5,
-              "end_line": 1339,
+              "end_line": 1327,
               "start_column": 5,
-              "start_line": 1330
+              "start_line": 1318
             }
           }
         },
@@ -2667,18 +2666,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1374,
+              "end_line": 1362,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1368,
+              "line": 1356,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 1381,
+              "end_line": 1369,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1375,
+              "line": 1363,
               "nesting_depth": 0
             }
           ],
@@ -2692,9 +2691,9 @@ expression: pretty
             "qualified_name": "trait_default_and_concrete_override_have_disjoint_spans",
             "span": {
               "end_column": 5,
-              "end_line": 1382,
+              "end_line": 1370,
               "start_column": 5,
-              "start_line": 1341
+              "start_line": 1329
             }
           }
         },
@@ -2716,9 +2715,9 @@ expression: pretty
             "qualified_name": "impl_method_no_branch",
             "span": {
               "end_column": 5,
-              "end_line": 1391,
+              "end_line": 1379,
               "start_column": 5,
-              "start_line": 1386
+              "start_line": 1374
             }
           }
         },
@@ -2740,9 +2739,9 @@ expression: pretty
             "qualified_name": "impl_method_with_branch",
             "span": {
               "end_column": 5,
-              "end_line": 1399,
+              "end_line": 1387,
               "start_column": 5,
-              "start_line": 1393
+              "start_line": 1381
             }
           }
         },
@@ -2756,10 +2755,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1410,
+              "end_line": 1398,
               "increment": 1,
               "kind": "match",
-              "line": 1407,
+              "line": 1395,
               "nesting_depth": 0
             }
           ],
@@ -2773,9 +2772,9 @@ expression: pretty
             "qualified_name": "invalid_source_returns_error",
             "span": {
               "end_column": 5,
-              "end_line": 1411,
+              "end_line": 1399,
               "start_column": 5,
-              "start_line": 1403
+              "start_line": 1391
             }
           }
         },
@@ -2797,9 +2796,9 @@ expression: pretty
             "qualified_name": "contributors_for",
             "span": {
               "end_column": 5,
-              "end_line": 1428,
+              "end_line": 1416,
               "start_column": 5,
-              "start_line": 1421
+              "start_line": 1409
             }
           }
         },
@@ -2813,10 +2812,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1440,
+              "end_line": 1428,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1432,
+              "line": 1420,
               "nesting_depth": 0
             }
           ],
@@ -2830,9 +2829,9 @@ expression: pretty
             "qualified_name": "base_fn_empty_contributors",
             "span": {
               "end_column": 5,
-              "end_line": 1441,
+              "end_line": 1429,
               "start_column": 5,
-              "start_line": 1430
+              "start_line": 1418
             }
           }
         },
@@ -2854,9 +2853,9 @@ expression: pretty
             "qualified_name": "if_branch_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1450,
+              "end_line": 1438,
               "start_column": 5,
-              "start_line": 1443
+              "start_line": 1431
             }
           }
         },
@@ -2878,9 +2877,9 @@ expression: pretty
             "qualified_name": "nested_if_nesting_increment",
             "span": {
               "end_column": 5,
-              "end_line": 1462,
+              "end_line": 1450,
               "start_column": 5,
-              "start_line": 1452
+              "start_line": 1440
             }
           }
         },
@@ -2902,9 +2901,9 @@ expression: pretty
             "qualified_name": "match_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1471,
+              "end_line": 1459,
               "start_column": 5,
-              "start_line": 1464
+              "start_line": 1452
             }
           }
         },
@@ -2918,10 +2917,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1486,
+              "end_line": 1474,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1484,
+              "line": 1472,
               "nesting_depth": 0
             }
           ],
@@ -2935,9 +2934,9 @@ expression: pretty
             "qualified_name": "match_arm_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1487,
+              "end_line": 1475,
               "start_column": 5,
-              "start_line": 1473
+              "start_line": 1461
             }
           }
         },
@@ -2959,9 +2958,9 @@ expression: pretty
             "qualified_name": "try_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1495,
+              "end_line": 1483,
               "start_column": 5,
-              "start_line": 1489
+              "start_line": 1477
             }
           }
         },
@@ -2983,9 +2982,9 @@ expression: pretty
             "qualified_name": "try_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1503,
+              "end_line": 1491,
               "start_column": 5,
-              "start_line": 1497
+              "start_line": 1485
             }
           }
         },
@@ -3007,9 +3006,9 @@ expression: pretty
             "qualified_name": "let_else_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1511,
+              "end_line": 1499,
               "start_column": 5,
-              "start_line": 1505
+              "start_line": 1493
             }
           }
         },
@@ -3031,9 +3030,9 @@ expression: pretty
             "qualified_name": "let_else_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1519,
+              "end_line": 1507,
               "start_column": 5,
-              "start_line": 1513
+              "start_line": 1501
             }
           }
         },
@@ -3055,9 +3054,9 @@ expression: pretty
             "qualified_name": "loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1527,
+              "end_line": 1515,
               "start_column": 5,
-              "start_line": 1521
+              "start_line": 1509
             }
           }
         },
@@ -3079,9 +3078,9 @@ expression: pretty
             "qualified_name": "for_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1535,
+              "end_line": 1523,
               "start_column": 5,
-              "start_line": 1529
+              "start_line": 1517
             }
           }
         },
@@ -3103,9 +3102,9 @@ expression: pretty
             "qualified_name": "for_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1543,
+              "end_line": 1531,
               "start_column": 5,
-              "start_line": 1537
+              "start_line": 1525
             }
           }
         },
@@ -3127,9 +3126,9 @@ expression: pretty
             "qualified_name": "while_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1551,
+              "end_line": 1539,
               "start_column": 5,
-              "start_line": 1545
+              "start_line": 1533
             }
           }
         },
@@ -3151,9 +3150,9 @@ expression: pretty
             "qualified_name": "while_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1559,
+              "end_line": 1547,
               "start_column": 5,
-              "start_line": 1553
+              "start_line": 1541
             }
           }
         },
@@ -3175,9 +3174,9 @@ expression: pretty
             "qualified_name": "logical_operator_same_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1575,
+              "end_line": 1563,
               "start_column": 5,
-              "start_line": 1561
+              "start_line": 1549
             }
           }
         },
@@ -3199,9 +3198,9 @@ expression: pretty
             "qualified_name": "logical_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1590,
+              "end_line": 1578,
               "start_column": 5,
-              "start_line": 1577
+              "start_line": 1565
             }
           }
         },
@@ -3223,9 +3222,9 @@ expression: pretty
             "qualified_name": "break_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1603,
+              "end_line": 1591,
               "start_column": 5,
-              "start_line": 1592
+              "start_line": 1580
             }
           }
         },
@@ -3247,9 +3246,9 @@ expression: pretty
             "qualified_name": "continue_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1616,
+              "end_line": 1604,
               "start_column": 5,
-              "start_line": 1605
+              "start_line": 1593
             }
           }
         },
@@ -3271,9 +3270,9 @@ expression: pretty
             "qualified_name": "unsafe_block_produces_no_unsafe_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1644,
+              "end_line": 1632,
               "start_column": 5,
-              "start_line": 1618
+              "start_line": 1606
             }
           }
         },
@@ -3295,9 +3294,9 @@ expression: pretty
             "qualified_name": "closure_no_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1656,
+              "end_line": 1644,
               "start_column": 5,
-              "start_line": 1646
+              "start_line": 1634
             }
           }
         },
@@ -3319,9 +3318,9 @@ expression: pretty
             "qualified_name": "nested_if_records_construct_end_line_and_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1689,
+              "end_line": 1677,
               "start_column": 5,
-              "start_line": 1660
+              "start_line": 1648
             }
           }
         },
@@ -3343,9 +3342,9 @@ expression: pretty
             "qualified_name": "try_records_token_span_for_atomic_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1703,
+              "end_line": 1691,
               "start_column": 5,
-              "start_line": 1691
+              "start_line": 1679
             }
           }
         },
@@ -3367,9 +3366,9 @@ expression: pretty
             "qualified_name": "for_with_continue_threads_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1725,
+              "end_line": 1713,
               "start_column": 5,
-              "start_line": 1705
+              "start_line": 1693
             }
           }
         },
@@ -3391,9 +3390,9 @@ expression: pretty
             "qualified_name": "nested_if_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1744,
+              "end_line": 1732,
               "start_column": 5,
-              "start_line": 1727
+              "start_line": 1715
             }
           }
         },
@@ -3415,9 +3414,9 @@ expression: pretty
             "qualified_name": "for_with_continue_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1764,
+              "end_line": 1752,
               "start_column": 5,
-              "start_line": 1746
+              "start_line": 1734
             }
           }
         },
@@ -3439,9 +3438,9 @@ expression: pretty
             "qualified_name": "match_records_end_line_covering_arms_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1783,
+              "end_line": 1771,
               "start_column": 5,
-              "start_line": 1766
+              "start_line": 1754
             }
           }
         },
@@ -3455,10 +3454,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1803,
+              "end_line": 1791,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1794,
+              "line": 1782,
               "nesting_depth": 0
             }
           ],
@@ -3472,9 +3471,9 @@ expression: pretty
             "qualified_name": "contributors_sorted_by_line",
             "span": {
               "end_column": 5,
-              "end_line": 1804,
+              "end_line": 1792,
               "start_column": 5,
-              "start_line": 1785
+              "start_line": 1773
             }
           }
         },
@@ -5856,34 +5855,34 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 601,
+              "end_line": 589,
               "increment": 1,
               "kind": "if-branch",
-              "line": 599,
+              "line": 587,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 626,
+              "end_line": 614,
               "increment": 1,
               "kind": "for-loop",
-              "line": 606,
+              "line": 594,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 625,
+              "end_line": 613,
               "increment": 2,
               "kind": "match",
-              "line": 607,
+              "line": 595,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 619,
+              "end_line": 607,
               "increment": 3,
               "kind": "if-branch",
-              "line": 609,
+              "line": 597,
               "nesting_depth": 2
             }
           ],
@@ -5897,9 +5896,9 @@ expression: pretty
             "qualified_name": "count_cognitive_binary_chain",
             "span": {
               "end_column": 1,
-              "end_line": 629,
+              "end_line": 617,
               "start_column": 1,
-              "start_line": 591
+              "start_line": 579
             }
           }
         },
@@ -5913,26 +5912,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 272,
+              "end_line": 260,
               "increment": 1,
               "kind": "match",
-              "line": 249,
+              "line": 237,
               "nesting_depth": 0
             },
             {
               "column": 13,
-              "end_line": 268,
+              "end_line": 256,
               "increment": 2,
               "kind": "if-branch",
-              "line": 253,
+              "line": 241,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 267,
+              "end_line": 255,
               "increment": 3,
               "kind": "if-branch",
-              "line": 255,
+              "line": 243,
               "nesting_depth": 2
             }
           ],
@@ -5946,9 +5945,9 @@ expression: pretty
             "qualified_name": "count_cognitive_stmt",
             "span": {
               "end_column": 1,
-              "end_line": 273,
+              "end_line": 261,
               "start_column": 1,
-              "start_line": 244
+              "start_line": 232
             }
           }
         },
@@ -5962,26 +5961,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 554,
+              "end_line": 542,
               "increment": 1,
               "kind": "if-branch",
-              "line": 527,
+              "line": 515,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 553,
+              "end_line": 541,
               "increment": 2,
               "kind": "match",
-              "line": 528,
+              "line": 516,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 544,
+              "end_line": 532,
               "increment": 3,
               "kind": "if-branch",
-              "line": 542,
+              "line": 530,
               "nesting_depth": 2
             }
           ],
@@ -5995,9 +5994,9 @@ expression: pretty
             "qualified_name": "count_cognitive_if",
             "span": {
               "end_column": 1,
-              "end_line": 557,
+              "end_line": 545,
               "start_column": 1,
-              "start_line": 504
+              "start_line": 492
             }
           }
         },
@@ -6076,18 +6075,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 137,
+              "end_line": 125,
               "increment": 1,
               "kind": "if-branch",
-              "line": 116,
+              "line": 108,
               "nesting_depth": 0
             },
             {
               "column": 29,
-              "end_line": 121,
+              "end_line": 113,
               "increment": 2,
               "kind": "match",
-              "line": 118,
+              "line": 110,
               "nesting_depth": 1
             }
           ],
@@ -6101,9 +6100,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_trait_item_fn",
             "span": {
               "end_column": 5,
-              "end_line": 140,
+              "end_line": 128,
               "start_column": 5,
-              "start_line": 114
+              "start_line": 106
             }
           }
         },
@@ -6117,18 +6116,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 325,
+              "end_line": 313,
               "increment": 1,
               "kind": "for-loop",
-              "line": 320,
+              "line": 308,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 323,
+              "end_line": 311,
               "increment": 2,
               "kind": "if-branch",
-              "line": 321,
+              "line": 309,
               "nesting_depth": 1
             }
           ],
@@ -6142,9 +6141,9 @@ expression: pretty
             "qualified_name": "count_cognitive_match",
             "span": {
               "end_column": 1,
-              "end_line": 327,
+              "end_line": 315,
               "start_column": 1,
-              "start_line": 305
+              "start_line": 293
             }
           }
         },
@@ -6158,18 +6157,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 588,
+              "end_line": 576,
               "increment": 1,
               "kind": "match",
-              "line": 564,
+              "line": 552,
               "nesting_depth": 0
             },
             {
               "column": 13,
-              "end_line": 580,
+              "end_line": 568,
               "increment": 2,
               "kind": "if-branch",
-              "line": 578,
+              "line": 566,
               "nesting_depth": 1
             }
           ],
@@ -6183,9 +6182,9 @@ expression: pretty
             "qualified_name": "count_cognitive_else",
             "span": {
               "end_column": 1,
-              "end_line": 589,
+              "end_line": 577,
               "start_column": 1,
-              "start_line": 559
+              "start_line": 547
             }
           }
         },
@@ -6199,18 +6198,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 782,
+              "end_line": 770,
               "increment": 1,
               "kind": "if-branch",
-              "line": 773,
+              "line": 761,
               "nesting_depth": 0
             },
             {
               "column": 13,
-              "end_line": 781,
+              "end_line": 769,
               "increment": 2,
               "kind": "match",
-              "line": 774,
+              "line": 762,
               "nesting_depth": 1
             }
           ],
@@ -6224,9 +6223,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_if",
             "span": {
               "end_column": 5,
-              "end_line": 783,
+              "end_line": 771,
               "start_column": 5,
-              "start_line": 764
+              "start_line": 752
             }
           }
         },
@@ -6289,18 +6288,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 210,
+              "end_line": 198,
               "increment": 1,
               "kind": "if-branch",
-              "line": 206,
+              "line": 194,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 207,
+              "end_line": 195,
               "increment": 1,
               "kind": "logical-operator",
-              "line": 207,
+              "line": 195,
               "nesting_depth": 0
             }
           ],
@@ -6314,9 +6313,9 @@ expression: pretty
             "qualified_name": "extract_type_name",
             "span": {
               "end_column": 1,
-              "end_line": 213,
+              "end_line": 201,
               "start_column": 1,
-              "start_line": 204
+              "start_line": 192
             }
           }
         },
@@ -6330,18 +6329,18 @@ expression: pretty
           "contributors": [
             {
               "column": 38,
-              "end_line": 750,
+              "end_line": 738,
               "increment": 1,
               "kind": "let-else",
-              "line": 748,
+              "line": 736,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 761,
+              "end_line": 749,
               "increment": 1,
               "kind": "if-branch",
-              "line": 753,
+              "line": 741,
               "nesting_depth": 0
             }
           ],
@@ -6355,9 +6354,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_local",
             "span": {
               "end_column": 5,
-              "end_line": 762,
+              "end_line": 750,
               "start_column": 5,
-              "start_line": 747
+              "start_line": 735
             }
           }
         },
@@ -6371,18 +6370,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 793,
+              "end_line": 781,
               "increment": 1,
               "kind": "for-loop",
-              "line": 786,
+              "line": 774,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 798,
+              "end_line": 786,
               "increment": 1,
               "kind": "for-loop",
-              "line": 796,
+              "line": 784,
               "nesting_depth": 0
             }
           ],
@@ -6396,9 +6395,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_match",
             "span": {
               "end_column": 5,
-              "end_line": 799,
+              "end_line": 787,
               "start_column": 5,
-              "start_line": 785
+              "start_line": 773
             }
           }
         },
@@ -6412,18 +6411,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1374,
+              "end_line": 1362,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1368,
+              "line": 1356,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 1381,
+              "end_line": 1369,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1375,
+              "line": 1363,
               "nesting_depth": 0
             }
           ],
@@ -6437,9 +6436,9 @@ expression: pretty
             "qualified_name": "trait_default_and_concrete_override_have_disjoint_spans",
             "span": {
               "end_column": 5,
-              "end_line": 1382,
+              "end_line": 1370,
               "start_column": 5,
-              "start_line": 1341
+              "start_line": 1329
             }
           }
         },
@@ -6683,10 +6682,10 @@ expression: pretty
           "contributors": [
             {
               "column": 25,
-              "end_line": 94,
+              "end_line": 90,
               "increment": 1,
               "kind": "match",
-              "line": 91,
+              "line": 87,
               "nesting_depth": 0
             }
           ],
@@ -6700,9 +6699,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_impl_item_fn",
             "span": {
               "end_column": 5,
-              "end_line": 112,
+              "end_line": 104,
               "start_column": 5,
-              "start_line": 89
+              "start_line": 85
             }
           }
         },
@@ -6716,10 +6715,10 @@ expression: pretty
           "contributors": [
             {
               "column": 15,
-              "end_line": 225,
+              "end_line": 213,
               "increment": 1,
               "kind": "match",
-              "line": 222,
+              "line": 210,
               "nesting_depth": 0
             }
           ],
@@ -6733,9 +6732,9 @@ expression: pretty
             "qualified_name": "count_complexity",
             "span": {
               "end_column": 1,
-              "end_line": 228,
+              "end_line": 216,
               "start_column": 1,
-              "start_line": 217
+              "start_line": 205
             }
           }
         },
@@ -6749,10 +6748,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 302,
+              "end_line": 290,
               "increment": 1,
               "kind": "match",
-              "line": 280,
+              "line": 268,
               "nesting_depth": 0
             }
           ],
@@ -6766,9 +6765,9 @@ expression: pretty
             "qualified_name": "count_cognitive_expr",
             "span": {
               "end_column": 1,
-              "end_line": 303,
+              "end_line": 291,
               "start_column": 1,
-              "start_line": 275
+              "start_line": 263
             }
           }
         },
@@ -6782,10 +6781,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 455,
+              "end_line": 443,
               "increment": 1,
               "kind": "match",
-              "line": 452,
+              "line": 440,
               "nesting_depth": 0
             }
           ],
@@ -6799,9 +6798,42 @@ expression: pretty
             "qualified_name": "count_cognitive_return",
             "span": {
               "end_column": 1,
-              "end_line": 456,
+              "end_line": 444,
               "start_column": 1,
-              "start_line": 447
+              "start_line": 435
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 464,
+              "increment": 1,
+              "kind": "for-loop",
+              "line": 462,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "acceptable",
+            "value": 6.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "count_cognitive_call",
+            "span": {
+              "end_column": 1,
+              "end_line": 466,
+              "start_column": 1,
+              "start_line": 456
             }
           }
         },
@@ -6829,7 +6861,7 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "count_cognitive_call",
+            "qualified_name": "count_cognitive_method_call",
             "span": {
               "end_column": 1,
               "end_line": 478,
@@ -6862,7 +6894,7 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "count_cognitive_method_call",
+            "qualified_name": "count_cognitive_tuple",
             "span": {
               "end_column": 1,
               "end_line": 490,
@@ -6881,43 +6913,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 500,
-              "increment": 1,
-              "kind": "for-loop",
-              "line": 498,
-              "nesting_depth": 0
-            }
-          ],
-          "coverage_percent": 0.0,
-          "crap": {
-            "risk_level": "acceptable",
-            "value": 6.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "count_cognitive_tuple",
-            "span": {
-              "end_column": 1,
-              "end_line": 502,
-              "start_column": 1,
-              "start_line": 492
-            }
-          }
-        },
-        "threshold": 25.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 2,
-          "complexity_metric": "cognitive",
-          "contributors": [
-            {
-              "column": 5,
-              "end_line": 646,
+              "end_line": 634,
               "increment": 1,
               "kind": "match",
-              "line": 640,
+              "line": 628,
               "nesting_depth": 0
             }
           ],
@@ -6931,9 +6930,9 @@ expression: pretty
             "qualified_name": "count_cognitive_binary_operands",
             "span": {
               "end_column": 1,
-              "end_line": 647,
+              "end_line": 635,
               "start_column": 1,
-              "start_line": 631
+              "start_line": 619
             }
           }
         },
@@ -6947,10 +6946,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 661,
+              "end_line": 649,
               "increment": 1,
               "kind": "match",
-              "line": 657,
+              "line": 645,
               "nesting_depth": 0
             }
           ],
@@ -6964,9 +6963,9 @@ expression: pretty
             "qualified_name": "classify_binop",
             "span": {
               "end_column": 1,
-              "end_line": 662,
+              "end_line": 650,
               "start_column": 1,
-              "start_line": 656
+              "start_line": 644
             }
           }
         },
@@ -6980,10 +6979,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 672,
+              "end_line": 660,
               "increment": 1,
               "kind": "match",
-              "line": 665,
+              "line": 653,
               "nesting_depth": 0
             }
           ],
@@ -6997,9 +6996,9 @@ expression: pretty
             "qualified_name": "binop_span",
             "span": {
               "end_column": 1,
-              "end_line": 673,
+              "end_line": 661,
               "start_column": 1,
-              "start_line": 664
+              "start_line": 652
             }
           }
         },
@@ -7013,10 +7012,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 690,
+              "end_line": 678,
               "increment": 1,
               "kind": "if-branch",
-              "line": 686,
+              "line": 674,
               "nesting_depth": 0
             }
           ],
@@ -7030,9 +7029,9 @@ expression: pretty
             "qualified_name": "flatten_binary_ops_inner",
             "span": {
               "end_column": 1,
-              "end_line": 691,
+              "end_line": 679,
               "start_column": 1,
-              "start_line": 685
+              "start_line": 673
             }
           }
         },
@@ -7046,10 +7045,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 744,
+              "end_line": 732,
               "increment": 1,
               "kind": "match",
-              "line": 740,
+              "line": 728,
               "nesting_depth": 0
             }
           ],
@@ -7063,9 +7062,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_stmt",
             "span": {
               "end_column": 5,
-              "end_line": 745,
+              "end_line": 733,
               "start_column": 5,
-              "start_line": 739
+              "start_line": 727
             }
           }
         },
@@ -7079,10 +7078,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 804,
+              "end_line": 792,
               "increment": 1,
               "kind": "if-branch",
-              "line": 802,
+              "line": 790,
               "nesting_depth": 0
             }
           ],
@@ -7096,9 +7095,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_arm",
             "span": {
               "end_column": 5,
-              "end_line": 806,
+              "end_line": 794,
               "start_column": 5,
-              "start_line": 801
+              "start_line": 789
             }
           }
         },
@@ -7112,10 +7111,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 844,
+              "end_line": 832,
               "increment": 1,
               "kind": "if-branch",
-              "line": 841,
+              "line": 829,
               "nesting_depth": 0
             }
           ],
@@ -7129,9 +7128,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_binary",
             "span": {
               "end_column": 5,
-              "end_line": 847,
+              "end_line": 835,
               "start_column": 5,
-              "start_line": 840
+              "start_line": 828
             }
           }
         },
@@ -7145,10 +7144,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 868,
+              "end_line": 856,
               "increment": 1,
               "kind": "if-branch",
-              "line": 866,
+              "line": 854,
               "nesting_depth": 0
             }
           ],
@@ -7162,9 +7161,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_break",
             "span": {
               "end_column": 5,
-              "end_line": 869,
+              "end_line": 857,
               "start_column": 5,
-              "start_line": 859
+              "start_line": 847
             }
           }
         },
@@ -7178,10 +7177,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1410,
+              "end_line": 1398,
               "increment": 1,
               "kind": "match",
-              "line": 1407,
+              "line": 1395,
               "nesting_depth": 0
             }
           ],
@@ -7195,9 +7194,9 @@ expression: pretty
             "qualified_name": "invalid_source_returns_error",
             "span": {
               "end_column": 5,
-              "end_line": 1411,
+              "end_line": 1399,
               "start_column": 5,
-              "start_line": 1403
+              "start_line": 1391
             }
           }
         },
@@ -7211,10 +7210,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1440,
+              "end_line": 1428,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1432,
+              "line": 1420,
               "nesting_depth": 0
             }
           ],
@@ -7228,9 +7227,9 @@ expression: pretty
             "qualified_name": "base_fn_empty_contributors",
             "span": {
               "end_column": 5,
-              "end_line": 1441,
+              "end_line": 1429,
               "start_column": 5,
-              "start_line": 1430
+              "start_line": 1418
             }
           }
         },
@@ -7244,10 +7243,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1486,
+              "end_line": 1474,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1484,
+              "line": 1472,
               "nesting_depth": 0
             }
           ],
@@ -7261,9 +7260,9 @@ expression: pretty
             "qualified_name": "match_arm_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1487,
+              "end_line": 1475,
               "start_column": 5,
-              "start_line": 1473
+              "start_line": 1461
             }
           }
         },
@@ -7277,10 +7276,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1803,
+              "end_line": 1791,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1794,
+              "line": 1782,
               "nesting_depth": 0
             }
           ],
@@ -7294,9 +7293,9 @@ expression: pretty
             "qualified_name": "contributors_sorted_by_line",
             "span": {
               "end_column": 5,
-              "end_line": 1804,
+              "end_line": 1792,
               "start_column": 5,
-              "start_line": 1785
+              "start_line": 1773
             }
           }
         },
@@ -7639,7 +7638,7 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_item_fn",
             "span": {
               "end_column": 5,
-              "end_line": 80,
+              "end_line": 76,
               "start_column": 5,
               "start_line": 58
             }
@@ -7663,9 +7662,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_item_impl",
             "span": {
               "end_column": 5,
-              "end_line": 87,
+              "end_line": 83,
               "start_column": 5,
-              "start_line": 82
+              "start_line": 78
             }
           }
         },
@@ -7687,9 +7686,9 @@ expression: pretty
             "qualified_name": "FunctionFinder::visit_item_trait",
             "span": {
               "end_column": 5,
-              "end_line": 147,
+              "end_line": 135,
               "start_column": 5,
-              "start_line": 142
+              "start_line": 130
             }
           }
         },
@@ -7711,9 +7710,9 @@ expression: pretty
             "qualified_name": "add_contributor",
             "span": {
               "end_column": 1,
-              "end_line": 171,
+              "end_line": 159,
               "start_column": 1,
-              "start_line": 152
+              "start_line": 140
             }
           }
         },
@@ -7735,9 +7734,9 @@ expression: pretty
             "qualified_name": "end_line_of",
             "span": {
               "end_column": 1,
-              "end_line": 179,
+              "end_line": 167,
               "start_column": 1,
-              "start_line": 173
+              "start_line": 161
             }
           }
         },
@@ -7759,9 +7758,9 @@ expression: pretty
             "qualified_name": "span_of",
             "span": {
               "end_column": 1,
-              "end_line": 202,
+              "end_line": 190,
               "start_column": 1,
-              "start_line": 181
+              "start_line": 169
             }
           }
         },
@@ -7783,9 +7782,9 @@ expression: pretty
             "qualified_name": "count_cognitive_block",
             "span": {
               "end_column": 1,
-              "end_line": 242,
+              "end_line": 230,
               "start_column": 1,
-              "start_line": 232
+              "start_line": 220
             }
           }
         },
@@ -7807,9 +7806,9 @@ expression: pretty
             "qualified_name": "count_cognitive_while",
             "span": {
               "end_column": 1,
-              "end_line": 346,
+              "end_line": 334,
               "start_column": 1,
-              "start_line": 329
+              "start_line": 317
             }
           }
         },
@@ -7831,9 +7830,9 @@ expression: pretty
             "qualified_name": "count_cognitive_for_loop",
             "span": {
               "end_column": 1,
-              "end_line": 365,
+              "end_line": 353,
               "start_column": 1,
-              "start_line": 348
+              "start_line": 336
             }
           }
         },
@@ -7855,9 +7854,9 @@ expression: pretty
             "qualified_name": "count_cognitive_loop",
             "span": {
               "end_column": 1,
-              "end_line": 383,
+              "end_line": 371,
               "start_column": 1,
-              "start_line": 367
+              "start_line": 355
             }
           }
         },
@@ -7879,9 +7878,9 @@ expression: pretty
             "qualified_name": "count_cognitive_binary",
             "span": {
               "end_column": 1,
-              "end_line": 397,
+              "end_line": 385,
               "start_column": 1,
-              "start_line": 389
+              "start_line": 377
             }
           }
         },
@@ -7903,9 +7902,9 @@ expression: pretty
             "qualified_name": "count_cognitive_try",
             "span": {
               "end_column": 1,
-              "end_line": 413,
+              "end_line": 401,
               "start_column": 1,
-              "start_line": 399
+              "start_line": 387
             }
           }
         },
@@ -7927,9 +7926,9 @@ expression: pretty
             "qualified_name": "count_cognitive_break",
             "span": {
               "end_column": 1,
-              "end_line": 429,
+              "end_line": 417,
               "start_column": 1,
-              "start_line": 415
+              "start_line": 403
             }
           }
         },
@@ -7951,9 +7950,9 @@ expression: pretty
             "qualified_name": "count_cognitive_continue",
             "span": {
               "end_column": 1,
-              "end_line": 445,
+              "end_line": 433,
               "start_column": 1,
-              "start_line": 431
+              "start_line": 419
             }
           }
         },
@@ -7975,9 +7974,9 @@ expression: pretty
             "qualified_name": "count_cognitive_closure",
             "span": {
               "end_column": 1,
-              "end_line": 466,
+              "end_line": 454,
               "start_column": 1,
-              "start_line": 460
+              "start_line": 448
             }
           }
         },
@@ -7999,9 +7998,9 @@ expression: pretty
             "qualified_name": "flatten_binary_ops",
             "span": {
               "end_column": 1,
-              "end_line": 683,
+              "end_line": 671,
               "start_column": 1,
-              "start_line": 675
+              "start_line": 663
             }
           }
         },
@@ -8023,9 +8022,9 @@ expression: pretty
             "qualified_name": "count_cyclomatic_block",
             "span": {
               "end_column": 1,
-              "end_line": 700,
+              "end_line": 688,
               "start_column": 1,
-              "start_line": 695
+              "start_line": 683
             }
           }
         },
@@ -8047,9 +8046,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::count_block",
             "span": {
               "end_column": 5,
-              "end_line": 717,
+              "end_line": 705,
               "start_column": 5,
-              "start_line": 709
+              "start_line": 697
             }
           }
         },
@@ -8071,9 +8070,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::bump",
             "span": {
               "end_column": 5,
-              "end_line": 729,
+              "end_line": 717,
               "start_column": 5,
-              "start_line": 719
+              "start_line": 707
             }
           }
         },
@@ -8095,9 +8094,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::with_nesting",
             "span": {
               "end_column": 5,
-              "end_line": 735,
+              "end_line": 723,
               "start_column": 5,
-              "start_line": 731
+              "start_line": 719
             }
           }
         },
@@ -8119,9 +8118,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_while",
             "span": {
               "end_column": 5,
-              "end_line": 817,
+              "end_line": 805,
               "start_column": 5,
-              "start_line": 808
+              "start_line": 796
             }
           }
         },
@@ -8143,9 +8142,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_for_loop",
             "span": {
               "end_column": 5,
-              "end_line": 828,
+              "end_line": 816,
               "start_column": 5,
-              "start_line": 819
+              "start_line": 807
             }
           }
         },
@@ -8167,9 +8166,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_loop",
             "span": {
               "end_column": 5,
-              "end_line": 838,
+              "end_line": 826,
               "start_column": 5,
-              "start_line": 830
+              "start_line": 818
             }
           }
         },
@@ -8191,9 +8190,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_try",
             "span": {
               "end_column": 5,
-              "end_line": 857,
+              "end_line": 845,
               "start_column": 5,
-              "start_line": 849
+              "start_line": 837
             }
           }
         },
@@ -8215,9 +8214,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_continue",
             "span": {
               "end_column": 5,
-              "end_line": 878,
+              "end_line": 866,
               "start_column": 5,
-              "start_line": 871
+              "start_line": 859
             }
           }
         },
@@ -8239,9 +8238,9 @@ expression: pretty
             "qualified_name": "CyclomaticCounter::visit_expr_closure",
             "span": {
               "end_column": 5,
-              "end_line": 885,
+              "end_line": 873,
               "start_column": 5,
-              "start_line": 880
+              "start_line": 868
             }
           }
         },
@@ -8263,9 +8262,9 @@ expression: pretty
             "qualified_name": "adapter",
             "span": {
               "end_column": 5,
-              "end_line": 896,
+              "end_line": 884,
               "start_column": 5,
-              "start_line": 894
+              "start_line": 882
             }
           }
         },
@@ -8287,9 +8286,9 @@ expression: pretty
             "qualified_name": "load_fixture",
             "span": {
               "end_column": 5,
-              "end_line": 902,
+              "end_line": 890,
               "start_column": 5,
-              "start_line": 898
+              "start_line": 886
             }
           }
         },
@@ -8311,9 +8310,9 @@ expression: pretty
             "qualified_name": "extract_fixture",
             "span": {
               "end_column": 5,
-              "end_line": 909,
+              "end_line": 897,
               "start_column": 5,
-              "start_line": 904
+              "start_line": 892
             }
           }
         },
@@ -8335,9 +8334,9 @@ expression: pretty
             "qualified_name": "find_fn",
             "span": {
               "end_column": 5,
-              "end_line": 922,
+              "end_line": 910,
               "start_column": 5,
-              "start_line": 911
+              "start_line": 899
             }
           }
         },
@@ -8359,9 +8358,9 @@ expression: pretty
             "qualified_name": "baseline_complexity_is_one_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 938,
+              "end_line": 926,
               "start_column": 5,
-              "start_line": 933
+              "start_line": 921
             }
           }
         },
@@ -8383,9 +8382,9 @@ expression: pretty
             "qualified_name": "baseline_complexity_is_one_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 945,
+              "end_line": 933,
               "start_column": 5,
-              "start_line": 940
+              "start_line": 928
             }
           }
         },
@@ -8407,9 +8406,9 @@ expression: pretty
             "qualified_name": "top_level_fn_identity",
             "span": {
               "end_column": 5,
-              "end_line": 956,
+              "end_line": 944,
               "start_column": 5,
-              "start_line": 949
+              "start_line": 937
             }
           }
         },
@@ -8431,9 +8430,9 @@ expression: pretty
             "qualified_name": "impl_method_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 964,
+              "end_line": 952,
               "start_column": 5,
-              "start_line": 958
+              "start_line": 946
             }
           }
         },
@@ -8455,9 +8454,9 @@ expression: pretty
             "qualified_name": "span_accuracy",
             "span": {
               "end_column": 5,
-              "end_line": 987,
+              "end_line": 975,
               "start_column": 5,
-              "start_line": 966
+              "start_line": 954
             }
           }
         },
@@ -8479,9 +8478,9 @@ expression: pretty
             "qualified_name": "span_carries_one_based_columns",
             "span": {
               "end_column": 5,
-              "end_line": 1008,
+              "end_line": 996,
               "start_column": 5,
-              "start_line": 989
+              "start_line": 977
             }
           }
         },
@@ -8503,9 +8502,9 @@ expression: pretty
             "qualified_name": "columns_are_exact_one_based_offsets_unindented",
             "span": {
               "end_column": 5,
-              "end_line": 1038,
+              "end_line": 1026,
               "start_column": 5,
-              "start_line": 1010
+              "start_line": 998
             }
           }
         },
@@ -8527,9 +8526,9 @@ expression: pretty
             "qualified_name": "columns_are_exact_one_based_offsets_indented",
             "span": {
               "end_column": 5,
-              "end_line": 1063,
+              "end_line": 1051,
               "start_column": 5,
-              "start_line": 1040
+              "start_line": 1028
             }
           }
         },
@@ -8551,9 +8550,9 @@ expression: pretty
             "qualified_name": "multiple_fns_returns_all",
             "span": {
               "end_column": 5,
-              "end_line": 1069,
+              "end_line": 1057,
               "start_column": 5,
-              "start_line": 1065
+              "start_line": 1053
             }
           }
         },
@@ -8575,9 +8574,9 @@ expression: pretty
             "qualified_name": "async_fn_detected",
             "span": {
               "end_column": 5,
-              "end_line": 1077,
+              "end_line": 1065,
               "start_column": 5,
-              "start_line": 1071
+              "start_line": 1059
             }
           }
         },
@@ -8599,9 +8598,9 @@ expression: pretty
             "qualified_name": "if_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1087,
+              "end_line": 1075,
               "start_column": 5,
-              "start_line": 1081
+              "start_line": 1069
             }
           }
         },
@@ -8623,9 +8622,9 @@ expression: pretty
             "qualified_name": "nested_if_cognitive_penalty",
             "span": {
               "end_column": 5,
-              "end_line": 1095,
+              "end_line": 1083,
               "start_column": 5,
-              "start_line": 1089
+              "start_line": 1077
             }
           }
         },
@@ -8647,9 +8646,9 @@ expression: pretty
             "qualified_name": "else_is_not_counted_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1104,
+              "end_line": 1092,
               "start_column": 5,
-              "start_line": 1097
+              "start_line": 1085
             }
           }
         },
@@ -8671,9 +8670,9 @@ expression: pretty
             "qualified_name": "match_flat_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1112,
+              "end_line": 1100,
               "start_column": 5,
-              "start_line": 1106
+              "start_line": 1094
             }
           }
         },
@@ -8695,9 +8694,9 @@ expression: pretty
             "qualified_name": "if_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1122,
+              "end_line": 1110,
               "start_column": 5,
-              "start_line": 1116
+              "start_line": 1104
             }
           }
         },
@@ -8719,9 +8718,9 @@ expression: pretty
             "qualified_name": "nested_if_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1130,
+              "end_line": 1118,
               "start_column": 5,
-              "start_line": 1124
+              "start_line": 1112
             }
           }
         },
@@ -8743,9 +8742,9 @@ expression: pretty
             "qualified_name": "match_arms_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1138,
+              "end_line": 1126,
               "start_column": 5,
-              "start_line": 1132
+              "start_line": 1120
             }
           }
         },
@@ -8767,9 +8766,9 @@ expression: pretty
             "qualified_name": "cognitive_gte_cyclomatic_for_nested",
             "span": {
               "end_column": 5,
-              "end_line": 1151,
+              "end_line": 1139,
               "start_column": 5,
-              "start_line": 1140
+              "start_line": 1128
             }
           }
         },
@@ -8791,9 +8790,9 @@ expression: pretty
             "qualified_name": "bool_same_sequence_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1161,
+              "end_line": 1149,
               "start_column": 5,
-              "start_line": 1155
+              "start_line": 1143
             }
           }
         },
@@ -8815,9 +8814,9 @@ expression: pretty
             "qualified_name": "bool_same_sequence_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1169,
+              "end_line": 1157,
               "start_column": 5,
-              "start_line": 1163
+              "start_line": 1151
             }
           }
         },
@@ -8839,9 +8838,9 @@ expression: pretty
             "qualified_name": "bool_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1177,
+              "end_line": 1165,
               "start_column": 5,
-              "start_line": 1171
+              "start_line": 1159
             }
           }
         },
@@ -8863,9 +8862,9 @@ expression: pretty
             "qualified_name": "bool_operator_switch_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1185,
+              "end_line": 1173,
               "start_column": 5,
-              "start_line": 1179
+              "start_line": 1167
             }
           }
         },
@@ -8887,9 +8886,9 @@ expression: pretty
             "qualified_name": "bool_in_condition_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1193,
+              "end_line": 1181,
               "start_column": 5,
-              "start_line": 1187
+              "start_line": 1175
             }
           }
         },
@@ -8911,9 +8910,9 @@ expression: pretty
             "qualified_name": "long_or_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1201,
+              "end_line": 1189,
               "start_column": 5,
-              "start_line": 1195
+              "start_line": 1183
             }
           }
         },
@@ -8935,9 +8934,9 @@ expression: pretty
             "qualified_name": "alternating_operators_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1209,
+              "end_line": 1197,
               "start_column": 5,
-              "start_line": 1203
+              "start_line": 1191
             }
           }
         },
@@ -8959,9 +8958,9 @@ expression: pretty
             "qualified_name": "closure_in_parent_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1222,
+              "end_line": 1210,
               "start_column": 5,
-              "start_line": 1213
+              "start_line": 1201
             }
           }
         },
@@ -8983,9 +8982,9 @@ expression: pretty
             "qualified_name": "try_operator_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1232,
+              "end_line": 1220,
               "start_column": 5,
-              "start_line": 1226
+              "start_line": 1214
             }
           }
         },
@@ -9007,9 +9006,9 @@ expression: pretty
             "qualified_name": "try_operator_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1240,
+              "end_line": 1228,
               "start_column": 5,
-              "start_line": 1234
+              "start_line": 1222
             }
           }
         },
@@ -9031,9 +9030,9 @@ expression: pretty
             "qualified_name": "loop_with_break_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1250,
+              "end_line": 1238,
               "start_column": 5,
-              "start_line": 1244
+              "start_line": 1232
             }
           }
         },
@@ -9055,9 +9054,9 @@ expression: pretty
             "qualified_name": "loop_with_break_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1258,
+              "end_line": 1246,
               "start_column": 5,
-              "start_line": 1252
+              "start_line": 1240
             }
           }
         },
@@ -9079,9 +9078,9 @@ expression: pretty
             "qualified_name": "let_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1268,
+              "end_line": 1256,
               "start_column": 5,
-              "start_line": 1262
+              "start_line": 1250
             }
           }
         },
@@ -9103,9 +9102,9 @@ expression: pretty
             "qualified_name": "let_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1276,
+              "end_line": 1264,
               "start_column": 5,
-              "start_line": 1270
+              "start_line": 1258
             }
           }
         },
@@ -9127,9 +9126,9 @@ expression: pretty
             "qualified_name": "chained_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1286,
+              "end_line": 1274,
               "start_column": 5,
-              "start_line": 1280
+              "start_line": 1268
             }
           }
         },
@@ -9151,9 +9150,9 @@ expression: pretty
             "qualified_name": "chained_try_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1294,
+              "end_line": 1282,
               "start_column": 5,
-              "start_line": 1288
+              "start_line": 1276
             }
           }
         },
@@ -9175,9 +9174,9 @@ expression: pretty
             "qualified_name": "for_iterator_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1302,
+              "end_line": 1290,
               "start_column": 5,
-              "start_line": 1296
+              "start_line": 1284
             }
           }
         },
@@ -9199,9 +9198,9 @@ expression: pretty
             "qualified_name": "for_iterator_try_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1310,
+              "end_line": 1298,
               "start_column": 5,
-              "start_line": 1304
+              "start_line": 1292
             }
           }
         },
@@ -9223,9 +9222,9 @@ expression: pretty
             "qualified_name": "match_scrutinee_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1318,
+              "end_line": 1306,
               "start_column": 5,
-              "start_line": 1312
+              "start_line": 1300
             }
           }
         },
@@ -9247,9 +9246,9 @@ expression: pretty
             "qualified_name": "trait_default_method_found",
             "span": {
               "end_column": 5,
-              "end_line": 1328,
+              "end_line": 1316,
               "start_column": 5,
-              "start_line": 1322
+              "start_line": 1310
             }
           }
         },
@@ -9271,9 +9270,9 @@ expression: pretty
             "qualified_name": "trait_method_without_default_not_found",
             "span": {
               "end_column": 5,
-              "end_line": 1339,
+              "end_line": 1327,
               "start_column": 5,
-              "start_line": 1330
+              "start_line": 1318
             }
           }
         },
@@ -9295,9 +9294,9 @@ expression: pretty
             "qualified_name": "impl_method_no_branch",
             "span": {
               "end_column": 5,
-              "end_line": 1391,
+              "end_line": 1379,
               "start_column": 5,
-              "start_line": 1386
+              "start_line": 1374
             }
           }
         },
@@ -9319,9 +9318,9 @@ expression: pretty
             "qualified_name": "impl_method_with_branch",
             "span": {
               "end_column": 5,
-              "end_line": 1399,
+              "end_line": 1387,
               "start_column": 5,
-              "start_line": 1393
+              "start_line": 1381
             }
           }
         },
@@ -9343,9 +9342,9 @@ expression: pretty
             "qualified_name": "contributors_for",
             "span": {
               "end_column": 5,
-              "end_line": 1428,
+              "end_line": 1416,
               "start_column": 5,
-              "start_line": 1421
+              "start_line": 1409
             }
           }
         },
@@ -9367,9 +9366,9 @@ expression: pretty
             "qualified_name": "if_branch_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1450,
+              "end_line": 1438,
               "start_column": 5,
-              "start_line": 1443
+              "start_line": 1431
             }
           }
         },
@@ -9391,9 +9390,9 @@ expression: pretty
             "qualified_name": "nested_if_nesting_increment",
             "span": {
               "end_column": 5,
-              "end_line": 1462,
+              "end_line": 1450,
               "start_column": 5,
-              "start_line": 1452
+              "start_line": 1440
             }
           }
         },
@@ -9415,9 +9414,9 @@ expression: pretty
             "qualified_name": "match_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1471,
+              "end_line": 1459,
               "start_column": 5,
-              "start_line": 1464
+              "start_line": 1452
             }
           }
         },
@@ -9439,9 +9438,9 @@ expression: pretty
             "qualified_name": "try_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1495,
+              "end_line": 1483,
               "start_column": 5,
-              "start_line": 1489
+              "start_line": 1477
             }
           }
         },
@@ -9463,9 +9462,9 @@ expression: pretty
             "qualified_name": "try_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1503,
+              "end_line": 1491,
               "start_column": 5,
-              "start_line": 1497
+              "start_line": 1485
             }
           }
         },
@@ -9487,9 +9486,9 @@ expression: pretty
             "qualified_name": "let_else_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1511,
+              "end_line": 1499,
               "start_column": 5,
-              "start_line": 1505
+              "start_line": 1493
             }
           }
         },
@@ -9511,9 +9510,9 @@ expression: pretty
             "qualified_name": "let_else_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1519,
+              "end_line": 1507,
               "start_column": 5,
-              "start_line": 1513
+              "start_line": 1501
             }
           }
         },
@@ -9535,9 +9534,9 @@ expression: pretty
             "qualified_name": "loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1527,
+              "end_line": 1515,
               "start_column": 5,
-              "start_line": 1521
+              "start_line": 1509
             }
           }
         },
@@ -9559,9 +9558,9 @@ expression: pretty
             "qualified_name": "for_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1535,
+              "end_line": 1523,
               "start_column": 5,
-              "start_line": 1529
+              "start_line": 1517
             }
           }
         },
@@ -9583,9 +9582,9 @@ expression: pretty
             "qualified_name": "for_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1543,
+              "end_line": 1531,
               "start_column": 5,
-              "start_line": 1537
+              "start_line": 1525
             }
           }
         },
@@ -9607,9 +9606,9 @@ expression: pretty
             "qualified_name": "while_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1551,
+              "end_line": 1539,
               "start_column": 5,
-              "start_line": 1545
+              "start_line": 1533
             }
           }
         },
@@ -9631,9 +9630,9 @@ expression: pretty
             "qualified_name": "while_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1559,
+              "end_line": 1547,
               "start_column": 5,
-              "start_line": 1553
+              "start_line": 1541
             }
           }
         },
@@ -9655,9 +9654,9 @@ expression: pretty
             "qualified_name": "logical_operator_same_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1575,
+              "end_line": 1563,
               "start_column": 5,
-              "start_line": 1561
+              "start_line": 1549
             }
           }
         },
@@ -9679,9 +9678,9 @@ expression: pretty
             "qualified_name": "logical_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1590,
+              "end_line": 1578,
               "start_column": 5,
-              "start_line": 1577
+              "start_line": 1565
             }
           }
         },
@@ -9703,9 +9702,9 @@ expression: pretty
             "qualified_name": "break_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1603,
+              "end_line": 1591,
               "start_column": 5,
-              "start_line": 1592
+              "start_line": 1580
             }
           }
         },
@@ -9727,9 +9726,9 @@ expression: pretty
             "qualified_name": "continue_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1616,
+              "end_line": 1604,
               "start_column": 5,
-              "start_line": 1605
+              "start_line": 1593
             }
           }
         },
@@ -9751,9 +9750,9 @@ expression: pretty
             "qualified_name": "unsafe_block_produces_no_unsafe_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1644,
+              "end_line": 1632,
               "start_column": 5,
-              "start_line": 1618
+              "start_line": 1606
             }
           }
         },
@@ -9775,9 +9774,9 @@ expression: pretty
             "qualified_name": "closure_no_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1656,
+              "end_line": 1644,
               "start_column": 5,
-              "start_line": 1646
+              "start_line": 1634
             }
           }
         },
@@ -9799,9 +9798,9 @@ expression: pretty
             "qualified_name": "nested_if_records_construct_end_line_and_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1689,
+              "end_line": 1677,
               "start_column": 5,
-              "start_line": 1660
+              "start_line": 1648
             }
           }
         },
@@ -9823,9 +9822,9 @@ expression: pretty
             "qualified_name": "try_records_token_span_for_atomic_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1703,
+              "end_line": 1691,
               "start_column": 5,
-              "start_line": 1691
+              "start_line": 1679
             }
           }
         },
@@ -9847,9 +9846,9 @@ expression: pretty
             "qualified_name": "for_with_continue_threads_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1725,
+              "end_line": 1713,
               "start_column": 5,
-              "start_line": 1705
+              "start_line": 1693
             }
           }
         },
@@ -9871,9 +9870,9 @@ expression: pretty
             "qualified_name": "nested_if_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1744,
+              "end_line": 1732,
               "start_column": 5,
-              "start_line": 1727
+              "start_line": 1715
             }
           }
         },
@@ -9895,9 +9894,9 @@ expression: pretty
             "qualified_name": "for_with_continue_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1764,
+              "end_line": 1752,
               "start_column": 5,
-              "start_line": 1746
+              "start_line": 1734
             }
           }
         },
@@ -9919,9 +9918,9 @@ expression: pretty
             "qualified_name": "match_records_end_line_covering_arms_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1783,
+              "end_line": 1771,
               "start_column": 5,
-              "start_line": 1766
+              "start_line": 1754
             }
           }
         },

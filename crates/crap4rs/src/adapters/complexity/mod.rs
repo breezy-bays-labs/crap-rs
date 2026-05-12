@@ -63,11 +63,7 @@ impl<'ast> Visit<'ast> for FunctionFinder {
         contributors.sort_by_key(|c| (c.line, c.column));
 
         self.functions.push(FunctionComplexity {
-            identity: FunctionIdentity {
-                file_path: self.file_path.clone(),
-                qualified_name: name,
-                span,
-            },
+            identity: FunctionIdentity::new(self.file_path.clone(), name, span),
             complexity,
             metric: self.metric,
             contributors,
@@ -98,11 +94,7 @@ impl<'ast> Visit<'ast> for FunctionFinder {
         contributors.sort_by_key(|c| (c.line, c.column));
 
         self.functions.push(FunctionComplexity {
-            identity: FunctionIdentity {
-                file_path: self.file_path.clone(),
-                qualified_name: qualified,
-                span,
-            },
+            identity: FunctionIdentity::new(self.file_path.clone(), qualified, span),
             complexity,
             metric: self.metric,
             contributors,
@@ -125,11 +117,7 @@ impl<'ast> Visit<'ast> for FunctionFinder {
             contributors.sort_by_key(|c| (c.line, c.column));
 
             self.functions.push(FunctionComplexity {
-                identity: FunctionIdentity {
-                    file_path: self.file_path.clone(),
-                    qualified_name: qualified,
-                    span,
-                },
+                identity: FunctionIdentity::new(self.file_path.clone(), qualified, span),
                 complexity,
                 metric: self.metric,
                 contributors,
@@ -157,17 +145,17 @@ fn add_contributor(
     nesting_depth: u32,
     increment: u32,
 ) {
-    contributors.push(ComplexityContributor {
+    // syn `Span::start().column` is 0-based; `ComplexityContributor.column`
+    // is 1-based inclusive (aligned with `SourceSpan::start_column` and
+    // SARIF). +1 here is the only conversion site.
+    contributors.push(ComplexityContributor::new(
         kind,
-        line: span.start().line,
-        // syn `Span::start().column` is 0-based; `ComplexityContributor.column`
-        // is 1-based inclusive (aligned with `SourceSpan::start_column` and
-        // SARIF). +1 here is the only conversion site.
-        column: Some(span.start().column as u32 + 1),
+        span.start().line,
+        Some(span.start().column as u32 + 1),
         increment,
         end_line,
         nesting_depth,
-    });
+    ));
 }
 
 /// 1-based inclusive end line of a construct's full span. Used by the
@@ -193,12 +181,12 @@ fn span_of(item: &impl syn::spanned::Spanned) -> SourceSpan {
     // Reporters that want SARIF-style exclusive endColumn add 1 at emit
     // time; everyone else gets the intuitive inclusive bound for free.
     let sp = item.span();
-    SourceSpan {
-        start_line: sp.start().line,
-        end_line: sp.end().line,
-        start_column: sp.start().column + 1,
-        end_column: sp.end().column,
-    }
+    SourceSpan::new(
+        sp.start().line,
+        sp.end().line,
+        sp.start().column + 1,
+        sp.end().column,
+    )
 }
 
 fn extract_type_name(item_impl: &ItemImpl) -> String {
