@@ -418,6 +418,7 @@ dependencies = [
  "oxc",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

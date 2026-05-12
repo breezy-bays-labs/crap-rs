@@ -69,6 +69,11 @@ const COVERAGE_HINT: &str = "ensure tests ran with coverage enabled (`cargo llvm
 
 const EXTENSIONS: &[&str] = &["rs"];
 
+/// Common Rust-project directories `init` writes as commented-out
+/// excludes — tests, benches, examples typically run their own coverage
+/// passes and shouldn't count against the source CRAP budget.
+const DEFAULT_EXCLUDES: &[&str] = &["tests/**", "benches/**", "examples/**"];
+
 fn main() -> ExitCode {
     let meta = AdapterMeta {
         tool_name: env!("CARGO_PKG_NAME"),
@@ -82,6 +87,7 @@ fn main() -> ExitCode {
         tool_info_uri: "https://github.com/breezy-bays-labs/crap-rs",
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_name: "crap4rs.toml",
+        default_excludes: DEFAULT_EXCLUDES,
     };
     let cli = crap_core::cli::parse_args(&meta);
     let complexity = SynComplexityAdapter::new();

@@ -31,6 +31,7 @@ use crate::domain::view::{self, GroupKey, SortKey};
 use crate::ports::{ComplexityPort, CoveragePort, ParseDiagnostic};
 
 mod delta_args;
+mod init;
 mod view_args;
 
 // ── ValueEnum wrappers (keep domain types clap-free) ────────────────
@@ -262,6 +263,20 @@ pub enum Command {
     Completions {
         #[arg(value_enum)]
         shell: ShellArg,
+    },
+    /// Generate a starter config TOML in the current directory.
+    ///
+    /// Interactive by default (asks for a threshold preset);
+    /// `--non-interactive` uses defaults for CI/scripts. Refuses to
+    /// overwrite an existing config unless `--force` is passed.
+    Init {
+        /// Overwrite an existing config file in this directory.
+        #[arg(long)]
+        force: bool,
+        /// Skip the interactive prompt and use defaults (preset =
+        /// "default"). CI-friendly.
+        #[arg(long)]
+        non_interactive: bool,
     },
 }
 
@@ -659,6 +674,14 @@ pub struct AdapterMeta {
     /// to `discover_config` and surfaced in `--view <preset>`
     /// error hints so users see the right file name to create.
     pub config_file_name: &'static str,
+    /// Commented-out exclude patterns emitted by `init` into the
+    /// generated config (e.g., `&["tests/**", "benches/**", "examples/**"]`
+    /// for Rust; `&["node_modules/**", "dist/**", "coverage/**"]` for
+    /// TS). Adapter-specific because the convention for "where tests
+    /// and ignorable artifacts live" differs per ecosystem. May be
+    /// empty — init then emits the `# exclude = [ … ]` block without
+    /// per-language entries.
+    pub default_excludes: &'static [&'static str],
 }
 
 impl AdapterMeta {
@@ -853,9 +876,19 @@ where
     P: ParseDiagnostic + std::fmt::Display + 'static,
     F: FnOnce(&Path) -> Box<dyn CoveragePort<Diagnostic = P>>,
 {
-    if let Some(Command::Completions { shell }) = cli.command {
-        emit_completions(shell, &current_bin_name(meta.tool_name));
-        return Ok(true);
+    match cli.command {
+        Some(Command::Completions { shell }) => {
+            emit_completions(shell, &current_bin_name(meta.tool_name));
+            return Ok(true);
+        }
+        Some(Command::Init {
+            force,
+            non_interactive,
+        }) => {
+            init::handle_init(force, non_interactive, meta)?;
+            return Ok(true);
+        }
+        None => {}
     }
 
     let prep = prepare_pipeline(&mut cli, complexity, coverage_factory, meta)?;
@@ -2545,6 +2578,7 @@ mod tests {
             tool_info_uri: "https://example.invalid/fake-adapter",
             rule_help_uri: "https://example.invalid/fake-adapter#rules",
             config_file_name: "fake-adapter.toml",
+            default_excludes: &["fixtures/**"],
         }
     }
 

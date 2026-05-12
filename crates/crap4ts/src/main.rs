@@ -47,6 +47,11 @@ const COVERAGE_HINT: &str = "ensure tests ran with coverage enabled (e.g. `c8 --
 
 const EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 
+/// Common TS/JS-project directories `init` writes as commented-out
+/// excludes — `node_modules` for vendored deps, build/coverage output
+/// dirs.
+const DEFAULT_EXCLUDES: &[&str] = &["node_modules/**", "dist/**", "coverage/**"];
+
 fn main() -> ExitCode {
     let meta = AdapterMeta {
         tool_name: env!("CARGO_PKG_NAME"),
@@ -60,6 +65,7 @@ fn main() -> ExitCode {
         tool_info_uri: "https://github.com/breezy-bays-labs/crap-rs",
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_name: "crap4ts.toml",
+        default_excludes: DEFAULT_EXCLUDES,
     };
     let cli = crap_core::cli::parse_args(&meta);
     let complexity = OxcWalker::new();
