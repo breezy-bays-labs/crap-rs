@@ -1,7 +1,13 @@
-//! Wire-envelope shape lock for the `--format json` envelope.
+//! Wire-envelope shape lock for the crap4rs `--format json` envelope.
 //!
-//! This snapshot is the canary for the S1–S5 monorepo migration
-//! (crap4rs#132). Every PR in S2–S5 must keep this snapshot byte-
+//! This module owns the **crap4rs** half of the dual wire-envelope
+//! canary established in W1.3 (crap-rs#183). Its sibling
+//! `wire_envelope_crap4ts.rs` owns the **crap4ts** half. From W1.3
+//! onward, every W2+ PR body must declare either "no drift" or
+//! "drift documented" for BOTH snapshots.
+//!
+//! This snapshot is the original canary from the S1–S5 monorepo
+//! migration (crap4rs#132). Every PR must keep this snapshot byte-
 //! identical OR document the drift in the PR body. Drift is the
 //! deliberate breaking-change tripwire; a default-passing run means
 //! the JSON envelope is unchanged.

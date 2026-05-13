@@ -1,5 +1,5 @@
 ---
-source: crates/crap-core/tests/wire_envelope_snapshot.rs
+source: crates/crap-core/tests/wire_envelope_crap4rs.rs
 expression: pretty
 ---
 {
