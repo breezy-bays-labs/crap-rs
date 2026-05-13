@@ -1,0 +1,50 @@
+# BDD tag lexicon for crap-rs feature files.
+#
+# Every Scenario across `tests/features/*.feature` carries exactly one
+# status tag (from `[status]`). Scope tags are additive and optional.
+# See `AGENTS.md` § BDD hygiene for the full convention.
+#
+# Tags are applied at the **scenario** level, not the feature level —
+# a single feature may mix wired and unwired scenarios as the harness
+# coverage grows. `@unwired` and `@wip` scenarios must carry a
+# `# tracked: crap-rs#<n> — <reason>` comment within the scenario
+# block, mirroring `~/.claude/rules/exclusions.md`.
+#
+# This file is the source of truth for the lexicon. A future bdd-rs
+# monitor (separate crate, mokumo epic #370) will parse this file
+# to validate tag usage; for now it is documentation.
+
+[status]
+# Mutually exclusive. Every scenario MUST carry exactly one.
+
+wired = """
+Scenario has executable step definitions in a cucumber-rs harness
+under `tests/*_cucumber.rs`. Failure of a `@wired` scenario fails CI.
+This is the desired end-state for every scenario.
+"""
+
+unwired = """
+Scenario describes the spec but has no executable step definitions
+today. The scenario is parseable Gherkin and survives `cucumber-rs`
+loading, but no harness picks it up. Must carry a
+`# tracked: crap-rs#<n> — <reason>` comment pointing at the issue
+that will wire it (or that explicitly defers wiring). Never tag
+something `@unwired` without filing the tracking issue first.
+"""
+
+wip = """
+Scenario is being wired right now in the active PR. Allowed to be
+red on a feature branch but never on `main`. Must carry a
+`# tracked: crap-rs#<n>` comment naming the in-flight issue.
+Convert to `@wired` (passing) or `@unwired` (deferred) before merge.
+"""
+
+[scope]
+# Additive — a scenario may carry zero or more scope tags alongside
+# its status tag. Reserved for future selective-run patterns.
+
+smoke = """
+Minimal end-to-end coverage that should run on every commit even
+when the full BDD suite is gated. Reserved for the future bdd-rs
+monitor's "smoke" run mode; no harness uses this filter today.
+"""
