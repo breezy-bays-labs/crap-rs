@@ -19,7 +19,7 @@ Feature: TypeScript file extension discovery and parsing
 
     Examples:
       | extension | content                                                                              |
-      | .ts       | `export function greet(name: string): string { return ${'`'}hello ${name}${'`'}; }`  |
+      | .ts       | `export function greet(name: string): string { return `hello ${name}`; }`            |
       | .tsx      | `export const Greet = ({name}: {name: string}) => <span>hi {name}</span>;`           |
       | .js       | `export function greet(name) { return 'hello ' + name; }`                            |
       | .jsx      | `export const Greet = ({name}) => <span>hi {name}</span>;`                           |
