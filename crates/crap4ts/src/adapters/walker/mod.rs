@@ -887,10 +887,14 @@ fn byte_to_line(source: &str, byte: u32) -> usize {
 /// label positions). `byte_to_line` is reused for the line count so
 /// the two helpers stay self-consistent on EOF clamp behaviour.
 fn byte_to_line_col(source: &str, byte: u32) -> (usize, u32) {
-    let limit = (byte as usize).min(source.len());
+    let bytes = source.as_bytes();
+    let limit = (byte as usize).min(bytes.len());
     let line = byte_to_line(source, byte);
-    let prefix = &source[..limit];
-    let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_start = bytes[..limit]
+        .iter()
+        .rposition(|&b| b == b'\n')
+        .map(|i| i + 1)
+        .unwrap_or(0);
     let column = (limit - line_start) as u32 + 1;
     (line, column)
 }

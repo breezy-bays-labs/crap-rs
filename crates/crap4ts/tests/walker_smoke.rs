@@ -229,6 +229,25 @@ fn nested_functions_are_separate_complexity_sites() {
 
 // ── Parse failure: malformed TS bubbles up as SourceParse ───────────────
 
+// ── Panic-safety: multi-byte UTF-8 spans don't crash byte_to_line_col ──
+
+#[test]
+fn unicode_identifiers_do_not_panic_in_span_to_column_conversion() {
+    // Regression: prior to using a byte-based scan, `byte_to_line_col`
+    // sliced `&source[..limit]` where `limit = span.end - 1` could land
+    // inside a multi-byte UTF-8 character (e.g., the trailing byte of
+    // an identifier containing non-ASCII letters), panicking with
+    // "byte index N is not a char boundary".
+    let source = "function π(αβγ: number) {\n  if (αβγ > 0) return αβγ;\n  return 0;\n}\n";
+    let fns = extract(source, "unicode.ts");
+    assert_eq!(fns.len(), 1, "expected one function in unicode.ts");
+    let f = &fns[0];
+    assert_eq!(f.identity.qualified_name, "π");
+    assert_eq!(f.complexity, 2, "if-branch contributes one decision point");
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::IfBranch);
+}
+
 #[test]
 fn malformed_typescript_returns_source_parse_with_file_prefix() {
     let walker = OxcWalker::new();
