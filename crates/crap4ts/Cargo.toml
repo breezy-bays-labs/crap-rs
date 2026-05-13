@@ -67,5 +67,11 @@ serde_json = { workspace = true }
 # Each scenario writes into a tempdir so the test doesn't pollute cwd.
 tempfile = { workspace = true }
 
+# End-to-end smoke tests (W1.3) invoke the `crap4ts` binary via
+# `assert_cmd::Command::cargo_bin` and assert on stdout/stderr/exit
+# code. Same cross-crate-invocation pattern crap-core uses for the
+# wire-envelope snapshot modules.
+assert_cmd = { workspace = true }
+
 [build-dependencies]
 napi-build = { workspace = true }
