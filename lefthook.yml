@@ -58,6 +58,17 @@ pre-push:
     test:
       run: cargo nextest run --workspace --all-targets
       timeout: 300s
+    insta:
+      # Mechanical enforcement of wire-snapshot drift detection
+      # (CEng ADVISORY-7, established with the dual-snapshot canary
+      # in W1.3 / crap-rs#183). `--check` makes insta fail on pending
+      # (unaccepted / .snap.new) snapshots, catching accidental
+      # `cargo insta accept` without review and unreviewed diffs in a
+      # branch's working tree before push. Without this step,
+      # documentation alone enforces the wire-snapshot contract;
+      # "documentation rots, CI doesn't."
+      run: cargo insta test --workspace --check
+      timeout: 180s
     cucumber:
       # cucumber-rs harness=false targets bypass libtest's
       # `--list --format terse` probing, so nextest excludes them
