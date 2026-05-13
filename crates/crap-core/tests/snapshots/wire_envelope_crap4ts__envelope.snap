@@ -1,0 +1,580 @@
+---
+source: crates/crap-core/tests/wire_envelope_crap4ts.rs
+expression: pretty
+---
+{
+  "diff_ref": null,
+  "language": "rust",
+  "metric": "cognitive",
+  "result": {
+    "functions": [
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "Button.tsx",
+            "qualified_name": "<arrow>",
+            "span": {
+              "end_column": 49,
+              "end_line": 3,
+              "start_column": 30,
+              "start_line": 3
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "Button.tsx",
+            "qualified_name": "Button",
+            "span": {
+              "end_column": 1,
+              "end_line": 5,
+              "start_column": 8,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "arrow.ts",
+            "qualified_name": "square",
+            "span": {
+              "end_column": 42,
+              "end_line": 1,
+              "start_column": 23,
+              "start_line": 1
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 50.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.13
+          },
+          "identity": {
+            "file_path": "arrow.ts",
+            "qualified_name": "cube",
+            "span": {
+              "end_column": 44,
+              "end_line": 2,
+              "start_column": 21,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "map.ts",
+            "qualified_name": "<arrow>",
+            "span": {
+              "end_column": 26,
+              "end_line": 2,
+              "start_column": 17,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "map.ts",
+            "qualified_name": "increment",
+            "span": {
+              "end_column": 1,
+              "end_line": 3,
+              "start_column": 8,
+              "start_line": 1
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "mixed.ts",
+            "qualified_name": "declared",
+            "span": {
+              "end_column": 40,
+              "end_line": 1,
+              "start_column": 8,
+              "start_line": 1
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "mixed.ts",
+            "qualified_name": "expression",
+            "span": {
+              "end_column": 50,
+              "end_line": 2,
+              "start_column": 27,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "mixed.ts",
+            "qualified_name": "arrow",
+            "span": {
+              "end_column": 28,
+              "end_line": 3,
+              "start_column": 22,
+              "start_line": 3
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "simple.ts",
+            "qualified_name": "add",
+            "span": {
+              "end_column": 1,
+              "end_line": 5,
+              "start_column": 8,
+              "start_line": 3
+            }
+          }
+        },
+        "threshold": 16.0
+      }
+    ],
+    "passed": true,
+    "summary": {
+      "average_complexity": 1.0,
+      "average_coverage": 95.0,
+      "average_crap": 1.013,
+      "distribution": {
+        "acceptable": 0,
+        "high": 0,
+        "low": 10,
+        "moderate": 0
+      },
+      "exceeding_threshold": 0,
+      "max_complexity": 1,
+      "max_crap": {
+        "risk_level": "low",
+        "value": 1.13
+      },
+      "median_complexity": 1.0,
+      "median_coverage": 100.0,
+      "median_crap": 1.0,
+      "min_coverage": 50.0,
+      "total_files": 5,
+      "total_functions": 10,
+      "worst_function": {
+        "file_path": "arrow.ts",
+        "qualified_name": "cube",
+        "span": {
+          "end_column": 44,
+          "end_line": 2,
+          "start_column": 21,
+          "start_line": 2
+        }
+      }
+    }
+  },
+  "schema_version": 2,
+  "threshold": 16.0,
+  "timestamp": "[STRIPPED:timestamp]",
+  "tool_version": "[STRIPPED:tool_version]",
+  "view": {
+    "eligible_count": 10,
+    "grouped": null,
+    "shown": [
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 50.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.13
+          },
+          "identity": {
+            "file_path": "arrow.ts",
+            "qualified_name": "cube",
+            "span": {
+              "end_column": 44,
+              "end_line": 2,
+              "start_column": 21,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "Button.tsx",
+            "qualified_name": "<arrow>",
+            "span": {
+              "end_column": 49,
+              "end_line": 3,
+              "start_column": 30,
+              "start_line": 3
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "Button.tsx",
+            "qualified_name": "Button",
+            "span": {
+              "end_column": 1,
+              "end_line": 5,
+              "start_column": 8,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "arrow.ts",
+            "qualified_name": "square",
+            "span": {
+              "end_column": 42,
+              "end_line": 1,
+              "start_column": 23,
+              "start_line": 1
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "map.ts",
+            "qualified_name": "<arrow>",
+            "span": {
+              "end_column": 26,
+              "end_line": 2,
+              "start_column": 17,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "map.ts",
+            "qualified_name": "increment",
+            "span": {
+              "end_column": 1,
+              "end_line": 3,
+              "start_column": 8,
+              "start_line": 1
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "mixed.ts",
+            "qualified_name": "declared",
+            "span": {
+              "end_column": 40,
+              "end_line": 1,
+              "start_column": 8,
+              "start_line": 1
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "mixed.ts",
+            "qualified_name": "expression",
+            "span": {
+              "end_column": 50,
+              "end_line": 2,
+              "start_column": 27,
+              "start_line": 2
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "mixed.ts",
+            "qualified_name": "arrow",
+            "span": {
+              "end_column": 28,
+              "end_line": 3,
+              "start_column": 22,
+              "start_line": 3
+            }
+          }
+        },
+        "threshold": 16.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "simple.ts",
+            "qualified_name": "add",
+            "span": {
+              "end_column": 1,
+              "end_line": 5,
+              "start_column": 8,
+              "start_line": 3
+            }
+          }
+        },
+        "threshold": 16.0
+      }
+    ],
+    "shown_summary": {
+      "average_complexity": 1.0,
+      "average_coverage": 95.0,
+      "average_crap": 1.013,
+      "distribution": {
+        "acceptable": 0,
+        "high": 0,
+        "low": 10,
+        "moderate": 0
+      },
+      "exceeding_threshold": 0,
+      "max_complexity": 1,
+      "max_crap": {
+        "risk_level": "low",
+        "value": 1.13
+      },
+      "median_complexity": 1.0,
+      "median_coverage": 100.0,
+      "median_crap": 1.0,
+      "min_coverage": 50.0,
+      "total_files": 5,
+      "total_functions": 10,
+      "worst_function": {
+        "file_path": "arrow.ts",
+        "qualified_name": "cube",
+        "span": {
+          "end_column": 44,
+          "end_line": 2,
+          "start_column": 21,
+          "start_line": 2
+        }
+      }
+    },
+    "spec": {
+      "filters": {
+        "coverage_range": null,
+        "only_failing": false
+      },
+      "group_by": null,
+      "limit": null,
+      "sort": "crap"
+    },
+    "truncated": false
+  }
+}
