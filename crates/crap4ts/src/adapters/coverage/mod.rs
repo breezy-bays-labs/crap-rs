@@ -210,7 +210,7 @@ impl CoveragePort for IstanbulCoverage {
                     file_path: entry.path.clone(),
                     kind: IstanbulDiagnosticKind::PathUnresolved,
                     message: format!(
-                        "path '{}' does not resolve under {}",
+                        "path '{}' does not resolve to a discovered source file under {}",
                         entry.path,
                         self.effective_src.display()
                     ),

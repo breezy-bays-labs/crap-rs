@@ -212,7 +212,8 @@ fn parse_emits_path_unresolved_for_out_of_tree_entries() {
         d.message
     );
     assert!(
-        d.message.contains("does not resolve under"),
+        d.message
+            .contains("does not resolve to a discovered source file under"),
         "msg: {}",
         d.message
     );
