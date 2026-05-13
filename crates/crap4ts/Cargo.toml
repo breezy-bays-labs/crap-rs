@@ -54,12 +54,14 @@ napi-derive = { workspace = true, optional = true }
 # which requires `Serialize + DeserializeOwned`.
 serde = { workspace = true }
 
-[dev-dependencies]
-# Used by `parse_diagnostic` round-trip tests. The production code path
-# doesn't depend on serde_json — `IstanbulParseDiagnostic` derives serde
-# traits for the envelope, the JSON serialization happens up in
-# crap-core's reporter layer.
+# Istanbul JSON coverage parsing — the production code path in
+# `adapters::coverage` consumes `serde_json::from_str` to deserialize
+# `coverage-final.json`. Previously dev-only while the parser was a
+# stub; promoted to runtime in W1.1 (crap-rs#181) when the parser
+# became real.
 serde_json = { workspace = true }
+
+[dev-dependencies]
 # `cli_init_integration` smoke-tests the `crap4ts init` subcommand
 # (crap-rs#73) which crap4ts inherits from crap-core via AdapterMeta.
 # Each scenario writes into a tempdir so the test doesn't pollute cwd.
