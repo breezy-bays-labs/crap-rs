@@ -18,3 +18,7 @@ lcov.info
 !.claude/rules/**
 .claude/focus.md
 .workflow/
+
+# Local agent + diagram tool state
+.gemini/
+excalidraw.log
