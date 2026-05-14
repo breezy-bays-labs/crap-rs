@@ -58,6 +58,30 @@ pre-push:
     test:
       run: cargo nextest run --workspace --all-targets
       timeout: 300s
+    insta:
+      # Mechanical enforcement of wire-snapshot drift detection
+      # (CEng ADVISORY-7, established with the dual-snapshot canary
+      # in W1.3 / crap-rs#183). `--check` makes insta fail on pending
+      # (unaccepted / .snap.new) snapshots, catching accidental
+      # `cargo insta accept` without review and unreviewed diffs in a
+      # branch's working tree before push. Without this step,
+      # documentation alone enforces the wire-snapshot contract;
+      # "documentation rots, CI doesn't."
+      #
+      # `--test-runner=nextest` is load-bearing — the default
+      # `cargo-test` backend runs tests in-process with thread
+      # parallelism, which interacts poorly with the
+      # `colored::set_override` global mutex used by the table
+      # reporter (see `~/.claude/projects/.../feedback_colored-set-
+      # override-mutex` memory). Under non-PTY environments (lefthook,
+      # CI) one test's width-detection panic poisons the mutex and
+      # cascades into 43+ unrelated failures. Nextest runs each test
+      # in its own process, so a panic in one test doesn't poison any
+      # other test's mutex state. This is the same runner the
+      # workspace's `test:` step above uses; switching insta to it
+      # keeps the two parallel testing layers consistent.
+      run: cargo insta test --workspace --check --test-runner=nextest
+      timeout: 180s
     cucumber:
       # cucumber-rs harness=false targets bypass libtest's
       # `--list --format terse` probing, so nextest excludes them
