@@ -365,3 +365,367 @@ fn arrow_ac_5d_mixed_bodies_all_covered() {
 fn _coverage_shape_compiles(out: &ParseOutput<crap4ts::parse_diagnostic::IstanbulParseDiagnostic>) {
     let _map: &HashMap<String, Vec<LineCoverage>> = &out.coverage;
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// W2.3 (#186) — Branch coverage (b + branchMap)
+// W2.4 (#187) — Schema variance + path-mismatch + missing-field paths
+// ─────────────────────────────────────────────────────────────────────
+
+const BRANCHES_FIXTURE: &str = include_str!("fixtures/istanbul-jest/coverage-with-branches.json");
+const ORPHAN_BRANCH_FIXTURE: &str =
+    include_str!("fixtures/istanbul-broken/coverage-with-orphan-branch.json");
+const ORPHAN_PATH_FIXTURE: &str =
+    include_str!("fixtures/istanbul-broken/coverage-with-orphan-path.json");
+const MISSING_FIELD_FIXTURE: &str =
+    include_str!("fixtures/istanbul-broken/coverage-with-missing-field.json");
+const VITEST_FIXTURE: &str = include_str!("fixtures/istanbul-vitest/coverage-final.json");
+const NYC_FIXTURE: &str = include_str!("fixtures/istanbul-nyc/coverage-final.json");
+const WRAPPED_FIXTURE: &str = include_str!("fixtures/istanbul-wrapped/coverage-final.json");
+
+/// Set up a tempdir with the branch-heavy source written and the
+/// `{SRC_ROOT}` placeholder substituted in the payload. Used by all
+/// W2.3 branch-coverage smoke tests.
+fn build_branch_heavy_fixture(payload_template: &str) -> (TempDir, PathBuf, String) {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let canonical = std::fs::canonicalize(tmp.path()).expect("canonicalize tempdir");
+    write_fixture(
+        &canonical,
+        "branch-heavy.ts",
+        include_str!("fixtures/ts-fixtures/branch-heavy.ts"),
+    );
+    let payload = payload_template.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+    (tmp, canonical, payload)
+}
+
+/// Set up a tempdir with the three vitest/nyc fixture sources written.
+/// Returns the canonical root + the resolved payload.
+fn build_three_file_fixture(payload_template: &str) -> (TempDir, PathBuf, String) {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let canonical = std::fs::canonicalize(tmp.path()).expect("canonicalize tempdir");
+    write_fixture(
+        &canonical,
+        "simple.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+    write_fixture(
+        &canonical,
+        "arrow.ts",
+        include_str!("fixtures/ts-fixtures/arrow.ts"),
+    );
+    write_fixture(
+        &canonical,
+        "map.ts",
+        include_str!("fixtures/ts-fixtures/map.ts"),
+    );
+    let payload = payload_template.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+    (tmp, canonical, payload)
+}
+
+/// W2.3: fixture with full `b:` + `branchMap` records populates
+/// `ParseOutput.branches`. Verifies (a) the option is `Some(...)`, (b)
+/// the file key is present, (c) per-arm fan-out matches the fixture
+/// arms (3 branchIds × {2, 2, 3} arms = 7 BranchCoverage rows).
+#[test]
+fn w23_branches_populated_when_b_records_present() {
+    let (_tmp, canonical, payload) = build_branch_heavy_fixture(BRANCHES_FIXTURE);
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("branch-heavy parses");
+
+    let branches = out
+        .branches
+        .as_ref()
+        .expect("branch-heavy fixture populates Some(branches)");
+    let file_branches = branches
+        .get("branch-heavy.ts")
+        .expect("branch-heavy.ts keyed in branches map");
+    // 2 (if arms) + 2 (ternary arms) + 3 (switch arms) = 7.
+    assert_eq!(
+        file_branches.len(),
+        7,
+        "expected one BranchCoverage row per arm; got {file_branches:?}"
+    );
+    // No diagnostics on the clean fixture.
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+}
+
+/// W2.3: branch arms expand to per-arm `taken` counts (NOT summed
+/// per branchId). The fixture's `b` records are:
+///   branchId 0 (if at line 11): [2, 2]   → 2 rows at line 11
+///   branchId 1 (ternary at line 19): [4, 2] → 2 rows at line 19
+///   branchId 2 (switch at line 23): [1, 1, 2] → 3 rows at line 23
+/// Per the matching consumer at
+/// `crap-core::domain::matching::compute_branch_coverage`, this is
+/// what produces the correct N-of-M arm-level coverage ratios.
+#[test]
+fn w23_branch_arms_fan_to_per_arm_rows_not_summed() {
+    let (_tmp, canonical, payload) = build_branch_heavy_fixture(BRANCHES_FIXTURE);
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("branch-heavy parses");
+
+    let branches = out.branches.unwrap();
+    let file_branches = branches.get("branch-heavy.ts").unwrap();
+
+    // Group by line for inspection.
+    let mut by_line: HashMap<usize, Vec<u64>> = HashMap::new();
+    for b in file_branches {
+        by_line
+            .entry(b.line)
+            .or_default()
+            .push(b.taken.expect("Istanbul always provides taken count"));
+    }
+    let mut line11 = by_line.remove(&11).unwrap_or_default();
+    let mut line19 = by_line.remove(&19).unwrap_or_default();
+    let mut line23 = by_line.remove(&23).unwrap_or_default();
+    line11.sort_unstable();
+    line19.sort_unstable();
+    line23.sort_unstable();
+    assert_eq!(line11, vec![2, 2], "if-arms");
+    assert_eq!(line19, vec![2, 4], "ternary-arms (sorted)");
+    assert_eq!(line23, vec![1, 1, 2], "switch-arms (sorted)");
+}
+
+/// W2.3: orphan branchId (`b` references a missing `branchMap`
+/// entry) emits `BranchMismatch` and skips ONLY that branch — the
+/// rest of the file's branch records still populate, and the file's
+/// statement coverage is intact.
+#[test]
+fn w23_orphan_branch_id_emits_branch_mismatch_and_skips_only_that_branch() {
+    let (_tmp, canonical, payload) = build_branch_heavy_fixture(ORPHAN_BRANCH_FIXTURE);
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("orphan-branch parses");
+
+    // Exactly one `BranchMismatch` diagnostic — for branchId 42.
+    let mismatches: Vec<_> = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.kind == IstanbulDiagnosticKind::BranchMismatch)
+        .collect();
+    assert_eq!(
+        mismatches.len(),
+        1,
+        "expected exactly one BranchMismatch; got {:?}",
+        out.diagnostics
+    );
+    let d = mismatches[0];
+    assert!(d.message.contains("`42`"), "{:?}", d.message);
+    assert!(
+        d.message.contains("coverage tool's issue tracker"),
+        "{:?}",
+        d.message
+    );
+
+    // The valid branch (id 0) still produced its 2 arms at line 11.
+    let file_branches = out
+        .branches
+        .as_ref()
+        .expect("valid branchId still populates Some(branches)")
+        .get("branch-heavy.ts")
+        .expect("branch-heavy.ts keyed");
+    assert_eq!(
+        file_branches.len(),
+        2,
+        "only the non-orphan branchId's 2 arms survive; got {file_branches:?}"
+    );
+    // The file's statement coverage is intact (1 statement at line 11).
+    let lines = lines_for(&out, "branch-heavy.ts");
+    assert!(!lines.is_empty(), "line coverage survives the orphan");
+}
+
+/// W2.3 regression: a fixture with no `b:` records keeps
+/// `ParseOutput.branches.is_none()`. Re-runs the W1.1 happy path and
+/// re-asserts. Locks the regression-pin gate in focus.md AC #15.
+#[test]
+fn w23_regression_no_b_records_leaves_branches_none() {
+    let (_tmp, canonical, payload) = build_fixture();
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("happy path");
+    assert!(
+        out.branches.is_none(),
+        "W1.1 jest fixture has `\"b\": {{}}` for every entry — branches must stay None"
+    );
+}
+
+/// W2.4: vitest-emitted shape (close to jest plus emitter-specific
+/// metadata fields like `_coverageSchema`, `all`, `inputSourceMap`)
+/// parses cleanly with no diagnostics — `#[serde(default)]` already
+/// tolerates unknown fields.
+#[test]
+fn w24_vitest_shape_parses_with_no_diagnostics() {
+    let (_tmp, canonical, payload) = build_three_file_fixture(VITEST_FIXTURE);
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("vitest parses");
+
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert!(keys.contains(&"simple.ts".to_string()), "keys: {keys:?}");
+    assert!(keys.contains(&"arrow.ts".to_string()), "keys: {keys:?}");
+    assert!(keys.contains(&"map.ts".to_string()), "keys: {keys:?}");
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    assert!(out.branches.is_none());
+}
+
+/// W2.4: nyc-emitted shape uses absolute paths; the existing
+/// `normalize_path` strip-prefix handles this since the
+/// `{SRC_ROOT}` substitution canonicalizes paths to be tempdir-rooted.
+#[test]
+fn w24_nyc_absolute_paths_normalize_via_strip_prefix() {
+    let (_tmp, canonical, payload) = build_three_file_fixture(NYC_FIXTURE);
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("nyc parses");
+
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert!(keys.contains(&"simple.ts".to_string()), "keys: {keys:?}");
+    assert!(keys.contains(&"arrow.ts".to_string()), "keys: {keys:?}");
+    assert!(keys.contains(&"map.ts".to_string()), "keys: {keys:?}");
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+}
+
+/// W2.4: wrapped shape `{"coverage-final": {...flat...}}` parses via
+/// the one-level unwrap arm; the inner flat map is consumed normally.
+#[test]
+fn w24_wrapped_shape_parses_via_single_level_unwrap() {
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+    write_fixture(
+        &canonical,
+        "simple.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+    write_fixture(
+        &canonical,
+        "arrow.ts",
+        include_str!("fixtures/ts-fixtures/arrow.ts"),
+    );
+    let payload = WRAPPED_FIXTURE.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("wrapped parses via unwrap");
+
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert!(keys.contains(&"simple.ts".to_string()), "keys: {keys:?}");
+    assert!(keys.contains(&"arrow.ts".to_string()), "keys: {keys:?}");
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+}
+
+/// W2.4: a JSON shape that is neither flat-Istanbul nor wrapped-
+/// Istanbul emits exactly one `SchemaUnrecognized` diagnostic whose
+/// message lists the detected top-level keys in sorted order — the
+/// "received: [...]" hint per breadboard W-3.
+#[test]
+fn w24_unrecognized_shape_emits_schema_unrecognized_with_detected_keys() {
+    let parser = IstanbulCoverage::new(PathBuf::from("/tmp"));
+    let out = parser
+        .parse(r#"{"foo": "bar", "baz": 42}"#)
+        .expect("parse returns Ok with diagnostic; downstream produces non-zero exit");
+
+    assert!(out.coverage.is_empty(), "no coverage on unrecognized shape");
+    assert!(out.branches.is_none());
+    assert_eq!(out.diagnostics.len(), 1, "{:?}", out.diagnostics);
+    let d = &out.diagnostics[0];
+    assert_eq!(d.kind, IstanbulDiagnosticKind::SchemaUnrecognized);
+    assert_eq!(d.file_path, "");
+    assert!(
+        d.message
+            .contains("top-level shape not recognized as Istanbul"),
+        "{:?}",
+        d.message
+    );
+    // Keys are sorted; expect "[baz, foo]" in the received-keys hint.
+    assert!(d.message.contains("[baz, foo]"), "{:?}", d.message);
+}
+
+/// W2.4: orphan-path entries emit `PathUnresolved` but the valid
+/// entries in the same fixture still parse — never abort first-record,
+/// never silent-drop.
+#[test]
+fn w24_orphan_path_emits_path_unresolved_and_valid_entries_still_parse() {
+    let (_tmp, canonical, payload) = build_branch_heavy_fixture(ORPHAN_PATH_FIXTURE);
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("orphan-path parses");
+
+    let unresolved: Vec<_> = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.kind == IstanbulDiagnosticKind::PathUnresolved)
+        .collect();
+    assert_eq!(unresolved.len(), 1, "{:?}", out.diagnostics);
+    assert_eq!(unresolved[0].file_path, "/build/transpiled/foreign.js");
+    assert!(
+        unresolved[0]
+            .message
+            .contains("/build/transpiled/foreign.js"),
+        "{:?}",
+        unresolved[0].message
+    );
+
+    // The valid entry still parsed.
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert!(
+        keys.contains(&"branch-heavy.ts".to_string()),
+        "valid entry survives orphan-path; keys: {keys:?}"
+    );
+    let lines = lines_for(&out, "branch-heavy.ts");
+    assert!(!lines.is_empty(), "valid line coverage intact");
+}
+
+/// W2.4: an entry that has `s` records but an empty `statementMap`
+/// emits `MissingField` and skips only that entry — the valid entry
+/// in the same fixture still parses.
+#[test]
+fn w24_missing_field_emits_diagnostic_and_skips_only_that_entry() {
+    let (_tmp, canonical, payload) = build_branch_heavy_fixture(MISSING_FIELD_FIXTURE);
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("missing-field parses");
+
+    let missing: Vec<_> = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.kind == IstanbulDiagnosticKind::MissingField)
+        .collect();
+    assert_eq!(missing.len(), 1, "{:?}", out.diagnostics);
+    let d = missing[0];
+    assert!(d.message.contains("orphan-sm.ts"), "{:?}", d.message);
+    assert!(d.message.contains("`s`"), "{:?}", d.message);
+    assert!(d.message.contains("`statementMap`"), "{:?}", d.message);
+
+    // The valid entry still parsed.
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert!(
+        keys.contains(&"branch-heavy.ts".to_string()),
+        "valid entry survives missing-field skip; keys: {keys:?}"
+    );
+}
+
+/// W2.4 regression: malformed JSON (not even valid JSON syntax)
+/// continues to fail fatally with `Err(CrapError::SourceParse(
+/// "istanbul: …"))` — the schema-tolerance arms do NOT swallow a
+/// fundamental "this isn't JSON" error.
+#[test]
+fn w24_truly_malformed_json_still_returns_source_parse_error() {
+    let parser = IstanbulCoverage::new(PathBuf::from("/tmp"));
+    let err = parser.parse("{not json at all").unwrap_err();
+    match err {
+        CrapError::SourceParse(msg) => assert!(msg.starts_with("istanbul: "), "msg: {msg}"),
+        other => panic!("expected SourceParse, got {other:?}"),
+    }
+}
+
+/// W2.4: a valid JSON array (e.g. `[]` or `["foo"]`) is not Istanbul
+/// shape and emits `SchemaUnrecognized` with `received keys: array`
+/// as the detected-type hint (objects-only get key listings).
+#[test]
+fn w24_top_level_array_emits_schema_unrecognized() {
+    let parser = IstanbulCoverage::new(PathBuf::from("/tmp"));
+    let out = parser
+        .parse(r#"["not", "istanbul"]"#)
+        .expect("returns Ok with diagnostic");
+    assert_eq!(out.diagnostics.len(), 1);
+    assert_eq!(
+        out.diagnostics[0].kind,
+        IstanbulDiagnosticKind::SchemaUnrecognized
+    );
+    assert!(
+        out.diagnostics[0].message.contains("received keys: array"),
+        "{:?}",
+        out.diagnostics[0].message
+    );
+}

@@ -1,0 +1,57 @@
+{
+  "{SRC_ROOT}/simple.ts": {
+    "path": "{SRC_ROOT}/simple.ts",
+    "statementMap": {
+      "0": { "start": { "line": 4, "column": 2 }, "end": { "line": 4, "column": 15 } }
+    },
+    "s": { "0": 3 },
+    "branchMap": {},
+    "b": {},
+    "fnMap": {
+      "0": {
+        "name": "add",
+        "decl": { "start": { "line": 3, "column": 16 }, "end": { "line": 3, "column": 19 } },
+        "loc": { "start": { "line": 3, "column": 51 }, "end": { "line": 5, "column": 1 } },
+        "line": 3
+      }
+    },
+    "f": { "0": 3 }
+  },
+  "{SRC_ROOT}/arrow.ts": {
+    "path": "{SRC_ROOT}/arrow.ts",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 44 } },
+      "1": { "start": { "line": 1, "column": 37 }, "end": { "line": 1, "column": 42 } }
+    },
+    "s": { "0": 1, "1": 100 },
+    "branchMap": {},
+    "b": {},
+    "fnMap": {
+      "0": {
+        "name": "square",
+        "decl": { "start": { "line": 1, "column": 13 }, "end": { "line": 1, "column": 19 } },
+        "loc": { "start": { "line": 1, "column": 37 }, "end": { "line": 1, "column": 42 } },
+        "line": 1
+      }
+    },
+    "f": { "0": 100 }
+  },
+  "{SRC_ROOT}/map.ts": {
+    "path": "{SRC_ROOT}/map.ts",
+    "statementMap": {
+      "0": { "start": { "line": 2, "column": 2 }, "end": { "line": 2, "column": 26 } }
+    },
+    "s": { "0": 1 },
+    "branchMap": {},
+    "b": {},
+    "fnMap": {
+      "0": {
+        "name": "increment",
+        "decl": { "start": { "line": 1, "column": 16 }, "end": { "line": 1, "column": 25 } },
+        "loc": { "start": { "line": 1, "column": 51 }, "end": { "line": 3, "column": 1 } },
+        "line": 1
+      }
+    },
+    "f": { "0": 1 }
+  }
+}

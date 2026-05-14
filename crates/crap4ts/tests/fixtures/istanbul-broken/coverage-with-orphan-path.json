@@ -1,0 +1,24 @@
+{
+  "{SRC_ROOT}/branch-heavy.ts": {
+    "path": "{SRC_ROOT}/branch-heavy.ts",
+    "statementMap": {
+      "0": { "start": { "line": 11, "column": 2 }, "end": { "line": 15, "column": 3 } }
+    },
+    "s": { "0": 4 },
+    "branchMap": {},
+    "b": {},
+    "fnMap": {},
+    "f": {}
+  },
+  "/build/transpiled/foreign.js": {
+    "path": "/build/transpiled/foreign.js",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 10 } }
+    },
+    "s": { "0": 1 },
+    "branchMap": {},
+    "b": {},
+    "fnMap": {},
+    "f": {}
+  }
+}

@@ -1,4 +1,4 @@
-//! Istanbul JSON coverage parser — minimal statement-only implementation.
+//! Istanbul JSON coverage parser — statement + branch + schema-tolerant.
 //!
 //! Consumes the per-file `coverage-final.json` map jest, vitest, and
 //! nyc emit. Each entry maps a `path` to a `statementMap` (statement
@@ -9,16 +9,37 @@
 //! against `effective_src` so the downstream line-range join sees
 //! workspace-relative paths).
 //!
-//! ## Scope (W1.1)
+//! ## Scope
 //!
-//! - Statement coverage (`s` + `statementMap`) only. Branch coverage
-//!   (`b` + `branchMap`) lands in W2.3 — the corresponding struct
-//!   fields are declared with `#[serde(default)]` so the W2.3 PR is
-//!   purely consumer-side (no type-surface churn).
-//! - Single emitter shape: minimal jest-flavored Istanbul.
-//!   vitest / nyc + extension dispatch land in W2.4.
-//! - Single source-type dispatch happens upstream in the walker
-//!   (W1.2); this parser is metric- and language-agnostic.
+//! - **W1.1**: statement coverage (`s` + `statementMap`) + jest-flat
+//!   top-level shape + `PathUnresolved` diagnostics. Branch- /
+//!   schema-variance fields landed in W1.1's struct with
+//!   `#[serde(default)]` so the consumer-side extensions stay
+//!   type-stable.
+//! - **W2.3 (#186)**: branch coverage. Each Istanbul branchId in `b`
+//!   carries a `Vec<u64>` of per-arm hit counts; the parser fans this
+//!   into one `BranchCoverage` row per arm keyed at the `branchMap`
+//!   entry's start line. Orphan branchIds (`b` references a missing
+//!   `branchMap` entry) emit `BranchMismatch` and skip THAT branch
+//!   only — the rest of the file still parses.
+//! - **W2.4 (#187)**: jest / vitest / nyc + wrapped emitter
+//!   tolerance. The parser tries the flat `{[path]: entry}` shape
+//!   first, then a single-level unwrap (`{"coverage-final":
+//!   {...flat...}}`), then emits `SchemaUnrecognized` with the
+//!   detected top-level keys. `MissingField` covers entries that
+//!   have `s` records but an empty `statementMap` (or vice versa).
+//!
+//! ## Decision points (locked)
+//!
+//! - **No `f`/`fnMap` backfill** — W1.1 discovery 5a–5d empirically
+//!   showed `s`/`statementMap` data is sufficient for arrow-function
+//!   coverage (CLAUDE.md locked decision #13).
+//! - **`ParseOutput.branches` is internal** — `crap-core::core::analyze`
+//!   lowers branch data into per-function `branch_coverage:
+//!   Option<CoverageRatio>` records, but the JSON envelope only
+//!   surfaces `coverage_percent` (= line coverage). Branch records
+//!   never reach the wire — verified by `wire_envelope_crap4ts` (no
+//!   `branchCoverage` field in any emitted row).
 //!
 //! ## Path normalization
 //!
@@ -31,9 +52,10 @@
 //! skipped — per Resolved Q10 in shaping, the scorecard NEVER aborts
 //! on first failure and NEVER silent-drops a record.
 
-use crap_core::domain::types::{CrapError, LineCoverage};
+use crap_core::domain::types::{BranchCoverage, CrapError, LineCoverage};
 use crap_core::ports::{CoveragePort, ParseOutput};
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -113,23 +135,26 @@ struct IstanbulCoverageFile {
     /// `statement_id` → `{ start: {line, column}, end: {line, column} }`.
     #[serde(default)]
     statement_map: HashMap<String, StatementLoc>,
-    /// W2.3: `branch_id` → `[hit count per branch arm]`. Declared with
-    /// `#[serde(default)]` now so the W2.3 consumer-side PR introduces
-    /// no type surface churn; ignored in W1.1.
+    /// W2.3 (now consumed): `branch_id` → `[hit count per branch arm]`.
+    /// Each branchId maps to a `Vec<u64>` of arm-level hit counts; the
+    /// parser fans these into one `BranchCoverage` row per arm at the
+    /// associated `branchMap[id]` start line.
     #[serde(default)]
-    #[allow(dead_code)]
     b: HashMap<String, Vec<u64>>,
-    /// W2.3: `branch_id` → branch location. See `b` above.
+    /// W2.3 (now consumed): `branch_id` → branch location. See `b`
+    /// above.
     #[serde(default)]
-    #[allow(dead_code)]
     branch_map: HashMap<String, BranchLoc>,
-    /// W2.3 fallback: `function_id` → execution count. Declared now so
-    /// W2.3's `fnMap` backfill (if arrow-function undercount surfaces)
-    /// is purely consumer-side.
+    /// `function_id` → execution count. Locked decision #13: NOT
+    /// consumed — W1.1 discovery 5a–5d showed `s`/`statementMap` is
+    /// sufficient for arrow-function coverage. Field kept for forward
+    /// compatibility (and to keep test fixtures faithful to real
+    /// emitter output) so future inclusion is consumer-side only.
     #[serde(default)]
     #[allow(dead_code)]
     f: HashMap<String, u64>,
-    /// W2.3 fallback: `function_id` → function metadata.
+    /// `function_id` → function metadata. See `f` above; not consumed
+    /// in v2.0.0.
     #[serde(default)]
     #[allow(dead_code)]
     fn_map: HashMap<String, FnLoc>,
@@ -153,18 +178,32 @@ struct Position {
     column: u32,
 }
 
-/// W2.3: branch metadata. Declared minimal here so the type lands
-/// with the rest of the schema; `r#type` carries the kebab-cased
-/// Istanbul branch kind (`if`, `switch`, `cond-expr`, etc.).
+/// W2.3 branch metadata. `kind` (e.g. `"if"`, `"switch"`, `"cond-expr"`)
+/// is carried but not consumed by the parser — line attribution joins
+/// only on the `loc.start.line` value (or the optional emitter-set
+/// `line` field when present, which some emitters use as the
+/// branching-site line independent of `loc`).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
 struct BranchLoc {
     loc: StatementLoc,
+    /// Istanbul branch kind (`if`, `switch`, `cond-expr`, `default-arg`,
+    /// `binary-expr`, etc.). Kept for downstream display only; not
+    /// consumed by the line-range join.
     #[serde(rename = "type")]
+    #[allow(dead_code)]
     kind: String,
+    /// Per-arm locations. Some emitters populate them with finer-grained
+    /// spans (e.g. switch case bodies); not consumed today since
+    /// `BranchCoverage` is line-keyed and the per-arm `taken` count
+    /// already lives in `b[branchId][arm_index]`.
     #[serde(default)]
+    #[allow(dead_code)]
     locations: Vec<StatementLoc>,
+    /// Optional emitter-set branching-site line. When present, takes
+    /// precedence over `loc.start.line` for line attribution (some
+    /// emitters set `loc` to a wide span covering both arms but pin
+    /// `line` to the branching keyword's line).
     #[serde(default)]
     line: Option<u32>,
 }
@@ -183,28 +222,25 @@ struct FnLoc {
     line: Option<u32>,
 }
 
-impl CoveragePort for IstanbulCoverage {
-    type Diagnostic = IstanbulParseDiagnostic;
-
-    /// Parse a `coverage-final.json` payload into per-file
-    /// `LineCoverage` records.
+impl IstanbulCoverage {
+    /// Build a `ParseOutput` from an already-deserialized flat map of
+    /// per-file Istanbul entries.
     ///
-    /// Top-level shape errors return `Err(CrapError::SourceParse(
-    /// "istanbul: …"))` — these are fatal because there is no
-    /// per-entry recovery path for "the whole document didn't parse."
-    /// Per-entry errors (path unresolved, missing field) push an
-    /// `IstanbulParseDiagnostic` and skip the entry; the scorecard
-    /// still produces results for the other entries. Branch
-    /// coverage parsing (`branches: Some(...)`) lands in W2.3 — for
-    /// W1.1 the field is always `None`.
-    fn parse(&self, data: &str) -> Result<ParseOutput<IstanbulParseDiagnostic>, CrapError> {
-        let raw: HashMap<String, IstanbulCoverageFile> = serde_json::from_str(data)
-            .map_err(|e| CrapError::SourceParse(format!("istanbul: {e}")))?;
-
+    /// Shared between the happy path (`parse_str` → flat) and the
+    /// one-level unwrap path (`parse_str` → wrapped → inner flat
+    /// map). Per-entry diagnostics (`PathUnresolved`, `MissingField`,
+    /// `BranchMismatch`) are emitted into `diagnostics`; the function
+    /// never aborts the whole parse and never silent-drops a record.
+    fn build_parse_output(
+        &self,
+        raw: HashMap<String, IstanbulCoverageFile>,
+    ) -> ParseOutput<IstanbulParseDiagnostic> {
         let mut coverage: HashMap<String, Vec<LineCoverage>> = HashMap::new();
+        let mut branch_map_out: HashMap<String, Vec<BranchCoverage>> = HashMap::new();
         let mut diagnostics: Vec<IstanbulParseDiagnostic> = Vec::new();
 
         for (_key, entry) in raw {
+            // ── Path normalization ──────────────────────────────────
             let Some(normalized) = self.normalize_path(&entry.path) else {
                 diagnostics.push(IstanbulParseDiagnostic {
                     file_path: entry.path.clone(),
@@ -219,6 +255,29 @@ impl CoveragePort for IstanbulCoverage {
                 continue;
             };
 
+            // ── MissingField: `s` populated but `statementMap` empty,
+            // or `statementMap` populated but `s` empty. Both cases
+            // indicate a partial / corrupt emitter record; emit and
+            // skip per breadboard W-3.
+            if entry.s.is_empty() != entry.statement_map.is_empty() {
+                let (present, missing) = if entry.s.is_empty() {
+                    ("statementMap", "s")
+                } else {
+                    ("s", "statementMap")
+                };
+                diagnostics.push(IstanbulParseDiagnostic {
+                    file_path: entry.path.clone(),
+                    kind: IstanbulDiagnosticKind::MissingField,
+                    message: format!(
+                        "entry for '{}' has `{}` records but `{}` is empty; one half of the statement-coverage pair is missing",
+                        entry.path, present, missing
+                    ),
+                    line: None,
+                });
+                continue;
+            }
+
+            // ── Line coverage (W1.1) ────────────────────────────────
             // Build per-line records by joining `s` (counts) to
             // `statementMap` (line spans). Statements whose IDs do not
             // appear in `statementMap` are skipped; statements that
@@ -238,14 +297,161 @@ impl CoveragePort for IstanbulCoverage {
             // (mirrors LCOV parser ordering).
             lines.sort_by_key(|lc| lc.line);
 
+            // ── Branch coverage (W2.3) ──────────────────────────────
+            // For each branchId in `b`, look up its `branchMap` entry.
+            // Missing branchMap entries emit `BranchMismatch` and
+            // skip THAT branch only (rest of the file still parses).
+            // Per the consumer contract at
+            // `crap-core::domain::matching::compute_branch_coverage`,
+            // each `BranchCoverage` row represents ONE branch arm —
+            // total = N records, covered = records with taken > 0.
+            // So we fan one Istanbul branchId with K arms into K
+            // separate `BranchCoverage` rows at the branching site's
+            // line, each carrying that arm's `taken` count. (Summing
+            // arm hits into a single record would collapse partial
+            // coverage into 100% — see PR body's plan-of-record
+            // deviation note for the worked example.)
+            let mut branches: Vec<BranchCoverage> = Vec::new();
+            for (branch_id, arms) in &entry.b {
+                let Some(loc) = entry.branch_map.get(branch_id) else {
+                    diagnostics.push(IstanbulParseDiagnostic {
+                        file_path: entry.path.clone(),
+                        kind: IstanbulDiagnosticKind::BranchMismatch,
+                        message: format!(
+                            "branch coverage record for branchId `{branch_id}` references no entry in branchMap. This is likely a bug in your coverage tool — report at the coverage tool's issue tracker."
+                        ),
+                        line: None,
+                    });
+                    continue;
+                };
+                // Prefer the emitter-set `line` when present (some
+                // emitters set it to the branching keyword's line
+                // independent of `loc`); fall back to
+                // `loc.start.line`.
+                let line = loc.line.unwrap_or(loc.loc.start.line) as usize;
+                for hits in arms {
+                    branches.push(BranchCoverage {
+                        line,
+                        taken: Some(*hits),
+                    });
+                }
+            }
+            // Deterministic ordering for downstream consumers.
+            branches.sort_by_key(|b| b.line);
+
             let key = normalized.to_string_lossy().into_owned();
-            coverage.insert(key, lines);
+            coverage.insert(key.clone(), lines);
+            if !branches.is_empty() {
+                branch_map_out.insert(key, branches);
+            }
         }
 
-        Ok(ParseOutput {
+        // `branches: None` ↔ "no branch data in this coverage file"
+        // (semantic distinction from `Some({})`; mirrors the LCOV
+        // adapter's `(!state.raw_branches.is_empty()).then(|| ...)`
+        // gate). This regression-pins existing W1.1 fixtures which
+        // have `"b": {}` everywhere.
+        let branches = (!branch_map_out.is_empty()).then_some(branch_map_out);
+
+        ParseOutput {
             coverage,
-            branches: None,
+            branches,
             diagnostics,
+        }
+    }
+
+    /// Try the one-level unwrap arm: `{"<single-key>": <flat-map>}`.
+    /// Returns the unwrapped flat map when the top-level value is a
+    /// single-key object whose value deserializes as Istanbul's flat
+    /// shape; returns `None` otherwise so the caller can emit
+    /// `SchemaUnrecognized`.
+    fn try_unwrap(value: &Value) -> Option<HashMap<String, IstanbulCoverageFile>> {
+        let obj = value.as_object()?;
+        if obj.len() != 1 {
+            return None;
+        }
+        // Take the single inner value and re-deserialize it as the
+        // flat shape. We use `serde_json::from_value` here (cloning
+        // is acceptable — the wrapped shape is rare and small
+        // relative to the inner flat map's deserialization cost).
+        let inner = obj.values().next()?;
+        serde_json::from_value::<HashMap<String, IstanbulCoverageFile>>(inner.clone()).ok()
+    }
+}
+
+impl CoveragePort for IstanbulCoverage {
+    type Diagnostic = IstanbulParseDiagnostic;
+
+    /// Parse a `coverage-final.json` payload into per-file
+    /// `LineCoverage` + `BranchCoverage` records.
+    ///
+    /// **Top-level shape tolerance (W2.4)**:
+    ///
+    /// 1. Try the flat `{[path]: entry}` shape first (jest, vitest,
+    ///    nyc baseline).
+    /// 2. If that fails, parse as `serde_json::Value` and try a
+    ///    single-level unwrap (`{"coverage-final": {...flat...}}`).
+    /// 3. If neither matches, emit a `SchemaUnrecognized` diagnostic
+    ///    (with detected top-level keys) and return an empty
+    ///    `ParseOutput` carrying that diagnostic — the scorecard's
+    ///    downstream "no functions extracted" path then surfaces a
+    ///    non-zero exit. Never abort first-record.
+    /// 4. If the input is not valid JSON at all,
+    ///    `Err(CrapError::SourceParse("istanbul: ..."))` propagates
+    ///    (fatal — no recovery path).
+    ///
+    /// Per-entry errors (`PathUnresolved`, `MissingField`,
+    /// `BranchMismatch`) push an `IstanbulParseDiagnostic` and skip
+    /// the entry / branch; other entries still parse cleanly.
+    fn parse(&self, data: &str) -> Result<ParseOutput<IstanbulParseDiagnostic>, CrapError> {
+        // Path 1: flat-shape fast path.
+        if let Ok(raw) = serde_json::from_str::<HashMap<String, IstanbulCoverageFile>>(data) {
+            return Ok(self.build_parse_output(raw));
+        }
+
+        // Path 2: re-parse as untyped `Value` for the unwrap arm and
+        // for top-level-key detection. If JSON itself is malformed,
+        // surface as fatal `SourceParse` per the W1.1 contract.
+        let value: Value = serde_json::from_str(data)
+            .map_err(|e| CrapError::SourceParse(format!("istanbul: {e}")))?;
+
+        if let Some(raw) = Self::try_unwrap(&value) {
+            return Ok(self.build_parse_output(raw));
+        }
+
+        // Path 3: schema unrecognized. Detect top-level keys (if the
+        // value is an object) so the diagnostic message names what we
+        // received vs what we expected. Use a single
+        // `Ok(ParseOutput { …, diagnostics: [SchemaUnrecognized] })`
+        // path so downstream "no functions extracted" produces the
+        // non-zero exit and the diagnostic surfaces in the envelope.
+        let detected_keys = match &value {
+            Value::Object(map) => {
+                let mut keys: Vec<&str> = map.keys().map(String::as_str).collect();
+                keys.sort();
+                if keys.is_empty() {
+                    "{}".to_string()
+                } else {
+                    format!("[{}]", keys.join(", "))
+                }
+            }
+            Value::Array(_) => "array".to_string(),
+            Value::String(_) => "string".to_string(),
+            Value::Number(_) => "number".to_string(),
+            Value::Bool(_) => "bool".to_string(),
+            Value::Null => "null".to_string(),
+        };
+        Ok(ParseOutput {
+            coverage: HashMap::new(),
+            branches: None,
+            diagnostics: vec![IstanbulParseDiagnostic {
+                file_path: String::new(),
+                kind: IstanbulDiagnosticKind::SchemaUnrecognized,
+                message: format!(
+                    "top-level shape not recognized as Istanbul; expected `{{[path]: {{ path, s, statementMap, … }}}}`; received keys: {detected_keys}"
+                ),
+                line: None,
+            }],
         })
     }
 
