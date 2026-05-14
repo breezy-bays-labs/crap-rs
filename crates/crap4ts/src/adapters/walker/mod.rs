@@ -25,8 +25,8 @@
 //!
 //! ## W1.2 + W2.1 decision-point coverage (crap-rs#182 + #184)
 //!
-//! The 11-row decision-point mapping table — see ADR (a) at
-//! `~/Github/ops/decisions/crap-rs/adr-cyclomatic-decision-points-ts.md`
+//! The 11-row decision-point mapping table — see ADR (a) (D15) at
+//! <https://github.com/breezy-bays-labs/ops/blob/main/decisions/crap-rs/adr-cyclomatic-decision-points-ts.md>
 //! for the rationale + per-row justification:
 //!
 //! | oxc AST node                                              | ContributorKind   |
@@ -911,11 +911,10 @@ impl<'src> FunctionFinder<'src> {
                 n,
             ));
         }
-        // `_` covers all current `LogicalOperator` variants (`And`,
-        // `Or`, `Coalesce`). The arm is intentionally exhaustive: any
-        // future operator variant on `LogicalOperator` falls through
-        // the same scoring path.
-        let _ = le.operator;
+        // Intentional non-discrimination on `le.operator`: all current
+        // variants (`And`, `Or`, `Coalesce`) and any future variant
+        // score identically per ADR (a). See the function rustdoc
+        // above for the mapping table.
         self.visit_expression(&le.left, out, nesting);
         self.visit_expression(&le.right, out, nesting);
     }
