@@ -5,14 +5,14 @@ expression: pretty
 {
   "diff_ref": null,
   "language": "rust",
-  "metric": "cognitive",
+  "metric": "cyclomatic",
   "result": {
     "functions": [
       {
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -36,7 +36,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -60,7 +60,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -84,7 +84,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 50.0,
           "crap": {
@@ -108,7 +108,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -132,7 +132,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -156,7 +156,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -180,7 +180,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -204,7 +204,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -228,7 +228,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -296,7 +296,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 50.0,
           "crap": {
@@ -320,7 +320,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -344,7 +344,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -368,7 +368,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -392,7 +392,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -416,7 +416,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -440,7 +440,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -464,7 +464,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -488,7 +488,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {
@@ -512,7 +512,7 @@ expression: pretty
         "exceeds": false,
         "scored": {
           "complexity": 1,
-          "complexity_metric": "cognitive",
+          "complexity_metric": "cyclomatic",
           "contributors": [],
           "coverage_percent": 100.0,
           "crap": {

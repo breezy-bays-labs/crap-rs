@@ -18,6 +18,7 @@
 use std::process::ExitCode;
 
 use crap_core::cli::AdapterMeta;
+use crap_core::domain::types::ComplexityMetric;
 use crap4ts::adapters::coverage::IstanbulCoverage;
 use crap4ts::adapters::walker::OxcWalker;
 
@@ -30,7 +31,8 @@ const LONG_ABOUT: &str = "CRAP (Change Risk Anti-Patterns) score analyzer for Ty
                          up ahead of the parser ship in the next pipeline.\n\n\
                          When the real adapters land, combines AST complexity (via oxc) with \
                          Istanbul JSON coverage to identify functions that are both complex \
-                         and under-tested. Default metric is cognitive complexity.";
+                         and under-tested. Default metric is cyclomatic complexity; cognitive \
+                         is not yet supported on crap4ts.";
 
 const AFTER_HELP: &str = "\
 EXAMPLES (alpha — walker not yet implemented):
@@ -66,6 +68,10 @@ fn main() -> ExitCode {
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_name: "crap4ts.toml",
         default_excludes: DEFAULT_EXCLUDES,
+        // crap4ts ships --metric cyclomatic as the only supported
+        // metric in 2.0.0; cognitive returns CrapError::MetricNotSupported
+        // from the walker (D5 + locked decision #2).
+        default_metric: ComplexityMetric::Cyclomatic,
     };
     let cli = crap_core::cli::parse_args(&meta);
     let complexity = OxcWalker::new();

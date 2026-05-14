@@ -297,6 +297,16 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
                 .extract(&source, &relative, self.options.metric)
             {
                 Ok(fns) => all_complexities.extend(fns),
+                // `MetricNotSupported` is a configuration mismatch
+                // (caller asked for a metric the adapter doesn't
+                // implement), not a per-file parse failure — bail
+                // immediately so the CLI's renderer surfaces the
+                // adapter-named hint instead of N stuttering
+                // `warning: skipping` lines followed by a
+                // misleading "no functions extracted" error.
+                Err(e @ crate::domain::types::CrapError::MetricNotSupported { .. }) => {
+                    return Err(e.into());
+                }
                 Err(e) => {
                     files_unparseable += 1;
                     eprintln!("warning: skipping {relative}: {e}");
