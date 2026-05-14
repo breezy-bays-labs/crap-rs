@@ -1,0 +1,21 @@
+{
+  "{SRC_ROOT}/branch-heavy.ts": {
+    "path": "{SRC_ROOT}/branch-heavy.ts",
+    "statementMap": {
+      "0": { "start": { "line": 11, "column": 2 }, "end": { "line": 15, "column": 3 } }
+    },
+    "s": { "0": 4 },
+    "branchMap": {},
+    "b": {},
+    "fnMap": {},
+    "f": {}
+  },
+  "{SRC_ROOT}/orphan-sm.ts": {
+    "path": "{SRC_ROOT}/orphan-sm.ts",
+    "s": { "0": 3 },
+    "branchMap": {},
+    "b": {},
+    "fnMap": {},
+    "f": {}
+  }
+}
