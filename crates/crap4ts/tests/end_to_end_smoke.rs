@@ -55,7 +55,15 @@ fn build_jest_fixture() -> (TempDir, PathBuf) {
         std::fs::write(canonical.join(name), content).expect("write fixture");
     }
 
-    let payload = FIXTURE_TEMPLATE.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+    // Normalize path separators before string-substituting into the
+    // JSON template — Windows backslashes would land as invalid `\p`-
+    // style escape sequences in the resulting JSON. Forward slashes
+    // are valid path separators in JSON string values on every
+    // platform. No-op on macOS/linux.
+    let payload = FIXTURE_TEMPLATE.replace(
+        "{SRC_ROOT}",
+        &canonical.to_string_lossy().replace('\\', "/"),
+    );
     std::fs::write(canonical.join("coverage-final.json"), payload)
         .expect("write coverage-final.json");
 
@@ -230,9 +238,15 @@ fn parse_failure_continues_other_files_are_analyzed() {
         }
     }"#;
     let coverage = canonical.join("coverage-final.json");
+    // Same forward-slash normalization rationale as `build_jest_fixture`:
+    // Windows backslashes break JSON parsing of the substituted
+    // template. No-op on macOS/linux.
     std::fs::write(
         &coverage,
-        coverage_template.replace("{SRC_ROOT}", &canonical.to_string_lossy()),
+        coverage_template.replace(
+            "{SRC_ROOT}",
+            &canonical.to_string_lossy().replace('\\', "/"),
+        ),
     )
     .expect("write coverage-final.json");
 

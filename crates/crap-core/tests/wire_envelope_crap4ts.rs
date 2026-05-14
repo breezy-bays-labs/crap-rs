@@ -118,7 +118,16 @@ fn build_fixture() -> (TempDir, PathBuf) {
         std::fs::write(canonical.join(name), content).expect("write fixture");
     }
 
-    let payload = FIXTURE_TEMPLATE.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+    // Normalize path separators before string-substituting into the
+    // JSON template — on Windows `canonical.to_string_lossy()` returns
+    // backslashes, which would land in the JSON as unescaped `\p`-style
+    // sequences and fail JSON parsing. Forward slashes are valid path
+    // separators in JSON string values on every platform crap4ts
+    // currently parses fixtures against. No-op on macOS/linux.
+    let payload = FIXTURE_TEMPLATE.replace(
+        "{SRC_ROOT}",
+        &canonical.to_string_lossy().replace('\\', "/"),
+    );
     std::fs::write(canonical.join("coverage-final.json"), payload)
         .expect("write coverage-final.json");
 
@@ -157,21 +166,24 @@ fn strip_tempdir_paths(value: &mut Value, tempdir: &str) {
 fn envelope() {
     let (_tmp, root) = build_fixture();
     let coverage = root.join("coverage-final.json");
-    let tempdir_str = root.to_string_lossy().to_string();
+    // Match production path normalization: `crap_core::core` emits
+    // forward-slash paths in the JSON envelope on every platform, so
+    // the defense-in-depth `strip_tempdir_paths` needle must be the
+    // forward-slash form too. No-op on macOS/linux where
+    // `to_string_lossy()` already returns forward slashes.
+    let tempdir_str = root.to_string_lossy().replace('\\', "/");
 
+    // Pass `Path` references directly to `Command::arg` (Command::arg
+    // takes `AsRef<OsStr>`, which `Path` impls): avoids forcing
+    // UTF-8 validation through `to_str()` and handles platform-specific
+    // OS string representations on Windows without lossy conversion.
     let output = Command::cargo_bin("crap4ts")
         .expect("crap4ts binary discoverable in workspace")
-        .args([
-            "--coverage",
-            coverage.to_str().expect("coverage path utf-8"),
-            "--src",
-            root.to_str().expect("src path utf-8"),
-            "--threshold",
-            "16",
-            "--format",
-            "json",
-            "--no-fail",
-        ])
+        .arg("--coverage")
+        .arg(&coverage)
+        .arg("--src")
+        .arg(&root)
+        .args(["--threshold", "16", "--format", "json", "--no-fail"])
         .output()
         .expect("crap4ts binary executes");
 
