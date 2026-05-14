@@ -31,6 +31,28 @@ const LOGICAL_TS: &str = include_str!("fixtures/ts-fixtures/logical.ts");
 const NESTED_TS: &str = include_str!("fixtures/ts-fixtures/nested.ts");
 const BROKEN_TS: &str = include_str!("fixtures/ts-fixtures/broken.ts");
 
+// W2.1 (#184): TS-specific decision-point fixtures.
+const TERNARY_TS: &str = include_str!("fixtures/ts-fixtures/ternary.ts");
+const OPTIONAL_CHAIN_TS: &str = include_str!("fixtures/ts-fixtures/optional-chain.ts");
+const NULLISH_TS: &str = include_str!("fixtures/ts-fixtures/nullish.ts");
+const TRY_CATCH_TS: &str = include_str!("fixtures/ts-fixtures/try-catch.ts");
+const JSX_CONDITIONAL_TSX: &str = include_str!("fixtures/ts-fixtures/jsx-conditional.tsx");
+const CHAINED_TERNARY_TS: &str = include_str!("fixtures/ts-fixtures/chained-ternary.ts");
+const CHAINED_LOGICAL_TS: &str = include_str!("fixtures/ts-fixtures/chained-logical.ts");
+const NESTED_IFS_TS: &str = include_str!("fixtures/ts-fixtures/nested-ifs.ts");
+const COMPOUND_IF_AND_TS: &str = include_str!("fixtures/ts-fixtures/compound-if-and.ts");
+
+// W2.2 (#185): file-extension dispatch fixtures.
+const EXAMPLE_TSX: &str = include_str!("fixtures/ts-fixtures/example.tsx");
+const EXAMPLE_JSX: &str = include_str!("fixtures/ts-fixtures/example.jsx");
+const EXAMPLE_JS: &str = include_str!("fixtures/ts-fixtures/example.js");
+const EXAMPLE_MJS: &str = include_str!("fixtures/ts-fixtures/example.mjs");
+const EXAMPLE_CJS: &str = include_str!("fixtures/ts-fixtures/example.cjs");
+
+// #199: class-field arrow + static-block discovery fixtures.
+const CLASS_FIELD_ARROWS_TSX: &str = include_str!("fixtures/ts-fixtures/class-field-arrows.tsx");
+const STATIC_BLOCK_TS: &str = include_str!("fixtures/ts-fixtures/static-block.ts");
+
 fn extract(source: &str, file_path: &str) -> Vec<FunctionComplexity> {
     let walker = OxcWalker::new();
     walker
@@ -267,4 +289,350 @@ fn malformed_typescript_returns_source_parse_with_file_prefix() {
         }
         other => panic!("expected CrapError::SourceParse, got: {other:?}"),
     }
+}
+
+// ── W2.1 (#184) — TS-specific cyclomatic decision points ───────────────
+//
+// Each fixture isolates one decision-point kind so the assertions stay
+// surgical. Mirrors the `cyclomatic_walker.feature` TS-specific outline
+// (`@unwired` until W3.3) row-for-row.
+
+#[test]
+fn ternary_contributes_one_ternary_decision_point() {
+    let fns = extract(TERNARY_TS, "ternary.ts");
+    let f = find_fn(&fns, "abs");
+    assert_eq!(f.complexity, 2, "ternary adds one decision point");
+    assert_eq!(f.contributors.len(), 1);
+    let c = &f.contributors[0];
+    assert_eq!(c.kind, ContributorKind::Ternary);
+    assert_eq!(c.increment, 1);
+    // The ternary lives on line 2 of the fixture (the `return` body).
+    assert_eq!(c.line, 2);
+}
+
+#[test]
+fn optional_member_chain_contributes_one_optional_chain() {
+    let fns = extract(OPTIONAL_CHAIN_TS, "optional-chain.ts");
+    let f = find_fn(&fns, "pickField");
+    // `obj?.nested?.value` parses as ONE ChainExpression (two optional
+    // links inside one chain). Per the BDD outline + ADR (a), this is
+    // ONE OptionalChain contributor — chain count, not link count.
+    assert_eq!(f.complexity, 2, "one ?.chain adds one decision point");
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::OptionalChain);
+}
+
+#[test]
+fn optional_call_chain_contributes_one_optional_chain() {
+    let fns = extract(OPTIONAL_CHAIN_TS, "optional-chain.ts");
+    let f = find_fn(&fns, "callMethod");
+    assert_eq!(f.complexity, 2, "obj?.method() is one chain → one point");
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::OptionalChain);
+}
+
+#[test]
+fn nullish_coalescing_contributes_one_logical_operator() {
+    let fns = extract(NULLISH_TS, "nullish.ts");
+    let f = find_fn(&fns, "withDefault");
+    // `??` maps to LogicalOperator per ADR (a) — no `NullishCoalesce`
+    // variant; the existing enum is sufficient.
+    assert_eq!(f.complexity, 2, "?? adds one decision point");
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::LogicalOperator);
+}
+
+#[test]
+fn try_catch_contributes_one_catch_decision_point() {
+    let fns = extract(TRY_CATCH_TS, "try-catch.ts");
+    let f = find_fn(&fns, "safeParse");
+    // try { ... } catch (e) { ... } scores ONE Catch contributor on
+    // handler.is_some(). The body of `try` adds no decision points.
+    assert_eq!(f.complexity, 2, "try/catch adds one decision point");
+    let catches: Vec<_> = f
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::Catch)
+        .collect();
+    assert_eq!(catches.len(), 1, "expected exactly one Catch contributor");
+    assert_eq!(f.contributors.len(), 1, "no other contributors expected");
+}
+
+#[test]
+fn try_finally_without_handler_contributes_no_catch() {
+    let fns = extract(TRY_CATCH_TS, "try-catch.ts");
+    let f = find_fn(&fns, "noHandler");
+    // `try { } finally { }` has no `handler` → no Catch contributor.
+    // The function body otherwise has no decision points.
+    assert_eq!(
+        f.complexity, 1,
+        "try/finally without handler is not a decision point"
+    );
+    assert!(
+        f.contributors.is_empty(),
+        "expected no contributors for try/finally without handler; got {:?}",
+        f.contributors
+    );
+}
+
+// ── W2.1 (#184) — JSX conditional rendering ────────────────────────────
+
+#[test]
+fn jsx_conditional_decomposes_through_logical_operator() {
+    let fns = extract(JSX_CONDITIONAL_TSX, "jsx-conditional.tsx");
+    let f = find_fn(&fns, "Greeting");
+    // `<div>{visible && <span>...{name}</span>}</div>` — the `&&` is
+    // the ONLY decision point. The JSX wrapper itself adds nothing.
+    // `{name}` is a bare identifier inside a JSXExpressionContainer →
+    // no contributor.
+    assert_eq!(
+        f.complexity, 2,
+        "JSX conditional adds exactly one decision point via the inner &&"
+    );
+    let logical_ops: Vec<_> = f
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::LogicalOperator)
+        .collect();
+    assert_eq!(
+        logical_ops.len(),
+        1,
+        "expected exactly one logical-operator contributor; got {:?}",
+        f.contributors
+    );
+    assert_eq!(f.contributors.len(), 1, "no other contributors expected");
+}
+
+// ── W2.1 (#184) — Compound counting: chains/nestings never flatten ─────
+
+#[test]
+fn chained_ternary_contributes_one_per_question_mark() {
+    let fns = extract(CHAINED_TERNARY_TS, "chained-ternary.ts");
+    let f = find_fn(&fns, "classify");
+    // `x < 0 ? "neg" : x === 0 ? "zero" : "pos"` parses as
+    // `x < 0 ? "neg" : (x === 0 ? "zero" : "pos")` — two nested
+    // ConditionalExpression nodes → CC=3, two Ternary contributors.
+    assert_eq!(f.complexity, 3, "two ?'s add two decision points");
+    let ternaries: Vec<_> = f
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::Ternary)
+        .collect();
+    assert_eq!(
+        ternaries.len(),
+        2,
+        "expected two Ternary contributors (one per ?); got: {:?}",
+        f.contributors
+    );
+}
+
+#[test]
+fn chained_logical_and_contributes_one_per_operator() {
+    let fns = extract(CHAINED_LOGICAL_TS, "chained-logical.ts");
+    let f = find_fn(&fns, "allTruthy");
+    // `a && b && c && d` parses as `((a && b) && c) && d` —
+    // three LogicalExpression nodes → CC=4, three LogicalOperator
+    // contributors. No flattening.
+    assert_eq!(f.complexity, 4, "three &&'s add three decision points");
+    let logicals: Vec<_> = f
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::LogicalOperator)
+        .collect();
+    assert_eq!(
+        logicals.len(),
+        3,
+        "expected three LogicalOperator contributors; got: {:?}",
+        f.contributors
+    );
+}
+
+#[test]
+fn nested_ifs_contribute_one_per_if_branch() {
+    let fns = extract(NESTED_IFS_TS, "nested-ifs.ts");
+    let f = find_fn(&fns, "deep");
+    // Outer `if (a > 0)` + inner `if (b > 0)` — both score even though
+    // the inner is at higher nesting depth. CC = 1 + 2 = 3.
+    assert_eq!(f.complexity, 3, "two nested ifs add two decision points");
+    let ifs: Vec<_> = f
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::IfBranch)
+        .collect();
+    assert_eq!(
+        ifs.len(),
+        2,
+        "expected two IfBranch contributors (one per if, no flattening); got: {:?}",
+        f.contributors
+    );
+}
+
+#[test]
+fn compound_if_and_counts_both_if_and_logical_operator() {
+    let fns = extract(COMPOUND_IF_AND_TS, "compound-if-and.ts");
+    let f = find_fn(&fns, "both");
+    // `if (a && b)` — counts the `if` AND the `&&`. CC = 1 + 2 = 3.
+    assert_eq!(
+        f.complexity, 3,
+        "compound `if (a && b)` should add the if AND the && (no skipping)"
+    );
+    let ifs = f
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::IfBranch)
+        .count();
+    let logicals = f
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::LogicalOperator)
+        .count();
+    assert_eq!(ifs, 1, "expected exactly one IfBranch contributor");
+    assert_eq!(
+        logicals, 1,
+        "expected exactly one LogicalOperator contributor"
+    );
+    assert_eq!(f.contributors.len(), 2, "expected exactly two contributors");
+}
+
+// ── W2.2 (#185) — File-extension dispatch ─────────────────────────────
+//
+// W1.2 wired SourceType::from_path as the canonical dispatcher, which
+// already covers all six AdapterMeta::extensions plus `.mts` / `.cts` /
+// `.d.ts`. These tests verify end-to-end that each extension parses +
+// surfaces at least one function. See PR body for W2.2 plan deviation
+// (no hand-rolled match needed).
+
+#[test]
+fn tsx_fixture_parses_and_discovers_jsx_function() {
+    let fns = extract(EXAMPLE_TSX, "example.tsx");
+    assert!(
+        !fns.is_empty(),
+        "expected at least one function in example.tsx; got: {:?}",
+        fns
+    );
+    assert!(
+        fns.iter().any(|f| f.identity.qualified_name == "Greet"),
+        "expected `Greet` function in example.tsx; got names: {:?}",
+        fns.iter()
+            .map(|f| &f.identity.qualified_name)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn jsx_fixture_parses_and_discovers_default_export_arrow() {
+    let fns = extract(EXAMPLE_JSX, "example.jsx");
+    assert!(
+        !fns.is_empty(),
+        "expected at least one function in example.jsx; got: {:?}",
+        fns
+    );
+    assert!(
+        fns.iter().any(|f| f.identity.qualified_name == "Greet"),
+        "expected `Greet` function in example.jsx; got names: {:?}",
+        fns.iter()
+            .map(|f| &f.identity.qualified_name)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn js_fixture_parses_and_discovers_function() {
+    let fns = extract(EXAMPLE_JS, "example.js");
+    assert!(
+        !fns.is_empty(),
+        "expected at least one function in example.js"
+    );
+    assert!(fns.iter().any(|f| f.identity.qualified_name == "greet"));
+}
+
+#[test]
+fn mjs_fixture_parses_and_discovers_function() {
+    let fns = extract(EXAMPLE_MJS, "example.mjs");
+    assert!(
+        !fns.is_empty(),
+        "expected at least one function in example.mjs"
+    );
+    assert!(fns.iter().any(|f| f.identity.qualified_name == "greet"));
+}
+
+#[test]
+fn cjs_fixture_parses_and_discovers_function() {
+    let fns = extract(EXAMPLE_CJS, "example.cjs");
+    // CJS `module.exports.greet = function (name) { ... }` is an
+    // anonymous FunctionExpression assigned to a member — the walker
+    // records it as `<anonymous>` (the only sentinel that fits without
+    // tracking assignment LHS, which is beyond W2.2 scope). The
+    // contract is "at least one function discovered" per the BDD spec.
+    assert!(
+        !fns.is_empty(),
+        "expected at least one function in example.cjs; got: {:?}",
+        fns
+    );
+}
+
+// ── #199 — Class-field arrows + StaticBlock discovery ────────────────
+
+#[test]
+fn class_field_arrow_initializers_are_discovered_as_functions() {
+    let fns = extract(CLASS_FIELD_ARROWS_TSX, "class-field-arrows.tsx");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+
+    // Three function-entry sites on the class:
+    //   onClick = () => {...}              (PropertyDefinition + arrow)
+    //   onSubmit = (e) => { if (...) ... } (PropertyDefinition + arrow)
+    //   static setup = function () {...}   (PropertyDefinition + FE)
+    let on_click = find_fn(&fns, "Form.onClick");
+    assert_eq!(
+        on_click.complexity, 1,
+        "Form.onClick has no decision points"
+    );
+    assert!(
+        on_click.contributors.is_empty(),
+        "expected no contributors for Form.onClick; got: {:?}",
+        on_click.contributors
+    );
+
+    let on_submit = find_fn(&fns, "Form.onSubmit");
+    assert_eq!(
+        on_submit.complexity, 2,
+        "Form.onSubmit's if-branch adds one decision point"
+    );
+    assert_eq!(on_submit.contributors.len(), 1);
+    assert_eq!(on_submit.contributors[0].kind, ContributorKind::IfBranch);
+
+    // `static setup = function () { return new Form(); }` is a
+    // FunctionExpression initializer — discovered with no decision
+    // points.
+    let setup = find_fn(&fns, "Form.setup");
+    assert_eq!(setup.complexity, 1);
+    assert!(setup.contributors.is_empty());
+
+    // Sanity check: the bare class-field `touched = false;` does NOT
+    // mint a synthetic function (it's a literal initializer, not a
+    // function-shaped expression).
+    assert!(
+        !names.iter().any(|n| n == "Form.touched"),
+        "expected no entry for literal class-field `touched`; got names: {names:?}"
+    );
+}
+
+#[test]
+fn static_block_is_discovered_as_synthetic_static_init_function() {
+    let fns = extract(STATIC_BLOCK_TS, "static-block.ts");
+    let synthetic = find_fn(&fns, "Registry.<static-init>");
+    // The static block contains `if (seed) { ... }` — one IfBranch.
+    assert_eq!(
+        synthetic.complexity, 2,
+        "Registry.<static-init> has one if-branch"
+    );
+    let ifs = synthetic
+        .contributors
+        .iter()
+        .filter(|c| c.kind == ContributorKind::IfBranch)
+        .count();
+    assert_eq!(ifs, 1, "expected one IfBranch in the static block body");
 }
