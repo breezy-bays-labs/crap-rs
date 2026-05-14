@@ -709,6 +709,26 @@ fn w24_truly_malformed_json_still_returns_source_parse_error() {
     }
 }
 
+/// W2.4 parity: `validate()` accepts wrapped shape so the CLI's
+/// pre-flight gate doesn't short-circuit the parse cascade. Without
+/// this parity, `IstanbulCoverage::validate` would reject
+/// `{"coverage-final": {...}}` with "not a recognizable Istanbul JSON
+/// shape" before parse ever ran the unwrap arm, defeating W2.4 at the
+/// CLI layer.
+#[test]
+fn w24_validate_accepts_wrapped_shape_for_cli_parity_with_parse() {
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+    let payload = WRAPPED_FIXTURE.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+    let cov_path = canonical.join("coverage-final.json");
+    std::fs::write(&cov_path, payload).unwrap();
+
+    let parser = IstanbulCoverage::new(canonical);
+    parser
+        .validate(&cov_path)
+        .expect("validate accepts wrapped shape (parity with parse)");
+}
+
 /// W2.4: a valid JSON array (e.g. `[]` or `["foo"]`) is not Istanbul
 /// shape and emits `SchemaUnrecognized` with `received keys: array`
 /// as the detected-type hint (objects-only get key listings).

@@ -458,18 +458,45 @@ impl CoveragePort for IstanbulCoverage {
     /// Pre-flight structural check: parse the file as Istanbul JSON and
     /// require at least one entry with a non-empty `statementMap`.
     ///
+    /// **Tolerance parity with `parse`** (W2.4): mirrors the
+    /// flat-then-unwrap cascade in `parse` so the CLI's pre-flight
+    /// gate doesn't reject wrapped fixtures before parse ever runs.
+    /// The CLI calls `validate` via
+    /// `crap-core::cli::check_coverage_has_data`; a strict pre-flight
+    /// would short-circuit the parse cascade and the
+    /// `SchemaUnrecognized` diagnostic surface for valid-but-wrapped
+    /// emitters.
+    ///
     /// Returns `Err("not a recognizable Istanbul JSON shape: …")` when
-    /// `serde_json::from_str` cannot deserialize the top-level
+    /// neither the flat shape nor a single-level unwrap deserialize as
     /// `HashMap<String, IstanbulCoverageFile>` (drives the
     /// `schema-unrecognized` user-facing error). Returns
-    /// `Err("no statement coverage records")` when every entry has an
-    /// empty `statementMap` (drives the "regenerate coverage" hint).
-    /// CLI layer surfaces these via `AdapterMeta::coverage_hint`.
+    /// `Err("no statement coverage records")` when every consumable
+    /// entry has an empty `statementMap` (drives the "regenerate
+    /// coverage" hint). CLI layer surfaces these via
+    /// `AdapterMeta::coverage_hint`.
     fn validate(&self, path: &Path) -> Result<(), String> {
         let data = std::fs::read_to_string(path)
             .map_err(|e| format!("cannot open {}: {e}", path.display()))?;
-        let raw: HashMap<String, IstanbulCoverageFile> = serde_json::from_str(&data)
-            .map_err(|e| format!("not a recognizable Istanbul JSON shape: {e}"))?;
+
+        // Path 1: flat-shape fast path (jest / vitest / nyc baseline).
+        let raw = match serde_json::from_str::<HashMap<String, IstanbulCoverageFile>>(&data) {
+            Ok(raw) => raw,
+            Err(flat_err) => {
+                // Path 2: try the one-level unwrap before rejecting,
+                // so a wrapped `{"coverage-final": {…flat…}}`
+                // payload still gets through to the parse cascade.
+                // We re-parse as `Value` once and pass it to the
+                // same `try_unwrap` helper `parse` uses; this keeps
+                // the validate / parse contracts symmetric.
+                let value: Value = serde_json::from_str(&data).map_err(|json_err| {
+                    format!("not a recognizable Istanbul JSON shape: {json_err}")
+                })?;
+                Self::try_unwrap(&value)
+                    .ok_or_else(|| format!("not a recognizable Istanbul JSON shape: {flat_err}"))?
+            }
+        };
+
         if raw.values().all(|f| f.statement_map.is_empty()) {
             return Err("no statement coverage records".into());
         }
