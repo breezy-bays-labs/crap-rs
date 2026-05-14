@@ -603,7 +603,16 @@ mod contributor_tests {
     }
 }
 
+/// Error variants returned through the crap-core analysis pipeline.
+///
+/// `#[non_exhaustive]` so adapter crates and downstream embedders can
+/// match against the variants they care about and treat new ones as
+/// "unknown" without their builds breaking — adding a variant stays
+/// non-breaking for downstream matchers. Internal exhaustive matches
+/// inside crap-core itself still need a new arm when a variant is
+/// added (the attribute affects external crates only).
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum CrapError {
     #[error("Invalid complexity value: {0}. Must be >= 1 and finite.")]
     InvalidComplexity(u32),
@@ -613,6 +622,19 @@ pub enum CrapError {
 
     #[error("Failed to parse LCOV data: {0}")]
     LcovParse(String),
+
+    /// The walker was asked to compute a metric the adapter does not
+    /// (yet) support. The variant is metric-named, not adapter-named —
+    /// adapter-specific phrasing comes from `meta.tool_name` at the
+    /// CLI rendering boundary, keeping the domain layer adapter-agnostic
+    /// (per CAO blocking finding on the W2.5 design).
+    ///
+    /// The `metric` field's `Display` impl yields the same lowercase
+    /// token used on the CLI (`cognitive` / `cyclomatic`), so the
+    /// adapter binary's error renderer can splice it directly into a
+    /// user-facing message without a Debug-format leak.
+    #[error("complexity metric `{}` is not yet supported by this adapter", metric)]
+    MetricNotSupported { metric: ComplexityMetric },
 
     #[error("Failed to parse source file: {0}")]
     SourceParse(String),

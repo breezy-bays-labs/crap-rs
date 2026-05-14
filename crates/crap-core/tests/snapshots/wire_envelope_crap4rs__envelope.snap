@@ -5504,9 +5504,9 @@ expression: pretty
             "qualified_name": "main",
             "span": {
               "end_column": 1,
-              "end_line": 100,
+              "end_line": 107,
               "start_column": 1,
-              "start_line": 77
+              "start_line": 78
             }
           }
         },
@@ -11190,9 +11190,9 @@ expression: pretty
             "qualified_name": "main",
             "span": {
               "end_column": 1,
-              "end_line": 100,
+              "end_line": 107,
               "start_column": 1,
-              "start_line": 77
+              "start_line": 78
             }
           }
         },

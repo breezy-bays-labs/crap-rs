@@ -15,16 +15,16 @@
 //! refactors. Separate per-adapter snapshots give cleaner failure
 //! attribution than a single dual-fixture snapshot would.
 //!
-//! ## Why the snapshot bakes in current (W1.3-era) wrong-by-design values
+//! ## Wrong-by-design values that flipped at W2.5
 //!
-//! The current crap4ts envelope reports `language: "rust"` and
-//! `metric: "cognitive"` — both incorrect for a TS adapter. These
-//! values flip in **W2.5** (crap-rs#188) when
-//! `AdapterMeta::default_metric` lands per locked decision #2
-//! (cyclomatic for crap4ts). The flip MUST show up as a deliberate
-//! snapshot diff at W2.5 PR time; until then, locking the
-//! wrong-by-design values into the W1.3 baseline catches accidental
-//! changes between W1.3 and W2.5.
+//! Through W1.3 the snapshot baked `metric: "cognitive"` — wrong for
+//! crap4ts (no cognitive support; default should be cyclomatic).
+//! W2.5 (crap-rs#188) flips this via `AdapterMeta::default_metric`
+//! per locked decision #2. The snapshot was regenerated at W2.5 PR
+//! time; `metric: "cyclomatic"` is now baked. `language: "rust"`
+//! remains wrong-by-design — that flips later when the `Language`
+//! enum lands as part of the deferred HTML-reporter Wave 5
+//! re-launch.
 //!
 //! ## Volatile fields stripped
 //!

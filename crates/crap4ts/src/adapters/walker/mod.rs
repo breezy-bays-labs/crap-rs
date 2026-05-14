@@ -70,13 +70,14 @@ use oxc::syntax::operator::LogicalOperator;
 
 /// Oxc-based complexity extractor implementing `ComplexityPort`.
 ///
-/// W1.2 supports cyclomatic counting only (one increment per decision
-/// point). Cognitive counting lands with W2.5 (#188) alongside the
-/// `MetricNotSupported` error variant — until then, requests for
-/// `ComplexityMetric::Cognitive` receive the same cyclomatic-style
-/// counts. The default metric for `crap4ts` flips to cyclomatic in
-/// W2.5 via `AdapterMeta::default_metric`, so end-to-end runs already
-/// converge on the right semantics.
+/// crap4ts 2.0.0 supports cyclomatic counting only (one increment per
+/// decision point). Cognitive counting is deferred to a follow-up
+/// issue (per shaping Q2); requests for `ComplexityMetric::Cognitive`
+/// return `CrapError::MetricNotSupported`, surfaced as an adapter-
+/// specific user message at the CLI boundary. The default metric for
+/// `crap4ts` is cyclomatic (locked decision #2) wired through
+/// `AdapterMeta::default_metric`, so end-to-end runs without an
+/// explicit `--metric` flag never trip the unsupported-metric path.
 pub struct OxcWalker {
     _private: (),
 }
@@ -102,6 +103,17 @@ impl ComplexityPort for OxcWalker {
         file_path: &str,
         metric: ComplexityMetric,
     ) -> Result<Vec<FunctionComplexity>, CrapError> {
+        // crap4ts 2.0.0 ships --metric cyclomatic only. Cognitive
+        // complexity for TS is deferred to a follow-up issue (per
+        // shaping Q2). Reject upfront so the binary's error renderer
+        // surfaces the adapter-named hint at the CLI boundary
+        // (`metric_unsupported.feature` scenario 1 contract).
+        if metric == ComplexityMetric::Cognitive {
+            return Err(CrapError::MetricNotSupported {
+                metric: ComplexityMetric::Cognitive,
+            });
+        }
+
         let allocator = Allocator::default();
         let source_type =
             SourceType::from_path(Path::new(file_path)).unwrap_or_else(|_| SourceType::ts());

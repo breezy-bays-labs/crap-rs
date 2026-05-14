@@ -251,6 +251,11 @@ mod tests {
             rule_help_uri: "https://example.invalid",
             config_file_name: "fake-adapter.toml",
             default_excludes: &["tests/**", "benches/**", "examples/**"],
+            // Cognitive matches the pre-W2.5 fallthrough — init's
+            // round-trip / comment-rendering assertions don't probe
+            // the metric default; this keeps the field meaningful
+            // without coupling init tests to W2.5 semantics.
+            default_metric: crate::domain::types::ComplexityMetric::Cognitive,
         }
     }
 

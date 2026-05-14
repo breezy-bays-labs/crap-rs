@@ -682,6 +682,16 @@ pub struct AdapterMeta {
     /// empty — init then emits the `# exclude = [ … ]` block without
     /// per-language entries.
     pub default_excludes: &'static [&'static str],
+    /// The default complexity metric the adapter binary uses when
+    /// neither CLI nor config file specifies one. crap4rs sets
+    /// `Cognitive`; crap4ts sets `Cyclomatic` (the only metric crap4ts
+    /// currently supports per `CrapError::MetricNotSupported`).
+    /// Threaded through `merge_effective_inputs` so the binary's
+    /// default flips per adapter without re-litigating the shared CLI
+    /// fallthrough. See ADR (d) `adr-adapter-meta-default-metric.md`
+    /// for the design rationale (per-adapter defaults surface through
+    /// `AdapterMeta`, not crap-core configuration).
+    pub default_metric: ComplexityMetric,
 }
 
 impl AdapterMeta {
@@ -860,10 +870,41 @@ where
         Ok(true) => ExitCode::from(0),
         Ok(false) => ExitCode::from(1),
         Err(e) => {
-            eprintln!("error: {e:#}");
+            render_error(&e, meta);
             ExitCode::from(2)
         }
     }
+}
+
+/// Render an end-of-pipeline error to stderr, special-casing the
+/// `MetricNotSupported` variant so the user sees adapter-specific
+/// phrasing without the generic `error:` prefix (per breadboard W-5
+/// + `metric_unsupported.feature` scenario 1 exact-string contract).
+///
+/// `anyhow::Error::downcast_ref` walks the source chain looking for a
+/// concrete `CrapError`; we use it (not `is::<CrapError>()`) so an
+/// error that was `.context(...)`-wrapped along the way is still
+/// detected. Every other error type falls through to the default
+/// `error: {e:#}` rendering — `{:#}` uses anyhow's alternate Display
+/// which prints the full cause chain.
+fn render_error(err: &anyhow::Error, meta: &AdapterMeta) {
+    if let Some(crap_err) = err.downcast_ref::<crate::domain::types::CrapError>()
+        && let crate::domain::types::CrapError::MetricNotSupported { metric } = crap_err
+    {
+        // Adapter-specific message: `tool_name` + `default_metric`
+        // hint + `tool_info_uri`. The domain layer's variant message
+        // stays adapter-agnostic; adapter-named phrasing lives at
+        // this rendering boundary only. `metric` (input) +
+        // `meta.default_metric` (hint) both use `ComplexityMetric`'s
+        // `Display` impl which yields lowercase wire tokens —
+        // matching CLI input (`cognitive`, not Debug `Cognitive`).
+        eprintln!(
+            "{}: complexity metric `{}` is not yet supported. Use `--metric {}` (the default for {}) or track support at {}.",
+            meta.tool_name, metric, meta.default_metric, meta.tool_name, meta.tool_info_uri,
+        );
+        return;
+    }
+    eprintln!("error: {err:#}");
 }
 
 fn run_inner<P, F>(
@@ -963,7 +1004,16 @@ struct PipelinePrep<P: ParseDiagnostic> {
     delta_state: Option<DeltaState<P>>,
 }
 
-fn merge_effective_inputs(cli: &Cli, file_config: &Option<FileConfig>) -> EffectiveInputs {
+/// Merge CLI flags, optional file config, and adapter defaults into a
+/// concrete `EffectiveInputs`. `meta.default_metric` is the
+/// load-bearing fallthrough — each adapter binary picks its own
+/// sensible default (crap4rs: `Cognitive`; crap4ts: `Cyclomatic`) so
+/// the shared CLI stays adapter-agnostic. See ADR (d).
+fn merge_effective_inputs(
+    cli: &Cli,
+    file_config: &Option<FileConfig>,
+    meta: &AdapterMeta,
+) -> EffectiveInputs {
     let src = cli
         .input
         .src
@@ -975,7 +1025,7 @@ fn merge_effective_inputs(cli: &Cli, file_config: &Option<FileConfig>) -> Effect
         .metric
         .map(Into::into)
         .or_else(|| file_config.as_ref().and_then(|c| c.metric))
-        .unwrap_or_default();
+        .unwrap_or(meta.default_metric);
     let (threshold_config, threshold) = merge_threshold(cli, file_config);
     let exclude = merge_exclude(cli, file_config);
     EffectiveInputs {
@@ -1092,7 +1142,7 @@ where
     )?;
     view_args::validate_view_args(cli)?;
 
-    let inputs = merge_effective_inputs(cli, &file_config);
+    let inputs = merge_effective_inputs(cli, &file_config, meta);
     let coverage_path = validate_runtime_inputs(cli, &inputs, meta)?;
 
     // Canonicalize the effective `src` (post-config-merge) and hand
@@ -2430,7 +2480,7 @@ mod tests {
     #[test]
     fn merge_effective_inputs_default_src() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        let inputs = merge_effective_inputs(&cli, &None);
+        let inputs = merge_effective_inputs(&cli, &None, &fake_meta());
         assert_eq!(inputs.src, PathBuf::from("src"));
     }
 
@@ -2441,7 +2491,7 @@ mod tests {
             src: Some(PathBuf::from("from-config/")),
             ..FileConfig::default()
         });
-        let inputs = merge_effective_inputs(&cli, &file_config);
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
         assert_eq!(inputs.src, PathBuf::from("crates/"));
     }
 
@@ -2452,15 +2502,38 @@ mod tests {
             src: Some(PathBuf::from("from-config/")),
             ..FileConfig::default()
         });
-        let inputs = merge_effective_inputs(&cli, &file_config);
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
         assert_eq!(inputs.src, PathBuf::from("from-config/"));
     }
 
     #[test]
-    fn merge_effective_inputs_default_metric_is_cognitive() {
+    fn merge_effective_inputs_uses_adapter_default_metric_cognitive() {
+        // Replaces the pre-W2.5 `merge_effective_inputs_default_metric_is_cognitive`
+        // test. Now that the fallthrough comes from `meta.default_metric`
+        // (not `ComplexityMetric::default()`), the assertion is "the
+        // adapter's default flows through when neither CLI nor config
+        // override it." crap4rs sets this to `Cognitive`.
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        let inputs = merge_effective_inputs(&cli, &None);
+        let meta = AdapterMeta {
+            default_metric: ComplexityMetric::Cognitive,
+            ..fake_meta()
+        };
+        let inputs = merge_effective_inputs(&cli, &None, &meta);
         assert!(matches!(inputs.metric, ComplexityMetric::Cognitive));
+    }
+
+    #[test]
+    fn merge_effective_inputs_uses_adapter_default_metric_cyclomatic() {
+        // Replaces the pre-W2.5 `merge_effective_inputs_default_metric_is_cognitive`
+        // test. Mirror of the Cognitive case for the crap4ts adapter
+        // (locked decision #2: crap4ts default = cyclomatic).
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let meta = AdapterMeta {
+            default_metric: ComplexityMetric::Cyclomatic,
+            ..fake_meta()
+        };
+        let inputs = merge_effective_inputs(&cli, &None, &meta);
+        assert!(matches!(inputs.metric, ComplexityMetric::Cyclomatic));
     }
 
     #[test]
@@ -2470,14 +2543,14 @@ mod tests {
             metric: Some(ComplexityMetric::Cognitive),
             ..FileConfig::default()
         });
-        let inputs = merge_effective_inputs(&cli, &file_config);
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
         assert!(matches!(inputs.metric, ComplexityMetric::Cyclomatic));
     }
 
     #[test]
     fn merge_effective_inputs_threshold_default() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        let inputs = merge_effective_inputs(&cli, &None);
+        let inputs = merge_effective_inputs(&cli, &None, &fake_meta());
         assert_eq!(inputs.threshold, DEFAULT_THRESHOLD);
     }
 
@@ -2488,8 +2561,26 @@ mod tests {
             exclude: Some(vec!["benches/**".to_string()]),
             ..FileConfig::default()
         });
-        let inputs = merge_effective_inputs(&cli, &file_config);
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
         assert_eq!(inputs.exclude, vec!["tests/**", "benches/**"]);
+    }
+
+    #[test]
+    fn merge_effective_inputs_config_metric_wins_over_adapter_default() {
+        // Config-file metric should still beat the adapter default —
+        // adapter default is the FINAL fallthrough, below CLI and
+        // config-file precedence.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            metric: Some(ComplexityMetric::Cyclomatic),
+            ..FileConfig::default()
+        });
+        let meta = AdapterMeta {
+            default_metric: ComplexityMetric::Cognitive,
+            ..fake_meta()
+        };
+        let inputs = merge_effective_inputs(&cli, &file_config, &meta);
+        assert!(matches!(inputs.metric, ComplexityMetric::Cyclomatic));
     }
 
     // ── compute_exit_code tests ────────────────────────────────────────
@@ -2579,6 +2670,11 @@ mod tests {
             rule_help_uri: "https://example.invalid/fake-adapter#rules",
             config_file_name: "fake-adapter.toml",
             default_excludes: &["fixtures/**"],
+            // `Cognitive` preserves the pre-W2.5 fallthrough semantics
+            // for tests that don't care which default they get (the two
+            // tests that DO care construct their own AdapterMeta with
+            // an explicit `default_metric`).
+            default_metric: ComplexityMetric::Cognitive,
         }
     }
 

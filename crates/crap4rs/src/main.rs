@@ -16,6 +16,7 @@
 use std::process::ExitCode;
 
 use crap_core::cli::AdapterMeta;
+use crap_core::domain::types::ComplexityMetric;
 use crap4rs::adapters::complexity::SynComplexityAdapter;
 use crap4rs::adapters::coverage::LcovParser;
 
@@ -88,6 +89,12 @@ fn main() -> ExitCode {
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_name: "crap4rs.toml",
         default_excludes: DEFAULT_EXCLUDES,
+        // crap4rs supports both cognitive and cyclomatic. Cognitive
+        // remains the default (locked decision #2) — explicit here so
+        // the per-adapter default flows through `AdapterMeta` for both
+        // adapters uniformly (no implicit `ComplexityMetric::default()`
+        // fallthrough anywhere in crap-core).
+        default_metric: ComplexityMetric::Cognitive,
     };
     let cli = crap_core::cli::parse_args(&meta);
     let complexity = SynComplexityAdapter::new();
