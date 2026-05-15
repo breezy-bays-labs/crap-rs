@@ -1,0 +1,6068 @@
+{
+  "$schema": "",
+  "version": "1.0.1",
+  "timestamp": "2026-05-15T01:43:29.966Z",
+  "config": {
+    "defaultThreshold": 8,
+    "overrides": [
+      {
+        "glob": "src/domain/**",
+        "threshold": 8
+      },
+      {
+        "glob": "src/adapters/**",
+        "threshold": 12
+      },
+      {
+        "glob": "src/cli/**",
+        "threshold": 12
+      }
+    ]
+  },
+  "summary": {
+    "totalFunctions": 137,
+    "totalFiles": 28,
+    "exceedingThreshold": 8,
+    "exceedingPercent": 6,
+    "averageCrap": 5.3,
+    "medianCrap": 4,
+    "maxCrap": {
+      "value": 56,
+      "riskLevel": "high"
+    },
+    "worstFunction": {
+      "filePath": "src/adapters/complexity/typescript-eslint.ts",
+      "qualifiedName": "TypeScriptEslintComplexityAdapter.handleExportDefault",
+      "span": {
+        "startLine": 122,
+        "startColumn": 2,
+        "endLine": 144,
+        "endColumn": 3
+      }
+    },
+    "distribution": {
+      "low": 87,
+      "acceptable": 28,
+      "moderate": 21,
+      "high": 1
+    },
+    "crapLoad": 116
+  },
+  "functions": [
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/facade.ts",
+          "qualifiedName": "ComplexityExtractionError.constructor",
+          "span": {
+            "startLine": 8,
+            "startColumn": 2,
+            "endLine": 13,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "isASTNode",
+          "span": {
+            "startLine": 35,
+            "startColumn": 0,
+            "endLine": 38,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.extract",
+          "span": {
+            "startLine": 58,
+            "startColumn": 2,
+            "endLine": 69,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.walkTopLevel",
+          "span": {
+            "startLine": 80,
+            "startColumn": 2,
+            "endLine": 108,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 8,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 8,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.handleVariableDeclaration",
+          "span": {
+            "startLine": 145,
+            "startColumn": 2,
+            "endLine": 171,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.walkClass",
+          "span": {
+            "startLine": 172,
+            "startColumn": 2,
+            "endLine": 205,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 9,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 9,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.getPropertyName",
+          "span": {
+            "startLine": 206,
+            "startColumn": 2,
+            "endLine": 211,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 40,
+        "crap": {
+          "value": 4.94,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.countComplexity",
+          "span": {
+            "startLine": 241,
+            "startColumn": 2,
+            "endLine": 273,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 9,
+        "coveragePercent": 94.44,
+        "crap": {
+          "value": 9.01,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.traverseChildren",
+          "span": {
+            "startLine": 274,
+            "startColumn": 2,
+            "endLine": 295,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 9,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 9,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.toFunctionComplexity",
+          "span": {
+            "startLine": 310,
+            "startColumn": 2,
+            "endLine": 328,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/detect.ts",
+          "qualifiedName": "detectCoverageFormat",
+          "span": {
+            "startLine": 3,
+            "startColumn": 7,
+            "endLine": 35,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 10,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 10,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/facade.ts",
+          "qualifiedName": "CoverageParseError.constructor",
+          "span": {
+            "startLine": 12,
+            "startColumn": 2,
+            "endLine": 17,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/facade.ts",
+          "qualifiedName": "UnsupportedFormatError.constructor",
+          "span": {
+            "startLine": 20,
+            "startColumn": 2,
+            "endLine": 26,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/facade.ts",
+          "qualifiedName": "createAutoDetectCoveragePort",
+          "span": {
+            "startLine": 42,
+            "startColumn": 7,
+            "endLine": 68,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 75,
+        "crap": {
+          "value": 1.02,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/facade.ts",
+          "qualifiedName": "parseCoverage",
+          "span": {
+            "startLine": 71,
+            "startColumn": 7,
+            "endLine": 100,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 10,
+        "coveragePercent": 85.71,
+        "crap": {
+          "value": 10.29,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/facade.ts",
+          "qualifiedName": "parseCoverageFile",
+          "span": {
+            "startLine": 103,
+            "startColumn": 7,
+            "endLine": 138,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/facade.ts",
+          "qualifiedName": "detectAndValidateFormat",
+          "span": {
+            "startLine": 141,
+            "startColumn": 0,
+            "endLine": 148,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/istanbul.ts",
+          "qualifiedName": "isWithinSpan",
+          "span": {
+            "startLine": 44,
+            "startColumn": 0,
+            "endLine": 62,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 77.78,
+        "crap": {
+          "value": 7.54,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/istanbul.ts",
+          "qualifiedName": "computeLineCoverage",
+          "span": {
+            "startLine": 63,
+            "startColumn": 0,
+            "endLine": 85,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 7,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/istanbul.ts",
+          "qualifiedName": "computeBranchCoverage",
+          "span": {
+            "startLine": 86,
+            "startColumn": 0,
+            "endLine": 114,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 8,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 8,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/istanbul.ts",
+          "qualifiedName": "findLongestCommonPrefix",
+          "span": {
+            "startLine": 115,
+            "startColumn": 0,
+            "endLine": 137,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 8,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 8,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/istanbul.ts",
+          "qualifiedName": "normalizePath",
+          "span": {
+            "startLine": 138,
+            "startColumn": 0,
+            "endLine": 146,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/istanbul.ts",
+          "qualifiedName": "IstanbulCoverageAdapter.constructor",
+          "span": {
+            "startLine": 152,
+            "startColumn": 2,
+            "endLine": 155,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/istanbul.ts",
+          "qualifiedName": "IstanbulCoverageAdapter.parse",
+          "span": {
+            "startLine": 156,
+            "startColumn": 2,
+            "endLine": 224,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 10,
+        "coveragePercent": 95.83,
+        "crap": {
+          "value": 10.01,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "buildLineOffsetTable",
+          "span": {
+            "startLine": 41,
+            "startColumn": 7,
+            "endLine": 50,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "byteOffsetToLineFromTable",
+          "span": {
+            "startLine": 55,
+            "startColumn": 7,
+            "endLine": 71,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "byteOffsetToLineApprox",
+          "span": {
+            "startLine": 74,
+            "startColumn": 0,
+            "endLine": 77,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "stripFileProtocol",
+          "span": {
+            "startLine": 80,
+            "startColumn": 0,
+            "endLine": 92,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 83.33,
+        "crap": {
+          "value": 3.04,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "findLongestCommonPrefix",
+          "span": {
+            "startLine": 93,
+            "startColumn": 0,
+            "endLine": 113,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 8,
+        "coveragePercent": 78.57,
+        "crap": {
+          "value": 8.63,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "normalizePath",
+          "span": {
+            "startLine": 114,
+            "startColumn": 0,
+            "endLine": 121,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "computeByteCoverage",
+          "span": {
+            "startLine": 122,
+            "startColumn": 0,
+            "endLine": 144,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 90.91,
+        "crap": {
+          "value": 4.01,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "computeSpan",
+          "span": {
+            "startLine": 145,
+            "startColumn": 0,
+            "endLine": 166,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "V8CoverageAdapter.constructor",
+          "span": {
+            "startLine": 172,
+            "startColumn": 2,
+            "endLine": 175,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "V8CoverageAdapter.parse",
+          "span": {
+            "startLine": 176,
+            "startColumn": 2,
+            "endLine": 204,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 4,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "V8CoverageAdapter.validateAndExtractScripts",
+          "span": {
+            "startLine": 205,
+            "startColumn": 2,
+            "endLine": 224,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/coverage/v8.ts",
+          "qualifiedName": "V8CoverageAdapter.processScript",
+          "span": {
+            "startLine": 225,
+            "startColumn": 2,
+            "endLine": 267,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 10,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 10,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/console.ts",
+          "qualifiedName": "ConsoleReporter.constructor",
+          "span": {
+            "startLine": 13,
+            "startColumn": 2,
+            "endLine": 17,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/console.ts",
+          "qualifiedName": "ConsoleReporter.format",
+          "span": {
+            "startLine": 18,
+            "startColumn": 2,
+            "endLine": 111,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 9,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 9,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/console.ts",
+          "qualifiedName": "ConsoleReporter.colorizeCoverage",
+          "span": {
+            "startLine": 112,
+            "startColumn": 2,
+            "endLine": 117,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/console.ts",
+          "qualifiedName": "ConsoleReporter.version",
+          "span": {
+            "startLine": 118,
+            "startColumn": 2,
+            "endLine": 121,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/json.ts",
+          "qualifiedName": "JsonReporter.format",
+          "span": {
+            "startLine": 6,
+            "startColumn": 2,
+            "endLine": 21,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/markdown.ts",
+          "qualifiedName": "MarkdownReporter.format",
+          "span": {
+            "startLine": 5,
+            "startColumn": 2,
+            "endLine": 60,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/markdown.ts",
+          "qualifiedName": "MarkdownReporter.appendTable",
+          "span": {
+            "startLine": 61,
+            "startColumn": 2,
+            "endLine": 78,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/version.ts",
+          "qualifiedName": "PackageJsonNotFoundError.constructor",
+          "span": {
+            "startLine": 16,
+            "startColumn": 2,
+            "endLine": 20,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/version.ts",
+          "qualifiedName": "readPackageVersion",
+          "span": {
+            "startLine": 26,
+            "startColumn": 7,
+            "endLine": 30,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/version.ts",
+          "qualifiedName": "readPackageVersionFrom",
+          "span": {
+            "startLine": 31,
+            "startColumn": 7,
+            "endLine": 56,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 90.91,
+        "crap": {
+          "value": 7.04,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/version.ts",
+          "qualifiedName": "isErrnoException",
+          "span": {
+            "startLine": 57,
+            "startColumn": 0,
+            "endLine": 60,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/reporters/version.ts",
+          "qualifiedName": "findPackageJson",
+          "span": {
+            "startLine": 61,
+            "startColumn": 0,
+            "endLine": 74,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/cli.ts",
+          "qualifiedName": "readVersion",
+          "span": {
+            "startLine": 41,
+            "startColumn": 0,
+            "endLine": 51,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "findConfigFile",
+          "span": {
+            "startLine": 48,
+            "startColumn": 7,
+            "endLine": 72,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 7,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "loadConfigFile",
+          "span": {
+            "startLine": 79,
+            "startColumn": 7,
+            "endLine": 103,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 6,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "extractFromPackageJson",
+          "span": {
+            "startLine": 104,
+            "startColumn": 0,
+            "endLine": 118,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 4,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "extractConfigExport",
+          "span": {
+            "startLine": 119,
+            "startColumn": 0,
+            "endLine": 128,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "createDefaultImport",
+          "span": {
+            "startLine": 129,
+            "startColumn": 0,
+            "endLine": 137,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "resolveConfig",
+          "span": {
+            "startLine": 183,
+            "startColumn": 7,
+            "endLine": 204,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "firstDefined",
+          "span": {
+            "startLine": 205,
+            "startColumn": 0,
+            "endLine": 216,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "parseEnvVars",
+          "span": {
+            "startLine": 226,
+            "startColumn": 0,
+            "endLine": 246,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 8,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 8,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/config.ts",
+          "qualifiedName": "configToThresholdConfig",
+          "span": {
+            "startLine": 252,
+            "startColumn": 7,
+            "endLine": 267,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/diff.ts",
+          "qualifiedName": "createExecAdapter",
+          "span": {
+            "startLine": 22,
+            "startColumn": 7,
+            "endLine": 32,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/diff.ts",
+          "qualifiedName": "handleExecError",
+          "span": {
+            "startLine": 37,
+            "startColumn": 0,
+            "endLine": 58,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 6,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/diff.ts",
+          "qualifiedName": "parseUnifiedDiff",
+          "span": {
+            "startLine": 70,
+            "startColumn": 7,
+            "endLine": 124,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 9,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 9,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/diff.ts",
+          "qualifiedName": "getChangedFiles",
+          "span": {
+            "startLine": 137,
+            "startColumn": 7,
+            "endLine": 167,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/discover.ts",
+          "qualifiedName": "discoverCoverage",
+          "span": {
+            "startLine": 41,
+            "startColumn": 7,
+            "endLine": 68,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/discover.ts",
+          "qualifiedName": "discoverSourceRoot",
+          "span": {
+            "startLine": 79,
+            "startColumn": 7,
+            "endLine": 124,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 11,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 11,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/discover.ts",
+          "qualifiedName": "formatCoverageNotFoundError",
+          "span": {
+            "startLine": 131,
+            "startColumn": 7,
+            "endLine": 147,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/discover.ts",
+          "qualifiedName": "extractBaseDir",
+          "span": {
+            "startLine": 159,
+            "startColumn": 0,
+            "endLine": 172,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 6,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "CliOptionError.constructor",
+          "span": {
+            "startLine": 9,
+            "startColumn": 2,
+            "endLine": 13,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "validateMutualExclusions",
+          "span": {
+            "startLine": 15,
+            "startColumn": 7,
+            "endLine": 36,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 7,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "parseBreakdownCliFlag",
+          "span": {
+            "startLine": 45,
+            "startColumn": 7,
+            "endLine": 58,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 7,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "createReporter",
+          "span": {
+            "startLine": 66,
+            "startColumn": 7,
+            "endLine": 82,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "applyFilters",
+          "span": {
+            "startLine": 83,
+            "startColumn": 7,
+            "endLine": 106,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 8,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 8,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "sortVerdicts",
+          "span": {
+            "startLine": 107,
+            "startColumn": 7,
+            "endLine": 141,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "formatSummaryLine",
+          "span": {
+            "startLine": 142,
+            "startColumn": 7,
+            "endLine": 147,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze-file.ts",
+          "qualifiedName": "analyzeFile",
+          "span": {
+            "startLine": 41,
+            "startColumn": 7,
+            "endLine": 79,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 7,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze-file.ts",
+          "qualifiedName": "scoreUnmatchedFunction",
+          "span": {
+            "startLine": 106,
+            "startColumn": 0,
+            "endLine": 126,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze-file.ts",
+          "qualifiedName": "loadDefaults",
+          "span": {
+            "startLine": 138,
+            "startColumn": 0,
+            "endLine": 142,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "analyze",
+          "span": {
+            "startLine": 32,
+            "startColumn": 7,
+            "endLine": 105,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "resolveOptions",
+          "span": {
+            "startLine": 127,
+            "startColumn": 0,
+            "endLine": 143,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 5,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "buildThresholdConfig",
+          "span": {
+            "startLine": 144,
+            "startColumn": 0,
+            "endLine": 157,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "scoreUnmatchedComplexities",
+          "span": {
+            "startLine": 211,
+            "startColumn": 0,
+            "endLine": 237,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "collectUnmatched",
+          "span": {
+            "startLine": 238,
+            "startColumn": 0,
+            "endLine": 250,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "unmatchedToWarning",
+          "span": {
+            "startLine": 274,
+            "startColumn": 0,
+            "endLine": 290,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "emptyResult",
+          "span": {
+            "startLine": 291,
+            "startColumn": 0,
+            "endLine": 301,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "loadDefaults",
+          "span": {
+            "startLine": 302,
+            "startColumn": 0,
+            "endLine": 306,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/defaults.ts",
+          "qualifiedName": "findFilesRecursive",
+          "span": {
+            "startLine": 11,
+            "startColumn": 0,
+            "endLine": 41,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/defaults.ts",
+          "qualifiedName": "createDefaultDeps",
+          "span": {
+            "startLine": 44,
+            "startColumn": 7,
+            "endLine": 58,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/define-config.ts",
+          "qualifiedName": "defineConfig",
+          "span": {
+            "startLine": 19,
+            "startColumn": 7,
+            "endLine": 22,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "normalizeSlashes",
+          "span": {
+            "startLine": 6,
+            "startColumn": 0,
+            "endLine": 9,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "stripLeadingDotSlash",
+          "span": {
+            "startLine": 10,
+            "startColumn": 0,
+            "endLine": 13,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "resolveIncludePatterns",
+          "span": {
+            "startLine": 43,
+            "startColumn": 7,
+            "endLine": 65,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 4,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "canonicalizePath",
+          "span": {
+            "startLine": 66,
+            "startColumn": 0,
+            "endLine": 82,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 87.5,
+        "crap": {
+          "value": 5.05,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "isErrnoException",
+          "span": {
+            "startLine": 83,
+            "startColumn": 0,
+            "endLine": 86,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "canonicalizeFromExistingAncestor",
+          "span": {
+            "startLine": 87,
+            "startColumn": 0,
+            "endLine": 112,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 84.62,
+        "crap": {
+          "value": 7.18,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/prepare-output.ts",
+          "qualifiedName": "prepareForJsonOutput",
+          "span": {
+            "startLine": 4,
+            "startColumn": 7,
+            "endLine": 22,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/crap.ts",
+          "qualifiedName": "computeCrap",
+          "span": {
+            "startLine": 4,
+            "startColumn": 7,
+            "endLine": 23,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 4,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/crap.ts",
+          "qualifiedName": "roundTo2",
+          "span": {
+            "startLine": 24,
+            "startColumn": 0,
+            "endLine": 27,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/crap.ts",
+          "qualifiedName": "classifyRisk",
+          "span": {
+            "startLine": 28,
+            "startColumn": 7,
+            "endLine": 34,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 4,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "spansOverlap",
+          "span": {
+            "startLine": 15,
+            "startColumn": 7,
+            "endLine": 18,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "spanContains",
+          "span": {
+            "startLine": 22,
+            "startColumn": 7,
+            "endLine": 25,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "overlapRatio",
+          "span": {
+            "startLine": 30,
+            "startColumn": 7,
+            "endLine": 40,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "isBetterCandidate",
+          "span": {
+            "startLine": 76,
+            "startColumn": 0,
+            "endLine": 81,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 60,
+        "crap": {
+          "value": 5.02,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "selectBestCandidate",
+          "span": {
+            "startLine": 82,
+            "startColumn": 0,
+            "endLine": 93,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 4,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "groupBy",
+          "span": {
+            "startLine": 99,
+            "startColumn": 7,
+            "endLine": 112,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "defaultSpanMatcher",
+          "span": {
+            "startLine": 125,
+            "startColumn": 7,
+            "endLine": 177,
+            "endColumn": 2
+          }
+        },
+        "cyclomaticComplexity": 8,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 8,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/summary.ts",
+          "qualifiedName": "computeSummary",
+          "span": {
+            "startLine": 15,
+            "startColumn": 7,
+            "endLine": 72,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/summary.ts",
+          "qualifiedName": "emptyDistribution",
+          "span": {
+            "startLine": 73,
+            "startColumn": 0,
+            "endLine": 81,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/summary.ts",
+          "qualifiedName": "computeMedian",
+          "span": {
+            "startLine": 82,
+            "startColumn": 0,
+            "endLine": 90,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/summary.ts",
+          "qualifiedName": "findWorst",
+          "span": {
+            "startLine": 91,
+            "startColumn": 0,
+            "endLine": 105,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 3,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/summary.ts",
+          "qualifiedName": "roundTo2",
+          "span": {
+            "startLine": 116,
+            "startColumn": 0,
+            "endLine": 119,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/threshold.ts",
+          "qualifiedName": "createThresholdConfig",
+          "span": {
+            "startLine": 18,
+            "startColumn": 7,
+            "endLine": 34,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 6,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/threshold.ts",
+          "qualifiedName": "resolvePreset",
+          "span": {
+            "startLine": 35,
+            "startColumn": 0,
+            "endLine": 46,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 4,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/types.ts",
+          "qualifiedName": "InvalidComplexityError.constructor",
+          "span": {
+            "startLine": 223,
+            "startColumn": 2,
+            "endLine": 227,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/types.ts",
+          "qualifiedName": "InvalidCoverageError.constructor",
+          "span": {
+            "startLine": 230,
+            "startColumn": 2,
+            "endLine": 234,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 100,
+        "crap": {
+          "value": 1,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/facade.ts",
+          "qualifiedName": "extractComplexity",
+          "span": {
+            "startLine": 19,
+            "startColumn": 7,
+            "endLine": 29,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.walkProgram",
+          "span": {
+            "startLine": 70,
+            "startColumn": 2,
+            "endLine": 79,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.handleFunctionDeclaration",
+          "span": {
+            "startLine": 109,
+            "startColumn": 2,
+            "endLine": 121,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 12,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.handleExportDefault",
+          "span": {
+            "startLine": 122,
+            "startColumn": 2,
+            "endLine": 144,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 56,
+          "riskLevel": "high"
+        }
+      },
+      "threshold": 12,
+      "exceeds": true
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.createScope",
+          "span": {
+            "startLine": 212,
+            "startColumn": 2,
+            "endLine": 230,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.countComplexityInFunction",
+          "span": {
+            "startLine": 231,
+            "startColumn": 2,
+            "endLine": 240,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.addContributor",
+          "span": {
+            "startLine": 296,
+            "startColumn": 2,
+            "endLine": 309,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "resolveThresholdFlag",
+          "span": {
+            "startLine": 37,
+            "startColumn": 7,
+            "endLine": 44,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 12,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "coerceArrayOption",
+          "span": {
+            "startLine": 59,
+            "startColumn": 7,
+            "endLine": 65,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 12,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 12,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze-file.ts",
+          "qualifiedName": "scoreMatchedFunction",
+          "span": {
+            "startLine": 82,
+            "startColumn": 0,
+            "endLine": 105,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze-file.ts",
+          "qualifiedName": "loadFileCoverages",
+          "span": {
+            "startLine": 127,
+            "startColumn": 0,
+            "endLine": 137,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "loadCoverageData",
+          "span": {
+            "startLine": 158,
+            "startColumn": 0,
+            "endLine": 171,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "flattenCoverages",
+          "span": {
+            "startLine": 172,
+            "startColumn": 7,
+            "endLine": 177,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "extractCoveragePercent",
+          "span": {
+            "startLine": 178,
+            "startColumn": 7,
+            "endLine": 189,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 12,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 8,
+      "exceeds": true
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "scoreMatchedPairs",
+          "span": {
+            "startLine": 190,
+            "startColumn": 0,
+            "endLine": 210,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "collectWarnings",
+          "span": {
+            "startLine": 251,
+            "startColumn": 0,
+            "endLine": 273,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 30,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 8,
+      "exceeds": true
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "normalizeProjectPath",
+          "span": {
+            "startLine": 14,
+            "startColumn": 7,
+            "endLine": 24,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "resolveInputPath",
+          "span": {
+            "startLine": 25,
+            "startColumn": 7,
+            "endLine": 35,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 12,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 8,
+      "exceeds": true
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "normalizeGlobPattern",
+          "span": {
+            "startLine": 36,
+            "startColumn": 7,
+            "endLine": 42,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 2,
+          "riskLevel": "low"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/contributors.ts",
+          "qualifiedName": "selectContributors",
+          "span": {
+            "startLine": 7,
+            "startColumn": 7,
+            "endLine": 20,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 30,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 8,
+      "exceeds": true
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/filtering.ts",
+          "qualifiedName": "shouldInclude",
+          "span": {
+            "startLine": 11,
+            "startColumn": 7,
+            "endLine": 20,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 12,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 8,
+      "exceeds": true
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "findCandidates",
+          "span": {
+            "startLine": 50,
+            "startColumn": 0,
+            "endLine": 71,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 20,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 8,
+      "exceeds": true
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/summary.ts",
+          "qualifiedName": "computeDistribution",
+          "span": {
+            "startLine": 106,
+            "startColumn": 0,
+            "endLine": 115,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 6,
+          "riskLevel": "acceptable"
+        }
+      },
+      "threshold": 8,
+      "exceeds": false
+    },
+    {
+      "scored": {
+        "identity": {
+          "filePath": "src/domain/threshold.ts",
+          "qualifiedName": "resolveThreshold",
+          "span": {
+            "startLine": 51,
+            "startColumn": 7,
+            "endLine": 63,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "coveragePercent": 0,
+        "crap": {
+          "value": 12,
+          "riskLevel": "moderate"
+        }
+      },
+      "threshold": 8,
+      "exceeds": true
+    }
+  ],
+  "unmatched": [
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/adapters/complexity/facade.ts",
+          "qualifiedName": "extractComplexity",
+          "span": {
+            "startLine": 19,
+            "startColumn": 7,
+            "endLine": 29,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "contributors": [
+          {
+            "kind": "catch",
+            "line": 25,
+            "column": 4
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 6,
+        "riskLevel": "acceptable"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.walkProgram",
+          "span": {
+            "startLine": 70,
+            "startColumn": 2,
+            "endLine": 79,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "contributors": [
+          {
+            "kind": "for-loop",
+            "line": 75,
+            "column": 4
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 6,
+        "riskLevel": "acceptable"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.handleFunctionDeclaration",
+          "span": {
+            "startLine": 109,
+            "startColumn": 2,
+            "endLine": 121,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 115,
+            "column": 4
+          },
+          {
+            "kind": "logical-operator",
+            "line": 115,
+            "column": 8,
+            "operator": "&&"
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 12,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.handleExportDefault",
+          "span": {
+            "startLine": 122,
+            "startColumn": 2,
+            "endLine": 144,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 7,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 128,
+            "column": 4
+          },
+          {
+            "kind": "if-branch",
+            "line": 130,
+            "column": 4
+          },
+          {
+            "kind": "logical-operator",
+            "line": 131,
+            "column": 6,
+            "operator": "||"
+          },
+          {
+            "kind": "logical-operator",
+            "line": 131,
+            "column": 6,
+            "operator": "||"
+          },
+          {
+            "kind": "ternary",
+            "line": 136,
+            "column": 8
+          },
+          {
+            "kind": "logical-operator",
+            "line": 136,
+            "column": 8,
+            "operator": "&&"
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 56,
+        "riskLevel": "high"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.createScope",
+          "span": {
+            "startLine": 212,
+            "startColumn": 2,
+            "endLine": 230,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "contributors": []
+      },
+      "worstCaseCrap": {
+        "value": 2,
+        "riskLevel": "low"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.countComplexityInFunction",
+          "span": {
+            "startLine": 231,
+            "startColumn": 2,
+            "endLine": 240,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "contributors": []
+      },
+      "worstCaseCrap": {
+        "value": 2,
+        "riskLevel": "low"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/adapters/complexity/typescript-eslint.ts",
+          "qualifiedName": "TypeScriptEslintComplexityAdapter.addContributor",
+          "span": {
+            "startLine": 296,
+            "startColumn": 2,
+            "endLine": 309,
+            "endColumn": 3
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "contributors": [
+          {
+            "kind": "ternary",
+            "line": 304,
+            "column": 6
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 6,
+        "riskLevel": "acceptable"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "resolveThresholdFlag",
+          "span": {
+            "startLine": 37,
+            "startColumn": 7,
+            "endLine": 44,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 40,
+            "column": 2
+          },
+          {
+            "kind": "if-branch",
+            "line": 41,
+            "column": 2
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 12,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/cli/runtime.ts",
+          "qualifiedName": "coerceArrayOption",
+          "span": {
+            "startLine": 59,
+            "startColumn": 7,
+            "endLine": 65,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 62,
+            "column": 2
+          },
+          {
+            "kind": "logical-operator",
+            "line": 62,
+            "column": 6,
+            "operator": "||"
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 12,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/analyze-file.ts",
+          "qualifiedName": "scoreMatchedFunction",
+          "span": {
+            "startLine": 82,
+            "startColumn": 0,
+            "endLine": 105,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "contributors": []
+      },
+      "worstCaseCrap": {
+        "value": 2,
+        "riskLevel": "low"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/analyze-file.ts",
+          "qualifiedName": "loadFileCoverages",
+          "span": {
+            "startLine": 127,
+            "startColumn": 0,
+            "endLine": 137,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 132,
+            "column": 2
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 6,
+        "riskLevel": "acceptable"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "loadCoverageData",
+          "span": {
+            "startLine": 158,
+            "startColumn": 0,
+            "endLine": 171,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 163,
+            "column": 2
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 6,
+        "riskLevel": "acceptable"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "flattenCoverages",
+          "span": {
+            "startLine": 172,
+            "startColumn": 7,
+            "endLine": 177,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "contributors": []
+      },
+      "worstCaseCrap": {
+        "value": 2,
+        "riskLevel": "low"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "extractCoveragePercent",
+          "span": {
+            "startLine": 178,
+            "startColumn": 7,
+            "endLine": 189,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 182,
+            "column": 2
+          },
+          {
+            "kind": "ternary",
+            "line": 183,
+            "column": 11
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 12,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "scoreMatchedPairs",
+          "span": {
+            "startLine": 190,
+            "startColumn": 0,
+            "endLine": 210,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "contributors": []
+      },
+      "worstCaseCrap": {
+        "value": 2,
+        "riskLevel": "low"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/analyze.ts",
+          "qualifiedName": "collectWarnings",
+          "span": {
+            "startLine": 251,
+            "startColumn": 0,
+            "endLine": 273,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 260,
+            "column": 2
+          },
+          {
+            "kind": "logical-operator",
+            "line": 260,
+            "column": 6,
+            "operator": "&&"
+          },
+          {
+            "kind": "logical-operator",
+            "line": 260,
+            "column": 6,
+            "operator": "&&"
+          },
+          {
+            "kind": "for-loop",
+            "line": 267,
+            "column": 2
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 30,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "normalizeProjectPath",
+          "span": {
+            "startLine": 14,
+            "startColumn": 7,
+            "endLine": 24,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "contributors": [
+          {
+            "kind": "ternary",
+            "line": 18,
+            "column": 23
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 6,
+        "riskLevel": "acceptable"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "resolveInputPath",
+          "span": {
+            "startLine": 25,
+            "startColumn": 7,
+            "endLine": 35,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 29,
+            "column": 2
+          },
+          {
+            "kind": "ternary",
+            "line": 30,
+            "column": 23
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 12,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/core/path-utils.ts",
+          "qualifiedName": "normalizeGlobPattern",
+          "span": {
+            "startLine": 36,
+            "startColumn": 7,
+            "endLine": 42,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 1,
+        "contributors": []
+      },
+      "worstCaseCrap": {
+        "value": 2,
+        "riskLevel": "low"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/domain/contributors.ts",
+          "qualifiedName": "selectContributors",
+          "span": {
+            "startLine": 7,
+            "startColumn": 7,
+            "endLine": 20,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 5,
+        "contributors": [
+          {
+            "kind": "case-branch",
+            "line": 12,
+            "column": 4
+          },
+          {
+            "kind": "case-branch",
+            "line": 14,
+            "column": 4
+          },
+          {
+            "kind": "case-branch",
+            "line": 16,
+            "column": 4
+          },
+          {
+            "kind": "ternary",
+            "line": 17,
+            "column": 13
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 30,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/domain/filtering.ts",
+          "qualifiedName": "shouldInclude",
+          "span": {
+            "startLine": 11,
+            "startColumn": 7,
+            "endLine": 20,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "contributors": [
+          {
+            "kind": "if-branch",
+            "line": 16,
+            "column": 2
+          },
+          {
+            "kind": "if-branch",
+            "line": 17,
+            "column": 2
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 12,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/domain/matching.ts",
+          "qualifiedName": "findCandidates",
+          "span": {
+            "startLine": 50,
+            "startColumn": 0,
+            "endLine": 71,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 4,
+        "contributors": [
+          {
+            "kind": "for-loop",
+            "line": 58,
+            "column": 2
+          },
+          {
+            "kind": "if-branch",
+            "line": 59,
+            "column": 4
+          },
+          {
+            "kind": "if-branch",
+            "line": 61,
+            "column": 4
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 20,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/domain/summary.ts",
+          "qualifiedName": "computeDistribution",
+          "span": {
+            "startLine": 106,
+            "startColumn": 0,
+            "endLine": 115,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 2,
+        "contributors": [
+          {
+            "kind": "for-loop",
+            "line": 110,
+            "column": 2
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 6,
+        "riskLevel": "acceptable"
+      }
+    },
+    {
+      "kind": "no-coverage",
+      "complexity": {
+        "identity": {
+          "filePath": "src/domain/threshold.ts",
+          "qualifiedName": "resolveThreshold",
+          "span": {
+            "startLine": 51,
+            "startColumn": 7,
+            "endLine": 63,
+            "endColumn": 1
+          }
+        },
+        "cyclomaticComplexity": 3,
+        "contributors": [
+          {
+            "kind": "for-loop",
+            "line": 56,
+            "column": 2
+          },
+          {
+            "kind": "if-branch",
+            "line": 57,
+            "column": 4
+          }
+        ]
+      },
+      "worstCaseCrap": {
+        "value": 12,
+        "riskLevel": "moderate"
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/facade.ts",
+        "name": "extractComplexity",
+        "span": {
+          "startLine": 22,
+          "startColumn": 24,
+          "endLine": 29,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 3,
+          "total": 3,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/typescript-eslint.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 74,
+          "startColumn": 10,
+          "endLine": 79,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/typescript-eslint.ts",
+        "name": "(anonymous_4)",
+        "span": {
+          "startLine": 114,
+          "startColumn": 10,
+          "endLine": 121,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 3,
+          "total": 4,
+          "percent": 75
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/typescript-eslint.ts",
+        "name": "(anonymous_5)",
+        "span": {
+          "startLine": 127,
+          "startColumn": 10,
+          "endLine": 144,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 6,
+          "total": 7,
+          "percent": 85.71
+        },
+        "branchCoverage": {
+          "covered": 9,
+          "total": 11,
+          "percent": 81.82
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/typescript-eslint.ts",
+        "name": "(anonymous_9)",
+        "span": {
+          "startLine": 216,
+          "startColumn": 19,
+          "endLine": 230,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/typescript-eslint.ts",
+        "name": "(anonymous_10)",
+        "span": {
+          "startLine": 237,
+          "startColumn": 10,
+          "endLine": 240,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/typescript-eslint.ts",
+        "name": "(anonymous_13)",
+        "span": {
+          "startLine": 301,
+          "startColumn": 10,
+          "endLine": 309,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/complexity/typescript-eslint.ts",
+        "name": "(anonymous_15)",
+        "span": {
+          "startLine": 316,
+          "startColumn": 16,
+          "endLine": 317,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/coverage/facade.ts",
+        "name": "(anonymous_3)",
+        "span": {
+          "startLine": 51,
+          "startColumn": 27,
+          "endLine": 66,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 6,
+          "total": 9,
+          "percent": 66.67
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 6,
+          "percent": 66.67
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/coverage/istanbul.ts",
+        "name": "(anonymous_7)",
+        "span": {
+          "startLine": 165,
+          "startColumn": 17,
+          "endLine": 166,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 3,
+          "total": 3,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/coverage/istanbul.ts",
+        "name": "(anonymous_8)",
+        "span": {
+          "startLine": 171,
+          "startColumn": 55,
+          "endLine": 172,
+          "endColumn": 58
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/coverage/istanbul.ts",
+        "name": "(anonymous_9)",
+        "span": {
+          "startLine": 181,
+          "startColumn": 18,
+          "endLine": 182,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/coverage/v8.ts",
+        "name": "(anonymous_10)",
+        "span": {
+          "startLine": 183,
+          "startColumn": 45,
+          "endLine": 184,
+          "endColumn": 69
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/coverage/v8.ts",
+        "name": "(anonymous_12)",
+        "span": {
+          "startLine": 221,
+          "startColumn": 13,
+          "endLine": 222,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/coverage/v8.ts",
+        "name": "(anonymous_14)",
+        "span": {
+          "startLine": 239,
+          "startColumn": 36,
+          "endLine": 240,
+          "endColumn": 75
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/reporters/console.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 35,
+          "startColumn": 31,
+          "endLine": 36,
+          "endColumn": 64
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/reporters/console.ts",
+        "name": "(anonymous_3)",
+        "span": {
+          "startLine": 39,
+          "startColumn": 31,
+          "endLine": 40,
+          "endColumn": 69
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/reporters/markdown.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 31,
+          "startColumn": 16,
+          "endLine": 32,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/reporters/markdown.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 34,
+          "startColumn": 41,
+          "endLine": 35,
+          "endColumn": 50
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/adapters/reporters/version.ts",
+        "name": "(anonymous_0)",
+        "span": {
+          "startLine": 12,
+          "startColumn": 26,
+          "endLine": 13,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/cli.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 93,
+          "startColumn": 16,
+          "endLine": 122,
+          "endColumn": 3
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 8,
+          "percent": 0
+        },
+        "branchCoverage": {
+          "covered": 0,
+          "total": 2,
+          "percent": 0
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/cli.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 125,
+          "startColumn": 56,
+          "endLine": 307,
+          "endColumn": 1
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 76,
+          "percent": 0
+        },
+        "branchCoverage": {
+          "covered": 0,
+          "total": 66,
+          "percent": 0
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/config.ts",
+        "name": "(anonymous_0)",
+        "span": {
+          "startLine": 24,
+          "startColumn": 37,
+          "endLine": 32,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 4,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/config.ts",
+        "name": "(anonymous_6)",
+        "span": {
+          "startLine": 130,
+          "startColumn": 37,
+          "endLine": 136,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 4,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/config.ts",
+        "name": "(anonymous_11)",
+        "span": {
+          "startLine": 256,
+          "startColumn": 68,
+          "endLine": 260,
+          "endColumn": 8
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/diff.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 23,
+          "startColumn": 52,
+          "endLine": 31,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/diff.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 34,
+          "startColumn": 39,
+          "endLine": 35,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/diff.ts",
+        "name": "(anonymous_5)",
+        "span": {
+          "startLine": 80,
+          "startColumn": 26,
+          "endLine": 89,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/discover.ts",
+        "name": "(anonymous_0)",
+        "span": {
+          "startLine": 17,
+          "startColumn": 30,
+          "endLine": 18,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/discover.ts",
+        "name": "(anonymous_4)",
+        "span": {
+          "startLine": 133,
+          "startColumn": 11,
+          "endLine": 134,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/runtime.ts",
+        "name": "resolveThresholdFlag",
+        "span": {
+          "startLine": 39,
+          "startColumn": 22,
+          "endLine": 44,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 5,
+          "total": 5,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/runtime.ts",
+        "name": "coerceArrayOption",
+        "span": {
+          "startLine": 61,
+          "startColumn": 24,
+          "endLine": 65,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 3,
+          "total": 3,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/runtime.ts",
+        "name": "(anonymous_8)",
+        "span": {
+          "startLine": 115,
+          "startColumn": 28,
+          "endLine": 116,
+          "endColumn": 69
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/runtime.ts",
+        "name": "(anonymous_9)",
+        "span": {
+          "startLine": 120,
+          "startColumn": 10,
+          "endLine": 121,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/runtime.ts",
+        "name": "(anonymous_10)",
+        "span": {
+          "startLine": 125,
+          "startColumn": 18,
+          "endLine": 126,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/cli/runtime.ts",
+        "name": "(anonymous_11)",
+        "span": {
+          "startLine": 130,
+          "startColumn": 8,
+          "endLine": 133,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze-file.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 70,
+          "startColumn": 4,
+          "endLine": 71,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze-file.ts",
+        "name": "scoreMatchedFunction",
+        "span": {
+          "startLine": 88,
+          "startColumn": 19,
+          "endLine": 105,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze-file.ts",
+        "name": "loadFileCoverages",
+        "span": {
+          "startLine": 131,
+          "startColumn": 67,
+          "endLine": 137,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 5,
+          "total": 5,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 68,
+          "startColumn": 36,
+          "endLine": 69,
+          "endColumn": 75
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 101,
+          "startColumn": 42,
+          "endLine": 102,
+          "endColumn": 52
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_4)",
+        "span": {
+          "startLine": 138,
+          "startColumn": 6,
+          "endLine": 139,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_6)",
+        "span": {
+          "startLine": 146,
+          "startColumn": 66,
+          "endLine": 150,
+          "endColumn": 8
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "loadCoverageData",
+        "span": {
+          "startLine": 162,
+          "startColumn": 100,
+          "endLine": 171,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 5,
+          "total": 5,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "flattenCoverages",
+        "span": {
+          "startLine": 174,
+          "startColumn": 22,
+          "endLine": 177,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "extractCoveragePercent",
+        "span": {
+          "startLine": 181,
+          "startColumn": 10,
+          "endLine": 189,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 3,
+          "total": 3,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "scoreMatchedPairs",
+        "span": {
+          "startLine": 195,
+          "startColumn": 21,
+          "endLine": 210,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 6,
+          "total": 6,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_11)",
+        "span": {
+          "startLine": 196,
+          "startColumn": 51,
+          "endLine": 209,
+          "endColumn": 3
+        },
+        "lineCoverage": {
+          "covered": 5,
+          "total": 5,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_13)",
+        "span": {
+          "startLine": 216,
+          "startColumn": 39,
+          "endLine": 236,
+          "endColumn": 3
+        },
+        "lineCoverage": {
+          "covered": 3,
+          "total": 3,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_15)",
+        "span": {
+          "startLine": 239,
+          "startColumn": 95,
+          "endLine": 244,
+          "endColumn": 4
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "(anonymous_16)",
+        "span": {
+          "startLine": 244,
+          "startColumn": 86,
+          "endLine": 248,
+          "endColumn": 4
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/analyze.ts",
+        "name": "collectWarnings",
+        "span": {
+          "startLine": 257,
+          "startColumn": 13,
+          "endLine": 273,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 6,
+          "total": 6,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 5,
+          "total": 5,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 15,
+          "startColumn": 39,
+          "endLine": 16,
+          "endColumn": 51
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 16,
+          "startColumn": 53,
+          "endLine": 17,
+          "endColumn": 65
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "walk",
+        "span": {
+          "startLine": 20,
+          "startColumn": 50,
+          "endLine": 37,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 12,
+          "percent": 0
+        },
+        "branchCoverage": {
+          "covered": 0,
+          "total": 8,
+          "percent": 0
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "(anonymous_4)",
+        "span": {
+          "startLine": 26,
+          "startColumn": 38,
+          "endLine": 27,
+          "endColumn": 48
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "(anonymous_5)",
+        "span": {
+          "startLine": 32,
+          "startColumn": 56,
+          "endLine": 33,
+          "endColumn": 66
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "(anonymous_7)",
+        "span": {
+          "startLine": 49,
+          "startColumn": 52,
+          "endLine": 50,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "(anonymous_8)",
+        "span": {
+          "startLine": 50,
+          "startColumn": 38,
+          "endLine": 51,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 1,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/defaults.ts",
+        "name": "(anonymous_9)",
+        "span": {
+          "startLine": 51,
+          "startColumn": 38,
+          "endLine": 55,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 0,
+          "total": 2,
+          "percent": 0
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/path-utils.ts",
+        "name": "normalizeProjectPath",
+        "span": {
+          "startLine": 17,
+          "startColumn": 10,
+          "endLine": 24,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/path-utils.ts",
+        "name": "resolveInputPath",
+        "span": {
+          "startLine": 28,
+          "startColumn": 22,
+          "endLine": 35,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/path-utils.ts",
+        "name": "normalizeGlobPattern",
+        "span": {
+          "startLine": 39,
+          "startColumn": 10,
+          "endLine": 42,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/path-utils.ts",
+        "name": "(anonymous_6)",
+        "span": {
+          "startLine": 49,
+          "startColumn": 36,
+          "endLine": 50,
+          "endColumn": 70
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/path-utils.ts",
+        "name": "(anonymous_7)",
+        "span": {
+          "startLine": 54,
+          "startColumn": 33,
+          "endLine": 61,
+          "endColumn": 5
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/core/prepare-output.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 10,
+          "startColumn": 43,
+          "endLine": 20,
+          "endColumn": 5
+        },
+        "lineCoverage": {
+          "covered": 3,
+          "total": 3,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 5,
+          "total": 5,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/contributors.ts",
+        "name": "selectContributors",
+        "span": {
+          "startLine": 10,
+          "startColumn": 40,
+          "endLine": 20,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 5,
+          "total": 5,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/filtering.ts",
+        "name": "shouldInclude",
+        "span": {
+          "startLine": 14,
+          "startColumn": 11,
+          "endLine": 20,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 7,
+          "total": 7,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/filtering.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 18,
+          "startColumn": 37,
+          "endLine": 19,
+          "endColumn": 77
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/matching.ts",
+        "name": "findCandidates",
+        "span": {
+          "startLine": 56,
+          "startColumn": 15,
+          "endLine": 71,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 9,
+          "total": 9,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/matching.ts",
+        "name": "(anonymous_8)",
+        "span": {
+          "startLine": 131,
+          "startColumn": 56,
+          "endLine": 132,
+          "endColumn": 75
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/matching.ts",
+        "name": "(anonymous_9)",
+        "span": {
+          "startLine": 132,
+          "startColumn": 51,
+          "endLine": 133,
+          "endColumn": 61
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/summary.ts",
+        "name": "(anonymous_1)",
+        "span": {
+          "startLine": 36,
+          "startColumn": 24,
+          "endLine": 37,
+          "endColumn": 50
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/summary.ts",
+        "name": "(anonymous_2)",
+        "span": {
+          "startLine": 39,
+          "startColumn": 43,
+          "endLine": 40,
+          "endColumn": 52
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/summary.ts",
+        "name": "(anonymous_3)",
+        "span": {
+          "startLine": 43,
+          "startColumn": 41,
+          "endLine": 44,
+          "endColumn": 60
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/summary.ts",
+        "name": "(anonymous_4)",
+        "span": {
+          "startLine": 45,
+          "startColumn": 34,
+          "endLine": 46,
+          "endColumn": 43
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/summary.ts",
+        "name": "(anonymous_5)",
+        "span": {
+          "startLine": 55,
+          "startColumn": 16,
+          "endLine": 56,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/summary.ts",
+        "name": "(anonymous_8)",
+        "span": {
+          "startLine": 83,
+          "startColumn": 44,
+          "endLine": 84,
+          "endColumn": 49
+        },
+        "lineCoverage": {
+          "covered": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/summary.ts",
+        "name": "computeDistribution",
+        "span": {
+          "startLine": 108,
+          "startColumn": 20,
+          "endLine": 115,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": null
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/threshold.ts",
+        "name": "resolveThreshold",
+        "span": {
+          "startLine": 55,
+          "startColumn": 10,
+          "endLine": 63,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 4,
+          "total": 4,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    },
+    {
+      "kind": "no-ast",
+      "coverage": {
+        "filePath": "src/domain/types.ts",
+        "name": "(anonymous_0)",
+        "span": {
+          "startLine": 70,
+          "startColumn": 7,
+          "endLine": 71,
+          "endColumn": null
+        },
+        "lineCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        },
+        "branchCoverage": {
+          "covered": 2,
+          "total": 2,
+          "percent": 100
+        }
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"extractComplexity\"",
+      "file": "src/adapters/complexity/facade.ts",
+      "function": "extractComplexity"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"TypeScriptEslintComplexityAdapter.walkProgram\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "TypeScriptEslintComplexityAdapter.walkProgram"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"TypeScriptEslintComplexityAdapter.handleFunctionDeclaration\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "TypeScriptEslintComplexityAdapter.handleFunctionDeclaration"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"TypeScriptEslintComplexityAdapter.handleExportDefault\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "TypeScriptEslintComplexityAdapter.handleExportDefault"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"TypeScriptEslintComplexityAdapter.createScope\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "TypeScriptEslintComplexityAdapter.createScope"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"TypeScriptEslintComplexityAdapter.countComplexityInFunction\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "TypeScriptEslintComplexityAdapter.countComplexityInFunction"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"TypeScriptEslintComplexityAdapter.addContributor\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "TypeScriptEslintComplexityAdapter.addContributor"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"resolveThresholdFlag\"",
+      "file": "src/cli/runtime.ts",
+      "function": "resolveThresholdFlag"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"coerceArrayOption\"",
+      "file": "src/cli/runtime.ts",
+      "function": "coerceArrayOption"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"scoreMatchedFunction\"",
+      "file": "src/core/analyze-file.ts",
+      "function": "scoreMatchedFunction"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"loadFileCoverages\"",
+      "file": "src/core/analyze-file.ts",
+      "function": "loadFileCoverages"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"loadCoverageData\"",
+      "file": "src/core/analyze.ts",
+      "function": "loadCoverageData"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"flattenCoverages\"",
+      "file": "src/core/analyze.ts",
+      "function": "flattenCoverages"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"extractCoveragePercent\"",
+      "file": "src/core/analyze.ts",
+      "function": "extractCoveragePercent"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"scoreMatchedPairs\"",
+      "file": "src/core/analyze.ts",
+      "function": "scoreMatchedPairs"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"collectWarnings\"",
+      "file": "src/core/analyze.ts",
+      "function": "collectWarnings"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"normalizeProjectPath\"",
+      "file": "src/core/path-utils.ts",
+      "function": "normalizeProjectPath"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"resolveInputPath\"",
+      "file": "src/core/path-utils.ts",
+      "function": "resolveInputPath"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"normalizeGlobPattern\"",
+      "file": "src/core/path-utils.ts",
+      "function": "normalizeGlobPattern"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"selectContributors\"",
+      "file": "src/domain/contributors.ts",
+      "function": "selectContributors"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"shouldInclude\"",
+      "file": "src/domain/filtering.ts",
+      "function": "shouldInclude"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"findCandidates\"",
+      "file": "src/domain/matching.ts",
+      "function": "findCandidates"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"computeDistribution\"",
+      "file": "src/domain/summary.ts",
+      "function": "computeDistribution"
+    },
+    {
+      "code": "unmatched-no-coverage",
+      "message": "No coverage data found for function \"resolveThreshold\"",
+      "file": "src/domain/threshold.ts",
+      "function": "resolveThreshold"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"extractComplexity\"",
+      "file": "src/adapters/complexity/facade.ts",
+      "function": "extractComplexity"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_4)\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "(anonymous_4)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_5)\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "(anonymous_5)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_9)\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "(anonymous_9)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_10)\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "(anonymous_10)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_13)\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "(anonymous_13)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_15)\"",
+      "file": "src/adapters/complexity/typescript-eslint.ts",
+      "function": "(anonymous_15)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_3)\"",
+      "file": "src/adapters/coverage/facade.ts",
+      "function": "(anonymous_3)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_7)\"",
+      "file": "src/adapters/coverage/istanbul.ts",
+      "function": "(anonymous_7)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_8)\"",
+      "file": "src/adapters/coverage/istanbul.ts",
+      "function": "(anonymous_8)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_9)\"",
+      "file": "src/adapters/coverage/istanbul.ts",
+      "function": "(anonymous_9)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_10)\"",
+      "file": "src/adapters/coverage/v8.ts",
+      "function": "(anonymous_10)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_12)\"",
+      "file": "src/adapters/coverage/v8.ts",
+      "function": "(anonymous_12)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_14)\"",
+      "file": "src/adapters/coverage/v8.ts",
+      "function": "(anonymous_14)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/adapters/reporters/console.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_3)\"",
+      "file": "src/adapters/reporters/console.ts",
+      "function": "(anonymous_3)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/adapters/reporters/markdown.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/adapters/reporters/markdown.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_0)\"",
+      "file": "src/adapters/reporters/version.ts",
+      "function": "(anonymous_0)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/cli/cli.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/cli/cli.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_0)\"",
+      "file": "src/cli/config.ts",
+      "function": "(anonymous_0)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_6)\"",
+      "file": "src/cli/config.ts",
+      "function": "(anonymous_6)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_11)\"",
+      "file": "src/cli/config.ts",
+      "function": "(anonymous_11)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/cli/diff.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/cli/diff.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_5)\"",
+      "file": "src/cli/diff.ts",
+      "function": "(anonymous_5)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_0)\"",
+      "file": "src/cli/discover.ts",
+      "function": "(anonymous_0)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_4)\"",
+      "file": "src/cli/discover.ts",
+      "function": "(anonymous_4)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"resolveThresholdFlag\"",
+      "file": "src/cli/runtime.ts",
+      "function": "resolveThresholdFlag"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"coerceArrayOption\"",
+      "file": "src/cli/runtime.ts",
+      "function": "coerceArrayOption"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_8)\"",
+      "file": "src/cli/runtime.ts",
+      "function": "(anonymous_8)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_9)\"",
+      "file": "src/cli/runtime.ts",
+      "function": "(anonymous_9)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_10)\"",
+      "file": "src/cli/runtime.ts",
+      "function": "(anonymous_10)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_11)\"",
+      "file": "src/cli/runtime.ts",
+      "function": "(anonymous_11)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/core/analyze-file.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"scoreMatchedFunction\"",
+      "file": "src/core/analyze-file.ts",
+      "function": "scoreMatchedFunction"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"loadFileCoverages\"",
+      "file": "src/core/analyze-file.ts",
+      "function": "loadFileCoverages"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_4)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_4)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_6)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_6)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"loadCoverageData\"",
+      "file": "src/core/analyze.ts",
+      "function": "loadCoverageData"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"flattenCoverages\"",
+      "file": "src/core/analyze.ts",
+      "function": "flattenCoverages"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"extractCoveragePercent\"",
+      "file": "src/core/analyze.ts",
+      "function": "extractCoveragePercent"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"scoreMatchedPairs\"",
+      "file": "src/core/analyze.ts",
+      "function": "scoreMatchedPairs"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_11)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_11)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_13)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_13)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_15)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_15)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_16)\"",
+      "file": "src/core/analyze.ts",
+      "function": "(anonymous_16)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"collectWarnings\"",
+      "file": "src/core/analyze.ts",
+      "function": "collectWarnings"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/core/defaults.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/core/defaults.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"walk\"",
+      "file": "src/core/defaults.ts",
+      "function": "walk"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_4)\"",
+      "file": "src/core/defaults.ts",
+      "function": "(anonymous_4)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_5)\"",
+      "file": "src/core/defaults.ts",
+      "function": "(anonymous_5)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_7)\"",
+      "file": "src/core/defaults.ts",
+      "function": "(anonymous_7)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_8)\"",
+      "file": "src/core/defaults.ts",
+      "function": "(anonymous_8)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_9)\"",
+      "file": "src/core/defaults.ts",
+      "function": "(anonymous_9)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"normalizeProjectPath\"",
+      "file": "src/core/path-utils.ts",
+      "function": "normalizeProjectPath"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"resolveInputPath\"",
+      "file": "src/core/path-utils.ts",
+      "function": "resolveInputPath"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"normalizeGlobPattern\"",
+      "file": "src/core/path-utils.ts",
+      "function": "normalizeGlobPattern"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_6)\"",
+      "file": "src/core/path-utils.ts",
+      "function": "(anonymous_6)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_7)\"",
+      "file": "src/core/path-utils.ts",
+      "function": "(anonymous_7)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/core/prepare-output.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"selectContributors\"",
+      "file": "src/domain/contributors.ts",
+      "function": "selectContributors"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"shouldInclude\"",
+      "file": "src/domain/filtering.ts",
+      "function": "shouldInclude"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/domain/filtering.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"findCandidates\"",
+      "file": "src/domain/matching.ts",
+      "function": "findCandidates"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_8)\"",
+      "file": "src/domain/matching.ts",
+      "function": "(anonymous_8)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_9)\"",
+      "file": "src/domain/matching.ts",
+      "function": "(anonymous_9)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_1)\"",
+      "file": "src/domain/summary.ts",
+      "function": "(anonymous_1)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_2)\"",
+      "file": "src/domain/summary.ts",
+      "function": "(anonymous_2)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_3)\"",
+      "file": "src/domain/summary.ts",
+      "function": "(anonymous_3)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_4)\"",
+      "file": "src/domain/summary.ts",
+      "function": "(anonymous_4)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_5)\"",
+      "file": "src/domain/summary.ts",
+      "function": "(anonymous_5)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_8)\"",
+      "file": "src/domain/summary.ts",
+      "function": "(anonymous_8)"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"computeDistribution\"",
+      "file": "src/domain/summary.ts",
+      "function": "computeDistribution"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"resolveThreshold\"",
+      "file": "src/domain/threshold.ts",
+      "function": "resolveThreshold"
+    },
+    {
+      "code": "unmatched-no-ast",
+      "message": "No AST match found for coverage entry \"(anonymous_0)\"",
+      "file": "src/domain/types.ts",
+      "function": "(anonymous_0)"
+    }
+  ],
+  "passed": false
+}

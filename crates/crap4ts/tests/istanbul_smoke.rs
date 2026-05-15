@@ -379,6 +379,8 @@ const ORPHAN_PATH_FIXTURE: &str =
 const MISSING_FIELD_FIXTURE: &str =
     include_str!("fixtures/istanbul-broken/coverage-with-missing-field.json");
 const VITEST_FIXTURE: &str = include_str!("fixtures/istanbul-vitest/coverage-final.json");
+const VITEST_NULL_COLUMNS_FIXTURE: &str =
+    include_str!("fixtures/istanbul-vitest/coverage-with-null-columns.json");
 const NYC_FIXTURE: &str = include_str!("fixtures/istanbul-nyc/coverage-final.json");
 const WRAPPED_FIXTURE: &str = include_str!("fixtures/istanbul-wrapped/coverage-final.json");
 
@@ -561,6 +563,54 @@ fn w24_vitest_shape_parses_with_no_diagnostics() {
     assert!(keys.contains(&"map.ts".to_string()), "keys: {keys:?}");
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
     assert!(out.branches.is_none());
+}
+
+/// #211 (surfaced during W3.1 #189): `@vitest/coverage-istanbul`
+/// emits `"column": null` on the `end` side of every span entry
+/// (statementMap, fnMap.decl, fnMap.loc, branchMap.loc,
+/// branchMap.locations[]) because the underlying V8 inspector data
+/// it transforms doesn't always have a precise end-column. The
+/// parser must accept null columns and treat them as advisory
+/// "unknown column" data; line-range matching is line-only so the
+/// column value is never consulted downstream. Regression: before
+/// the `Position.column: Option<u32>` fix, this fixture failed
+/// deserialization with `invalid type: null, expected u32`, bailing
+/// the entire analysis pre-discovery.
+#[test]
+fn w24_vitest_null_columns_parse_without_bailing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+    write_fixture(
+        &canonical,
+        "simple.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+    let payload = VITEST_NULL_COLUMNS_FIXTURE.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser
+        .parse(&payload)
+        .expect("null-column fixture parses successfully (regression for #211)");
+
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert_eq!(
+        keys,
+        vec!["simple.ts".to_string()],
+        "expected single file keyed `simple.ts`; got {keys:?}"
+    );
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+
+    // Branch records also survive the null-column treatment: the fixture
+    // declares one branch with two arms and `b: [3, 0]` — per-arm fan-out
+    // produces two BranchCoverage rows at line 4.
+    let branches = out
+        .branches
+        .as_ref()
+        .expect("branchMap present → branches Some(...)");
+    let file_branches = branches
+        .get("simple.ts")
+        .expect("simple.ts keyed in branches map");
+    assert_eq!(file_branches.len(), 2, "{file_branches:?}");
 }
 
 /// W2.4: nyc-emitted shape uses absolute paths; the existing
