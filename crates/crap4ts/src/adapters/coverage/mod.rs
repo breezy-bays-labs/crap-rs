@@ -171,11 +171,21 @@ struct StatementLoc {
 
 /// 1-based line + 0-based column. Matches Istanbul's emitter
 /// convention; downstream `LineCoverage.line` is 1-based `usize`.
+///
+/// `column` is `Option<u32>` because `@vitest/coverage-istanbul` (and
+/// possibly other producers) emit `"column": null` on the `end` side of
+/// every span, signalling "unknown column" — the underlying V8
+/// inspector data they transform doesn't always have a precise
+/// end-column. crap4ts line-range matching is line-only, so the
+/// column value is advisory and never consulted; accepting `null` is
+/// semantically a no-op. Surfaced by W3.1's crap4ts@1.x corpus
+/// capture (#189) where 1,943 of 4,696 columns were null; tracked
+/// fix: #211.
 #[derive(Debug, Deserialize)]
 struct Position {
     line: u32,
     #[allow(dead_code)]
-    column: u32,
+    column: Option<u32>,
 }
 
 /// W2.3 branch metadata. `kind` (e.g. `"if"`, `"switch"`, `"cond-expr"`)
@@ -193,13 +203,6 @@ struct BranchLoc {
     #[serde(rename = "type")]
     #[allow(dead_code)]
     kind: String,
-    /// Per-arm locations. Some emitters populate them with finer-grained
-    /// spans (e.g. switch case bodies); not consumed today since
-    /// `BranchCoverage` is line-keyed and the per-arm `taken` count
-    /// already lives in `b[branchId][arm_index]`.
-    #[serde(default)]
-    #[allow(dead_code)]
-    locations: Vec<StatementLoc>,
     /// Optional emitter-set branching-site line. When present, takes
     /// precedence over `loc.start.line` for line attribution (some
     /// emitters set `loc` to a wide span covering both arms but pin
