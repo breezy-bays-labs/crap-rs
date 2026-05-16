@@ -331,11 +331,11 @@ impl<'src> FunctionFinder<'src> {
         prop: &oxc::ast::ast::PropertyDefinition<'_>,
         class_name: &str,
     ) {
-        if prop.computed {
-            if let Some(key_expr) = prop.key.as_expression() {
-                let mut sink = Contributors::default();
-                self.visit_expression(key_expr, &mut sink, None);
-            }
+        if prop.computed
+            && let Some(key_expr) = prop.key.as_expression()
+        {
+            let mut sink = Contributors::default();
+            self.visit_expression(key_expr, &mut sink, None);
         }
         let Some(value) = &prop.value else {
             return;
@@ -1141,10 +1141,10 @@ impl<'src> FunctionFinder<'src> {
         for prop in &obj.properties {
             match prop {
                 ObjectPropertyKind::ObjectProperty(p) => {
-                    if p.computed {
-                        if let Some(key_expr) = p.key.as_expression() {
-                            self.visit_expression(key_expr, out, nesting);
-                        }
+                    if p.computed
+                        && let Some(key_expr) = p.key.as_expression()
+                    {
+                        self.visit_expression(key_expr, out, nesting);
                     }
                     self.visit_expression(&p.value, out, nesting);
                 }
