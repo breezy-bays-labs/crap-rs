@@ -215,27 +215,39 @@ jobs:
       - name: Run cargo mutants on crates/crap4ts/src/adapters/walker/mod.rs
         # crap-rs#209: the walker is the highest-leverage file in the
         # crap4ts adapter (every decision-point + function-discovery +
-        # span-to-line decision routes through it). The `--skip
-        # envelope` test-arg the crap-core run relies on is NOT passed
-        # inline: it lives in the repo-global `.cargo/mutants.toml`
-        # (`additional_cargo_test_args = ["--", "--skip", "envelope"]`)
-        # which cargo-mutants applies to EVERY invocation in this
-        # workspace, so it is replicated automatically for the crap4ts
-        # run — see AGENTS.md "Why additional_cargo_test_args …".
+        # span-to-line decision routes through it).
         #
-        # Deliberate asymmetry vs the view.rs step above: the walker is
-        # ~5× view.rs's mutant count (157 vs ~30). Single-worker
-        # `--in-place` on 157 mutants is ~1 h wall-clock — far past the
-        # crap-rs#209 ≤8-min budget AC (plan-of-record deviation,
-        # documented in the PR). So this step uses `-j 4` copy mode
-        # (parallel workers, each reusing the prebuilt `target/` via
-        # `.cargo/mutants.toml`'s `copy_target = true`). `-j N` and
+        # PER-MERGE GATE (not per-PR). The `on:` block restricts CI to
+        # `push: [main]` + `pull_request: [main]`, so a `push` event is
+        # exactly a merge-to-main. This step's `if:` therefore runs the
+        # walker mutation pass ONLY on merge-to-main; the view.rs step
+        # above has no `if:` and stays per-PR. Rationale (crap-rs#209 AC
+        # amended from "≤8 min per-PR" → "per-merge"): the walker has
+        # ~5× view.rs's mutant count (157 vs ~30) and a full pass is
+        # ~1 h even under `-j 4` copy mode — a recurring per-PR tax that
+        # is not worth it for a file that changes rarely once Cluster W
+        # (#200/#205/#207/#209) lands. Gating at merge keeps every
+        # crap4ts PR fast while still gating the walker before
+        # crap4ts@2.0.0 GA. Trade-off: a walker regression surfaces at
+        # merge, not on the introducing PR (acceptable — the #207
+        # proptest suite is the per-PR behavioural net; mutants is the
+        # deeper periodic gate). User-confirmed sequencing decision
+        # 2026-05-16.
+        #
+        # `-j 4` copy mode (parallel workers, each reusing the prebuilt
+        # `target/` via `.cargo/mutants.toml`'s `copy_target = true`)
+        # keeps even the per-merge run tractable. `-j N` and
         # `--in-place` are mutually exclusive by design (parallel
         # workers REQUIRE source copies) — see AGENTS.md "Mutation
         # testing". `--no-shuffle` keeps mutant order deterministic for
-        # flaky-mutant triage. This is the dual-file mutation surface;
-        # the two steps run sequentially within the single `mutants`
-        # job.
+        # flaky-mutant triage. The `--skip envelope` test-arg the
+        # crap-core run relies on is NOT passed inline: it lives in the
+        # repo-global `.cargo/mutants.toml`
+        # (`additional_cargo_test_args = ["--", "--skip", "envelope"]`)
+        # which cargo-mutants applies to EVERY invocation in this
+        # workspace, so it is replicated automatically here — see
+        # AGENTS.md "Why additional_cargo_test_args …".
+        if: github.event_name == 'push'
         run: cargo mutants -j 4 --package crap4ts --file crates/crap4ts/src/adapters/walker/mod.rs --no-shuffle
 
   scorecard-smoke:

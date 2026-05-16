@@ -105,9 +105,19 @@ surface** — the two highest-leverage files in the workspace:
 | `crates/crap-core/src/domain/view.rs` | highest-complexity function family in `crap-core` (view-projection / column logic) | `crap-core` |
 | `crates/crap4ts/src/adapters/walker/mod.rs` | every decision-point decision + every function-discovery decision + every span-to-line conversion in the TS adapter routes through it (crap-rs#209) | `crap4ts` |
 
-CI runs both **sequentially within one `mutants` job** on every PR (the
-`view.rs` step then the walker step); locally you'll want parallelism
-so a single file's gate finishes in minutes rather than half an hour.
+CI runs both in one `mutants` job but on **different cadences**: the
+`view.rs` step runs **per-PR** (small, ~30 mutants, minutes); the
+walker step runs **per-merge only** — gated `if: github.event_name ==
+'push'`, which (given CI triggers on `push: [main]` /
+`pull_request: [main]`) means it fires on merge-to-main, not on PR
+pushes. Rationale: the walker's ~157-mutant pass is ~1 h even under
+`-j 4`; a per-PR tax that size is not worth it for a file that changes
+rarely once Cluster W (#200/#205/#207/#209) lands, while a per-merge
+gate still catches walker regressions before crap4ts@2.0.0 GA. The
+per-PR behavioural net for the walker is the `walker_proptest.rs`
+suite (crap-rs#207); mutants is the deeper periodic gate. Locally
+you'll want parallelism so a single file's gate finishes in minutes
+rather than half an hour.
 
 ### Local invocation
 
@@ -169,25 +179,30 @@ free disk should be ≥ `target/` size × N. The flag is ignored under
 
 ### CI parity
 
-CI's `mutants` job runs **two sequential steps** on a single
-ubuntu-latest worker:
+CI's `mutants` job runs **two steps on different cadences** on a
+single ubuntu-latest worker:
 
 ```bash
+# per-PR (no `if:`):
 cargo mutants    --package crap-core --file crates/crap-core/src/domain/view.rs      --no-shuffle --in-place
+# per-merge only (`if: github.event_name == 'push'`):
 cargo mutants -j 4 --package crap4ts --file crates/crap4ts/src/adapters/walker/mod.rs --no-shuffle
 ```
 
-**The two steps deliberately differ in execution mode.** The
-`view.rs` step (~30 mutants) uses `--in-place` single-worker — fast
-enough, no tree copy. The walker step has ~5× the mutant count (157);
-single-worker `--in-place` on 157 mutants is ~1 h wall-clock, so it
-uses `-j 4` copy mode instead (parallel workers, each reusing the
-prebuilt `target/` via `.cargo/mutants.toml`'s `copy_target = true`).
-`-j N` and `--in-place` are mutually exclusive by design (see the
-section below), which is why the walker step drops `--in-place`. The
-crap-rs#209 ≤8-min budget AC is **not met by single-worker in-place on
-the walker** — that is a recorded plan-of-record deviation, not a
-regression; `-j 4` copy mode is the chosen mitigation. `--no-shuffle`
+**The two steps deliberately differ in cadence AND execution mode.**
+The `view.rs` step (~30 mutants) runs per-PR with `--in-place`
+single-worker — fast enough, no tree copy. The walker step has ~5× the
+mutant count (157); a single-worker `--in-place` pass is ~1 h
+wall-clock, so it (a) runs **per-merge only** (`if: github.event_name
+== 'push'` — a `push` event under this repo's `on:` triggers is a
+merge-to-main), keeping every PR fast, and (b) uses `-j 4` copy mode
+(parallel workers, each reusing the prebuilt `target/` via
+`.cargo/mutants.toml`'s `copy_target = true`) so even the per-merge
+run is tractable. `-j N` and `--in-place` are mutually exclusive by
+design (see the section below), which is why the walker step drops
+`--in-place`. crap-rs#209's original "≤8 min per-PR" budget AC was
+**amended to per-merge gating** (user-confirmed 2026-05-16) — that is
+a resolved sequencing decision, not an open deviation. `--no-shuffle`
 on both keeps mutant order deterministic across reruns, which makes
 flaky-mutant triage tractable. The walker proptest suite
 (`walker_proptest.rs`, crap-rs#207 — including the
