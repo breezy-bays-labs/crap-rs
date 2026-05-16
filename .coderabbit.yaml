@@ -3,6 +3,14 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+  # Third-party snapshot fixtures are vendored OSS source captured for the
+  # W3 parity oracle corpus, not crap-rs code. Excluding them stops
+  # CodeRabbit/gemini from reviewing snapshot source as if it were ours
+  # (recurred on PR #213 — 6 false suggestions on the crap4ts-v1 snapshot;
+  # W3.1-deferred follow-up, landed with the class-validator second oracle #208).
+  path_filters:
+    - "!crates/crap4ts/tests/fixtures/crap4ts-v1/**"
+    - "!crates/crap4ts/tests/fixtures/class-validator/**"
   path_instructions:
     - path: "src/domain/**"
       instructions: "Domain layer must be pure — no external crate imports, no I/O, no Rust-language-specific assumptions. These modules are destined for crap-core extraction."
