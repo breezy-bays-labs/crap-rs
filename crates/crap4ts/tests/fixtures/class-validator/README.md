@@ -112,7 +112,8 @@ committed artifacts.**
 
    The crap4ts CLI exits **non-zero** when functions exceed the
    threshold; that's expected and does NOT mean the capture failed —
-   verify by parsing the JSON (`jq . class-validator-reference.json`).
+   verify by parsing the JSON
+   (`jq . crates/crap4ts/tests/fixtures/class-validator-reference.json`).
    At commit `2e1a5c2` the baseline reports 568 functions, 1 exceeding
    the default threshold of 25 (`container.ts :: getFromContainer`,
    CRAP 32.62), so the CLI exits **1** with `passed: false`. That is
