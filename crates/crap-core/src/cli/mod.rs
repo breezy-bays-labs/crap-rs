@@ -23,9 +23,7 @@ use crate::adapters::reporters;
 use crate::adapters::reporters::json::DeltaContext;
 use crate::core::{AnalysisOutput, AnalyzeOptions};
 use crate::domain::delta::{self, AnalysisDelta, DeltaView};
-use crate::domain::threshold::{
-    DEFAULT_THRESHOLD, LENIENT_THRESHOLD, STRICT_THRESHOLD, ThresholdConfig, is_valid_threshold,
-};
+use crate::domain::threshold::{ThresholdConfig, ThresholdPreset, is_valid_threshold};
 use crate::domain::types::{AnalysisDiagnostics, ComplexityMetric};
 use crate::domain::view::{self, GroupKey, SortKey};
 use crate::ports::{ComplexityPort, CoveragePort, ParseDiagnostic};
@@ -347,17 +345,22 @@ pub struct OutputArgs {
     )]
     pub format: Vec<FormatSpec>,
 
-    /// CRAP score threshold — functions above this fail the check [default: 25]
+    /// CRAP score threshold — functions above this fail the check.
+    /// Defaults to the calibrated cutoff for the active complexity
+    /// metric (cyclomatic and cognitive scores differ in magnitude, so
+    /// the default differs per metric — see the generated config).
     // allow_hyphen_values: lets clap parse `--threshold -5` as a value
     // (not a flag), so our validate_inputs can give an actionable error.
     #[arg(long, allow_hyphen_values = true, group = "threshold_select")]
     pub threshold: Option<f64>,
 
-    /// Use strict threshold (15) — for high-quality or safety-critical code
+    /// Use the strict preset (tighter cutoff calibrated for the active
+    /// metric) — for high-quality or safety-critical code
     #[arg(long, group = "threshold_select")]
     pub strict: bool,
 
-    /// Use lenient threshold (40) — for legacy or transitional code
+    /// Use the lenient preset (looser cutoff calibrated for the active
+    /// metric) — for legacy or transitional code
     #[arg(long, group = "threshold_select")]
     pub lenient: bool,
 
@@ -1026,7 +1029,7 @@ fn merge_effective_inputs(
         .map(Into::into)
         .or_else(|| file_config.as_ref().and_then(|c| c.metric))
         .unwrap_or(meta.default_metric);
-    let (threshold_config, threshold) = merge_threshold(cli, file_config);
+    let (threshold_config, threshold) = merge_threshold(cli, file_config, metric);
     let exclude = merge_exclude(cli, file_config);
     EffectiveInputs {
         src,
@@ -1452,27 +1455,51 @@ fn load_file_config(
 
 /// Merge CLI threshold with config file. Returns (ThresholdConfig, effective_display_threshold).
 ///
-/// Resolution order (first match wins):
-/// 1. `--threshold N`   — explicit CLI value
-/// 2. `--strict`        → STRICT_THRESHOLD
-/// 3. `--lenient`       → LENIENT_THRESHOLD
-/// 4. config `preset`   → preset.threshold()
-/// 5. config `threshold`
-/// 6. DEFAULT_THRESHOLD
-fn merge_threshold(cli: &Cli, file_config: &Option<FileConfig>) -> (ThresholdConfig, f64) {
+/// Resolution order (first match wins). Every tier-derived value is
+/// keyed on the resolved `metric` via [`ThresholdPreset::threshold`],
+/// so a cutoff calibrated for one metric is never applied to the
+/// other metric's (different-magnitude) scores. `metric` is the
+/// already-resolved effective metric (CLI > config > adapter default).
+/// A literal cutoff (an explicit number) always beats a named preset
+/// at the same level of specificity, because a literal is the most
+/// specific expression of intent: CLI `--threshold N` beats CLI
+/// `--strict`/`--lenient`, and config `threshold = N` beats config
+/// `preset = "..."`. This keeps CLI and config-file semantics
+/// consistent — a user who writes an explicit number gets that number.
+///
+/// 1. `--threshold N`   — explicit CLI value (a literal cutoff; metric-independent)
+/// 2. `--strict`        → `ThresholdPreset::Strict.threshold(metric)`
+/// 3. `--lenient`       → `ThresholdPreset::Lenient.threshold(metric)`
+/// 4. config `threshold` — explicit literal cutoff (metric-independent)
+/// 5. config `preset`   → `preset.threshold(metric)`
+/// 6. no-flag default   → `ThresholdPreset::Default.threshold(metric)`
+///    (cyclomatic-metric runs → 16; cognitive-metric runs → 25)
+fn merge_threshold(
+    cli: &Cli,
+    file_config: &Option<FileConfig>,
+    metric: ComplexityMetric,
+) -> (ThresholdConfig, f64) {
     let global = cli
         .output
         .threshold
-        .or_else(|| cli.output.strict.then_some(STRICT_THRESHOLD))
-        .or_else(|| cli.output.lenient.then_some(LENIENT_THRESHOLD))
+        .or_else(|| {
+            cli.output
+                .strict
+                .then(|| ThresholdPreset::Strict.threshold(metric))
+        })
+        .or_else(|| {
+            cli.output
+                .lenient
+                .then(|| ThresholdPreset::Lenient.threshold(metric))
+        })
+        .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
         .or_else(|| {
             file_config
                 .as_ref()
                 .and_then(|c| c.preset)
-                .map(|p| p.threshold())
+                .map(|p| p.threshold(metric))
         })
-        .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
-        .unwrap_or(DEFAULT_THRESHOLD);
+        .unwrap_or(ThresholdPreset::Default.threshold(metric));
 
     let overrides = file_config
         .as_ref()
@@ -1746,6 +1773,10 @@ fn apply_color(choice: ColorArg) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // `DEFAULT_THRESHOLD` is no longer referenced by `merge_threshold`
+    // (it reads `meta.default_threshold` post-#218); only the tests
+    // assert against the value crap4rs's `AdapterMeta` carries.
+    use crate::domain::threshold::DEFAULT_THRESHOLD;
     use std::path::Path;
 
     fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
@@ -2113,7 +2144,7 @@ mod tests {
             threshold: Some(10.0),
             ..FileConfig::default()
         });
-        let (config, display) = merge_threshold(&cli, &file_config);
+        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 15.0);
         assert_eq!(display, 15.0);
     }
@@ -2125,7 +2156,7 @@ mod tests {
             threshold: Some(12.0),
             ..FileConfig::default()
         });
-        let (config, display) = merge_threshold(&cli, &file_config);
+        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 12.0);
         assert_eq!(display, 12.0);
     }
@@ -2142,7 +2173,7 @@ mod tests {
             }],
             ..FileConfig::default()
         });
-        let (config, _) = merge_threshold(&cli, &file_config);
+        let (config, _) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(config.overrides.len(), 1);
         assert_eq!(config.overrides[0].pattern, "domain/**");
     }
@@ -2150,7 +2181,7 @@ mod tests {
     #[test]
     fn merge_threshold_no_config() {
         let cli = parse(&["--coverage", "lcov.info", "--threshold", "20.0"]).unwrap();
-        let (config, display) = merge_threshold(&cli, &None);
+        let (config, display) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 20.0);
         assert!(config.overrides.is_empty());
         assert_eq!(display, 20.0);
@@ -2165,7 +2196,7 @@ mod tests {
             threshold: Some(12.0),
             ..FileConfig::default()
         });
-        let (config, display) = merge_threshold(&cli, &file_config);
+        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(
             config.global, 8.0,
             "explicit CLI default must override config"
@@ -2174,11 +2205,46 @@ mod tests {
     }
 
     #[test]
-    fn merge_threshold_no_cli_no_config_uses_hardcoded_default() {
+    fn merge_threshold_no_flag_default_is_metric_keyed() {
+        // Replaces the pre-fix `merge_threshold_no_cli_no_config_uses_hardcoded_default`.
+        // The no-flag/no-config fallthrough is the `Default` tier
+        // resolved against the effective metric — NOT a single shared
+        // scalar. Cognitive runs get 25; cyclomatic runs get 16. A
+        // cognitive-tuned 25 applied to cyclomatic scores would
+        // under-gate (the bug this keys against).
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        let (config, display) = merge_threshold(&cli, &None);
-        assert_eq!(config.global, DEFAULT_THRESHOLD);
-        assert_eq!(display, DEFAULT_THRESHOLD);
+        let (cog, cog_disp) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
+        assert_eq!(cog.global, 25.0);
+        assert_eq!(cog_disp, 25.0);
+        let (cyc, cyc_disp) = merge_threshold(&cli, &None, ComplexityMetric::Cyclomatic);
+        assert_eq!(cyc.global, 16.0);
+        assert_eq!(cyc_disp, 16.0);
+    }
+
+    #[test]
+    fn merge_threshold_strict_lenient_are_metric_keyed() {
+        // `--strict` / `--lenient` were previously metric-blind (always
+        // the cognitive 15 / 40). They now resolve per metric too, so
+        // no preset path silently applies a cognitive cutoff to
+        // cyclomatic scores.
+        let strict = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
+        assert_eq!(
+            merge_threshold(&strict, &None, ComplexityMetric::Cognitive).1,
+            15.0
+        );
+        assert_eq!(
+            merge_threshold(&strict, &None, ComplexityMetric::Cyclomatic).1,
+            8.0
+        );
+        let lenient = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
+        assert_eq!(
+            merge_threshold(&lenient, &None, ComplexityMetric::Cognitive).1,
+            40.0
+        );
+        assert_eq!(
+            merge_threshold(&lenient, &None, ComplexityMetric::Cyclomatic).1,
+            30.0
+        );
     }
 
     #[test]
@@ -2417,7 +2483,7 @@ mod tests {
     fn merge_threshold_strict_flag() {
         use crate::domain::threshold::STRICT_THRESHOLD;
         let cli = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
-        let (config, display) = merge_threshold(&cli, &None);
+        let (config, display) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, STRICT_THRESHOLD);
         assert_eq!(display, STRICT_THRESHOLD);
     }
@@ -2426,7 +2492,7 @@ mod tests {
     fn merge_threshold_lenient_flag() {
         use crate::domain::threshold::LENIENT_THRESHOLD;
         let cli = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
-        let (config, display) = merge_threshold(&cli, &None);
+        let (config, display) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, LENIENT_THRESHOLD);
         assert_eq!(display, LENIENT_THRESHOLD);
     }
@@ -2439,8 +2505,27 @@ mod tests {
             preset: Some(ThresholdPreset::Strict),
             ..FileConfig::default()
         });
-        let (config, _) = merge_threshold(&cli, &file_config);
+        let (config, _) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(config.global, STRICT_THRESHOLD);
+    }
+
+    #[test]
+    fn merge_threshold_config_literal_overrides_config_preset() {
+        // A literal `threshold = N` in the config is the most specific
+        // expression of intent and must beat a named `preset` in the
+        // same file — mirrors CLI semantics where `--threshold N` beats
+        // `--strict`/`--lenient`. Without this, a user who sets both
+        // would silently get the preset and never the number they typed.
+        use crate::domain::threshold::ThresholdPreset;
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            preset: Some(ThresholdPreset::Strict),
+            threshold: Some(99.0),
+            ..FileConfig::default()
+        });
+        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        assert_eq!(config.global, 99.0);
+        assert_eq!(display, 99.0);
     }
 
     #[test]
@@ -2451,7 +2536,7 @@ mod tests {
             preset: Some(ThresholdPreset::Strict),
             ..FileConfig::default()
         });
-        let (config, _) = merge_threshold(&cli, &file_config);
+        let (config, _) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 50.0);
     }
 
@@ -2548,10 +2633,34 @@ mod tests {
     }
 
     #[test]
-    fn merge_effective_inputs_threshold_default() {
+    fn merge_effective_inputs_default_threshold_follows_adapter_metric_cognitive() {
+        // End-to-end wiring: an adapter whose default metric is
+        // cognitive, with no `--threshold`/`--metric`/config, resolves
+        // the no-flag gate to the cognitive `Default` cutoff (25).
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        let inputs = merge_effective_inputs(&cli, &None, &fake_meta());
-        assert_eq!(inputs.threshold, DEFAULT_THRESHOLD);
+        let meta = AdapterMeta {
+            default_metric: ComplexityMetric::Cognitive,
+            ..fake_meta()
+        };
+        let inputs = merge_effective_inputs(&cli, &None, &meta);
+        assert!(matches!(inputs.metric, ComplexityMetric::Cognitive));
+        assert_eq!(inputs.threshold, 25.0);
+    }
+
+    #[test]
+    fn merge_effective_inputs_default_threshold_follows_adapter_metric_cyclomatic() {
+        // Mirror for a cyclomatic-default adapter (crap4ts): the no-flag
+        // gate must be the cyclomatic `Default` cutoff (16), not the
+        // cognitive 25 — a single shared default applied the wrong
+        // metric's cutoff before this fix.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let meta = AdapterMeta {
+            default_metric: ComplexityMetric::Cyclomatic,
+            ..fake_meta()
+        };
+        let inputs = merge_effective_inputs(&cli, &None, &meta);
+        assert!(matches!(inputs.metric, ComplexityMetric::Cyclomatic));
+        assert_eq!(inputs.threshold, 16.0);
     }
 
     #[test]

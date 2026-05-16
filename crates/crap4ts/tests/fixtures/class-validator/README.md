@@ -114,10 +114,14 @@ committed artifacts.**
    threshold; that's expected and does NOT mean the capture failed —
    verify by parsing the JSON
    (`jq . crates/crap4ts/tests/fixtures/class-validator-reference.json`).
-   At commit `2e1a5c2` the baseline reports 568 functions, 1 exceeding
-   the default threshold of 25 (`container.ts :: getFromContainer`,
-   CRAP 32.62), so the CLI exits **1** with `passed: false`. That is
-   the expected frozen state.
+   At commit `2e1a5c2` the baseline reports 568 functions. Post-#218
+   the no-flag default gate is the D5-correct `16` (was `25`), so **3**
+   functions exceed (worst: `container.ts :: getFromContainer`, CRAP
+   32.62); the CLI exits **1** with `result.passed: false`. That is the
+   expected frozen state. Only threshold-derived fields shifted from
+   the pre-#218 capture (`threshold` 25→16, `exceeding` 1→3,
+   `result.passed` unchanged false); scores/complexity/coverage are
+   identical (the "threshold-default-change" class).
 
 ## Baseline disposition
 
@@ -138,30 +142,32 @@ crap4ts@2.x change that moves a class-validator function's complexity,
 coverage, or CRAP score is a baseline drift that #190's harness
 surfaces for triage (legitimate improvement vs. score regression).
 
-### Known default-threshold caveat (#218) — regenerate post-fix
+### Default-threshold caveat (#218) — RESOLVED, baseline regenerated
 
-This baseline was captured at crap4ts@2.x's **no-flag default
-top-level gate `threshold` of `25.0`**. That `25` is crap-core's
-*shared* default (crap4rs's cognitive-metric value), **NOT** the
-D5-calibrated crap4ts cyclomatic default of **16** that locked
-pipeline decision #2/#5 mandates. W2.5 (#188) wired the default
-*metric* (cyclomatic) and the per-function/per-row threshold (`16.0`)
-but the top-level *gate* threshold still falls back to `25`; the
-`wire_envelope_crap4ts` canary masks this because it invokes the
-binary with an explicit `--threshold 16`. This is a real crap4ts
-default-threshold bug tracked as **#218** (sub-issue of #173,
-`type:bug priority:soon`).
+This baseline was *originally* captured at crap4ts@2.x's **no-flag
+default top-level gate `threshold` of `25.0`** — crap-core's *shared*
+default (crap4rs's cognitive-metric value), **NOT** the D5-calibrated
+crap4ts cyclomatic default of **16** that locked pipeline decision
+#2/#5 mandates. W2.5 (#188) wired the default *metric* (cyclomatic)
+and the per-function/per-row threshold (`16.0`) but the top-level
+*gate* threshold fell back to `25`; the `wire_envelope_crap4ts` canary
+masked it (it invokes the binary with an explicit `--threshold 16`).
+Tracked and **fixed in #218** (`AdapterMeta::default_threshold`,
+sibling of W2.5's `default_metric`).
 
-The baseline is deliberately **left frozen at the actual current
-default (`threshold: 25`)** per the W3.1 "freeze reality" precedent
-(the v1.x oracle likewise froze v1.x's real default threshold of 12) —
-a regression baseline must capture what crap4ts@2.x produces *today*,
-not its intended-after-fix behavior. **#190 (W3.2) must regenerate
-this baseline after #218 lands**: the top-level `threshold`, `passed`,
-each function's `exceeds`, and the `exceeding`-count will all shift
-when the default corrects 25 → 16. Until then, the "exceeding default
-threshold (25)" row in the Sanity-check table below reflects the
-buggy-default capture, not the D5-intended gate.
+**Plan-of-record correction (surfaced, not silently absorbed):** the
+original wording said "**#190 (W3.2) must regenerate this baseline
+after #218 lands**." #218's own acceptance criteria retconned that —
+**#218 regenerates this baseline; #190 (W3.2) *consumes* the corrected
+one.** This README is updated in the #218 PR (not left stale for
+#190). The freeze-reality precedent still holds: a regression baseline
+captures what crap4ts@2.x produces *today* — and today, post-#218, the
+no-flag default is the D5-correct `16`, so the frozen baseline now
+reflects `threshold: 16`. The top-level `threshold`, `result.passed`,
+each function's `exceeds`, and the `exceeding`-count shifted exactly as
+predicted (25 → 16; scores/complexity/coverage unchanged — the
+"threshold-default-change" class #190's 3-way classifier treats as
+PASS). The Sanity-check table below reflects the corrected `16` gate.
 
 ## Sanity-check (captured at `2e1a5c2`)
 
@@ -181,7 +187,7 @@ From the frozen baseline + `--verbose` parse statistics:
 | Average CRAP | 1.91 |
 | Median CRAP | 1.0 |
 | Max CRAP | 32.62 (`container.ts :: getFromContainer`, high) |
-| Functions exceeding default threshold (25) | 1 |
+| Functions exceeding default threshold (16, D5 — post-#218) | 3 |
 | Coverage health (non-zero / total) | 545 / 568 (95.9%) |
 | Functions at 100% coverage | 517 |
 | Average coverage | 94.29% |
