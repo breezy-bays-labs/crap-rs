@@ -41,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged. The generated `crap4rs.toml` / `crap4ts.toml` threshold
   comment now states which metric the printed cutoffs apply to. (#218)
 
+### Changed
+
+- Config-file `threshold = N` now takes precedence over
+  `preset = "..."` when both are set in the same `crap4rs.toml` /
+  `crap4ts.toml`. This makes config-file resolution consistent with
+  CLI semantics, where an explicit `--threshold N` already overrides
+  `--strict` / `--lenient`. Users who had both fields set will now get
+  the literal value; previously the preset silently won. The
+  `init`-generated config never writes both, so the blast radius is
+  limited to hand-edited configs. (#218)
+
 ### Changed (crap-core public API)
 
 - `AdapterMeta` gains a `default_excludes: &'static [&'static str]`

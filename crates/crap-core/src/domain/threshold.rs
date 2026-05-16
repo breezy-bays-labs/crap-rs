@@ -113,6 +113,29 @@ pub struct ThresholdConfig {
     pub overrides: Vec<ThresholdOverride>,
 }
 
+/// Returns the cognitive-metric default cutoff. `Default` cannot take
+/// a metric argument, so it cannot be metric-correct on its own — it
+/// is the cognitive baseline only.
+///
+/// The CLI never relies on this: the analysis path resolves the
+/// metric-correct `global` through `merge_threshold` (CLI > config >
+/// adapter default, keyed on the effective metric) and constructs
+/// `ThresholdConfig` directly, bypassing `Default`. The remaining
+/// `Default` use is a struct-field initializer that is overwritten
+/// before any analysis runs.
+///
+/// A library embedder that needs a metric-correct config should build
+/// it explicitly rather than via `Default`:
+///
+/// ```
+/// # use crap_core::domain::threshold::{ThresholdConfig, ThresholdPreset};
+/// # use crap_core::domain::types::ComplexityMetric;
+/// let metric = ComplexityMetric::Cyclomatic;
+/// let config = ThresholdConfig {
+///     global: ThresholdPreset::Default.threshold(metric),
+///     overrides: Vec::new(),
+/// };
+/// ```
 impl Default for ThresholdConfig {
     fn default() -> Self {
         Self {

@@ -345,17 +345,22 @@ pub struct OutputArgs {
     )]
     pub format: Vec<FormatSpec>,
 
-    /// CRAP score threshold — functions above this fail the check [default: 25]
+    /// CRAP score threshold — functions above this fail the check.
+    /// Defaults to the calibrated cutoff for the active complexity
+    /// metric (cyclomatic and cognitive scores differ in magnitude, so
+    /// the default differs per metric — see the generated config).
     // allow_hyphen_values: lets clap parse `--threshold -5` as a value
     // (not a flag), so our validate_inputs can give an actionable error.
     #[arg(long, allow_hyphen_values = true, group = "threshold_select")]
     pub threshold: Option<f64>,
 
-    /// Use strict threshold (15) — for high-quality or safety-critical code
+    /// Use the strict preset (tighter cutoff calibrated for the active
+    /// metric) — for high-quality or safety-critical code
     #[arg(long, group = "threshold_select")]
     pub strict: bool,
 
-    /// Use lenient threshold (40) — for legacy or transitional code
+    /// Use the lenient preset (looser cutoff calibrated for the active
+    /// metric) — for legacy or transitional code
     #[arg(long, group = "threshold_select")]
     pub lenient: bool,
 
@@ -1455,11 +1460,18 @@ fn load_file_config(
 /// so a cutoff calibrated for one metric is never applied to the
 /// other metric's (different-magnitude) scores. `metric` is the
 /// already-resolved effective metric (CLI > config > adapter default).
+/// A literal cutoff (an explicit number) always beats a named preset
+/// at the same level of specificity, because a literal is the most
+/// specific expression of intent: CLI `--threshold N` beats CLI
+/// `--strict`/`--lenient`, and config `threshold = N` beats config
+/// `preset = "..."`. This keeps CLI and config-file semantics
+/// consistent — a user who writes an explicit number gets that number.
+///
 /// 1. `--threshold N`   — explicit CLI value (a literal cutoff; metric-independent)
 /// 2. `--strict`        → `ThresholdPreset::Strict.threshold(metric)`
 /// 3. `--lenient`       → `ThresholdPreset::Lenient.threshold(metric)`
-/// 4. config `preset`   → `preset.threshold(metric)`
-/// 5. config `threshold` — explicit literal cutoff (metric-independent)
+/// 4. config `threshold` — explicit literal cutoff (metric-independent)
+/// 5. config `preset`   → `preset.threshold(metric)`
 /// 6. no-flag default   → `ThresholdPreset::Default.threshold(metric)`
 ///    (cyclomatic-metric runs → 16; cognitive-metric runs → 25)
 fn merge_threshold(
@@ -1480,13 +1492,13 @@ fn merge_threshold(
                 .lenient
                 .then(|| ThresholdPreset::Lenient.threshold(metric))
         })
+        .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
         .or_else(|| {
             file_config
                 .as_ref()
                 .and_then(|c| c.preset)
                 .map(|p| p.threshold(metric))
         })
-        .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
         .unwrap_or(ThresholdPreset::Default.threshold(metric));
 
     let overrides = file_config
@@ -2495,6 +2507,25 @@ mod tests {
         });
         let (config, _) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(config.global, STRICT_THRESHOLD);
+    }
+
+    #[test]
+    fn merge_threshold_config_literal_overrides_config_preset() {
+        // A literal `threshold = N` in the config is the most specific
+        // expression of intent and must beat a named `preset` in the
+        // same file — mirrors CLI semantics where `--threshold N` beats
+        // `--strict`/`--lenient`. Without this, a user who sets both
+        // would silently get the preset and never the number they typed.
+        use crate::domain::threshold::ThresholdPreset;
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            preset: Some(ThresholdPreset::Strict),
+            threshold: Some(99.0),
+            ..FileConfig::default()
+        });
+        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        assert_eq!(config.global, 99.0);
+        assert_eq!(display, 99.0);
     }
 
     #[test]

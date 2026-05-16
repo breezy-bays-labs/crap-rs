@@ -68,7 +68,7 @@ pub(crate) fn handle_init_with_io<R: BufRead, W: Write>(
     let preset = if non_interactive {
         ThresholdPreset::Default
     } else {
-        prompt_threshold_preset(stdin, stderr)?
+        prompt_threshold_preset(meta.default_metric, stdin, stderr)?
     };
 
     let detection = detect_src_layout();
@@ -165,14 +165,7 @@ pub(crate) fn render_config(
     // for the same function differ in magnitude), so the numbers shown
     // are this adapter's metric, sourced from the one calibration
     // table — never re-hardcoded here.
-    let metric = meta.default_metric;
-    let strict = ThresholdPreset::Strict.threshold(metric);
-    let default = ThresholdPreset::Default.threshold(metric);
-    let lenient = ThresholdPreset::Lenient.threshold(metric);
-    let metric_name = match metric {
-        ComplexityMetric::Cyclomatic => "cyclomatic",
-        ComplexityMetric::Cognitive => "cognitive",
-    };
+    let (strict, default, lenient, metric_name) = preset_display(meta.default_metric);
     out.push_str("# Threshold preset (cutoffs are for the ");
     out.push_str(metric_name);
     out.push_str(" metric):\n");
@@ -215,16 +208,39 @@ pub(crate) fn render_config(
     out
 }
 
+/// The three preset cutoffs plus the metric's display name, derived
+/// from the one calibration table. Both the generated-config comment
+/// and the interactive prompt render these, so neither re-hardcodes
+/// the numbers — a calibration change can never desync the two
+/// user-facing surfaces, and a cutoff calibrated for one metric is
+/// never shown for the other (whose scores have a different magnitude).
+fn preset_display(metric: ComplexityMetric) -> (f64, f64, f64, &'static str) {
+    (
+        ThresholdPreset::Strict.threshold(metric),
+        ThresholdPreset::Default.threshold(metric),
+        ThresholdPreset::Lenient.threshold(metric),
+        match metric {
+            ComplexityMetric::Cyclomatic => "cyclomatic",
+            ComplexityMetric::Cognitive => "cognitive",
+        },
+    )
+}
+
 /// Read one line from stdin and map the first character to a
 /// `ThresholdPreset`. Empty/whitespace/anything-else → `Default`.
 /// EOF (closed stdin) is treated as empty input — Returns `Default`.
+/// The displayed cutoffs are calibrated for `metric` (the adapter's
+/// default complexity metric), so the interactive numbers match what
+/// the generated config will resolve to.
 fn prompt_threshold_preset<R: BufRead, W: Write>(
+    metric: ComplexityMetric,
     stdin: &mut R,
     stderr: &mut W,
 ) -> Result<ThresholdPreset> {
+    let (strict, default, lenient, metric_name) = preset_display(metric);
     write!(
         stderr,
-        "Threshold preset?\n  (s)trict  = 15  high-quality libs\n  (d)efault = 25  typical projects\n  (l)enient = 40  legacy code\n[d]: "
+        "Threshold preset ({metric_name} metric)?\n  (s)trict  = {strict}  high-quality libs\n  (d)efault = {default}  typical projects\n  (l)enient = {lenient}  legacy code\n[d]: "
     )
     .ok();
     stderr.flush().ok();
@@ -375,7 +391,8 @@ mod tests {
     fn prompt_reads_strict_from_piped_stdin() {
         let mut stdin = Cursor::new(b"s\n");
         let mut stderr: Vec<u8> = Vec::new();
-        let preset = prompt_threshold_preset(&mut stdin, &mut stderr).unwrap();
+        let preset =
+            prompt_threshold_preset(ComplexityMetric::Cognitive, &mut stdin, &mut stderr).unwrap();
         assert_eq!(preset, ThresholdPreset::Strict);
     }
 
@@ -383,8 +400,26 @@ mod tests {
     fn prompt_defaults_when_stdin_is_empty() {
         let mut stdin = Cursor::new(b"");
         let mut stderr: Vec<u8> = Vec::new();
-        let preset = prompt_threshold_preset(&mut stdin, &mut stderr).unwrap();
+        let preset =
+            prompt_threshold_preset(ComplexityMetric::Cognitive, &mut stdin, &mut stderr).unwrap();
         assert_eq!(preset, ThresholdPreset::Default);
+    }
+
+    #[test]
+    fn prompt_numbers_track_the_metric() {
+        // The interactive prompt must show the cutoffs calibrated for
+        // the adapter's metric — a cyclomatic adapter shows 8/16/30,
+        // never the cognitive 15/25/40. This is the same defect class
+        // as the generated-config comment: metric-blind numbers shown
+        // to the user.
+        let mut stdin = Cursor::new(b"\n");
+        let mut stderr: Vec<u8> = Vec::new();
+        prompt_threshold_preset(ComplexityMetric::Cyclomatic, &mut stdin, &mut stderr).unwrap();
+        let shown = String::from_utf8(stderr).unwrap();
+        assert!(shown.contains("cyclomatic metric"), "prompt: {shown}");
+        assert!(shown.contains("(s)trict  = 8"), "prompt: {shown}");
+        assert!(shown.contains("(d)efault = 16"), "prompt: {shown}");
+        assert!(shown.contains("(l)enient = 30"), "prompt: {shown}");
     }
 
     #[test]
