@@ -43,14 +43,16 @@
 //!
 //! ## Path normalization
 //!
-//! Mirrors `crap4rs::adapters::coverage::LcovParser::normalize_path` —
-//! a pure `strip_prefix(effective_src)`. The orchestrator pre-
-//! canonicalizes `effective_src` at the factory-closure boundary, so
-//! the parser does no filesystem I/O during path joining. Entries
-//! whose paths fall outside `effective_src` emit an
-//! `IstanbulParseDiagnostic { kind: PathUnresolved, … }` and are
-//! skipped — per Resolved Q10 in shaping, the scorecard NEVER aborts
-//! on first failure and NEVER silent-drops a record.
+//! Two-arm strategy (see `IstanbulCoverage::normalize_path`): a pure
+//! `strip_prefix(effective_src)` fast path for same-machine captures,
+//! then a bounded `.is_file()` longest-suffix reachability fallback
+//! (#215) for portable fixtures whose absolute paths were captured on
+//! a different machine and share no prefix with the local
+//! `effective_src`. The orchestrator pre-canonicalizes `effective_src`
+//! at the factory-closure boundary. Entries whose paths resolve under
+//! neither arm emit an `IstanbulParseDiagnostic { kind: PathUnresolved,
+//! … }` and are skipped — per Resolved Q10 in shaping, the scorecard
+//! NEVER aborts on first failure and NEVER silent-drops a record.
 
 use crap_core::domain::types::{BranchCoverage, CrapError, LineCoverage};
 use crap_core::ports::{CoveragePort, ParseOutput};
@@ -90,15 +92,41 @@ impl IstanbulCoverage {
         }
     }
 
-    /// Strip `effective_src` from `raw` and return a workspace-relative
-    /// path, or `None` if the entry resolves outside the source tree.
+    /// Resolve `raw` to a workspace-relative path under
+    /// `effective_src`, or `None` if it can't be resolved.
     ///
-    /// Pure: no filesystem I/O. Mirrors `LcovParser::normalize_path`
-    /// in `crap4rs`. The orchestrator canonicalizes `effective_src`
-    /// before construction, so no further `canonicalize()` walk is
-    /// needed here. Joining relative entries against `effective_src`
-    /// and stripping the prefix is the same two-step the LCOV parser
-    /// uses on its own platform.
+    /// Two-arm strategy:
+    ///
+    /// 1. **Strip-prefix fast path (pure, no I/O).** Join relative
+    ///    entries against `effective_src`, then strip the canonical
+    ///    `effective_src` prefix. This succeeds whenever the coverage
+    ///    payload was captured on the same machine/tree being analyzed
+    ///    (jest/vitest/nyc on the local checkout). The orchestrator
+    ///    pre-canonicalizes `effective_src`, so no `canonicalize()`
+    ///    walk is needed here.
+    /// 2. **Suffix-reachability fallback (bounded `.is_file()` I/O,
+    ///    #215).** When the coverage was captured on a *different*
+    ///    machine (a portable fixture: coverage produced on machine A,
+    ///    analyzed on machine B), the entry's absolute path shares no
+    ///    prefix with the local `effective_src` and arm 1 returns
+    ///    `None`. Arm 2 then walks the path's components longest →
+    ///    shortest, joining each suffix under `effective_src` and
+    ///    accepting the first suffix that resolves to a real file. The
+    ///    longest matching suffix wins, which deterministically
+    ///    disambiguates a leaf filename (e.g. `index.ts`) that exists
+    ///    in multiple directories — the longer shared path is the
+    ///    structural truth; the machine-specific absolute prefix is
+    ///    noise. If two equal-length suffixes could both match (only
+    ///    reachable via symlinks/odd trees), the first found wins.
+    ///
+    /// This is *not* a pure function and no longer mirrors
+    /// `crap4rs::adapters::coverage::LcovParser::normalize_path` (which
+    /// remains pure strip-prefix): the fallback does bounded,
+    /// OS-cached filesystem I/O (~components × `.is_file()` syscalls).
+    /// That trade buys cross-machine fixture portability. When even the
+    /// suffix match fails, this returns `None` and the caller emits
+    /// `PathUnresolved` as before — the diagnostic-and-skip contract
+    /// (D16) is preserved as the final arm.
     fn normalize_path(&self, raw: &str) -> Option<PathBuf> {
         let path = PathBuf::from(raw);
         let joined = if path.is_absolute() {
@@ -106,10 +134,46 @@ impl IstanbulCoverage {
         } else {
             self.effective_src.join(raw)
         };
-        joined
-            .strip_prefix(&self.effective_src)
-            .ok()
-            .map(|p| p.to_path_buf())
+        // Arm 1: strip the canonical effective_src prefix (W2.4 fast
+        // path — same-machine capture).
+        if let Ok(stripped) = joined.strip_prefix(&self.effective_src) {
+            return Some(stripped.to_path_buf());
+        }
+        // Arm 2: cross-machine absolute paths don't share a prefix —
+        // find the longest path suffix that resolves to a real file
+        // under effective_src (#215).
+        self.suffix_match_under(&joined)
+    }
+
+    /// Find the longest suffix of `raw` whose components, joined under
+    /// `effective_src`, resolve to a real file. Returns the
+    /// workspace-relative suffix, or `None` if no suffix is reachable.
+    ///
+    /// Iterates suffixes longest → shortest (`start` from 0 outward),
+    /// so the first reachable suffix is the longest one
+    /// (longest-suffix-wins precedence — see [`Self::normalize_path`]).
+    ///
+    /// `.is_file()` is used (not `.exists()`): one syscall, and it
+    /// prevents a directory false-positive when a raw path component
+    /// happens to match a directory name under `effective_src`.
+    ///
+    /// The `starts_with(effective_src)` guard rejects the `start == 0`
+    /// degenerate case: when `raw` is absolute, `effective_src.join(raw)`
+    /// collapses back to `raw` itself (Rust `Path::join` replaces the
+    /// base with an absolute RHS). Without the guard, an absolute path
+    /// that exists verbatim *outside* `effective_src` would leak an
+    /// out-of-tree match. The guard keeps every accepted match strictly
+    /// under the source root.
+    fn suffix_match_under(&self, raw: &Path) -> Option<PathBuf> {
+        let components: Vec<_> = raw.components().collect();
+        for start in 0..components.len() {
+            let candidate_rel: PathBuf = components[start..].iter().collect();
+            let candidate_abs = self.effective_src.join(&candidate_rel);
+            if candidate_abs.starts_with(&self.effective_src) && candidate_abs.is_file() {
+                return Some(candidate_rel);
+            }
+        }
+        None
     }
 }
 
