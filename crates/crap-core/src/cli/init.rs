@@ -29,6 +29,7 @@ use anyhow::{Context, Result, bail};
 
 use crate::cli::AdapterMeta;
 use crate::domain::threshold::ThresholdPreset;
+use crate::domain::types::ComplexityMetric;
 
 /// Handle the `init` subcommand. Writes a starter config to
 /// `meta.config_file_name` in the current directory.
@@ -158,12 +159,32 @@ pub(crate) fn render_config(
     out.push_str("# Edit freely; the analyzer re-reads this file on every run.\n\n");
 
     // Threshold preset — `preset` and `threshold` are mutually
-    // exclusive in `FileConfig`; we emit `preset` so the canonical
-    // values (15/25/40) stay in one place.
-    out.push_str("# Threshold preset:\n");
-    out.push_str("#   strict (15)  — high-quality libraries, safety-critical code\n");
-    out.push_str("#   default (25) — typical Rust projects (balanced)\n");
-    out.push_str("#   lenient (40) — legacy or transitional code\n");
+    // exclusive in `FileConfig`; we emit `preset` (the configurable
+    // unit) and let resolution map it to a number. The cutoffs differ
+    // by complexity metric (a cyclomatic count and a cognitive count
+    // for the same function differ in magnitude), so the numbers shown
+    // are this adapter's metric, sourced from the one calibration
+    // table — never re-hardcoded here.
+    let metric = meta.default_metric;
+    let strict = ThresholdPreset::Strict.threshold(metric);
+    let default = ThresholdPreset::Default.threshold(metric);
+    let lenient = ThresholdPreset::Lenient.threshold(metric);
+    let metric_name = match metric {
+        ComplexityMetric::Cyclomatic => "cyclomatic",
+        ComplexityMetric::Cognitive => "cognitive",
+    };
+    out.push_str("# Threshold preset (cutoffs are for the ");
+    out.push_str(metric_name);
+    out.push_str(" metric):\n");
+    out.push_str(&format!(
+        "#   strict ({strict})  — high-quality libraries, safety-critical code\n"
+    ));
+    out.push_str(&format!(
+        "#   default ({default}) — typical projects (balanced)\n"
+    ));
+    out.push_str(&format!(
+        "#   lenient ({lenient}) — legacy or transitional code\n"
+    ));
     out.push_str("# Use `threshold = N` instead to set a custom numeric cutoff.\n");
     out.push_str("preset = \"");
     out.push_str(preset_str(preset));
