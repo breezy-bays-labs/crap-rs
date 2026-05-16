@@ -137,6 +137,31 @@ crap4ts@2.x change that moves a class-validator function's complexity,
 coverage, or CRAP score is a baseline drift that #190's harness
 surfaces for triage (legitimate improvement vs. score regression).
 
+### Known default-threshold caveat (#218) — regenerate post-fix
+
+This baseline was captured at crap4ts@2.x's **no-flag default
+top-level gate `threshold` of `25.0`**. That `25` is crap-core's
+*shared* default (crap4rs's cognitive-metric value), **NOT** the
+D5-calibrated crap4ts cyclomatic default of **16** that locked
+pipeline decision #2/#5 mandates. W2.5 (#188) wired the default
+*metric* (cyclomatic) and the per-function/per-row threshold (`16.0`)
+but the top-level *gate* threshold still falls back to `25`; the
+`wire_envelope_crap4ts` canary masks this because it invokes the
+binary with an explicit `--threshold 16`. This is a real crap4ts
+default-threshold bug tracked as **#218** (sub-issue of #173,
+`type:bug priority:soon`).
+
+The baseline is deliberately **left frozen at the actual current
+default (`threshold: 25`)** per the W3.1 "freeze reality" precedent
+(the v1.x oracle likewise froze v1.x's real default threshold of 12) —
+a regression baseline must capture what crap4ts@2.x produces *today*,
+not its intended-after-fix behavior. **#190 (W3.2) must regenerate
+this baseline after #218 lands**: the top-level `threshold`, `passed`,
+each function's `exceeds`, and the `exceeding`-count will all shift
+when the default corrects 25 → 16. Until then, the "exceeding default
+threshold (25)" row in the Sanity-check table below reflects the
+buggy-default capture, not the D5-intended gate.
+
 ## Sanity-check (captured at `2e1a5c2`)
 
 From the frozen baseline + `--verbose` parse statistics:
