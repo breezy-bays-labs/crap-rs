@@ -159,7 +159,7 @@ fn crap4rs_threshold(extra_args: &[&str]) -> f64 {
 // ── crap4ts: cyclomatic-metric adapter ───────────────────────────────
 
 #[test]
-fn crap4ts_no_flag_default_threshold_is_cyclomatic_16() {
+fn default_gate_crap4ts_no_flag_is_cyclomatic_16() {
     assert_eq!(
         crap4ts_threshold(&[]),
         16.0,
@@ -170,7 +170,7 @@ fn crap4ts_no_flag_default_threshold_is_cyclomatic_16() {
 }
 
 #[test]
-fn crap4ts_strict_is_cyclomatic_8() {
+fn default_gate_crap4ts_strict_is_cyclomatic_8() {
     assert_eq!(
         crap4ts_threshold(&["--strict"]),
         8.0,
@@ -180,7 +180,7 @@ fn crap4ts_strict_is_cyclomatic_8() {
 }
 
 #[test]
-fn crap4ts_lenient_is_cyclomatic_30() {
+fn default_gate_crap4ts_lenient_is_cyclomatic_30() {
     assert_eq!(
         crap4ts_threshold(&["--lenient"]),
         30.0,
@@ -192,7 +192,7 @@ fn crap4ts_lenient_is_cyclomatic_30() {
 // ── crap4rs: cognitive-metric adapter (regression guards) ────────────
 
 #[test]
-fn crap4rs_no_flag_default_threshold_stays_cognitive_25() {
+fn default_gate_crap4rs_no_flag_stays_cognitive_25() {
     assert_eq!(
         crap4rs_threshold(&[]),
         25.0,
@@ -203,7 +203,7 @@ fn crap4rs_no_flag_default_threshold_stays_cognitive_25() {
 }
 
 #[test]
-fn crap4rs_strict_stays_cognitive_15() {
+fn default_gate_crap4rs_strict_stays_cognitive_15() {
     assert_eq!(
         crap4rs_threshold(&["--strict"]),
         15.0,
@@ -212,7 +212,7 @@ fn crap4rs_strict_stays_cognitive_15() {
 }
 
 #[test]
-fn crap4rs_metric_cyclomatic_no_flag_default_is_16() {
+fn default_gate_crap4rs_metric_cyclomatic_no_flag_is_16() {
     // The deeper instance of the same defect class: crap4rs *supports*
     // cyclomatic too, and `--metric cyclomatic` with no threshold must
     // resolve to the cyclomatic `default` (16), not the cognitive 25.
@@ -225,7 +225,7 @@ fn crap4rs_metric_cyclomatic_no_flag_default_is_16() {
 }
 
 #[test]
-fn crap4rs_metric_cyclomatic_strict_is_8() {
+fn default_gate_crap4rs_metric_cyclomatic_strict_is_8() {
     assert_eq!(
         crap4rs_threshold(&["--metric", "cyclomatic", "--strict"]),
         8.0,

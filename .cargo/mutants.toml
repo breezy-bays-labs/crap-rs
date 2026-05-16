@@ -1,16 +1,28 @@
 # cargo-mutants config — see https://mutants.rs/
 
-# Skip the wire-envelope canary test under mutants.
+# Skip crap-core integration tests that exec the adapter binaries.
 #
-# `crates/crap-core/tests/wire_envelope_snapshot.rs` exec's the `crap4rs`
-# binary via `assert_cmd::Command::cargo_bin("crap4rs")` to lock the JSON
-# envelope shape across the migration. Under `cargo mutants --package
-# crap-core` the bin is not built (only crap-core's targets are), so the
-# test panics before any mutant runs. The canary still gates every PR via
-# the `Test (linux-x86)` / `Test (macos-arm)` / `Test (macos-x86)` jobs,
-# which run `cargo nextest run --workspace --all-targets` and DO build the
-# crap4rs bin first. Excluding it here is scoped to mutants only.
-additional_cargo_test_args = ["--", "--skip", "envelope"]
+# Two crap-core integration suites shell out to the `crap4rs` / `crap4ts`
+# binaries via `assert_cmd::Command::cargo_bin(...)`:
+#
+#   * `wire_envelope_crap4rs.rs` / `wire_envelope_crap4ts.rs` (test fn
+#     `envelope`) — lock the JSON envelope shape across the migration.
+#   * `default_gate_threshold.rs` (test fns prefixed `default_gate_`) —
+#     assert the no-explicit-`--threshold` gate resolves to the
+#     metric-calibrated cutoff, the path the explicit-flag wire snapshots
+#     structurally cannot exercise.
+#
+# Under `cargo mutants --package crap-core` only crap-core's own targets
+# build — the `crap4rs` / `crap4ts` bins are not, so `CARGO_BIN_EXE_*` is
+# unset and these tests panic before any mutant runs. Both suites still
+# gate every PR via the `Test (linux-x86)` / `Test (macos-arm)` /
+# `Test (macos-x86)` jobs, which run `cargo nextest run --workspace
+# --all-targets` and DO build the bins first. Neither suite exercises
+# `view.rs` (the mutated file), so skipping them here loses zero
+# mutant-killing power. Both `--skip` filters are libtest substring
+# matches on the test-fn name; `default_gate` is collision-free
+# workspace-wide. Scoped to mutants only.
+additional_cargo_test_args = ["--", "--skip", "envelope", "--skip", "default_gate"]
 
 # Warm each parallel worker's scratch tree with our /target dir.
 #
