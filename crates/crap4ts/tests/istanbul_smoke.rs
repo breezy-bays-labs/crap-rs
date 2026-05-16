@@ -799,3 +799,271 @@ fn w24_top_level_array_emits_schema_unrecognized() {
         out.diagnostics[0].message
     );
 }
+
+// ── #215: suffix-fallback for cross-machine absolute paths ────────────
+//
+// When a portable fixture's `coverage-final.json` carries absolute
+// paths captured on machine A (e.g. `/Users/alice/Github/proj/src/...`)
+// but is analyzed on machine B under a different `--src`, the absolute
+// prefix shares nothing with the canonical `effective_src`, so
+// `strip_prefix` (arm 1) returns `None`. `normalize_path`'s arm 2
+// walks path suffixes longest → shortest under `effective_src` and
+// accepts the first that resolves to a real file. These four tests
+// lock that contract: (a) resolves a different-prefix absolute path,
+// (b) over-match guard — no false-positive when no suffix exists,
+// (c) longest-suffix-wins disambiguation, (d) e2e floor on the W3.1
+// v1.x corpus.
+
+/// Build a minimal single-statement Istanbul payload keyed by `key`
+/// whose entry `path` is the given (foreign-machine) absolute path.
+/// One statement at line 1 with one hit so a `LineCoverage` record
+/// flows when the path resolves.
+fn one_stmt_payload(key: &str, entry_path: &str) -> String {
+    format!(
+        r#"{{"{key}":{{"path":"{entry_path}","s":{{"0":1}},"statementMap":{{"0":{{"start":{{"line":1,"column":0}},"end":{{"line":1,"column":10}}}}}},"b":{{}},"branchMap":{{}},"f":{{}},"fnMap":{{}}}}}}"#
+    )
+}
+
+/// #215(a): an absolute path with a *different* machine prefix but a
+/// suffix that matches a real file under `effective_src` resolves via
+/// the suffix fallback — no `PathUnresolved`, coverage present.
+#[test]
+fn fix215_foreign_prefix_absolute_path_resolves_via_suffix_fallback() {
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+    write_fixture(
+        &canonical,
+        "simple.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+
+    // The fixture only has `simple.ts` at the root, but the coverage
+    // entry's path is an absolute path from a completely foreign tree.
+    let payload = one_stmt_payload(
+        "/some/foreign/machine/Github/proj/src/simple.ts",
+        "/some/foreign/machine/Github/proj/src/simple.ts",
+    );
+
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser
+        .parse(&payload)
+        .expect("foreign-prefix absolute path parses via suffix fallback");
+
+    assert!(
+        out.diagnostics.is_empty(),
+        "no PathUnresolved expected — suffix fallback resolves it: {:?}",
+        out.diagnostics
+    );
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert_eq!(
+        keys,
+        vec!["simple.ts".to_string()],
+        "entry resolves to the relative suffix `simple.ts`; got {keys:?}"
+    );
+    let lines = lines_for(&out, "simple.ts");
+    assert!(
+        !lines.is_empty(),
+        "coverage records flow for the matched file"
+    );
+}
+
+/// #215(b): over-match guard. An absolute path whose *no* suffix
+/// resolves to a real file under `effective_src` still emits exactly
+/// one `PathUnresolved` — the fallback must not invent a match.
+#[test]
+fn fix215_no_matching_suffix_still_emits_path_unresolved() {
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+    write_fixture(
+        &canonical,
+        "simple.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+
+    // `nonexistent.ts` has no suffix anywhere under the fixture root.
+    let payload = one_stmt_payload(
+        "/foreign/x/y/z/nonexistent.ts",
+        "/foreign/x/y/z/nonexistent.ts",
+    );
+
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser.parse(&payload).expect("parses with diagnostic");
+
+    let unresolved: Vec<_> = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.kind == IstanbulDiagnosticKind::PathUnresolved)
+        .collect();
+    assert_eq!(
+        unresolved.len(),
+        1,
+        "exactly one PathUnresolved when no suffix matches: {:?}",
+        out.diagnostics
+    );
+    assert_eq!(unresolved[0].file_path, "/foreign/x/y/z/nonexistent.ts");
+    assert!(
+        out.coverage.is_empty(),
+        "no coverage for an unmatched path: {:?}",
+        out.coverage.keys().collect::<Vec<_>>()
+    );
+}
+
+/// #215(c): ambiguous suffix. With `a/util.ts` AND `b/util.ts` under
+/// the root, a coverage entry path `/foreign/x/b/util.ts` must resolve
+/// to `b/util.ts` (longest-suffix-wins, deterministic) — never the
+/// shorter leaf-only `util.ts` and never `a/util.ts`.
+#[test]
+fn fix215_ambiguous_suffix_longest_wins_deterministically() {
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+    std::fs::create_dir_all(canonical.join("a")).unwrap();
+    std::fs::create_dir_all(canonical.join("b")).unwrap();
+    write_fixture(
+        &canonical,
+        "a/util.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+    write_fixture(
+        &canonical,
+        "b/util.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+
+    let payload = one_stmt_payload("/foreign/x/b/util.ts", "/foreign/x/b/util.ts");
+
+    let parser = IstanbulCoverage::new(canonical);
+    let out = parser
+        .parse(&payload)
+        .expect("ambiguous-suffix path parses");
+
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    let keys: Vec<_> = out.coverage.keys().cloned().collect();
+    assert_eq!(
+        keys,
+        vec!["b/util.ts".to_string()],
+        "longest suffix `b/util.ts` wins over leaf-only `util.ts` and over `a/util.ts`; got {keys:?}"
+    );
+}
+
+/// #215(d): end-to-end floor on the W3.1 v1.x corpus. Runs the full
+/// pipeline (`crap4ts` binary) against the captured crap4ts@1.x
+/// fixture whose `coverage-final.json` carries machine-absolute paths
+/// (`/Users/cmbays/github/crap4ts/src/...`) that share no prefix with
+/// the fixture's local `--src`. Before this fix every one of the 158
+/// discovered functions reported 0% coverage. Asserts a FLOOR of
+/// ≥ 100/158 functions with non-zero coverage — exact classification
+/// is W3.2/#190's domain; a precise pin would be brittle now. This is
+/// the GATE: if it can't reach the floor, the fix is incomplete.
+#[test]
+fn fix215_v1_corpus_e2e_floor_at_least_100_of_158_functions_have_coverage() {
+    let manifest = env!("CARGO_MANIFEST_DIR");
+    let src = format!("{manifest}/tests/fixtures/crap4ts-v1/src");
+    let coverage = format!("{manifest}/tests/fixtures/crap4ts-v1/coverage-final.json");
+
+    let out = assert_cmd::Command::cargo_bin("crap4ts")
+        .expect("crap4ts binary discoverable")
+        .arg("--src")
+        .arg(&src)
+        .arg("--coverage")
+        .arg(&coverage)
+        .arg("--format")
+        .arg("json")
+        .arg("--no-fail")
+        .output()
+        .expect("crap4ts executes");
+
+    assert!(
+        out.status.success(),
+        "crap4ts exited non-zero under --no-fail: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let envelope: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("stdout is valid JSON envelope");
+    let functions = envelope["result"]["functions"]
+        .as_array()
+        .expect("result.functions array present");
+    let total = functions.len();
+    let nonzero = functions
+        .iter()
+        .filter(|f| {
+            f["scored"]["coverage_percent"]
+                .as_f64()
+                .map(|c| c > 0.0)
+                .unwrap_or(false)
+        })
+        .count();
+
+    assert_eq!(
+        total, 158,
+        "walker discovers 158 functions in the v1.x corpus (NOT a regression target — \
+         pins the denominator so the floor stays meaningful)"
+    );
+    assert!(
+        nonzero >= 100,
+        "FLOOR: expected >= 100/158 functions with non-zero coverage after the \
+         suffix-fallback fix; got {nonzero}/{total}. If this fails the fix is \
+         incomplete — re-diagnose, do not loosen the floor."
+    );
+}
+
+/// #215 / #216 (gemini security-medium): the suffix fallback must NOT
+/// resolve a path that traverses *out* of `effective_src` via `..`.
+/// `Path::starts_with` is lexical, so without the explicit ParentDir
+/// rejection a crafted user-supplied coverage path like
+/// `<src_root>/../<sibling>/secret.ts` would pass the under-root guard
+/// but `.is_file()`-resolve to the out-of-tree sibling file. Asserts:
+/// emits exactly one `PathUnresolved`, the out-of-tree `secret.ts` is
+/// NOT bound into `out.coverage`, and the parser does not panic.
+#[test]
+fn fix216_parentdir_traversal_does_not_resolve_outside_effective_src() {
+    // `effective_src` is a subdir so a `..` can climb above it while
+    // still landing inside a real, on-disk sibling (a strong test:
+    // the escape target genuinely exists).
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical_root = std::fs::canonicalize(tmp.path()).unwrap();
+    let src_root = canonical_root.join("project");
+    let sibling = canonical_root.join("outside");
+    std::fs::create_dir_all(&src_root).unwrap();
+    std::fs::create_dir_all(&sibling).unwrap();
+    // Sentinel file that genuinely exists OUTSIDE the source root.
+    write_fixture(
+        &sibling,
+        "secret.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+
+    // Absolute coverage path that traverses out of src_root via `..`.
+    let escape = format!(
+        "{}/../outside/secret.ts",
+        src_root.to_string_lossy().replace('\\', "/")
+    );
+    let payload = one_stmt_payload(&escape, &escape);
+
+    let parser = IstanbulCoverage::new(src_root);
+    let out = parser
+        .parse(&payload)
+        .expect("traversal path parses (with diagnostic), no panic");
+
+    let unresolved: Vec<_> = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.kind == IstanbulDiagnosticKind::PathUnresolved)
+        .collect();
+    assert_eq!(
+        unresolved.len(),
+        1,
+        "a `..`-traversal path must emit exactly one PathUnresolved \
+         (the ParentDir filter rejects every suffix that escapes root): {:?}",
+        out.diagnostics
+    );
+    assert!(
+        out.coverage.is_empty(),
+        "the out-of-tree sentinel must NOT be bound into coverage; got {:?}",
+        out.coverage.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        !out.coverage.contains_key("secret.ts"),
+        "secret.ts (outside effective_src) leaked into coverage"
+    );
+}
