@@ -31,3 +31,28 @@ additional_cargo_test_args = ["--", "--skip", "envelope"]
 # incompatibility: parallel workers REQUIRE copies, --in-place forbids
 # them, so `-j N` and `--in-place` are mutually exclusive by design.
 copy_target = true
+
+# Residual walker mutation-coverage gaps (crap-rs#209 initial run).
+#
+# These 4 mutants survive because the crap-rs#207 proptest grammar
+# (`crates/crap4ts/tests/walker_proptest.rs`) does not yet generate the
+# TS construct that makes the corresponding recursion arm load-bearing.
+# The walker behaviour is VERIFIED CORRECT in every case (it discovers
+# the nested function) — these are test-coverage gaps, NOT walker bugs,
+# so they are excluded-with-tracking-issue per ~/.claude/rules/
+# exclusions.md rather than filed as type:bug. The issue (#219) owns the
+# grammar extension that lifts each exclusion; it was opened BEFORE this
+# exclusion landed and is wired as a sub-issue of epic #173.
+#
+# Restoration condition: crap-rs#219 extends the proptest grammar so
+# each mutant is CAUGHT, then deletes the matching line below.
+exclude_re = [
+  # tracked: crap-rs#219 — grammar has no `export default` container; walker recurses it correctly (export default (()=>{fn})() discovers the fn)
+  "replace FunctionFinder<'src>::visit_export_default with \\(\\)",
+  # tracked: crap-rs#219 — grammar never nests a class inside a function body; walker recurses it correctly (function o(){ class C{m(){}} } discovers C.m)
+  "delete match arm Statement::ClassDeclaration\\(class\\) in FunctionFinder<'src>::visit_statement",
+  # tracked: crap-rs#219 — grammar has no labeled statements; walker recurses it correctly (lbl: { function inner(){} } discovers inner)
+  "delete match arm Statement::LabeledStatement\\(l\\) in FunctionFinder<'src>::visit_statement",
+  # tracked: crap-rs#219 — grammar has no `throw`; walker recurses it correctly (throw (()=>{fn})() discovers the fn)
+  "delete match arm Statement::ThrowStatement\\(th\\) in FunctionFinder<'src>::visit_statement",
+]

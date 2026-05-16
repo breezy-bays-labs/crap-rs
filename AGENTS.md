@@ -97,16 +97,33 @@ breezy-bays-labs/mokumo#370) can dogfood on us without false positives.
 
 ## Mutation testing
 
-`cargo mutants` is the surviving-mutant gate on `domain/view.rs` (the
-highest-complexity function family in `crap-core`). CI runs it
-sequentially on every PR; locally you'll want parallelism so a single
-file's gate finishes in minutes rather than half an hour.
+`cargo mutants` is the surviving-mutant gate on a **dual-file
+surface** — the two highest-leverage files in the workspace:
+
+| File | Why it's gated | Crate |
+|------|----------------|-------|
+| `crates/crap-core/src/domain/view.rs` | highest-complexity function family in `crap-core` (view-projection / column logic) | `crap-core` |
+| `crates/crap4ts/src/adapters/walker/mod.rs` | every decision-point decision + every function-discovery decision + every span-to-line conversion in the TS adapter routes through it (crap-rs#209) | `crap4ts` |
+
+CI runs both **sequentially within one `mutants` job** on every PR (the
+`view.rs` step then the walker step); locally you'll want parallelism
+so a single file's gate finishes in minutes rather than half an hour.
 
 ### Local invocation
 
 ```bash
+# crap-core view.rs
 cargo mutants -j 4 --package crap-core --file crates/crap-core/src/domain/view.rs
+# crap4ts walker (crap-rs#209) — same flag shape, different package+file
+cargo mutants -j 4 --package crap4ts --file crates/crap4ts/src/adapters/walker/mod.rs
 ```
+
+The walker is ~1.2k LOC with 11 decision-point variants + nested-fn +
+JSX + class-field/namespace traversal, so its mutant count is several
+times `view.rs`'s. Run it **after** the `walker_proptest.rs` suite
+(crap-rs#207) is green locally — the proptests kill a large fraction of
+walker mutants without any per-mutant fixture work, leaving a much
+smaller, more meaningful surviving set to triage.
 
 `-j N` is CLI-only — cargo-mutants 27.x's config schema does not expose
 a `jobs` field. Pick N up to your physical core count. Speedup is
@@ -152,19 +169,44 @@ free disk should be ≥ `target/` size × N. The flag is ignored under
 
 ### CI parity
 
-CI's `mutants` job runs `cargo mutants --package crap-core --file
-crates/crap-core/src/domain/view.rs --no-shuffle --in-place` on a single
-ubuntu-latest worker. `--in-place` keeps the run fast (no tree copy)
-and `--no-shuffle` keeps the mutant order deterministic across reruns,
-which makes flaky-mutant triage tractable. Local `-j N` runs may surface
-the same mutants in a different order — that's expected, not a
-regression.
+CI's `mutants` job runs **two sequential steps** on a single
+ubuntu-latest worker:
+
+```bash
+cargo mutants    --package crap-core --file crates/crap-core/src/domain/view.rs      --no-shuffle --in-place
+cargo mutants -j 4 --package crap4ts --file crates/crap4ts/src/adapters/walker/mod.rs --no-shuffle
+```
+
+**The two steps deliberately differ in execution mode.** The
+`view.rs` step (~30 mutants) uses `--in-place` single-worker — fast
+enough, no tree copy. The walker step has ~5× the mutant count (157);
+single-worker `--in-place` on 157 mutants is ~1 h wall-clock, so it
+uses `-j 4` copy mode instead (parallel workers, each reusing the
+prebuilt `target/` via `.cargo/mutants.toml`'s `copy_target = true`).
+`-j N` and `--in-place` are mutually exclusive by design (see the
+section below), which is why the walker step drops `--in-place`. The
+crap-rs#209 ≤8-min budget AC is **not met by single-worker in-place on
+the walker** — that is a recorded plan-of-record deviation, not a
+regression; `-j 4` copy mode is the chosen mitigation. `--no-shuffle`
+on both keeps mutant order deterministic across reruns, which makes
+flaky-mutant triage tractable. The walker proptest suite
+(`walker_proptest.rs`, crap-rs#207 — including the
+`walker_nesting_depth_matches_oracle` invariant added specifically to
+kill the `nesting.map(|n| n + 1)` arithmetic mutant class) keeps the
+surviving set — hence the triage cost — small.
 
 ### Why `additional_cargo_test_args = ["--", "--skip", "envelope"]`
 
-The wire-envelope snapshot test (`crates/crap-core/tests/wire_envelope_snapshot.rs`)
-shells out to the `crap4rs` binary, which `cargo mutants --package
-crap-core` doesn't build. Skipping it under mutants is scoped to mutants
-only; every PR's `Test (linux-x86)` / `Test (macos-arm)` /
-`Test (macos-x86)` job still runs the canary via `cargo nextest run
---workspace --all-targets`, which DOES build the bin first.
+The wire-envelope snapshot tests
+(`crates/crap-core/tests/wire_envelope_crap4rs.rs` and
+`wire_envelope_crap4ts.rs`, test name `envelope`) shell out to the
+`crap4rs` / `crap4ts` binaries, which a scoped `cargo mutants --package
+crap-core` (or `--package crap4ts`) doesn't necessarily build. The
+skip lives in the **repo-global** `.cargo/mutants.toml`, so
+cargo-mutants applies it to **every** invocation in this workspace —
+both the `view.rs` step and the walker step inherit it automatically;
+there is no per-step inline `--skip` to maintain. Skipping it under
+mutants is scoped to mutants only; every PR's `Test (linux-x86)` /
+`Test (macos-arm)` / `Test (macos-x86)` job still runs both canaries
+via `cargo nextest run --workspace --all-targets`, which DOES build the
+bins first.

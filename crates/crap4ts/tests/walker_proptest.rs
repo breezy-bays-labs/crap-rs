@@ -11,7 +11,10 @@
 //! TS source spanning every construct (simple/nested functions, class
 //! methods + computed-key fields + static blocks, namespaces, all 11
 //! decision-point kinds, JSX conditionals) across all six file
-//! extensions, and asserts six invariants on every parseable input.
+//! extensions, and asserts the six #207 invariants — plus a seventh,
+//! a `contributor.nesting`-depth oracle, added to mechanically kill
+//! the `nesting.map(|n| n + 1)` arithmetic mutant class surfaced by
+//! the crap-rs#209 walker mutation run — on every parseable input.
 //!
 //! ## The grammar carries its own oracle
 //!
@@ -88,6 +91,79 @@ enum Stmt {
     /// the enclosing function (invariant 4 — isolation); the nested
     /// function is its own complexity site.
     NestedFn(Box<Body>),
+    /// An IIFE arrow `(() => { <inner> })()` embedded inside a chosen
+    /// expression context (`await`, array element, template-literal
+    /// substitution, sequence, unary, `as`/`satisfies`/`!`,
+    /// computed-member, throw argument, ternary branch). Emits
+    /// `const _wN = <wrap>;`. The wrapper itself adds ZERO decision
+    /// points to the enclosing function and the IIFE arrow is a
+    /// SEPARATE complexity site (so `<inner>`'s decision points charge
+    /// the arrow, not the enclosing function). Its purpose is mutation
+    /// coverage: each `WrapKind` routes the discoverable IIFE through a
+    /// different `visit_expression` recursion arm, so DELETING any of
+    /// those arms (or replacing a recursion helper with `()`) drops the
+    /// arrow from the discovered-function set and
+    /// `walker_nested_function_isolation` catches it. Adds 1 to the
+    /// enclosing function's `nested_fn_count`.
+    ExprWrap(WrapKind, Box<Body>),
+}
+
+/// The expression context an [`Stmt::ExprWrap`] routes its
+/// discoverable IIFE arrow through. Each variant exercises a distinct
+/// `visit_expression` recursion arm in the walker.
+#[derive(Debug, Clone, Copy)]
+enum WrapKind {
+    /// `await (IIFE)` — `Expression::AwaitExpression` arm.
+    Await,
+    /// `[IIFE][0]` — `Expression::ArrayExpression` arm.
+    Array,
+    /// `` `${IIFE}` `` — `Expression::TemplateLiteral` arm.
+    Template,
+    /// `(0, IIFE)` — `Expression::SequenceExpression` arm.
+    Sequence,
+    /// `void IIFE` — `Expression::UnaryExpression` arm.
+    Unary,
+    /// `(IIFE as unknown)` — `Expression::TSAsExpression` arm.
+    TsAs,
+    /// `(IIFE satisfies unknown)` — `Expression::TSSatisfiesExpression`.
+    TsSatisfies,
+    /// `(IIFE)!` — `Expression::TSNonNullExpression` arm.
+    TsNonNull,
+    /// `({ k: 0 })[(IIFE, "k") as any]` — `ComputedMemberExpression`.
+    ComputedMember,
+    /// `(true ? IIFE : 0)` — `Expression::ConditionalExpression` branch
+    /// recursion (consequent).
+    TernaryBranch,
+    /// `` IIFE`x` `` — `Expression::TaggedTemplateExpression` tag arm.
+    TaggedTemplate,
+    /// `(import((IIFE as any)) as unknown)` — `ImportExpression` arm
+    /// (the IIFE is the dynamic-import source expression). NOTE: no
+    /// `.catch(…)` / `.then(…)` — those would inject a stray arrow
+    /// site and corrupt the nested-fn oracle.
+    ImportSource,
+}
+
+impl WrapKind {
+    /// Emit `<wrap>` where `iife` is the already-rendered
+    /// `(() => { … })()` text. The result is a single expression.
+    fn wrap(self, iife: &str) -> String {
+        match self {
+            WrapKind::Await => format!("await ({iife})"),
+            WrapKind::Array => format!("[{iife}][0]"),
+            WrapKind::Template => format!("`${{{iife}}}`"),
+            WrapKind::Sequence => format!("(0, {iife})"),
+            WrapKind::Unary => format!("void ({iife})"),
+            WrapKind::TsAs => format!("(({iife}) as unknown)"),
+            WrapKind::TsSatisfies => format!("(({iife}) satisfies unknown)"),
+            WrapKind::TsNonNull => format!("(({iife})!)"),
+            WrapKind::ComputedMember => {
+                format!("(({{ k: 0 }}) as any)[(({iife}), \"k\") as any]")
+            }
+            WrapKind::TernaryBranch => format!("(true ? ({iife}) : 0)"),
+            WrapKind::TaggedTemplate => format!("(({iife}) as any)`x`"),
+            WrapKind::ImportSource => format!("(import((({iife}) as any)) as unknown)"),
+        }
+    }
 }
 
 impl Stmt {
@@ -98,7 +174,10 @@ impl Stmt {
             // the enclosing function — its body is a separate site
             // (invariant 4). `TryFinally` is not a decision point but
             // still recurses into its `try` body.
-            Stmt::Noop | Stmt::NestedFn(_) => 0,
+            // `ExprWrap`'s decision points live inside its IIFE arrow
+            // (a separate site), so it charges ZERO to the enclosing
+            // function — same isolation as `NestedFn`.
+            Stmt::Noop | Stmt::NestedFn(_) | Stmt::ExprWrap(..) => 0,
             Stmt::TryFinally(b) => b.increments(),
             // One decision point + whatever the inner body charges.
             Stmt::If(b)
@@ -207,6 +286,27 @@ impl Stmt {
                 b.emit(out, ctr, indent + 1);
                 out.push_str(&format!("{pad}}}\n"));
             }
+            Stmt::ExprWrap(kind, b) => {
+                // Two nested function sites:
+                //   outer async IIFE  — makes `await` always legal
+                //                        regardless of the enclosing
+                //                        container's async-ness
+                //   inner IIFE arrow  — holds <body>; routed through
+                //                        the chosen wrapper expression
+                //                        so DELETING the matching
+                //                        `visit_expression` recursion
+                //                        arm drops it from the
+                //                        discovered-function set.
+                let mut inner_body = String::new();
+                b.emit(&mut inner_body, ctr, indent + 3);
+                let inner_iife = format!("(() => {{\n{inner_body}{pad}    }})()");
+                let wrapped = kind.wrap(&inner_iife);
+                out.push_str(&format!("{pad}const _w{id}: unknown = (async () => {{\n"));
+                out.push_str(&format!("{pad}  const _r{id}: unknown = {wrapped};\n"));
+                out.push_str(&format!("{pad}  return _r{id};\n"));
+                out.push_str(&format!("{pad}}})();\n"));
+                out.push_str(&format!("{pad}void _w{id};\n"));
+            }
         }
     }
 
@@ -231,6 +331,68 @@ impl Stmt {
             | Stmt::TryCatch(b)
             | Stmt::TryFinally(b) => b.nested_fn_count(),
             Stmt::NestedFn(b) => 1 + b.nested_fn_count(),
+            // The wrapper introduces TWO IIFE sites (outer async +
+            // inner); the inner's body may itself introduce more.
+            Stmt::ExprWrap(_, b) => 2 + b.nested_fn_count(),
+        }
+    }
+
+    /// Append the nesting depth the walker assigns to each decision
+    /// point this node charges to the *enclosing* function, given the
+    /// statement itself sits at `depth`. Mirrors the walker's exact
+    /// `nesting` arithmetic (the `nesting.map(|n| n + 1)` recursion):
+    ///
+    /// - A control-flow statement (`if`/`for*`/`while`/`do-while`)
+    ///   scores its own contributor at `depth`, then its body recurses
+    ///   at `depth + 1`.
+    /// - `switch` scores `CaseBranch` at `depth`; the case consequent
+    ///   recurses at `depth + 1`.
+    /// - `try { } catch { }` scores `Catch` at `depth`, but the
+    ///   try-block body recurses at the **same** `depth` (the walker's
+    ///   `visit_try` does NOT bump nesting — verified asymmetry vs the
+    ///   loop/if family). `try { } finally { }` likewise recurses its
+    ///   body at the same `depth` with no contributor.
+    /// - A leaf expression decision point (`&&`/`||`/`??`/`?:`/`?.`)
+    ///   scores at `depth` (it is visited with the statement's own
+    ///   `nesting`, never bumped).
+    /// - `NestedFn` introduces a SEPARATE function whose body restarts
+    ///   at its own depth 0 — it contributes NOTHING to the enclosing
+    ///   function's nesting multiset (invariant 4).
+    ///
+    /// This is the independent oracle for invariant 7: a mutant that
+    /// turns `n + 1` into `n * 1`, `n - 1`, etc. produces a different
+    /// nesting multiset and is caught here even though complexity (1 +
+    /// sum) is unchanged.
+    fn expected_nestings(&self, depth: u32, out: &mut Vec<u32>) {
+        match self {
+            // `ExprWrap`'s decision points live in its separate IIFE
+            // arrow, so it contributes NOTHING to the enclosing
+            // function's nesting multiset (same as `NestedFn`).
+            Stmt::Noop | Stmt::NestedFn(_) | Stmt::ExprWrap(..) => {}
+            Stmt::If(b)
+            | Stmt::For(b)
+            | Stmt::ForIn(b)
+            | Stmt::ForOf(b)
+            | Stmt::While(b)
+            | Stmt::DoWhile(b)
+            | Stmt::Switch(b) => {
+                out.push(depth);
+                b.collect_nestings(depth + 1, out);
+            }
+            Stmt::TryCatch(b) => {
+                out.push(depth);
+                // try-block body is NOT depth-bumped by visit_try.
+                b.collect_nestings(depth, out);
+            }
+            Stmt::TryFinally(b) => {
+                // No contributor; body recurses at same depth.
+                b.collect_nestings(depth, out);
+            }
+            Stmt::LogicalAnd
+            | Stmt::LogicalOr
+            | Stmt::Nullish
+            | Stmt::Ternary
+            | Stmt::OptionalChain => out.push(depth),
         }
     }
 }
@@ -242,6 +404,25 @@ struct Body(Vec<Stmt>);
 impl Body {
     fn increments(&self) -> u32 {
         self.0.iter().map(Stmt::increments).sum()
+    }
+
+    /// Accumulate (unsorted) the nesting depths of every decision
+    /// point in this body, given the body starts at `depth`. Recursive
+    /// worker for [`Body::expected_nestings`].
+    fn collect_nestings(&self, depth: u32, out: &mut Vec<u32>) {
+        for s in &self.0 {
+            s.expected_nestings(depth, out);
+        }
+    }
+
+    /// The multiset (collected as a sorted Vec) of contributor nesting
+    /// depths the walker should emit for this body, given it starts at
+    /// `base_depth`. See [`Stmt::expected_nestings`].
+    fn expected_nestings(&self, base_depth: u32) -> Vec<u32> {
+        let mut v = Vec::new();
+        self.collect_nestings(base_depth, &mut v);
+        v.sort_unstable();
+        v
     }
     fn nested_fn_count(&self) -> u32 {
         self.0.iter().map(Stmt::nested_fn_count).sum()
@@ -267,6 +448,23 @@ fn leaf_stmt() -> impl Strategy<Value = Stmt> {
     ]
 }
 
+fn wrapkind_strategy() -> impl Strategy<Value = WrapKind> {
+    prop_oneof![
+        Just(WrapKind::Await),
+        Just(WrapKind::Array),
+        Just(WrapKind::Template),
+        Just(WrapKind::Sequence),
+        Just(WrapKind::Unary),
+        Just(WrapKind::TsAs),
+        Just(WrapKind::TsSatisfies),
+        Just(WrapKind::TsNonNull),
+        Just(WrapKind::ComputedMember),
+        Just(WrapKind::TernaryBranch),
+        Just(WrapKind::TaggedTemplate),
+        Just(WrapKind::ImportSource),
+    ]
+}
+
 /// A recursively-nested statement. `prop::collection::vec` bounds the
 /// body so generated programs stay parseable + fast.
 fn stmt_strategy() -> impl Strategy<Value = Stmt> {
@@ -282,7 +480,8 @@ fn stmt_strategy() -> impl Strategy<Value = Stmt> {
             body.clone().prop_map(|b| Stmt::Switch(Box::new(b))),
             body.clone().prop_map(|b| Stmt::TryCatch(Box::new(b))),
             body.clone().prop_map(|b| Stmt::TryFinally(Box::new(b))),
-            body.prop_map(|b| Stmt::NestedFn(Box::new(b))),
+            body.clone().prop_map(|b| Stmt::NestedFn(Box::new(b))),
+            (wrapkind_strategy(), body).prop_map(|(k, b)| Stmt::ExprWrap(k, Box::new(b))),
         ]
     })
 }
@@ -427,14 +626,21 @@ impl Program {
                 out.push_str("  }\n}\n");
             }
             Container::ComputedObjectKey => {
-                // `[(_kx as any) && 1]` is a computed key whose `&&` is
-                // a LogicalOperator that charges the enclosing IIFE
-                // arrow; the IIFE arrow also holds <body>.
+                // `[(_kx as any) && 1]` is a computed key whose `&&`
+                // is a LogicalOperator charging the *enclosing*
+                // function — here module scope (the `const o = {…}`
+                // is top-level), so it charges nobody (verified
+                // empirically against the walker). The body holder is
+                // a NAMED const arrow `_holder` (not an anonymous
+                // value IIFE) so it stays uniquely findable even when
+                // <body> spawns more anonymous `<arrow>` sites via
+                // `ExprWrap`.
                 out.push_str("const _kx: unknown = 1;\n");
+                out.push_str("const _holder = () => {\n");
+                self.body.emit(&mut out, &mut ctr, 1);
+                out.push_str("};\n");
                 out.push_str("const o = {\n");
-                out.push_str("  [((_kx as any) && 1) as any]: (() => {\n");
-                self.body.emit(&mut out, &mut ctr, 2);
-                out.push_str("  })(),\n");
+                out.push_str("  [((_kx as any) && 1) as any]: _holder(),\n");
                 out.push_str("};\nvoid o;\n");
             }
             Container::JsxConditional => {
@@ -551,7 +757,9 @@ proptest! {
             Container::ClassMethod
             | Container::ClassComputedKey => "C.m",
             Container::StaticBlock => "C.<static-init>",
-            Container::ComputedObjectKey => "<arrow>",
+            // Named const arrow — unique even when <body> spawns
+            // anonymous `<arrow>` sites via ExprWrap.
+            Container::ComputedObjectKey => "_holder",
         };
         let Some(holder) = fns
             .iter()
@@ -571,6 +779,63 @@ proptest! {
             holder.complexity,
             prog.expected_body_holder_complexity(),
             src
+        );
+    }
+
+    /// Invariant 7 (independent oracle for the nesting-depth
+    /// arithmetic): the multiset of `contributor.nesting` values on the
+    /// body holder equals exactly what the grammar predicts from the
+    /// walker's `nesting.map(|n| n + 1)` recursion. This is the
+    /// independent-axis kill for the entire `replace + with *` /
+    /// `replace + with -` / `delete nesting bump` mutant class on
+    /// `visit_for*` / `visit_while` / `visit_do_while` / `visit_if` /
+    /// `visit_switch_case`: those mutations leave complexity (1 + sum)
+    /// untouched but corrupt the nesting depth, which `walker_core_
+    /// invariants` and `walker_matches_independent_oracle` do not
+    /// observe. Restricted to the containers whose holder contributor
+    /// set is exactly the generated body's (the two computed-key /
+    /// JSX containers add a container-intrinsic `&&` that is accounted
+    /// separately and excluded here for a clean oracle).
+    #[test]
+    fn walker_nesting_depth_matches_oracle(prog in program_strategy()) {
+        // Exclude the containers that inject a non-body decision point
+        // into (or adjacent to) the holder — their nesting oracle is
+        // covered transitively by the complexity oracle; this test
+        // isolates the body-recursion arithmetic.
+        prop_assume!(!matches!(
+            prog.container,
+            Container::ComputedObjectKey | Container::JsxConditional
+        ));
+        let src = prog.source();
+        let path = prog.file_path();
+        let Some(fns) = walk(&src, &path) else { return Ok(()); };
+
+        let holder_name: &str = match prog.container {
+            Container::FunctionDecl
+            | Container::Namespace
+            | Container::ArrowConst => "top",
+            Container::ClassMethod | Container::ClassComputedKey => "C.m",
+            Container::StaticBlock => "C.<static-init>",
+            Container::ComputedObjectKey | Container::JsxConditional => unreachable!(),
+        };
+        let Some(holder) = fns
+            .iter()
+            .find(|f| f.identity.qualified_name == holder_name)
+        else {
+            return Ok(());
+        };
+
+        // The body holder's body is visited starting at nesting 0
+        // (visit_function_body → visit_statement(.., Some(0)); a static
+        // block likewise seeds Some(0)).
+        let expected = prog.body.expected_nestings(0);
+        let mut actual: Vec<u32> = holder.contributors.iter().map(|c| c.nesting_depth).collect();
+        actual.sort_unstable();
+        prop_assert_eq!(
+            &actual,
+            &expected,
+            "holder {:?} contributor nesting multiset {:?} != grammar oracle {:?}\n--- source ---\n{}",
+            holder_name, actual, expected, src
         );
     }
 

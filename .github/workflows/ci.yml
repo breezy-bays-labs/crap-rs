@@ -198,7 +198,7 @@ jobs:
           PY
 
   mutants:
-    name: Mutation testing on domain/view.rs
+    name: Mutation testing (crap-core view.rs + crap4ts walker)
     runs-on: ubuntu-latest
     needs: [test]
     steps:
@@ -212,6 +212,31 @@ jobs:
         # S2 (#134) moved view.rs from crap4rs to crap-core. Update
         # both --package and --file to follow the move.
         run: cargo mutants --package crap-core --file crates/crap-core/src/domain/view.rs --no-shuffle --in-place
+      - name: Run cargo mutants on crates/crap4ts/src/adapters/walker/mod.rs
+        # crap-rs#209: the walker is the highest-leverage file in the
+        # crap4ts adapter (every decision-point + function-discovery +
+        # span-to-line decision routes through it). The `--skip
+        # envelope` test-arg the crap-core run relies on is NOT passed
+        # inline: it lives in the repo-global `.cargo/mutants.toml`
+        # (`additional_cargo_test_args = ["--", "--skip", "envelope"]`)
+        # which cargo-mutants applies to EVERY invocation in this
+        # workspace, so it is replicated automatically for the crap4ts
+        # run — see AGENTS.md "Why additional_cargo_test_args …".
+        #
+        # Deliberate asymmetry vs the view.rs step above: the walker is
+        # ~5× view.rs's mutant count (157 vs ~30). Single-worker
+        # `--in-place` on 157 mutants is ~1 h wall-clock — far past the
+        # crap-rs#209 ≤8-min budget AC (plan-of-record deviation,
+        # documented in the PR). So this step uses `-j 4` copy mode
+        # (parallel workers, each reusing the prebuilt `target/` via
+        # `.cargo/mutants.toml`'s `copy_target = true`). `-j N` and
+        # `--in-place` are mutually exclusive by design (parallel
+        # workers REQUIRE source copies) — see AGENTS.md "Mutation
+        # testing". `--no-shuffle` keeps mutant order deterministic for
+        # flaky-mutant triage. This is the dual-file mutation surface;
+        # the two steps run sequentially within the single `mutants`
+        # job.
+        run: cargo mutants -j 4 --package crap4ts --file crates/crap4ts/src/adapters/walker/mod.rs --no-shuffle
 
   scorecard-smoke:
     # Two-layer smoke for the composite action:
