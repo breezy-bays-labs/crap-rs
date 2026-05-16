@@ -314,11 +314,29 @@ impl<'src> FunctionFinder<'src> {
     /// walked purely for nested-function discovery via a throwaway sink
     /// (the field doesn't itself contribute to any parent accumulator —
     /// it is the parent in this position).
+    ///
+    /// #205 (class side): a **computed** property key
+    /// (`class Foo { [(() => "x")()]: 42 = 0 }`) is an arbitrary
+    /// expression that can embed nested functions or decision points,
+    /// exactly like the object-literal case (#200 item 1). When
+    /// `prop.computed` is set we recurse into the key expression first,
+    /// through a throwaway sink because the class element is its own
+    /// root — it has no parent function accumulator to charge. This
+    /// runs even when `prop.value` is `None` (`class Foo { [k()]; }`),
+    /// so the early `let-else` return below must NOT short-circuit the
+    /// key recursion. The non-`Expression` `PropertyKey` variants yield
+    /// `None` from `as_expression`, so non-computed keys are untouched.
     fn visit_property_definition(
         &mut self,
         prop: &oxc::ast::ast::PropertyDefinition<'_>,
         class_name: &str,
     ) {
+        if prop.computed
+            && let Some(key_expr) = prop.key.as_expression()
+        {
+            let mut sink = Contributors::default();
+            self.visit_expression(key_expr, &mut sink, None);
+        }
         let Some(value) = &prop.value else {
             return;
         };
@@ -458,6 +476,18 @@ impl<'src> FunctionFinder<'src> {
                 if let Some(inner) = &decl.declaration {
                     self.visit_top_level_declaration(inner);
                 }
+            }
+
+            // #200 item 2: TS namespaces / modules. A
+            // `namespace Foo { function bar() {} }` carries an
+            // executable body whose statements must be walked so `bar`
+            // (and any decision points / nested functions) are
+            // discovered. This single arm covers both the top-level
+            // path (the catch-all in `visit_top_level_statement` routes
+            // unmatched statements here) and the nested-in-a-function
+            // path (a `namespace` declared inside a function body).
+            Statement::TSModuleDeclaration(ns) => {
+                self.visit_ts_module_declaration(ns, out, nesting);
             }
 
             // Everything else is structural-only at this scope: leaf
@@ -771,7 +801,61 @@ impl<'src> FunctionFinder<'src> {
                 self.visit_expression(&b.right, out, nesting);
             }
             Expression::AssignmentExpression(a) => {
+                // #200 item 3 (+ gemini review on PR #220): a
+                // member-expression LHS embeds sub-expressions that can
+                // contain a nested function (e.g. an IIFE) or decision
+                // points. The pre-#200 arm discarded `a.left` entirely.
+                // `AssignmentTarget` flattens `MemberExpression`'s three
+                // variants via `inherit_variants!`:
+                //  - Computed (`x[foo()] = 1`): recurse object + the
+                //    index expression.
+                //  - Static (`getObj().p = 1`): recurse object — the
+                //    `.property` is a bare `IdentifierName`, no
+                //    sub-expression. `getObj()` may be an IIFE.
+                //  - PrivateField (`getObj().#p = 1`): recurse object —
+                //    `.field` is a bare `PrivateIdentifier`.
+                // Other targets (plain identifier, destructuring
+                // patterns) hold no embedded expression worth
+                // descending, so remain no-ops here.
+                use oxc::ast::ast::AssignmentTarget as AT;
+                match &a.left {
+                    AT::ComputedMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                        self.visit_expression(&m.expression, out, nesting);
+                    }
+                    AT::StaticMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    AT::PrivateFieldExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    _ => {}
+                }
                 self.visit_expression(&a.right, out, nesting);
+            }
+            // #200 item 4 (+ gemini review on PR #220): `x[foo()]++`,
+            // `getObj().p++`, `getObj().#p++`. The `UpdateExpression`
+            // operand is a `SimpleAssignmentTarget`, which flattens the
+            // same three `MemberExpression` variants; recurse their
+            // sub-expressions for nested-function discovery (Static /
+            // PrivateField carry only `.object`; Computed also carries
+            // the index `.expression`). Pre-#200 the whole arm was
+            // dropped by the `_ => {}` fallthrough.
+            Expression::UpdateExpression(u) => {
+                use oxc::ast::ast::SimpleAssignmentTarget as SAT;
+                match &u.argument {
+                    SAT::ComputedMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                        self.visit_expression(&m.expression, out, nesting);
+                    }
+                    SAT::StaticMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    SAT::PrivateFieldExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    _ => {}
+                }
             }
             Expression::ArrayExpression(arr) => {
                 self.visit_array_elements(&arr.elements, out, nesting);
@@ -1061,6 +1145,19 @@ impl<'src> FunctionFinder<'src> {
         }
     }
 
+    /// Walk an object literal's properties for nested-function +
+    /// decision-point discovery.
+    ///
+    /// #200 item 1 / #205 (object side): a **computed** property key
+    /// (`{ [foo()]: 1 }`, `{ [a && b]: 1 }`) is an arbitrary expression
+    /// that can embed nested functions or decision points. When
+    /// `p.computed` is set we recurse into the key expression via the
+    /// `inherit_variants!`-generated `PropertyKey::as_expression`
+    /// downcast — the two non-`Expression` `PropertyKey` variants
+    /// (`StaticIdentifier`, `PrivateIdentifier`) hold no executable
+    /// sub-tree and yield `None`, so a non-computed `a: 1` key never
+    /// touches the visitor. Spread properties (`{ ...rest }`) are
+    /// unchanged.
     fn visit_object_expression(
         &mut self,
         obj: &ObjectExpression<'_>,
@@ -1070,11 +1167,66 @@ impl<'src> FunctionFinder<'src> {
         for prop in &obj.properties {
             match prop {
                 ObjectPropertyKind::ObjectProperty(p) => {
+                    if p.computed
+                        && let Some(key_expr) = p.key.as_expression()
+                    {
+                        self.visit_expression(key_expr, out, nesting);
+                    }
                     self.visit_expression(&p.value, out, nesting);
                 }
                 ObjectPropertyKind::SpreadProperty(s) => {
                     self.visit_expression(&s.argument, out, nesting);
                 }
+            }
+        }
+    }
+
+    /// #200 item 2: walk a `TSModuleDeclaration` (`namespace Foo { … }`
+    /// / `module "x" { … }`). `body` is `Option` — declaration-only
+    /// forms (`declare namespace Foo;`, ambient module headers) carry
+    /// `None` and are handled cleanly as no-ops. The body is one of two
+    /// `TSModuleDeclarationBody` variants:
+    ///
+    /// - `TSModuleBlock` — the executable `{ … }` block; its statement
+    ///   list is walked exactly like a function/block body so nested
+    ///   `function bar()` declarations become their own
+    ///   `FunctionComplexity` sites and any decision points inside the
+    ///   block charge the enclosing accumulator.
+    /// - `TSModuleDeclaration` — a dotted-namespace continuation
+    ///   (`namespace A.B { … }` parses as `A` whose body is the nested
+    ///   declaration `B`); recurse so the eventual block is reached.
+    ///
+    /// `nesting`/`out` are threaded straight through: a `namespace`
+    /// nested inside a function body is uncommon but legal in `.ts`, and
+    /// in that position its block's decision points belong to the
+    /// enclosing function. At module scope `nesting` is `None` so
+    /// top-level decision points in the block are not charged to any
+    /// (non-existent) parent, matching the rest of the walker.
+    ///
+    /// Known limitation: functions discovered inside a namespace keep
+    /// their **bare local name** (`bar`), not a namespace-qualified one
+    /// (`Foo.bar`) — unlike class methods, which qualify as `C.m`. The
+    /// `#200` AC only requires separate-`FunctionComplexity` discovery
+    /// (satisfied); qualified naming is a tracked enhancement.
+    /// tracked: crap-rs#221 — namespace-qualified function names
+    fn visit_ts_module_declaration(
+        &mut self,
+        ns: &oxc::ast::ast::TSModuleDeclaration<'_>,
+        out: &mut Contributors,
+        nesting: Option<u32>,
+    ) {
+        use oxc::ast::ast::TSModuleDeclarationBody;
+        let Some(body) = &ns.body else {
+            return;
+        };
+        match body {
+            TSModuleDeclarationBody::TSModuleBlock(block) => {
+                for stmt in &block.body {
+                    self.visit_statement(stmt, out, nesting);
+                }
+            }
+            TSModuleDeclarationBody::TSModuleDeclaration(inner) => {
+                self.visit_ts_module_declaration(inner, out, nesting);
             }
         }
     }

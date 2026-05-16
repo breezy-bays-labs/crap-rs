@@ -73,5 +73,12 @@ tempfile = { workspace = true }
 # wire-envelope snapshot modules.
 assert_cmd = { workspace = true }
 
+# Property-test invariant suite for the oxc walker (crap-rs#207). A
+# constrained AST grammar generates valid TS source to assert the 6
+# cyclomatic invariants over generated (not hand-picked) inputs —
+# independent-axis verification for the #200/#205 traversal arms.
+# Regression files in `proptest-regressions/` are committed to git.
+proptest = { workspace = true }
+
 [build-dependencies]
 napi-build = { workspace = true }

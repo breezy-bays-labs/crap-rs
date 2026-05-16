@@ -53,6 +53,20 @@ const EXAMPLE_CJS: &str = include_str!("fixtures/ts-fixtures/example.cjs");
 const CLASS_FIELD_ARROWS_TSX: &str = include_str!("fixtures/ts-fixtures/class-field-arrows.tsx");
 const STATIC_BLOCK_TS: &str = include_str!("fixtures/ts-fixtures/static-block.ts");
 
+// #200 + #205: walker traversal coverage-gap fixtures.
+const COMPUTED_OBJECT_KEY_TS: &str = include_str!("fixtures/ts-fixtures/computed-object-key.ts");
+const NAMESPACE_TS: &str = include_str!("fixtures/ts-fixtures/namespace.ts");
+const ASSIGNMENT_COMPUTED_LHS_TS: &str =
+    include_str!("fixtures/ts-fixtures/assignment-computed-lhs.ts");
+const UPDATE_COMPUTED_OPERAND_TS: &str =
+    include_str!("fixtures/ts-fixtures/update-computed-operand.ts");
+const COMPUTED_CLASS_KEY_TS: &str = include_str!("fixtures/ts-fixtures/computed-class-key.ts");
+// gemini PR #220 review: static-member object recursion (assignment + update).
+const ASSIGNMENT_STATIC_MEMBER_OBJECT_TS: &str =
+    include_str!("fixtures/ts-fixtures/assignment-static-member-object.ts");
+const UPDATE_STATIC_MEMBER_OBJECT_TS: &str =
+    include_str!("fixtures/ts-fixtures/update-static-member-object.ts");
+
 fn extract(source: &str, file_path: &str) -> Vec<FunctionComplexity> {
     let walker = OxcWalker::new();
     walker
@@ -635,4 +649,223 @@ fn static_block_is_discovered_as_synthetic_static_init_function() {
         .filter(|c| c.kind == ContributorKind::IfBranch)
         .count();
     assert_eq!(ifs, 1, "expected one IfBranch in the static block body");
+}
+
+// ── #200 + #205 — Walker traversal coverage gaps ──────────────────────
+//
+// Each fixture isolates one previously-uncovered traversal path so the
+// assertions stay surgical: exact CC, exact ContributorKind, exact
+// line, exact function set (no leakage, no double-count). Mirrors the
+// W2.1 smoke-test rigor above.
+
+#[test]
+fn computed_object_key_decision_point_charges_enclosing_function() {
+    // #200 item 1: `{ [a && b]: 1, ...rest }` — the `&&` in the
+    // computed key is a LogicalOperator that must charge `build`.
+    // The spread property must NOT mint any contributor.
+    let fns = extract(COMPUTED_OBJECT_KEY_TS, "computed-object-key.ts");
+    assert_eq!(fns.len(), 1, "expected exactly one function (build)");
+    let f = find_fn(&fns, "build");
+    assert_eq!(
+        f.complexity, 2,
+        "the && inside the computed key adds exactly one decision point"
+    );
+    assert_eq!(f.contributors.len(), 1, "spread must not add a contributor");
+    let c = &f.contributors[0];
+    assert_eq!(c.kind, ContributorKind::LogicalOperator);
+    assert_eq!(c.increment, 1);
+    // `[a && b]: 1` is on line 7 of the fixture (1-based).
+    assert_eq!(c.line, 7, "contributor points at the computed-key line");
+}
+
+#[test]
+fn namespace_nested_function_is_discovered_as_separate_site() {
+    // #200 item 2: `namespace Foo { export function bar() { if … } }`
+    // — `bar` is its own FunctionComplexity; its `if` charges `bar`,
+    // not module scope. The trailing declaration-only
+    // `declare module "side-effect-only";` (body: None) must be a
+    // clean no-op (no panic, no extra function).
+    let fns = extract(NAMESPACE_TS, "namespace.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    // The walker records the BARE local name `bar` here, not a
+    // namespace-qualified `Foo.bar` (contrast class methods, which
+    // qualify as `C.m`). #200 item 2's AC only requires `bar` be
+    // discovered as a separate FunctionComplexity, which it is.
+    // Namespace-qualified naming is a tracked enhancement:
+    // tracked: crap-rs#221 — namespace-qualified function names
+    assert_eq!(
+        fns.len(),
+        1,
+        "expected exactly one function (local name `bar`); got names: {names:?}"
+    );
+    let bar = find_fn(&fns, "bar");
+    assert_eq!(bar.complexity, 2, "bar's `if` adds one decision point");
+    assert_eq!(bar.contributors.len(), 1);
+    assert_eq!(bar.contributors[0].kind, ContributorKind::IfBranch);
+    // The `if` is on line 6 of the fixture (1-based).
+    assert_eq!(bar.contributors[0].line, 6);
+}
+
+#[test]
+fn assignment_computed_lhs_iife_is_discovered() {
+    // #200 item 3: `target[(() => { if … })()] = 1` — the IIFE arrow
+    // in the index expression is its own FunctionComplexity (CC 2 from
+    // its own `if`); `assign` itself stays CC 1 (the `if` must not
+    // bleed into the enclosing function).
+    let fns = extract(ASSIGNMENT_COMPUTED_LHS_TS, "assignment-computed-lhs.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected assign + the IIFE arrow; got names: {names:?}"
+    );
+    let assign = find_fn(&fns, "assign");
+    assert_eq!(
+        assign.complexity, 1,
+        "the nested IIFE's `if` must NOT bleed into assign"
+    );
+    assert!(
+        assign.contributors.is_empty(),
+        "assign has no decision points of its own; got {:?}",
+        assign.contributors
+    );
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(
+        arrow.complexity, 2,
+        "the IIFE arrow's own `if` adds one decision point"
+    );
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn update_expression_computed_operand_iife_is_discovered() {
+    // #200 item 4: `counters[(() => { if … })()]++` — the IIFE arrow
+    // in the operand's index expression is its own FunctionComplexity;
+    // `bump` stays CC 1.
+    let fns = extract(UPDATE_COMPUTED_OPERAND_TS, "update-computed-operand.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected bump + the IIFE arrow; got names: {names:?}"
+    );
+    let bump = find_fn(&fns, "bump");
+    assert_eq!(
+        bump.complexity, 1,
+        "the nested IIFE's `if` must NOT bleed into bump"
+    );
+    assert!(bump.contributors.is_empty());
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(arrow.complexity, 2, "the IIFE arrow's own `if`");
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn assignment_static_member_object_iife_is_discovered() {
+    // gemini PR #220 review: `(() => { if … })().prop = 1` — the IIFE
+    // arrow is the *object* of a STATIC-member assignment LHS. It must
+    // be discovered as its own FunctionComplexity (CC 2 from its own
+    // `if`); `assignStatic` stays CC 1 (the arrow's `if` must not
+    // bleed). Pre-fix this whole LHS was dropped (only the computed
+    // case recursed).
+    let fns = extract(
+        ASSIGNMENT_STATIC_MEMBER_OBJECT_TS,
+        "assignment-static-member-object.ts",
+    );
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected assignStatic + the IIFE arrow; got names: {names:?}"
+    );
+    let assign = find_fn(&fns, "assignStatic");
+    assert_eq!(
+        assign.complexity, 1,
+        "the static-member-object IIFE's `if` must NOT bleed into assignStatic"
+    );
+    assert!(assign.contributors.is_empty());
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(arrow.complexity, 2, "the IIFE arrow's own `if`");
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn update_static_member_object_iife_is_discovered() {
+    // gemini PR #220 review: `(() => { if … })().prop++` — the IIFE
+    // arrow is the *object* of a STATIC-member UpdateExpression
+    // operand. Same contract as the assignment case: arrow is its own
+    // CC-2 site; `bumpStatic` stays CC 1.
+    let fns = extract(
+        UPDATE_STATIC_MEMBER_OBJECT_TS,
+        "update-static-member-object.ts",
+    );
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected bumpStatic + the IIFE arrow; got names: {names:?}"
+    );
+    let bump = find_fn(&fns, "bumpStatic");
+    assert_eq!(
+        bump.complexity, 1,
+        "the static-member-object IIFE's `if` must NOT bleed into bumpStatic"
+    );
+    assert!(bump.contributors.is_empty());
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(arrow.complexity, 2, "the IIFE arrow's own `if`");
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn computed_class_key_iife_is_discovered() {
+    // #205 (class side): `class Widget { [(() => "x")()]: number = 0 }`
+    // — the IIFE arrow in the computed class-property key is its own
+    // FunctionComplexity (CC 1, no decision points), separate from the
+    // class's regular method `Widget.regular` (CC 2 from its `if`).
+    let fns = extract(COMPUTED_CLASS_KEY_TS, "computed-class-key.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected Widget.regular + the computed-key IIFE arrow; got names: {names:?}"
+    );
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(
+        arrow.complexity, 1,
+        "the computed-key IIFE arrow has no decision points"
+    );
+    assert!(
+        arrow.contributors.is_empty(),
+        "arrow has no contributors; got {:?}",
+        arrow.contributors
+    );
+    let regular = find_fn(&fns, "Widget.regular");
+    assert_eq!(
+        regular.complexity, 2,
+        "Widget.regular's `if` adds one decision point"
+    );
+    assert_eq!(regular.contributors.len(), 1);
+    assert_eq!(regular.contributors[0].kind, ContributorKind::IfBranch);
 }
