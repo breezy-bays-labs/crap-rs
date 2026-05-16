@@ -1006,3 +1006,64 @@ fn fix215_v1_corpus_e2e_floor_at_least_100_of_158_functions_have_coverage() {
          incomplete — re-diagnose, do not loosen the floor."
     );
 }
+
+/// #215 / #216 (gemini security-medium): the suffix fallback must NOT
+/// resolve a path that traverses *out* of `effective_src` via `..`.
+/// `Path::starts_with` is lexical, so without the explicit ParentDir
+/// rejection a crafted user-supplied coverage path like
+/// `<src_root>/../<sibling>/secret.ts` would pass the under-root guard
+/// but `.is_file()`-resolve to the out-of-tree sibling file. Asserts:
+/// emits exactly one `PathUnresolved`, the out-of-tree `secret.ts` is
+/// NOT bound into `out.coverage`, and the parser does not panic.
+#[test]
+fn fix216_parentdir_traversal_does_not_resolve_outside_effective_src() {
+    // `effective_src` is a subdir so a `..` can climb above it while
+    // still landing inside a real, on-disk sibling (a strong test:
+    // the escape target genuinely exists).
+    let tmp = tempfile::tempdir().unwrap();
+    let canonical_root = std::fs::canonicalize(tmp.path()).unwrap();
+    let src_root = canonical_root.join("project");
+    let sibling = canonical_root.join("outside");
+    std::fs::create_dir_all(&src_root).unwrap();
+    std::fs::create_dir_all(&sibling).unwrap();
+    // Sentinel file that genuinely exists OUTSIDE the source root.
+    write_fixture(
+        &sibling,
+        "secret.ts",
+        include_str!("fixtures/ts-fixtures/simple.ts"),
+    );
+
+    // Absolute coverage path that traverses out of src_root via `..`.
+    let escape = format!(
+        "{}/../outside/secret.ts",
+        src_root.to_string_lossy().replace('\\', "/")
+    );
+    let payload = one_stmt_payload(&escape, &escape);
+
+    let parser = IstanbulCoverage::new(src_root);
+    let out = parser
+        .parse(&payload)
+        .expect("traversal path parses (with diagnostic), no panic");
+
+    let unresolved: Vec<_> = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.kind == IstanbulDiagnosticKind::PathUnresolved)
+        .collect();
+    assert_eq!(
+        unresolved.len(),
+        1,
+        "a `..`-traversal path must emit exactly one PathUnresolved \
+         (the ParentDir filter rejects every suffix that escapes root): {:?}",
+        out.diagnostics
+    );
+    assert!(
+        out.coverage.is_empty(),
+        "the out-of-tree sentinel must NOT be bound into coverage; got {:?}",
+        out.coverage.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        !out.coverage.contains_key("secret.ts"),
+        "secret.ts (outside effective_src) leaked into coverage"
+    );
+}
