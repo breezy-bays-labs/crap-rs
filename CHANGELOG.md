@@ -25,6 +25,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emitted) and `--quiet` (quiet wins — no output). Closes the
   2026-05-08 crap4rs ↔ crap4ts parity audit's final gap. (#131)
 
+### Fixed
+
+- Threshold cutoffs are now calibrated per complexity metric instead
+  of a single shared scalar. A cyclomatic count and a cognitive count
+  have different magnitudes for the same function, so one cutoff
+  cannot fit both — applying the cognitive cutoff to cyclomatic scores
+  silently mis-gated. The strict/default/lenient presets now resolve
+  to cyclomatic `8/16/30` or cognitive `15/25/40` based on the
+  effective metric. User-visible behavior changes: `crap4ts` with no
+  threshold flag now gates at `16` (was `25`), `--strict` at `8` (was
+  `15`), `--lenient` at `30` (was `40`); `crap4rs --metric cyclomatic`
+  with no flag now gates at `16` (was `25`) and `--strict` at `8`
+  (was `15`). `crap4rs`'s cognitive defaults (the common path) are
+  unchanged. The generated `crap4rs.toml` / `crap4ts.toml` threshold
+  comment now states which metric the printed cutoffs apply to. (#218)
+
 ### Changed (crap-core public API)
 
 - `AdapterMeta` gains a `default_excludes: &'static [&'static str]`
@@ -35,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-field literal-init to keep zero-cost). Affects only adapter
   binary crates; library consumers of `crap-core` do not construct
   `AdapterMeta` directly. (#73)
+- `ThresholdPreset::threshold` now takes a `ComplexityMetric`
+  argument and returns the metric-calibrated cutoff
+  (`fn threshold(self, metric: ComplexityMetric) -> f64`). Callers
+  resolving a preset to a numeric cutoff must pass the effective
+  metric. crap-core minor-bumped `0.2.0` → `0.3.0`; no external
+  consumers. (#218)
 
 ## [0.5.0] - 2026-05-10
 
