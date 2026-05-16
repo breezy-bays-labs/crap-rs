@@ -61,6 +61,11 @@ const ASSIGNMENT_COMPUTED_LHS_TS: &str =
 const UPDATE_COMPUTED_OPERAND_TS: &str =
     include_str!("fixtures/ts-fixtures/update-computed-operand.ts");
 const COMPUTED_CLASS_KEY_TS: &str = include_str!("fixtures/ts-fixtures/computed-class-key.ts");
+// gemini PR #220 review: static-member object recursion (assignment + update).
+const ASSIGNMENT_STATIC_MEMBER_OBJECT_TS: &str =
+    include_str!("fixtures/ts-fixtures/assignment-static-member-object.ts");
+const UPDATE_STATIC_MEMBER_OBJECT_TS: &str =
+    include_str!("fixtures/ts-fixtures/update-static-member-object.ts");
 
 fn extract(source: &str, file_path: &str) -> Vec<FunctionComplexity> {
     let walker = OxcWalker::new();
@@ -685,10 +690,16 @@ fn namespace_nested_function_is_discovered_as_separate_site() {
         .iter()
         .map(|f| f.identity.qualified_name.clone())
         .collect();
+    // The walker records the BARE local name `bar` here, not a
+    // namespace-qualified `Foo.bar` (contrast class methods, which
+    // qualify as `C.m`). #200 item 2's AC only requires `bar` be
+    // discovered as a separate FunctionComplexity, which it is.
+    // Namespace-qualified naming is a tracked enhancement:
+    // tracked: crap-rs#221 — namespace-qualified function names
     assert_eq!(
         fns.len(),
         1,
-        "expected exactly one function (Foo.bar); got names: {names:?}"
+        "expected exactly one function (local name `bar`); got names: {names:?}"
     );
     let bar = find_fn(&fns, "bar");
     assert_eq!(bar.complexity, 2, "bar's `if` adds one decision point");
@@ -752,6 +763,70 @@ fn update_expression_computed_operand_iife_is_discovered() {
     assert_eq!(
         bump.complexity, 1,
         "the nested IIFE's `if` must NOT bleed into bump"
+    );
+    assert!(bump.contributors.is_empty());
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(arrow.complexity, 2, "the IIFE arrow's own `if`");
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn assignment_static_member_object_iife_is_discovered() {
+    // gemini PR #220 review: `(() => { if … })().prop = 1` — the IIFE
+    // arrow is the *object* of a STATIC-member assignment LHS. It must
+    // be discovered as its own FunctionComplexity (CC 2 from its own
+    // `if`); `assignStatic` stays CC 1 (the arrow's `if` must not
+    // bleed). Pre-fix this whole LHS was dropped (only the computed
+    // case recursed).
+    let fns = extract(
+        ASSIGNMENT_STATIC_MEMBER_OBJECT_TS,
+        "assignment-static-member-object.ts",
+    );
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected assignStatic + the IIFE arrow; got names: {names:?}"
+    );
+    let assign = find_fn(&fns, "assignStatic");
+    assert_eq!(
+        assign.complexity, 1,
+        "the static-member-object IIFE's `if` must NOT bleed into assignStatic"
+    );
+    assert!(assign.contributors.is_empty());
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(arrow.complexity, 2, "the IIFE arrow's own `if`");
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn update_static_member_object_iife_is_discovered() {
+    // gemini PR #220 review: `(() => { if … })().prop++` — the IIFE
+    // arrow is the *object* of a STATIC-member UpdateExpression
+    // operand. Same contract as the assignment case: arrow is its own
+    // CC-2 site; `bumpStatic` stays CC 1.
+    let fns = extract(
+        UPDATE_STATIC_MEMBER_OBJECT_TS,
+        "update-static-member-object.ts",
+    );
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected bumpStatic + the IIFE arrow; got names: {names:?}"
+    );
+    let bump = find_fn(&fns, "bumpStatic");
+    assert_eq!(
+        bump.complexity, 1,
+        "the static-member-object IIFE's `if` must NOT bleed into bumpStatic"
     );
     assert!(bump.contributors.is_empty());
     let arrow = find_fn(&fns, "<arrow>");

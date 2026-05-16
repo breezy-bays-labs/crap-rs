@@ -801,34 +801,60 @@ impl<'src> FunctionFinder<'src> {
                 self.visit_expression(&b.right, out, nesting);
             }
             Expression::AssignmentExpression(a) => {
-                // #200 item 3: a computed-member LHS
-                // (`x[foo()] = 1`) embeds an arbitrary index
-                // expression that can contain a nested function (e.g.
-                // an IIFE) or decision points. The pre-#200 arm
-                // discarded `a.left` entirely; now, when the target is
-                // a computed member access, recurse into both the
-                // object and the index expression before the RHS. Other
-                // `AssignmentTarget` variants (plain identifier, static
-                // member, destructuring patterns) hold no embedded
-                // index expression worth descending for nested-function
-                // discovery, so they remain no-ops here.
-                if let oxc::ast::ast::AssignmentTarget::ComputedMemberExpression(m) = &a.left {
-                    self.visit_expression(&m.object, out, nesting);
-                    self.visit_expression(&m.expression, out, nesting);
+                // #200 item 3 (+ gemini review on PR #220): a
+                // member-expression LHS embeds sub-expressions that can
+                // contain a nested function (e.g. an IIFE) or decision
+                // points. The pre-#200 arm discarded `a.left` entirely.
+                // `AssignmentTarget` flattens `MemberExpression`'s three
+                // variants via `inherit_variants!`:
+                //  - Computed (`x[foo()] = 1`): recurse object + the
+                //    index expression.
+                //  - Static (`getObj().p = 1`): recurse object — the
+                //    `.property` is a bare `IdentifierName`, no
+                //    sub-expression. `getObj()` may be an IIFE.
+                //  - PrivateField (`getObj().#p = 1`): recurse object —
+                //    `.field` is a bare `PrivateIdentifier`.
+                // Other targets (plain identifier, destructuring
+                // patterns) hold no embedded expression worth
+                // descending, so remain no-ops here.
+                use oxc::ast::ast::AssignmentTarget as AT;
+                match &a.left {
+                    AT::ComputedMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                        self.visit_expression(&m.expression, out, nesting);
+                    }
+                    AT::StaticMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    AT::PrivateFieldExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    _ => {}
                 }
                 self.visit_expression(&a.right, out, nesting);
             }
-            // #200 item 4: `x[foo()]++` / `--y[bar()]`. The
-            // `UpdateExpression` operand is a `SimpleAssignmentTarget`;
-            // when it is a computed member access the index expression
-            // can embed a nested function or decision points. Pre-#200
-            // this whole arm was dropped by the `_ => {}` fallthrough.
+            // #200 item 4 (+ gemini review on PR #220): `x[foo()]++`,
+            // `getObj().p++`, `getObj().#p++`. The `UpdateExpression`
+            // operand is a `SimpleAssignmentTarget`, which flattens the
+            // same three `MemberExpression` variants; recurse their
+            // sub-expressions for nested-function discovery (Static /
+            // PrivateField carry only `.object`; Computed also carries
+            // the index `.expression`). Pre-#200 the whole arm was
+            // dropped by the `_ => {}` fallthrough.
             Expression::UpdateExpression(u) => {
-                if let oxc::ast::ast::SimpleAssignmentTarget::ComputedMemberExpression(m) =
-                    &u.argument
-                {
-                    self.visit_expression(&m.object, out, nesting);
-                    self.visit_expression(&m.expression, out, nesting);
+                use oxc::ast::ast::SimpleAssignmentTarget as SAT;
+                match &u.argument {
+                    SAT::ComputedMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                        self.visit_expression(&m.expression, out, nesting);
+                    }
+                    SAT::StaticMemberExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    SAT::PrivateFieldExpression(m) => {
+                        self.visit_expression(&m.object, out, nesting);
+                    }
+                    _ => {}
                 }
             }
             Expression::ArrayExpression(arr) => {
@@ -1176,6 +1202,13 @@ impl<'src> FunctionFinder<'src> {
     /// enclosing function. At module scope `nesting` is `None` so
     /// top-level decision points in the block are not charged to any
     /// (non-existent) parent, matching the rest of the walker.
+    ///
+    /// Known limitation: functions discovered inside a namespace keep
+    /// their **bare local name** (`bar`), not a namespace-qualified one
+    /// (`Foo.bar`) — unlike class methods, which qualify as `C.m`. The
+    /// `#200` AC only requires separate-`FunctionComplexity` discovery
+    /// (satisfied); qualified naming is a tracked enhancement.
+    /// tracked: crap-rs#221 — namespace-qualified function names
     fn visit_ts_module_declaration(
         &mut self,
         ns: &oxc::ast::ast::TSModuleDeclaration<'_>,
