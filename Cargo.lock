@@ -417,6 +417,7 @@ dependencies = [
  "napi-build",
  "napi-derive",
  "oxc",
+ "proptest",
  "serde",
  "serde_json",
  "tempfile",
