@@ -1067,3 +1067,152 @@ fn fix216_parentdir_traversal_does_not_resolve_outside_effective_src() {
         "secret.ts (outside effective_src) leaked into coverage"
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// #214 — Producer fixture matrix (captured-real Istanbul output)
+//
+// One small fixture captured from each active Istanbul producer in the
+// TypeScript ecosystem, all run against the same `producer-sample.ts`
+// source (statements + an if + a ternary + an inline anonymous arrow +
+// an uncovered function). Producers vary freely in fields the parser
+// does NOT model: jest/vitest/nyc synthesize `(anonymous_N)` fnMap
+// names while c8 uses concrete transpiled-helper names; branch `type`
+// is `if`/`cond-expr`/`binary-expr` for babel-istanbul producers but a
+// generic `"branch"` for c8; `@vitest/coverage-istanbul@4` still emits
+// `"column": null` on span ends plus empty `{}` objects in
+// `branchMap.locations[]`; nyc emits null columns via tsx source-map
+// remapping; c8 adds an extra per-entry `all` field. These tests are
+// the regression net proving every real producer parses with zero
+// diagnostics and well-formed line coverage after the
+// schema-minimalism hardening — none of that variance can bail.
+
+const PRODUCER_JEST: &str = include_str!("fixtures/istanbul-jest/coverage-real-jest29.json");
+const PRODUCER_VITEST4: &str = include_str!("fixtures/istanbul-vitest/coverage-real-vitest4.json");
+const PRODUCER_NYC: &str = include_str!("fixtures/istanbul-nyc/coverage-real-nyc17.json");
+const PRODUCER_C8: &str = include_str!("fixtures/istanbul-c8/coverage-real-c8.json");
+
+/// Write `producer-sample.ts` as `sample.ts` into a canonical tempdir
+/// and substitute `{SRC_ROOT}`, mirroring `build_fixture`.
+fn build_producer_fixture(template: &str) -> (TempDir, PathBuf, String) {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let canonical = std::fs::canonicalize(tmp.path()).expect("canonicalize tempdir");
+    write_fixture(
+        &canonical,
+        "sample.ts",
+        include_str!("fixtures/ts-fixtures/producer-sample.ts"),
+    );
+    let payload = template.replace("{SRC_ROOT}", &canonical.to_string_lossy());
+    (tmp, canonical, payload)
+}
+
+/// Shared contract for every captured producer fixture: parses without
+/// bailing, emits zero diagnostics, keys coverage at `sample.ts`, and
+/// the `LineCoverage` rows are well-formed — non-empty, every line
+/// 1-based ≥ 1, ascending (the deterministic order the downstream
+/// line-range join relies on).
+fn assert_producer_well_formed(
+    out: &ParseOutput<crap4ts::parse_diagnostic::IstanbulParseDiagnostic>,
+) {
+    assert!(
+        out.diagnostics.is_empty(),
+        "expected no diagnostics; got {:?}",
+        out.diagnostics
+    );
+    let lines = lines_for(out, "sample.ts");
+    assert!(
+        !lines.is_empty(),
+        "expected non-empty line coverage for sample.ts"
+    );
+    let mut prev = 0usize;
+    for lc in lines {
+        assert!(
+            lc.line >= 1,
+            "LineCoverage.line must be 1-based ≥ 1; got {lines:?}"
+        );
+        assert!(
+            lc.line >= prev,
+            "LineCoverage rows must be ascending by line; {} came after {}",
+            lc.line,
+            prev
+        );
+        prev = lc.line;
+    }
+    // When the producer emits b+branchMap, the lowered BranchCoverage
+    // rows must share the line-coverage 1-based invariant. A producer
+    // whose branch line came through as 0 (or whose unmodelled
+    // `locations[]` shape silently zeroed it) would mis-join in the
+    // downstream line-range pass — assert the structural floor here so
+    // the producer matrix regression-locks branch data too, not just
+    // line data.
+    if let Some(branches) = &out.branches {
+        let recs = branches
+            .get("sample.ts")
+            .expect("branches keyed at sample.ts when present");
+        assert!(
+            !recs.is_empty(),
+            "branches present for sample.ts must be non-empty"
+        );
+        for bc in recs {
+            assert!(
+                bc.line >= 1,
+                "BranchCoverage.line must be 1-based ≥ 1; got {recs:?}"
+            );
+        }
+    }
+}
+
+/// jest 29 (`ts-jest` preset, babel-plugin-istanbul). Synthesizes
+/// `(anonymous_N)` for the inline arrow; concrete `if`/`cond-expr`
+/// branch types; no null columns.
+#[test]
+fn producer_jest29_parses_clean() {
+    let (_t, c, p) = build_producer_fixture(PRODUCER_JEST);
+    let out = IstanbulCoverage::new(c)
+        .parse(&p)
+        .expect("jest 29 captured fixture parses");
+    assert_producer_well_formed(&out);
+    assert!(
+        out.branches.is_some(),
+        "jest fixture carries b+branchMap → Some(branches)"
+    );
+}
+
+/// `@vitest/coverage-istanbul@4`. The major bump did NOT make columns
+/// concrete — 4.x still emits `"column": null` on span ends and empty
+/// `{}` objects in `branchMap.locations[]`. Neither is modelled, so
+/// the parse must not bail (the original #211 failure mode).
+#[test]
+fn producer_vitest4_parses_clean_with_null_columns() {
+    let (_t, c, p) = build_producer_fixture(PRODUCER_VITEST4);
+    assert!(
+        p.contains("\"column\": null"),
+        "vitest4 fixture must carry null columns — that is the variance under test"
+    );
+    let out = IstanbulCoverage::new(c)
+        .parse(&p)
+        .expect("vitest 4.x captured fixture parses despite null columns");
+    assert_producer_well_formed(&out);
+}
+
+/// nyc 17 (+ tsx). Emits null columns via tsx source-map remapping and
+/// extra `binary-expr` branch types from transpiled helpers.
+#[test]
+fn producer_nyc17_parses_clean() {
+    let (_t, c, p) = build_producer_fixture(PRODUCER_NYC);
+    let out = IstanbulCoverage::new(c)
+        .parse(&p)
+        .expect("nyc 17 captured fixture parses");
+    assert_producer_well_formed(&out);
+}
+
+/// c8 10 (`--reporter=json`, V8→Istanbul via v8-to-istanbul). Carries
+/// an extra per-entry `all` field and a generic `type: "branch"` on
+/// every branchMap entry — both unmodelled, must not bail.
+#[test]
+fn producer_c8_parses_clean() {
+    let (_t, c, p) = build_producer_fixture(PRODUCER_C8);
+    let out = IstanbulCoverage::new(c)
+        .parse(&p)
+        .expect("c8 captured fixture parses");
+    assert_producer_well_formed(&out);
+}

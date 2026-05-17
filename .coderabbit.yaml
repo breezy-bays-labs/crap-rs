@@ -8,9 +8,18 @@ reviews:
   # CodeRabbit/gemini from reviewing snapshot source as if it were ours
   # (recurred on PR #213 — 6 false suggestions on the crap4ts-v1 snapshot;
   # W3.1-deferred follow-up, landed with the class-validator second oracle #208).
+  # The producer-matrix corpus (#214) is the same case: captured-real
+  # Istanbul output from jest/vitest/nyc/c8, byte-faithful except a
+  # {SRC_ROOT} path substitution — reviewing it as our code is noise.
+  # istanbul-c8/ is a wholly-captured directory; coverage-real-*.json
+  # are the captured files added beside the synthetic fixtures in the
+  # pre-existing istanbul-{jest,vitest,nyc}/ dirs (the glob suppresses
+  # only those, not the reviewed synthetic fixtures there).
   path_filters:
     - "!crates/crap4ts/tests/fixtures/crap4ts-v1/**"
     - "!crates/crap4ts/tests/fixtures/class-validator/**"
+    - "!crates/crap4ts/tests/fixtures/istanbul-c8/**"
+    - "!crates/crap4ts/tests/fixtures/**/coverage-real-*.json"
   path_instructions:
     - path: "src/domain/**"
       instructions: "Domain layer must be pure — no external crate imports, no I/O, no Rust-language-specific assumptions. These modules are destined for crap-core extraction."
