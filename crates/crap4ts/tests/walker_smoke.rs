@@ -56,6 +56,11 @@ const STATIC_BLOCK_TS: &str = include_str!("fixtures/ts-fixtures/static-block.ts
 // #200 + #205: walker traversal coverage-gap fixtures.
 const COMPUTED_OBJECT_KEY_TS: &str = include_str!("fixtures/ts-fixtures/computed-object-key.ts");
 const NAMESPACE_TS: &str = include_str!("fixtures/ts-fixtures/namespace.ts");
+const NAMESPACE_DOTTED_TS: &str = include_str!("fixtures/ts-fixtures/namespace-dotted.ts");
+const NAMESPACE_NESTED_TS: &str = include_str!("fixtures/ts-fixtures/namespace-nested.ts");
+const NAMESPACE_CLASS_TS: &str = include_str!("fixtures/ts-fixtures/namespace-class.ts");
+const NAMESPACE_CONST_FN_TS: &str =
+    include_str!("fixtures/ts-fixtures/namespace-const-fn.ts");
 const ASSIGNMENT_COMPUTED_LHS_TS: &str =
     include_str!("fixtures/ts-fixtures/assignment-computed-lhs.ts");
 const UPDATE_COMPUTED_OPERAND_TS: &str =
@@ -680,33 +685,121 @@ fn computed_object_key_decision_point_charges_enclosing_function() {
 
 #[test]
 fn namespace_nested_function_is_discovered_as_separate_site() {
-    // #200 item 2: `namespace Foo { export function bar() { if … } }`
-    // — `bar` is its own FunctionComplexity; its `if` charges `bar`,
-    // not module scope. The trailing declaration-only
-    // `declare module "side-effect-only";` (body: None) must be a
-    // clean no-op (no panic, no extra function).
+    // `namespace Foo { export function bar() { if … } }` — `bar` is
+    // its own FunctionComplexity, recorded namespace-qualified as
+    // `Foo.bar` (mirroring class methods, which qualify as `C.m`). Its
+    // `if` charges `Foo.bar`, not module scope. The trailing
+    // declaration-only `declare module "side-effect-only";` (body:
+    // None) must be a clean no-op (no panic, no extra function).
     let fns = extract(NAMESPACE_TS, "namespace.ts");
     let names: Vec<_> = fns
         .iter()
         .map(|f| f.identity.qualified_name.clone())
         .collect();
-    // The walker records the BARE local name `bar` here, not a
-    // namespace-qualified `Foo.bar` (contrast class methods, which
-    // qualify as `C.m`). #200 item 2's AC only requires `bar` be
-    // discovered as a separate FunctionComplexity, which it is.
-    // Namespace-qualified naming is a tracked enhancement:
-    // tracked: crap-rs#221 — namespace-qualified function names
     assert_eq!(
         fns.len(),
         1,
-        "expected exactly one function (local name `bar`); got names: {names:?}"
+        "expected exactly one function (`Foo.bar`); got names: {names:?}"
     );
-    let bar = find_fn(&fns, "bar");
+    let bar = find_fn(&fns, "Foo.bar");
     assert_eq!(bar.complexity, 2, "bar's `if` adds one decision point");
     assert_eq!(bar.contributors.len(), 1);
     assert_eq!(bar.contributors[0].kind, ContributorKind::IfBranch);
     // The `if` is on line 6 of the fixture (1-based).
     assert_eq!(bar.contributors[0].line, 6);
+}
+
+#[test]
+fn namespace_dotted_continuation_qualifies_with_full_path() {
+    // `namespace A.B { export function f }` parses as `A` whose module
+    // body is the nested declaration `B`. The qualified name carries
+    // the full dotted path `A.B.f` — not module scope, not a partial
+    // `B.f` — and the `if` charges `A.B.f`.
+    let fns = extract(NAMESPACE_DOTTED_TS, "namespace-dotted.ts");
+    assert_eq!(fns.len(), 1, "expected exactly one function (`A.B.f`)");
+    let f = find_fn(&fns, "A.B.f");
+    assert_eq!(f.complexity, 2, "f's `if` adds one decision point");
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn namespace_block_nested_qualifies_same_as_dotted_and_is_shallow() {
+    // `namespace A { function outer; namespace B { function g } }` —
+    // the block-nested path yields the same `A.B.g` as the dotted
+    // form, and `outer` declared in the outer block is `A.outer`.
+    // Qualification is SHALLOW: `inner`, nested inside `g`, keeps its
+    // bare name (mirrors a function nested inside a class method).
+    let fns = extract(NAMESPACE_NESTED_TS, "namespace-nested.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        3,
+        "expected A.outer, A.B.g, inner; got: {names:?}"
+    );
+    find_fn(&fns, "A.outer");
+    let g = find_fn(&fns, "A.B.g");
+    assert_eq!(g.complexity, 2, "g's `if` adds one; `inner` does not bleed");
+    let inner = find_fn(&fns, "inner");
+    assert_eq!(
+        inner.complexity, 1,
+        "shallow qualification: nested `inner` stays bare and isolated"
+    );
+}
+
+#[test]
+fn namespace_class_methods_carry_namespace_then_class_prefix() {
+    // A class inside a namespace qualifies methods with both prefixes:
+    // `Svc.Repo.find`, not `Repo.find`. A namespace-level function
+    // alongside it is `Svc.helper`.
+    let fns = extract(NAMESPACE_CLASS_TS, "namespace-class.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected Svc.helper + Svc.Repo.find; got: {names:?}"
+    );
+    find_fn(&fns, "Svc.helper");
+    let find = find_fn(&fns, "Svc.Repo.find");
+    assert_eq!(
+        find.complexity, 2,
+        "find's `if` adds one decision point"
+    );
+    assert_eq!(find.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn namespace_function_valued_const_bindings_carry_namespace_prefix() {
+    // Function-valued `const`s in a namespace are discovered with the
+    // namespace prefix regardless of whether they reach the walker
+    // through the bare statement path (`const bare = …`) or the
+    // `export` declaration path (`export const exported = …`):
+    // `Calc.bare` and `Calc.exported`, each CC 2 from its own `if`.
+    let fns = extract(NAMESPACE_CONST_FN_TS, "namespace-const-fn.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected Calc.bare + Calc.exported; got: {names:?}"
+    );
+    let bare = find_fn(&fns, "Calc.bare");
+    assert_eq!(bare.complexity, 2, "bare's `if` adds one decision point");
+    assert_eq!(bare.contributors[0].kind, ContributorKind::IfBranch);
+    let exported = find_fn(&fns, "Calc.exported");
+    assert_eq!(
+        exported.complexity, 2,
+        "exported's `if` adds one decision point"
+    );
+    assert_eq!(exported.contributors[0].kind, ContributorKind::IfBranch);
 }
 
 #[test]

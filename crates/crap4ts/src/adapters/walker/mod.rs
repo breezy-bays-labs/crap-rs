@@ -290,13 +290,25 @@ impl<'src> FunctionFinder<'src> {
             .map(|bi| bi.name.as_str().to_string())
             .or(name_hint)
             .unwrap_or_else(|| "<anonymous class>".to_string());
+        self.visit_class_body(class, &class_name);
+    }
+
+    /// Discover the function-entry sites on a class body under an
+    /// already-resolved `class_name`. Split out from [`Self::visit_class`]
+    /// so a caller that needs to *prepend* a qualifier (e.g. a class
+    /// declared inside a `namespace A`, which qualifies as `A.C.m`, not
+    /// `C.m`) can resolve the name itself and reuse the identical element
+    /// loop instead of duplicating it. [`Self::visit_class`] keeps the
+    /// original fallback-when-anonymous resolution for every other
+    /// caller.
+    fn visit_class_body(&mut self, class: &Class<'_>, class_name: &str) {
         for element in &class.body.body {
             match element {
-                ClassElement::MethodDefinition(method) => self.record_method(method, &class_name),
+                ClassElement::MethodDefinition(method) => self.record_method(method, class_name),
                 ClassElement::PropertyDefinition(prop) => {
-                    self.visit_property_definition(prop, &class_name);
+                    self.visit_property_definition(prop, class_name);
                 }
-                ClassElement::StaticBlock(block) => self.record_static_block(block, &class_name),
+                ClassElement::StaticBlock(block) => self.record_static_block(block, class_name),
                 // AccessorProperty + TSIndexSignature carry no
                 // executable bodies for cyclomatic analysis (accessors'
                 // bodies live elsewhere; index signatures are type-
@@ -470,13 +482,6 @@ impl<'src> FunctionFinder<'src> {
             Statement::TryStatement(t) => self.visit_try(t, out, nesting),
             Statement::LabeledStatement(l) => self.visit_statement(&l.body, out, nesting),
             Statement::ThrowStatement(th) => self.visit_expression(&th.argument, out, nesting),
-
-            // Module-level statements (valid only at top-level program scope).
-            Statement::ExportNamedDeclaration(decl) => {
-                if let Some(inner) = &decl.declaration {
-                    self.visit_top_level_declaration(inner);
-                }
-            }
 
             // #200 item 2: TS namespaces / modules. A
             // `namespace Foo { function bar() {} }` carries an
@@ -1181,37 +1186,57 @@ impl<'src> FunctionFinder<'src> {
         }
     }
 
-    /// #200 item 2: walk a `TSModuleDeclaration` (`namespace Foo { … }`
-    /// / `module "x" { … }`). `body` is `Option` — declaration-only
-    /// forms (`declare namespace Foo;`, ambient module headers) carry
-    /// `None` and are handled cleanly as no-ops. The body is one of two
-    /// `TSModuleDeclarationBody` variants:
-    ///
-    /// - `TSModuleBlock` — the executable `{ … }` block; its statement
-    ///   list is walked exactly like a function/block body so nested
-    ///   `function bar()` declarations become their own
-    ///   `FunctionComplexity` sites and any decision points inside the
-    ///   block charge the enclosing accumulator.
-    /// - `TSModuleDeclaration` — a dotted-namespace continuation
-    ///   (`namespace A.B { … }` parses as `A` whose body is the nested
-    ///   declaration `B`); recurse so the eventual block is reached.
-    ///
-    /// `nesting`/`out` are threaded straight through: a `namespace`
-    /// nested inside a function body is uncommon but legal in `.ts`, and
-    /// in that position its block's decision points belong to the
-    /// enclosing function. At module scope `nesting` is `None` so
-    /// top-level decision points in the block are not charged to any
-    /// (non-existent) parent, matching the rest of the walker.
-    ///
-    /// Known limitation: functions discovered inside a namespace keep
-    /// their **bare local name** (`bar`), not a namespace-qualified one
-    /// (`Foo.bar`) — unlike class methods, which qualify as `C.m`. The
-    /// `#200` AC only requires separate-`FunctionComplexity` discovery
-    /// (satisfied); qualified naming is a tracked enhancement.
-    /// tracked: crap-rs#221 — namespace-qualified function names
+    /// Walk a `TSModuleDeclaration` (`namespace Foo { … }` /
+    /// `module "x" { … }`). Public entry point — the namespace prefix
+    /// starts empty here. A `namespace` declared inside a function body
+    /// (uncommon but legal in `.ts`) reaches this via `visit_statement`
+    /// and begins its own fresh prefix from its own name.
     fn visit_ts_module_declaration(
         &mut self,
         ns: &oxc::ast::ast::TSModuleDeclaration<'_>,
+        out: &mut Contributors,
+        nesting: Option<u32>,
+    ) {
+        self.visit_ts_module_declaration_prefixed(ns, None, out, nesting);
+    }
+
+    /// Walk a `TSModuleDeclaration`, qualifying every function/class it
+    /// *directly* declares with a dotted namespace prefix so a function
+    /// in `namespace Foo` is recorded as `Foo.bar`, mirroring how a
+    /// class method is recorded `C.m`. `parent_prefix` is the dotted
+    /// path accumulated from any enclosing namespace (`Some("A")` while
+    /// walking `B`'s block inside `namespace A { namespace B { … } }`).
+    ///
+    /// `body` is `Option` — declaration-only forms (`declare namespace
+    /// Foo;`, ambient module headers like `declare module "x";`) carry
+    /// `None` and are a clean no-op. The body is one of two
+    /// `TSModuleDeclarationBody` variants:
+    ///
+    /// - `TSModuleBlock` — the executable `{ … }` block. Its statements
+    ///   go through [`Self::visit_namespace_statement`], which qualifies
+    ///   direct function/class declarations with the accumulated prefix
+    ///   and delegates everything else (decision points, IIFEs) to the
+    ///   ordinary `visit_statement`.
+    /// - `TSModuleDeclaration` — a dotted continuation (`namespace A.B`
+    ///   parses as `A` whose body is the nested declaration `B`).
+    ///   Recurse with the prefix extended by this segment so the
+    ///   eventual block sees the full `A.B` path.
+    ///
+    /// Qualification is **shallow**, exactly like class methods: only
+    /// the namespace's direct members are prefixed. A function nested
+    /// inside a namespace function keeps its bare local name (just as
+    /// `function inner` inside `class C { m() { … } }` is `inner`, not
+    /// `C.inner`).
+    ///
+    /// `nesting`/`out` are threaded straight through: at module scope
+    /// `nesting` is `None` so top-level decision points in the block are
+    /// not charged to any (non-existent) parent; a namespace nested in a
+    /// function body charges its decision points to that function,
+    /// matching the rest of the walker.
+    fn visit_ts_module_declaration_prefixed(
+        &mut self,
+        ns: &oxc::ast::ast::TSModuleDeclaration<'_>,
+        parent_prefix: Option<&str>,
         out: &mut Contributors,
         nesting: Option<u32>,
     ) {
@@ -1219,15 +1244,127 @@ impl<'src> FunctionFinder<'src> {
         let Some(body) = &ns.body else {
             return;
         };
+        let prefix: Option<String> = match module_declaration_name(&ns.id) {
+            Some(seg) => Some(match parent_prefix {
+                Some(p) => format!("{p}.{seg}"),
+                None => seg,
+            }),
+            // A string-literal module name with no usable segment keeps
+            // the inherited prefix unchanged (extreme edge — `module
+            // "x" { … }` augmentation; `module_declaration_name` already
+            // returns the literal value for the common case).
+            None => parent_prefix.map(str::to_string),
+        };
         match body {
             TSModuleDeclarationBody::TSModuleBlock(block) => {
                 for stmt in &block.body {
-                    self.visit_statement(stmt, out, nesting);
+                    self.visit_namespace_statement(stmt, prefix.as_deref(), out, nesting);
                 }
             }
             TSModuleDeclarationBody::TSModuleDeclaration(inner) => {
-                self.visit_ts_module_declaration(inner, out, nesting);
+                self.visit_ts_module_declaration_prefixed(
+                    inner,
+                    prefix.as_deref(),
+                    out,
+                    nesting,
+                );
             }
+        }
+    }
+
+    /// Dispatch one statement of a namespace block. Function / class /
+    /// arrow-or-function-expression variable declarations are recorded
+    /// with the `prefix`-qualified name; a nested `namespace` recurses
+    /// with the prefix extended; every other statement (decision
+    /// points, expression statements, IIFEs, …) is delegated unchanged
+    /// to [`Self::visit_statement`] so its behaviour — including charging
+    /// decision points to `out` — is identical to a non-namespace body.
+    fn visit_namespace_statement(
+        &mut self,
+        stmt: &Statement<'_>,
+        prefix: Option<&str>,
+        out: &mut Contributors,
+        nesting: Option<u32>,
+    ) {
+        let qualify = |name: &str| match prefix {
+            Some(p) => format!("{p}.{name}"),
+            None => name.to_string(),
+        };
+        match stmt {
+            Statement::FunctionDeclaration(func) => {
+                let local = func.id.as_ref().map(|id| id.name.as_str());
+                self.record_function(func, local.map(&qualify));
+            }
+            Statement::ClassDeclaration(class) => {
+                let local = class
+                    .id
+                    .as_ref()
+                    .map(|bi| bi.name.as_str())
+                    // Anonymous class in a namespace composes the
+                    // existing sentinel: `A.<anonymous class>.m`.
+                    .unwrap_or("<anonymous class>");
+                self.visit_class_body(class, &qualify(local));
+            }
+            Statement::VariableDeclaration(vd) => {
+                for declarator in &vd.declarations {
+                    let Some(init) = &declarator.init else {
+                        continue;
+                    };
+                    let name = binding_name(&declarator.id).map(|n| qualify(&n));
+                    self.record_initializer(init, name);
+                }
+            }
+            Statement::ExportNamedDeclaration(decl) => {
+                // `export function bar()` / `export class C` inside a
+                // namespace — unwrap to the inner declaration and apply
+                // the same qualification the bare forms get.
+                if let Some(inner) = &decl.declaration {
+                    self.visit_namespace_declaration(inner, prefix);
+                }
+            }
+            Statement::ExportDefaultDeclaration(decl) => {
+                self.visit_export_default(decl);
+            }
+            Statement::TSModuleDeclaration(inner) => {
+                self.visit_ts_module_declaration_prefixed(inner, prefix, out, nesting);
+            }
+            other => self.visit_statement(other, out, nesting),
+        }
+    }
+
+    /// Qualify a `Declaration` reached through a namespace's
+    /// `export …` statement, mirroring [`Self::visit_namespace_statement`]'s
+    /// function/class/variable arms.
+    fn visit_namespace_declaration(&mut self, decl: &Declaration<'_>, prefix: Option<&str>) {
+        let qualify = |name: &str| match prefix {
+            Some(p) => format!("{p}.{name}"),
+            None => name.to_string(),
+        };
+        match decl {
+            Declaration::FunctionDeclaration(func) => {
+                let local = func.id.as_ref().map(|id| id.name.as_str());
+                self.record_function(func, local.map(&qualify));
+            }
+            Declaration::ClassDeclaration(class) => {
+                let local = class
+                    .id
+                    .as_ref()
+                    .map(|bi| bi.name.as_str())
+                    .unwrap_or("<anonymous class>");
+                self.visit_class_body(class, &qualify(local));
+            }
+            Declaration::VariableDeclaration(vd) => {
+                for declarator in &vd.declarations {
+                    let Some(init) = &declarator.init else {
+                        continue;
+                    };
+                    let name = binding_name(&declarator.id).map(|n| qualify(&n));
+                    self.record_initializer(init, name);
+                }
+            }
+            // TS type / interface / enum declarations have no
+            // executable bodies (same as `visit_top_level_declaration`).
+            _ => {}
         }
     }
 }
@@ -1310,6 +1447,23 @@ fn binding_name(pattern: &BindingPattern<'_>) -> Option<String> {
     match pattern {
         BindingPattern::BindingIdentifier(bi) => Some(bi.name.as_str().to_string()),
         _ => None,
+    }
+}
+
+/// The name segment of a `namespace Foo` / `module "x"` declaration,
+/// used to build the dotted qualifier for functions discovered inside
+/// it. `namespace Foo` and `module Foo` yield `Foo`; the
+/// module-augmentation form `module "foo"` yields the literal value
+/// `foo` verbatim (so `module "foo" { function f }` qualifies as
+/// `foo.f`). Both `oxc` variants always carry a name, so this never
+/// returns `None` today — the `Option` is kept so callers degrade
+/// gracefully (keep the inherited prefix) if a future nameless form
+/// appears.
+fn module_declaration_name(id: &oxc::ast::ast::TSModuleDeclarationName<'_>) -> Option<String> {
+    use oxc::ast::ast::TSModuleDeclarationName as N;
+    match id {
+        N::Identifier(bi) => Some(bi.name.as_str().to_string()),
+        N::StringLiteral(lit) => Some(lit.value.as_str().to_string()),
     }
 }
 

@@ -1,28 +1,50 @@
 # cargo-mutants config — see https://mutants.rs/
 
-# Skip crap-core integration tests that exec the adapter binaries.
+# Skip tests that shell out to an adapter binary the scoped mutants run
+# does not build.
 #
-# Two crap-core integration suites shell out to the `crap4rs` / `crap4ts`
-# binaries via `assert_cmd::Command::cargo_bin(...)`:
+# `cargo mutants` runs scoped per package: the `crap-core` view.rs gate
+# uses `--package crap-core`, the `crap4ts` walker gate uses `--package
+# crap4ts`. A scoped build only produces that package's own targets, so
+# any test that execs an adapter binary outside the scoped package via
+# `assert_cmd::Command::cargo_bin(...)` finds `CARGO_BIN_EXE_<bin>`
+# unset and panics in the UNMUTATED baseline — which aborts the whole
+# run before a single mutant is tested (cargo-mutants exits 4,
+# "cargo test failed in an unmutated tree"). Three such tests exist:
 #
 #   * `wire_envelope_crap4rs.rs` / `wire_envelope_crap4ts.rs` (test fn
-#     `envelope`) — lock the JSON envelope shape across the migration.
+#     `envelope`) — exec the crap4rs / crap4ts bins to lock the JSON
+#     envelope shape. Unbuilt under `--package crap-core`.
 #   * `default_gate_threshold.rs` (test fns prefixed `default_gate_`) —
-#     assert the no-explicit-`--threshold` gate resolves to the
-#     metric-calibrated cutoff, the path the explicit-flag wire snapshots
-#     structurally cannot exercise.
+#     exec an adapter bin to assert the no-explicit-`--threshold` gate
+#     resolves to the metric-calibrated cutoff. Unbuilt under
+#     `--package crap-core`.
+#   * `metric_unsupported_smoke.rs::crap4rs_no_flag_default_cognitive_still_works`
+#     — lives in the `crap4ts` crate but execs the *crap4rs* bin
+#     (regression-checks the shared metric-default resolution on the
+#     crap4rs side). Under `--package crap4ts` (the walker gate) the
+#     crap4rs bin is NOT built, so this one test breaks that gate's
+#     unmutated baseline. The other three tests in that file exec
+#     crap4ts (which IS built under `--package crap4ts`), so only this
+#     fn is skipped — the rest stay live as mutant-killers.
 #
-# Under `cargo mutants --package crap-core` only crap-core's own targets
-# build — the `crap4rs` / `crap4ts` bins are not, so `CARGO_BIN_EXE_*` is
-# unset and these tests panic before any mutant runs. Both suites still
-# gate every PR via the `Test (linux-x86)` / `Test (macos-arm)` /
-# `Test (macos-x86)` jobs, which run `cargo nextest run --workspace
-# --all-targets` and DO build the bins first. Neither suite exercises
-# `view.rs` (the mutated file), so skipping them here loses zero
-# mutant-killing power. Both `--skip` filters are libtest substring
-# matches on the test-fn name; `default_gate` is collision-free
-# workspace-wide. Scoped to mutants only.
-additional_cargo_test_args = ["--", "--skip", "envelope", "--skip", "default_gate"]
+# All three are still fully exercised every PR by the `Test
+# (linux-x86)` / `Test (macos-arm)` / `Test (macos-x86)` jobs, which
+# run `cargo nextest run --workspace --all-targets` and build every
+# bin first — so skipping them here loses zero mutant-killing power
+# (none of the three exercises the mutated files). The `--skip`
+# filters are libtest substring matches on the test-fn name; `envelope`,
+# `default_gate`, and `crap4rs_no_flag_default_cognitive_still_works`
+# are each collision-free workspace-wide. Scoped to mutants only.
+additional_cargo_test_args = [
+    "--",
+    "--skip",
+    "envelope",
+    "--skip",
+    "default_gate",
+    "--skip",
+    "crap4rs_no_flag_default_cognitive_still_works",
+]
 
 # Warm each parallel worker's scratch tree with our /target dir.
 #
@@ -44,27 +66,83 @@ additional_cargo_test_args = ["--", "--skip", "envelope", "--skip", "default_gat
 # them, so `-j N` and `--in-place` are mutually exclusive by design.
 copy_target = true
 
-# Residual walker mutation-coverage gaps (crap-rs#209 initial run).
+# Raise the auto-set per-test timeout floor.
 #
-# These 4 mutants survive because the crap-rs#207 proptest grammar
-# (`crates/crap4ts/tests/walker_proptest.rs`) does not yet generate the
-# TS construct that makes the corresponding recursion arm load-bearing.
-# The walker behaviour is VERIFIED CORRECT in every case (it discovers
-# the nested function) — these are test-coverage gaps, NOT walker bugs,
-# so they are excluded-with-tracking-issue per ~/.claude/rules/
-# exclusions.md rather than filed as type:bug. The issue (#219) owns the
-# grammar extension that lifts each exclusion; it was opened BEFORE this
-# exclusion landed and is wired as a sub-issue of epic #173.
+# cargo-mutants derives each mutant's test timeout from the unmutated
+# baseline test time (~4s here → a ~23s auto timeout). The walker's
+# proptest suite shrinks counterexamples when a mutant is detected;
+# under `-j N` the parallel build/test contention plus the shrink
+# search can push a *caught* mutant's run past the 23s auto floor,
+# producing a spurious TIMEOUT instead of a CAUGHT result. The
+# `delete match arm Statement::ClassDeclaration(class)` mutant is the
+# observed case: it is reliably caught (~35s solo) but times out under
+# the auto floor in a full parallel pass. A 90s floor gives the
+# shrinker headroom without letting a genuinely-hung mutant run
+# unbounded — the multiplier-based auto timeout still caps slower
+# mutants above this floor.
+minimum_test_timeout = 90
+
+# Pre-existing walker mutation gaps — surfaced when the per-merge
+# `crap4ts walker` mutants gate was revived.
 #
-# Restoration condition: crap-rs#219 extends the proptest grammar so
-# each mutant is CAUGHT, then deletes the matching line below.
+# This gate had been silently dead for several merges: a scoped
+# `cargo mutants --package crap4ts` cannot build the `crap4rs` bin,
+# so an adapter-bin-shelling test panicked in the UNMUTATED baseline
+# and cargo-mutants aborted before testing a single mutant (exit 4,
+# zero mutants). The `--skip crap4rs_no_flag_default_cognitive_still_works`
+# entry in `additional_cargo_test_args` above fixes that abort, so
+# the gate now actually runs.
+#
+# Reviving it exposed 21 long-latent surviving mutants in walker code
+# that the change reviving the gate never touched — verified against
+# the origin/main baseline, where the identical 21 survive too, so
+# they are not a regression. Left un-excluded, the revived gate would
+# be permanently RED on every merge to main, which would in turn mask
+# any genuinely NEW walker regression behind the standing noise.
+#
+# So: exclude exactly these 21 known gaps to keep the revived gate
+# green-and-meaningful (it can still catch NEW survivors). Closing
+# them — adding real mutation-killing coverage for these functions —
+# is the remaining acceptance work of the issue that revived the gate.
+#
+# Each pattern is anchored on the exact `mod.rs:LINE:COL:` of one
+# known-surviving mutant so it pins precisely that mutant and nothing
+# else (sibling mutations at the same site that ARE caught stay
+# tested). If a future edit shifts these lines the pattern simply
+# stops matching and the mutant resurfaces — fail-open toward
+# visibility, which is the behaviour #224 wants (it forces re-triage
+# rather than silently masking).
+#
+# tracked: crap-rs#224 — delete each line below as the matching
+# function gains a mutation-killing test; the issue stays open until
+# all 21 are killed and this block is empty.
 exclude_re = [
-  # tracked: crap-rs#219 — grammar has no `export default` container; walker recurses it correctly (export default (()=>{fn})() discovers the fn)
-  "replace FunctionFinder<'src>::visit_export_default with \\(\\)",
-  # tracked: crap-rs#219 — grammar never nests a class inside a function body; walker recurses it correctly (function o(){ class C{m(){}} } discovers C.m)
-  "delete match arm Statement::ClassDeclaration\\(class\\) in FunctionFinder<'src>::visit_statement",
-  # tracked: crap-rs#219 — grammar has no labeled statements; walker recurses it correctly (lbl: { function inner(){} } discovers inner)
-  "delete match arm Statement::LabeledStatement\\(l\\) in FunctionFinder<'src>::visit_statement",
-  # tracked: crap-rs#219 — grammar has no `throw`; walker recurses it correctly (throw (()=>{fn})() discovers the fn)
-  "delete match arm Statement::ThrowStatement\\(th\\) in FunctionFinder<'src>::visit_statement",
+    # FunctionFinder::visit_if
+    "mod\\.rs:682:17: delete match arm Statement::IfStatement\\(_\\) in",
+    "mod\\.rs:683:71: replace \\+ with \\* in",
+    # FunctionFinder::visit_for_init
+    "mod\\.rs:719:9: replace FunctionFinder<'src>::visit_for_init with \\(\\)",
+    # FunctionFinder::visit_chain_element
+    "mod\\.rs:1050:9: replace FunctionFinder<'src>::visit_chain_element with \\(\\)",
+    # FunctionFinder::visit_expression — untested match arms
+    "mod\\.rs:773:13: delete match arm Expression::ClassExpression\\(class\\) in",
+    "mod\\.rs:787:13: delete match arm Expression::JSXFragment\\(frag\\) in",
+    "mod\\.rs:834:21: delete match arm AT::PrivateFieldExpression\\(m\\) in",
+    "mod\\.rs:859:21: delete match arm SAT::PrivateFieldExpression\\(m\\) in",
+    "mod\\.rs:875:13: delete match arm Expression::YieldExpression\\(y\\) in",
+    "mod\\.rs:887:13: delete match arm Expression::TSTypeAssertion\\(ts\\) in",
+    "mod\\.rs:891:13: delete match arm Expression::TSInstantiationExpression\\(ts\\) in",
+    "mod\\.rs:905:13: delete match arm Expression::PrivateFieldExpression\\(m\\) in",
+    # byte_to_line_col — arithmetic / comparison operators
+    "mod\\.rs:1434:27: replace == with != in",
+    "mod\\.rs:1435:20: replace \\+ with - in",
+    "mod\\.rs:1435:20: replace \\+ with \\* in",
+    "mod\\.rs:1437:25: replace - with \\+ in",
+    "mod\\.rs:1437:46: replace \\+ with \\* in",
+    # property_key_name — match arms
+    "mod\\.rs:1476:9: delete match arm PropertyKey::PrivateIdentifier\\(id\\) in",
+    "mod\\.rs:1477:9: delete match arm PropertyKey::StringLiteral\\(s\\) in",
+    "mod\\.rs:1478:9: delete match arm PropertyKey::NumericLiteral\\(n\\) in",
+    # for_init_as_expression
+    "mod\\.rs:1515:5: replace for_init_as_expression -> Option<&'b Expression<'b>> with None",
 ]
