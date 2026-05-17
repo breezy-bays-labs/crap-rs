@@ -29,11 +29,28 @@
 //!   detected top-level keys. `MissingField` covers entries that
 //!   have `s` records but an empty `statementMap` (or vice versa).
 //!
-//! ## Decision points (locked)
+//! ## Schema minimalism (only model what is consumed)
 //!
-//! - **No `f`/`fnMap` backfill** — W1.1 discovery 5a–5d empirically
-//!   showed `s`/`statementMap` data is sufficient for arrow-function
-//!   coverage (CLAUDE.md locked decision #13).
+//! The internal deserialization types model **only** the fields the
+//! parser actually reads (`path`, `s`, `statementMap.start.line`, `b`,
+//! `branchMap.loc.start.line`, `branchMap.line`). Fields a producer
+//! emits but the parser never consults (`f`/`fnMap`, the `end` side of
+//! every span, a branch's `type`) are deliberately **not** modelled —
+//! serde drops unknown fields, so they are tolerated for free.
+//!
+//! This is not just tidiness: it shrinks the whole-file failure
+//! surface. serde aborts the entire flat-shape parse the instant any
+//! *modelled, required* field has the wrong type (e.g. `"type": null`,
+//! `"name": null`, `"end": {}`), and that abort happens **before** any
+//! per-entry diagnostic can fire — the file produces zero coverage and
+//! zero diagnostics, the worst possible outcome. Empirically, jest,
+//! `@vitest/coverage-istanbul@4`, nyc, and `c8 --reporter=json` all
+//! emit concrete values for the fields we *do* model, but they vary
+//! freely in the fields we don't (anonymous `fnMap` names, generic
+//! branch `type`, `column: null`, empty `{}` position objects). Not
+//! modelling the unconsumed fields means that variance — present or
+//! future — can never bail the parse.
+//!
 //! - **`ParseOutput.branches` is internal** — `crap-core::core::analyze`
 //!   lowers branch data into per-function `branch_coverage:
 //!   Option<CoverageRatio>` records, but the JSON envelope only
@@ -248,95 +265,57 @@ struct IstanbulCoverageFile {
     /// `statement_id` → execution count.
     #[serde(default)]
     s: HashMap<String, u64>,
-    /// `statement_id` → `{ start: {line, column}, end: {line, column} }`.
+    /// `statement_id` → statement location. Only `start.line` is read
+    /// (the line-coverage join key).
     #[serde(default)]
     statement_map: HashMap<String, StatementLoc>,
-    /// W2.3 (now consumed): `branch_id` → `[hit count per branch arm]`.
-    /// Each branchId maps to a `Vec<u64>` of arm-level hit counts; the
-    /// parser fans these into one `BranchCoverage` row per arm at the
-    /// associated `branchMap[id]` start line.
+    /// `branch_id` → per-arm hit counts. Each branchId maps to a
+    /// `Vec<u64>` of arm-level counts; the parser fans these into one
+    /// `BranchCoverage` row per arm at the branching site's line.
     #[serde(default)]
     b: HashMap<String, Vec<u64>>,
-    /// W2.3 (now consumed): `branch_id` → branch location. See `b`
-    /// above.
+    /// `branch_id` → branch location. See `b` above.
     #[serde(default)]
     branch_map: HashMap<String, BranchLoc>,
-    /// `function_id` → execution count. Locked decision #13: NOT
-    /// consumed — W1.1 discovery 5a–5d showed `s`/`statementMap` is
-    /// sufficient for arrow-function coverage. Field kept for forward
-    /// compatibility (and to keep test fixtures faithful to real
-    /// emitter output) so future inclusion is consumer-side only.
-    #[serde(default)]
-    #[allow(dead_code)]
-    f: HashMap<String, u64>,
-    /// `function_id` → function metadata. See `f` above; not consumed
-    /// in v2.0.0.
-    #[serde(default)]
-    #[allow(dead_code)]
-    fn_map: HashMap<String, FnLoc>,
+    // `f`/`fnMap` (function exec counts + metadata) are intentionally
+    // not modelled: line coverage from `s`/`statementMap` is sufficient
+    // for every function shape (including arrow functions), so the
+    // parser never reads them. serde drops them as unknown fields.
+    // Modelling `fnMap` would re-introduce a whole-file bail vector —
+    // its `name` is `null` for anonymous functions in some producers.
 }
 
-/// Range location for a statement (or function decl/body). `start`
-/// and `end` carry 1-based line numbers + 0-based columns.
+/// A span location. Istanbul carries `{ start, end }`, but only
+/// `start.line` is the line-coverage join key, so `end` (and the
+/// column on either side) is not modelled — see the module-level
+/// "Schema minimalism" note. serde ignores the unmodelled `end`.
 #[derive(Debug, Deserialize)]
 struct StatementLoc {
     start: Position,
-    #[allow(dead_code)]
-    end: Position,
 }
 
-/// 1-based line + 0-based column. Matches Istanbul's emitter
-/// convention; downstream `LineCoverage.line` is 1-based `usize`.
-///
-/// `column` is `Option<u32>` because `@vitest/coverage-istanbul` (and
-/// possibly other producers) emit `"column": null` on the `end` side of
-/// every span, signalling "unknown column" — the underlying V8
-/// inspector data they transform doesn't always have a precise
-/// end-column. crap4ts line-range matching is line-only, so the
-/// column value is advisory and never consulted; accepting `null` is
-/// semantically a no-op. Surfaced by W3.1's crap4ts@1.x corpus
-/// capture (#189) where 1,943 of 4,696 columns were null; tracked
-/// fix: #211.
+/// The 1-based source line of a span's start — the only positional
+/// datum the line-coverage join consumes. Istanbul also emits a
+/// `column` here (and a whole `end` position), sometimes `null` or an
+/// empty `{}` object depending on the producer; none of that is
+/// modelled because none of it is read, so its variance can never
+/// fail the parse.
 #[derive(Debug, Deserialize)]
 struct Position {
     line: u32,
-    #[allow(dead_code)]
-    column: Option<u32>,
 }
 
-/// W2.3 branch metadata. `kind` (e.g. `"if"`, `"switch"`, `"cond-expr"`)
-/// is carried but not consumed by the parser — line attribution joins
-/// only on the `loc.start.line` value (or the optional emitter-set
-/// `line` field when present, which some emitters use as the
-/// branching-site line independent of `loc`).
+/// Branch location. Only the branching-site line is consumed: the
+/// emitter-set `line` when present (some emitters pin it to the
+/// branching keyword's line while `loc` spans both arms), else
+/// `loc.start.line`. Istanbul's branch `type` and `locations[]` are
+/// not modelled — unread, and `type` is `null` / `locations[]` holds
+/// empty `{}` objects in some producers' output.
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct BranchLoc {
     loc: StatementLoc,
-    /// Istanbul branch kind (`if`, `switch`, `cond-expr`, `default-arg`,
-    /// `binary-expr`, etc.). Kept for downstream display only; not
-    /// consumed by the line-range join.
-    #[serde(rename = "type")]
-    #[allow(dead_code)]
-    kind: String,
-    /// Optional emitter-set branching-site line. When present, takes
-    /// precedence over `loc.start.line` for line attribution (some
-    /// emitters set `loc` to a wide span covering both arms but pin
-    /// `line` to the branching keyword's line).
-    #[serde(default)]
-    line: Option<u32>,
-}
-
-/// W2.3 fallback: function metadata. Declared minimal here for the
-/// same reason as `BranchLoc`; `name` + `decl` + `loc` + `line` is the
-/// minimum surface needed if `f`/`fnMap` later backfills arrow
-/// coverage that `s`/`statementMap` undercounts.
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct FnLoc {
-    name: String,
-    decl: StatementLoc,
-    loc: StatementLoc,
+    /// Optional emitter-set branching-site line; takes precedence over
+    /// `loc.start.line` when present.
     #[serde(default)]
     line: Option<u32>,
 }
