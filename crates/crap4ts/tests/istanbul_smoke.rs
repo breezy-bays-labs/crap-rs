@@ -1137,6 +1137,28 @@ fn assert_producer_well_formed(
         );
         prev = lc.line;
     }
+    // When the producer emits b+branchMap, the lowered BranchCoverage
+    // rows must share the line-coverage 1-based invariant. A producer
+    // whose branch line came through as 0 (or whose unmodelled
+    // `locations[]` shape silently zeroed it) would mis-join in the
+    // downstream line-range pass — assert the structural floor here so
+    // the producer matrix regression-locks branch data too, not just
+    // line data.
+    if let Some(branches) = &out.branches {
+        let recs = branches
+            .get("sample.ts")
+            .expect("branches keyed at sample.ts when present");
+        assert!(
+            !recs.is_empty(),
+            "branches present for sample.ts must be non-empty"
+        );
+        for bc in recs {
+            assert!(
+                bc.line >= 1,
+                "BranchCoverage.line must be 1-based ≥ 1; got {recs:?}"
+            );
+        }
+    }
 }
 
 /// jest 29 (`ts-jest` preset, babel-plugin-istanbul). Synthesizes
