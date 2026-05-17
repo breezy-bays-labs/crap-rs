@@ -51,6 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the literal value; previously the preset silently won. The
   `init`-generated config never writes both, so the blast radius is
   limited to hand-edited configs. (#218)
+- crap4ts's Istanbul `coverage-final.json` parser now models only the
+  fields it actually consumes (`path`, `s`, `statementMap.start.line`,
+  `b`, `branchMap`). Unconsumed fields (`f`/`fnMap`, statement/branch
+  `end` positions, `column`, branch `type`) are no longer deserialized,
+  so emitter-side `null` or shape drift in those fields can no longer
+  abort the whole-file parse. Forward-looking: every captured jest 29 /
+  vitest-istanbul 4 / nyc 17 / c8 10 fixture already parsed cleanly, so
+  no current producer triggered this; the change removes a latent
+  whole-file-bail vector and locks the four producers as regression
+  fixtures. (#214)
 
 ### Changed (crap-core public API)
 
