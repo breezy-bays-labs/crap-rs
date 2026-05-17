@@ -1262,12 +1262,7 @@ impl<'src> FunctionFinder<'src> {
                 }
             }
             TSModuleDeclarationBody::TSModuleDeclaration(inner) => {
-                self.visit_ts_module_declaration_prefixed(
-                    inner,
-                    prefix.as_deref(),
-                    out,
-                    nesting,
-                );
+                self.visit_ts_module_declaration_prefixed(inner, prefix.as_deref(), out, nesting);
             }
         }
     }

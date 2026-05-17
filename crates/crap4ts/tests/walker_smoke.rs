@@ -59,8 +59,7 @@ const NAMESPACE_TS: &str = include_str!("fixtures/ts-fixtures/namespace.ts");
 const NAMESPACE_DOTTED_TS: &str = include_str!("fixtures/ts-fixtures/namespace-dotted.ts");
 const NAMESPACE_NESTED_TS: &str = include_str!("fixtures/ts-fixtures/namespace-nested.ts");
 const NAMESPACE_CLASS_TS: &str = include_str!("fixtures/ts-fixtures/namespace-class.ts");
-const NAMESPACE_CONST_FN_TS: &str =
-    include_str!("fixtures/ts-fixtures/namespace-const-fn.ts");
+const NAMESPACE_CONST_FN_TS: &str = include_str!("fixtures/ts-fixtures/namespace-const-fn.ts");
 const ASSIGNMENT_COMPUTED_LHS_TS: &str =
     include_str!("fixtures/ts-fixtures/assignment-computed-lhs.ts");
 const UPDATE_COMPUTED_OPERAND_TS: &str =
@@ -767,10 +766,7 @@ fn namespace_class_methods_carry_namespace_then_class_prefix() {
     );
     find_fn(&fns, "Svc.helper");
     let find = find_fn(&fns, "Svc.Repo.find");
-    assert_eq!(
-        find.complexity, 2,
-        "find's `if` adds one decision point"
-    );
+    assert_eq!(find.complexity, 2, "find's `if` adds one decision point");
     assert_eq!(find.contributors[0].kind, ContributorKind::IfBranch);
 }
 
