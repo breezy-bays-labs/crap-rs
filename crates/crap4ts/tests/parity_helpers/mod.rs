@@ -173,9 +173,12 @@ pub struct FnRecord {
 
 /// Strip a single leading `src/` so oracle paths
 /// (`src/adapters/x.ts`) align with crap4ts@2 `--src`-relative paths
-/// (`adapters/x.ts`). Forward slashes only — both sides normalize.
+/// (`adapters/x.ts`). Backslashes are folded to `/` first so a
+/// Windows-emitted path matches the forward-slash oracle regardless of
+/// the platform the matrix runs on.
 fn norm_path(p: &str) -> String {
-    p.strip_prefix("src/").unwrap_or(p).to_string()
+    let p = p.replace('\\', "/");
+    p.strip_prefix("src/").unwrap_or(&p).to_string()
 }
 
 /// Parse the committed oracle JSON. Panics with context on malformed
@@ -458,20 +461,16 @@ impl ParityReport {
 /// span boundary tolerance). Classify every matched pair; collect
 /// unmatched oracle functions as discovery failures.
 pub fn diff(oracle: &[FnRecord], v2: &[FnRecord]) -> ParityReport {
-    // (file, name) → candidates, so duplicate anonymous functions in
-    // one file (`<arrow>` ×N) are disambiguated by start line.
-    let mut v2_index: BTreeMap<(&str, &str), Vec<&FnRecord>> = BTreeMap::new();
-    for f in v2 {
+    // (file, name) → candidate indices into `v2`, so duplicate
+    // anonymous functions in one file (`<arrow>` ×N) are disambiguated
+    // by start line.
+    let mut v2_index: BTreeMap<(&str, &str), Vec<usize>> = BTreeMap::new();
+    for (i, f) in v2.iter().enumerate() {
         v2_index
             .entry((f.file.as_str(), f.name.as_str()))
             .or_default()
-            .push(f);
+            .push(i);
     }
-
-    let oracle_keys: std::collections::HashSet<(&str, &str)> = oracle
-        .iter()
-        .map(|f| (f.file.as_str(), f.name.as_str()))
-        .collect();
 
     let mut report = ParityReport {
         matched: 0,
@@ -481,18 +480,27 @@ pub fn diff(oracle: &[FnRecord], v2: &[FnRecord]) -> ParityReport {
         divergences: Vec::new(),
     };
 
+    // Each v2 record is consumed by at most one oracle entry. Without
+    // this, a future regression where v2 drops a function but a sibling
+    // (same file+name, start line within ±1) absorbs two oracle entries
+    // would be silently masked — both oracle entries "match" the same
+    // surviving v2 record and the dropped one never surfaces as v1_only.
+    let mut consumed: std::collections::HashSet<usize> = std::collections::HashSet::new();
+
     for o in oracle {
         let key = (o.file.as_str(), o.name.as_str());
-        let cand = v2_index.get(&key).and_then(|cands| {
-            cands
-                .iter()
+        let cand = v2_index.get(&key).and_then(|idxs| {
+            idxs.iter()
                 .copied()
-                .filter(|c| (c.start_line - o.start_line).abs() <= 1)
-                .min_by_key(|c| (c.start_line - o.start_line).abs())
+                .filter(|&i| !consumed.contains(&i))
+                .filter(|&i| (v2[i].start_line - o.start_line).abs() <= 1)
+                .min_by_key(|&i| (v2[i].start_line - o.start_line).abs())
         });
         match cand {
             None => report.v1_only.push(format!("{}::{}", o.file, o.name)),
-            Some(m) => {
+            Some(mi) => {
+                consumed.insert(mi);
+                let m = &v2[mi];
                 report.matched += 1;
                 if o.cc == m.cc {
                     report.exact_cc += 1;
@@ -516,10 +524,12 @@ pub fn diff(oracle: &[FnRecord], v2: &[FnRecord]) -> ParityReport {
         }
     }
 
-    report.v2_only_count = v2
-        .iter()
-        .filter(|f| !oracle_keys.contains(&(f.file.as_str(), f.name.as_str())))
-        .count();
+    // v2 records never consumed by a 1-to-1 oracle match. crap4ts@2's
+    // walker is a deliberate superset of v1.x, so this is the genuine
+    // extra-discovery delta — not a `(file, name)`-existence heuristic,
+    // which undercounts whenever v2 adds a function sharing a name with
+    // an oracle entry (common for anonymous `<arrow>` / nested fns).
+    report.v2_only_count = v2.len() - report.matched;
 
     report
 }
