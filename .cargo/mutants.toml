@@ -100,7 +100,9 @@ minimum_test_timeout = 90
 # be permanently RED on every merge to main, which would in turn mask
 # any genuinely NEW walker regression behind the standing noise.
 #
-# So: exclude exactly these 21 known gaps to keep the revived gate
+# So: exclude these 21 hard line-anchored gaps (plus one further
+# proptest-flaky arm parked separately in its own sub-block below — see
+# the paragraph preceding `exclude_re`) to keep the revived gate
 # green-and-meaningful (it can still catch NEW survivors). Closing
 # them — adding real mutation-killing coverage for these functions —
 # is the remaining acceptance work of the issue that revived the gate.
