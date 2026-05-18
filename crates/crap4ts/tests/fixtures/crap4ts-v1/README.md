@@ -73,7 +73,7 @@ maintenance mode pending the v2.x cutover, see crap4ts#38).**
 
    ```bash
    rsync -av --exclude='__tests__/' --exclude='*.test.ts' --exclude='dist/' \
-         --exclude='coverage/' --exclude='node_modules/' --exclude='.DS_Store' \
+         --exclude='node_modules/' --exclude='.DS_Store' \
          ~/Github/crap4ts/src/ \
          crates/crap4ts/tests/fixtures/crap4ts-v1/src/
    cp ~/Github/crap4ts/coverage/coverage-final.json \
@@ -81,6 +81,19 @@ maintenance mode pending the v2.x cutover, see crap4ts#38).**
    cp crap4ts-v1-reference.json \
       crates/crap4ts/tests/fixtures/
    ```
+
+   **Do NOT add `--exclude='coverage/'` back.** The build-artifact
+   `coverage/` directory lives at the repo *root*
+   (`~/Github/crap4ts/coverage/`), which is outside this rsync's
+   `~/Github/crap4ts/src/` source root — it is never in the transfer set,
+   so excluding it is unnecessary. Worse, rsync's `coverage/` pattern is
+   unanchored: it matches a directory named `coverage` at *any* depth, so
+   it silently drops the `src/adapters/coverage/` *source* subtree (5 files,
+   26 scored functions in the oracle). That defect shipped in the first
+   capture and was caught during W3.2 #190 pre-flight. The remaining
+   directory excludes (`__tests__/`) are intentionally unanchored —
+   co-located test directories at any depth should be dropped. `dist/`
+   and `node_modules/` do not occur under `src/`; they are belt-and-braces.
 
 6. Revert v1.x's local-only modifications:
 
