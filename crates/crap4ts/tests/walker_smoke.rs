@@ -60,6 +60,12 @@ const NAMESPACE_DOTTED_TS: &str = include_str!("fixtures/ts-fixtures/namespace-d
 const NAMESPACE_NESTED_TS: &str = include_str!("fixtures/ts-fixtures/namespace-nested.ts");
 const NAMESPACE_CLASS_TS: &str = include_str!("fixtures/ts-fixtures/namespace-class.ts");
 const NAMESPACE_CONST_FN_TS: &str = include_str!("fixtures/ts-fixtures/namespace-const-fn.ts");
+const NAMESPACE_EXPORT_DEFAULT_TS: &str =
+    include_str!("fixtures/ts-fixtures/namespace-export-default.ts");
+const UNARY_OPERAND_NESTED_FN_TS: &str =
+    include_str!("fixtures/ts-fixtures/unary-operand-nested-fn.ts");
+const ARRAY_LITERAL_NESTED_FN_TS: &str =
+    include_str!("fixtures/ts-fixtures/array-literal-nested-fn.ts");
 const ASSIGNMENT_COMPUTED_LHS_TS: &str =
     include_str!("fixtures/ts-fixtures/assignment-computed-lhs.ts");
 const UPDATE_COMPUTED_OPERAND_TS: &str =
@@ -796,6 +802,81 @@ fn namespace_function_valued_const_bindings_carry_namespace_prefix() {
         "exported's `if` adds one decision point"
     );
     assert_eq!(exported.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn namespace_export_default_declaration_carries_namespace_prefix() {
+    // `export default function` AND `export default class` inside a
+    // namespace are qualified like every other member — `Api.handler`
+    // / `Svc.Repo.find`, not the bare `handler` / `Repo.find`. The
+    // class case also pins the `K::ClassDeclaration` arm: without it
+    // the declaration falls back to the unqualified top-level
+    // export-default path and the prefix is lost.
+    let fns = extract(NAMESPACE_EXPORT_DEFAULT_TS, "namespace-export-default.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(
+        fns.len(),
+        2,
+        "expected Api.handler + Svc.Repo.find; got: {names:?}"
+    );
+    let handler = find_fn(&fns, "Api.handler");
+    assert_eq!(
+        handler.complexity, 2,
+        "handler's `if` adds one decision point"
+    );
+    assert_eq!(handler.contributors[0].kind, ContributorKind::IfBranch);
+    let find = find_fn(&fns, "Svc.Repo.find");
+    assert_eq!(find.complexity, 2, "find's `if` adds one decision point");
+    assert_eq!(find.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn unary_expression_argument_is_recursed_for_nested_function_discovery() {
+    // `const probe = typeof (function discovered(){ if … })` — the
+    // function is reachable only through the UnaryExpression operand.
+    // With the walker's `Expression::UnaryExpression` arm it is
+    // discovered (CC 2 from its `if`); deleting that arm drops the
+    // unary node to the no-op fallthrough and `discovered` vanishes.
+    // Pins that arm so the mutant stays caught deterministically.
+    let fns = extract(UNARY_OPERAND_NESTED_FN_TS, "unary-operand-nested-fn.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(fns.len(), 1, "expected `discovered`; got: {names:?}");
+    let discovered = find_fn(&fns, "discovered");
+    assert_eq!(
+        discovered.complexity, 2,
+        "discovered's `if` adds one decision point"
+    );
+    assert_eq!(discovered.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn array_literal_element_is_recursed_for_nested_function_discovery() {
+    // `const probe = [function discovered(){ if … }]` — the function is
+    // reachable only through an ArrayExpression element. The walker's
+    // `Expression::ArrayExpression` arm forwards to `visit_array_elements`,
+    // which yields each element via `array_element_as_expression`.
+    // Deleting the arm, stubbing the helper to `()`, or returning `None`
+    // from `array_element_as_expression` all drop `discovered` to the
+    // no-op fallthrough. Pins all three sites deterministically so the
+    // mutants stay caught regardless of proptest generation.
+    let fns = extract(ARRAY_LITERAL_NESTED_FN_TS, "array-literal-nested-fn.ts");
+    let names: Vec<_> = fns
+        .iter()
+        .map(|f| f.identity.qualified_name.clone())
+        .collect();
+    assert_eq!(fns.len(), 1, "expected `discovered`; got: {names:?}");
+    let discovered = find_fn(&fns, "discovered");
+    assert_eq!(
+        discovered.complexity, 2,
+        "discovered's `if` adds one decision point"
+    );
+    assert_eq!(discovered.contributors[0].kind, ContributorKind::IfBranch);
 }
 
 #[test]
