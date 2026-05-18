@@ -86,7 +86,7 @@ pre-push:
       # cucumber-rs harness=false targets bypass libtest's
       # `--list --format terse` probing, so nextest excludes them
       # via `.config/nextest.toml` and they run via `cargo test`.
-      run: cargo test --test json_reporter_cucumber
+      run: cargo test --test json_reporter_cucumber --test metric_unsupported_cucumber --test cyclomatic_walker_cucumber
       timeout: 180s
     docs:
       env:

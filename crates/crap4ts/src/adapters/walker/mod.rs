@@ -1281,14 +1281,10 @@ impl<'src> FunctionFinder<'src> {
         out: &mut Contributors,
         nesting: Option<u32>,
     ) {
-        let qualify = |name: &str| match prefix {
-            Some(p) => format!("{p}.{name}"),
-            None => name.to_string(),
-        };
         match stmt {
             Statement::FunctionDeclaration(func) => {
                 let local = func.id.as_ref().map(|id| id.name.as_str());
-                self.record_function(func, local.map(&qualify));
+                self.record_function(func, local.map(|n| qualify(prefix, n)));
             }
             Statement::ClassDeclaration(class) => {
                 let local = class
@@ -1298,29 +1294,10 @@ impl<'src> FunctionFinder<'src> {
                     // Anonymous class in a namespace composes the
                     // existing sentinel: `A.<anonymous class>.m`.
                     .unwrap_or("<anonymous class>");
-                self.visit_class_body(class, &qualify(local));
+                self.visit_class_body(class, &qualify(prefix, local));
             }
             Statement::VariableDeclaration(vd) => {
-                // Mirror `visit_variable_declaration_in_body`: route
-                // function-valued initializers to their recorders with
-                // the qualified name, and thread `out`/`nesting` for
-                // every other initializer so a namespace nested in a
-                // function body charges its initializer decision points
-                // to that function (the contract this module documents).
-                for declarator in &vd.declarations {
-                    let name = binding_name(&declarator.id).map(|n| qualify(&n));
-                    let Some(init) = &declarator.init else {
-                        continue;
-                    };
-                    match init {
-                        Expression::ArrowFunctionExpression(arrow) => {
-                            self.record_arrow(arrow, name)
-                        }
-                        Expression::FunctionExpression(func) => self.record_function(func, name),
-                        Expression::ClassExpression(class) => self.visit_class(class, name),
-                        other => self.visit_expression(other, out, nesting),
-                    }
-                }
+                self.visit_namespace_var_decl(vd, prefix, out, nesting)
             }
             Statement::ExportNamedDeclaration(decl) => {
                 // `export function bar()` / `export class C` inside a
@@ -1331,32 +1308,70 @@ impl<'src> FunctionFinder<'src> {
                 }
             }
             Statement::ExportDefaultDeclaration(decl) => {
-                // `export default function f` / `export default class C`
-                // inside a namespace must carry the prefix like every
-                // other namespace member; a default-exported *expression*
-                // has no declaration name to qualify, so it keeps the
-                // ordinary expression handling.
-                use oxc::ast::ast::ExportDefaultDeclarationKind as K;
-                match &decl.declaration {
-                    K::FunctionDeclaration(func) => {
-                        let local = func.id.as_ref().map(|id| id.name.as_str());
-                        self.record_function(func, local.map(&qualify));
-                    }
-                    K::ClassDeclaration(class) => {
-                        let local = class
-                            .id
-                            .as_ref()
-                            .map(|bi| bi.name.as_str())
-                            .unwrap_or("<anonymous class>");
-                        self.visit_class_body(class, &qualify(local));
-                    }
-                    _ => self.visit_export_default(decl),
-                }
+                self.visit_namespace_export_default(decl, prefix)
             }
             Statement::TSModuleDeclaration(inner) => {
                 self.visit_ts_module_declaration_prefixed(inner, prefix, out, nesting);
             }
             other => self.visit_statement(other, out, nesting),
+        }
+    }
+
+    /// Shared namespace-member `VariableDeclaration` handling for both
+    /// [`Self::visit_namespace_statement`] (bare statement) and
+    /// [`Self::visit_namespace_declaration`] (reached through `export
+    /// …`). Mirrors `visit_variable_declaration_in_body`: route
+    /// function-valued initializers to their recorders with the
+    /// `prefix`-qualified name, and thread `out`/`nesting` for every
+    /// other initializer so a namespace nested in a function body
+    /// charges its initializer decision points to that function (the
+    /// contract this module documents).
+    fn visit_namespace_var_decl(
+        &mut self,
+        vd: &oxc::ast::ast::VariableDeclaration<'_>,
+        prefix: Option<&str>,
+        out: &mut Contributors,
+        nesting: Option<u32>,
+    ) {
+        for declarator in &vd.declarations {
+            let name = binding_name(&declarator.id).map(|n| qualify(prefix, &n));
+            let Some(init) = &declarator.init else {
+                continue;
+            };
+            match init {
+                Expression::ArrowFunctionExpression(arrow) => self.record_arrow(arrow, name),
+                Expression::FunctionExpression(func) => self.record_function(func, name),
+                Expression::ClassExpression(class) => self.visit_class(class, name),
+                other => self.visit_expression(other, out, nesting),
+            }
+        }
+    }
+
+    /// Shared namespace-member `export default …` handling. `export
+    /// default function f` / `export default class C` inside a
+    /// namespace must carry the prefix like every other namespace
+    /// member; a default-exported *expression* has no declaration name
+    /// to qualify, so it keeps the ordinary expression handling.
+    fn visit_namespace_export_default(
+        &mut self,
+        decl: &oxc::ast::ast::ExportDefaultDeclaration<'_>,
+        prefix: Option<&str>,
+    ) {
+        use oxc::ast::ast::ExportDefaultDeclarationKind as K;
+        match &decl.declaration {
+            K::FunctionDeclaration(func) => {
+                let local = func.id.as_ref().map(|id| id.name.as_str());
+                self.record_function(func, local.map(|n| qualify(prefix, n)));
+            }
+            K::ClassDeclaration(class) => {
+                let local = class
+                    .id
+                    .as_ref()
+                    .map(|bi| bi.name.as_str())
+                    .unwrap_or("<anonymous class>");
+                self.visit_class_body(class, &qualify(prefix, local));
+            }
+            _ => self.visit_export_default(decl),
         }
     }
 
@@ -1373,14 +1388,10 @@ impl<'src> FunctionFinder<'src> {
         out: &mut Contributors,
         nesting: Option<u32>,
     ) {
-        let qualify = |name: &str| match prefix {
-            Some(p) => format!("{p}.{name}"),
-            None => name.to_string(),
-        };
         match decl {
             Declaration::FunctionDeclaration(func) => {
                 let local = func.id.as_ref().map(|id| id.name.as_str());
-                self.record_function(func, local.map(&qualify));
+                self.record_function(func, local.map(|n| qualify(prefix, n)));
             }
             Declaration::ClassDeclaration(class) => {
                 let local = class
@@ -1388,23 +1399,10 @@ impl<'src> FunctionFinder<'src> {
                     .as_ref()
                     .map(|bi| bi.name.as_str())
                     .unwrap_or("<anonymous class>");
-                self.visit_class_body(class, &qualify(local));
+                self.visit_class_body(class, &qualify(prefix, local));
             }
             Declaration::VariableDeclaration(vd) => {
-                for declarator in &vd.declarations {
-                    let name = binding_name(&declarator.id).map(|n| qualify(&n));
-                    let Some(init) = &declarator.init else {
-                        continue;
-                    };
-                    match init {
-                        Expression::ArrowFunctionExpression(arrow) => {
-                            self.record_arrow(arrow, name)
-                        }
-                        Expression::FunctionExpression(func) => self.record_function(func, name),
-                        Expression::ClassExpression(class) => self.visit_class(class, name),
-                        other => self.visit_expression(other, out, nesting),
-                    }
-                }
+                self.visit_namespace_var_decl(vd, prefix, out, nesting)
             }
             // TS type / interface / enum declarations have no
             // executable bodies (same as `visit_top_level_declaration`).
@@ -1433,6 +1431,16 @@ impl Contributors {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
+
+/// Compose a namespace-qualified member name: `prefix.name` when a
+/// prefix is in scope, else the bare `name`. Replaces the per-call
+/// `qualify` closure so the namespace dispatch helpers can share it.
+fn qualify(prefix: Option<&str>, name: &str) -> String {
+    match prefix {
+        Some(p) => format!("{p}.{name}"),
+        None => name.to_string(),
+    }
+}
 
 fn contributor(
     kind: ContributorKind,

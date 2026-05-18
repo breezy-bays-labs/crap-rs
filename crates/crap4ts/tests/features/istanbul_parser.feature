@@ -3,17 +3,9 @@ Feature: Istanbul JSON coverage parsing
   I want crap4ts to consume my coverage-final.json out of the box
   So that I don't have to translate or pre-process my coverage output
 
-  Background:
-    # Istanbul JSON is the schema emitted by jest, vitest, and nyc.
-    # Per Resolved Q10 (shaping), crap4ts@2.0.0 tolerates all three emitters;
-    # unknown emitters surface a ParseDiagnostic rather than aborting.
-    # The CoveragePort signature is `parse(&self, data: &str)` (slurp at
-    # orchestrator boundary, parse via serde_json::from_str). A separate
-    # `validate(&Path)` pre-flight checks structural sanity before parse.
-
   @unwired
   Scenario: A jest-emitted coverage-final.json parses cleanly
-    # tracked: crap-rs#173 — W1.1 jest fixture baseline; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a jest-emitted Istanbul `coverage-final.json` covering 3 source files
     And the report's source root resolves all 3 file paths to discovered sources
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -22,7 +14,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: A vitest-emitted coverage-final.json parses with the same shape
-    # tracked: crap-rs#173 — W2.4 vitest variance fixture; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a vitest-emitted Istanbul `coverage-final.json` covering 3 source files
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report attributes line coverage to all 3 files
@@ -30,7 +22,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: An nyc-emitted coverage-final.json parses with the same shape
-    # tracked: crap-rs#173 — W2.4 nyc variance fixture; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given an nyc-emitted Istanbul `coverage-final.json` covering 3 source files
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report attributes line coverage to all 3 files
@@ -38,7 +30,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: A coverage entry whose path cannot resolve to a source file emits PathUnresolved
-    # tracked: crap-rs#173 — W2.4 path-mismatch contract per CPO #3; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given an Istanbul `coverage-final.json` with one entry pointing at `/private/build/transpiled/foo.js`
     And no source file resolves to that path under `--src src`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -49,7 +41,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: A JSON file that is not Istanbul-shaped emits SchemaUnrecognized
-    # tracked: crap-rs#173 — W2.4 schema-unrecognized contract per CPO sharpening; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a `coverage.json` whose top-level shape is `{ "foo": "bar" }` (not Istanbul)
     When the operator runs `crap4ts --coverage coverage.json --src src`
     Then `crap4ts` exits with a non-zero status
@@ -59,7 +51,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: A branch-record references an unknown branchId — emits BranchMismatch
-    # tracked: crap-rs#173 — W2.3 + W2.4 branch coverage mismatch UX; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a `coverage-final.json` whose `b` record references branchId `42`
     And `branchMap` contains no entry for branchId `42`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -69,7 +61,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: validate() pre-flight catches an empty coverage file before parse
-    # tracked: crap-rs#173 — W1.1 validate() impl per port trait docstring; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a `coverage-final.json` that decodes as Istanbul JSON but every entry's `statementMap` is empty
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then `crap4ts` exits with a non-zero status before reaching the parse pass
@@ -78,7 +70,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: A coverage entry with extra unknown fields is ignored permissively
-    # tracked: crap-rs#173 — W1.1 unknown-field tolerance for jest/vitest/nyc metadata; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a jest-emitted `coverage-final.json` with `hash` and `contentHash` fields
     And no other deviation from the expected schema
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -87,7 +79,7 @@ Feature: Istanbul JSON coverage parsing
 
   @unwired
   Scenario: Relative paths in the coverage report are resolved against --src
-    # tracked: crap-rs#173 — W2.4 relative-path normalization; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given an Istanbul `coverage-final.json` whose entries use relative paths like `src/foo.ts`
     And the operator invokes `crap4ts --coverage coverage-final.json --src /home/me/project/src`
     When the parser normalizes the entry paths

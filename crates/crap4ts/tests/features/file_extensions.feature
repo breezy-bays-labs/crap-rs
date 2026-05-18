@@ -3,14 +3,9 @@ Feature: TypeScript file extension discovery and parsing
   I want crap4ts to discover and parse my .ts, .tsx, .jsx, .mjs, and .cjs files
   So that I don't have to pre-filter the file list or write a custom discovery script
 
-  Background:
-    # crap4ts's AdapterMeta.extensions = ["ts", "tsx", "js", "jsx", "mjs", "cjs"].
-    # The walker dispatches to oxc with the correct SourceType per extension
-    # (W2.2). All five extensions discover + parse without runtime panic.
-
   @unwired
   Scenario Outline: Files with supported extensions are discovered and parsed
-    # tracked: crap-rs#173 — W2.2 extension dispatch matrix; per CQO each row specifies dialect-appropriate content; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a source tree under `src/` containing a single file `example<extension>` with contents `<content>`
     And a valid Istanbul `coverage-final.json` covering that file
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -28,7 +23,7 @@ Feature: TypeScript file extension discovery and parsing
 
   @unwired
   Scenario: A .d.ts file is skipped by default (declaration-only, no executable code)
-    # tracked: crap-rs#173 — W2.2 declaration-only exclusion; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a source tree under `src/` containing `types.d.ts` and `app.ts`
     And the operator's `crap4ts.toml` does NOT explicitly include `.d.ts`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -37,7 +32,7 @@ Feature: TypeScript file extension discovery and parsing
 
   @unwired
   Scenario: A .test.ts file is included unless excluded via crap4ts.toml
-    # tracked: crap-rs#173 — W2.2 test-file inclusion default; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a source tree under `src/` containing `app.ts` and `app.test.ts`
     And the operator's `crap4ts.toml` has no exclusion for `.test.ts`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -45,7 +40,7 @@ Feature: TypeScript file extension discovery and parsing
 
   @unwired
   Scenario: A .test.ts file is excluded when crap4ts.toml lists it in excludes
-    # tracked: crap-rs#173 — W2.2 explicit exclude works for test files; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a source tree under `src/` containing `app.ts` and `app.test.ts`
     And the operator's `crap4ts.toml` has `excludes = ["**/*.test.ts"]`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
@@ -54,7 +49,7 @@ Feature: TypeScript file extension discovery and parsing
 
   @unwired
   Scenario: An unrecognized extension is silently skipped
-    # tracked: crap-rs#173 — W2.2 unknown-extension behavior; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a source tree under `src/` containing `app.ts` and `notes.txt`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report includes functions from `app.ts`
@@ -63,7 +58,7 @@ Feature: TypeScript file extension discovery and parsing
 
   @unwired
   Scenario: A parser failure on one file does not abort the run for others
-    # tracked: crap-rs#173 — W1.2 parse-failure pattern mirrors crap4rs syn walker; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     # Note: verified via crap-core/src/core/mod.rs:286-310 — orchestrator catches per-file
     # ComplexityPort::extract errors and increments AnalysisDiagnostics.files_unparseable
     # before continuing. crap4ts inherits this behavior automatically.

@@ -3,16 +3,9 @@ Feature: Istanbul branch coverage flows through to the scorecard
   I want crap4ts to surface per-function branch coverage alongside line coverage
   So that I can identify functions whose branches are tested but whose statements are not (or vice versa)
 
-  Background:
-    # Per CAO advisory A-3, branch coverage uses the EXISTING
-    # ParseOutput.branches: Option<HashMap<String, Vec<BranchCoverage>>> slot
-    # already defined in crap-core::ports::ParseOutput. No new parallel seam.
-    # W2.3 lands this: extend IstanbulCoverage::parse to consume `b` records
-    # alongside `s` records.
-
   @unwired
   Scenario: A coverage-final.json with branch records populates ParseOutput.branches
-    # tracked: crap-rs#173 — W2.3 branch coverage extension; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given an Istanbul `coverage-final.json` whose entries include `b` and `branchMap` records
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report includes a branch-coverage column for every covered function
@@ -21,7 +14,7 @@ Feature: Istanbul branch coverage flows through to the scorecard
 
   @unwired
   Scenario: A coverage-final.json with NO branch records leaves ParseOutput.branches as None
-    # tracked: crap-rs#173 — W2.3 default branches=None when adapter doesn't emit; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given an Istanbul `coverage-final.json` whose entries have empty `b` and empty `branchMap`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the scorecard renders with no branch-coverage column
@@ -29,7 +22,7 @@ Feature: Istanbul branch coverage flows through to the scorecard
 
   @unwired
   Scenario: A function's branch coverage joins its line coverage in the report
-    # tracked: crap-rs#173 — W2.3 per-function branch coverage join; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript function with cyclomatic complexity 3 (one if/else, one ternary)
     And a coverage-final.json showing 4 of 6 branches hit (66% branch coverage)
     And the same function shows 100% line coverage in the `s` record
@@ -40,7 +33,7 @@ Feature: Istanbul branch coverage flows through to the scorecard
 
   @unwired
   Scenario: A b record references a branchId not in branchMap emits BranchMismatch
-    # tracked: crap-rs#173 — W2.3 mismatch surfaces as diagnostic, not silent drop; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given an Istanbul `coverage-final.json` whose `b` references branchId `42` and `branchMap` omits `42`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the parser emits an `IstanbulParseDiagnostic` with kind `branch-mismatch`

@@ -340,16 +340,7 @@ impl IstanbulCoverage {
         for (_key, entry) in raw {
             // ── Path normalization ──────────────────────────────────
             let Some(normalized) = self.normalize_path(&entry.path) else {
-                diagnostics.push(IstanbulParseDiagnostic {
-                    file_path: entry.path.clone(),
-                    kind: IstanbulDiagnosticKind::PathUnresolved,
-                    message: format!(
-                        "path '{}' does not resolve to a discovered source file under {}",
-                        entry.path,
-                        self.effective_src.display()
-                    ),
-                    line: None,
-                });
+                diagnostics.push(self.path_unresolved_diagnostic(&entry.path));
                 continue;
             };
 
@@ -357,85 +348,13 @@ impl IstanbulCoverage {
             // or `statementMap` populated but `s` empty. Both cases
             // indicate a partial / corrupt emitter record; emit and
             // skip per breadboard W-3.
-            if entry.s.is_empty() != entry.statement_map.is_empty() {
-                let (present, missing) = if entry.s.is_empty() {
-                    ("statementMap", "s")
-                } else {
-                    ("s", "statementMap")
-                };
-                diagnostics.push(IstanbulParseDiagnostic {
-                    file_path: entry.path.clone(),
-                    kind: IstanbulDiagnosticKind::MissingField,
-                    message: format!(
-                        "entry for '{}' has `{}` records but `{}` is empty; one half of the statement-coverage pair is missing",
-                        entry.path, present, missing
-                    ),
-                    line: None,
-                });
+            if let Some(diag) = Self::missing_field_diagnostic(&entry) {
+                diagnostics.push(diag);
                 continue;
             }
 
-            // ── Line coverage (W1.1) ────────────────────────────────
-            // Build per-line records by joining `s` (counts) to
-            // `statementMap` (line spans). Statements whose IDs do not
-            // appear in `statementMap` are skipped; statements that
-            // span multiple lines emit one `LineCoverage` per line in
-            // the span keyed by `start.line` (Istanbul records hits at
-            // the start-of-statement granularity, per its emitter).
-            let mut lines: Vec<LineCoverage> = Vec::with_capacity(entry.s.len());
-            for (stmt_id, hits) in &entry.s {
-                if let Some(loc) = entry.statement_map.get(stmt_id) {
-                    lines.push(LineCoverage {
-                        line: loc.start.line as usize,
-                        hits: *hits,
-                    });
-                }
-            }
-            // Sort by line for deterministic downstream consumption
-            // (mirrors LCOV parser ordering).
-            lines.sort_by_key(|lc| lc.line);
-
-            // ── Branch coverage (W2.3) ──────────────────────────────
-            // For each branchId in `b`, look up its `branchMap` entry.
-            // Missing branchMap entries emit `BranchMismatch` and
-            // skip THAT branch only (rest of the file still parses).
-            // Per the consumer contract at
-            // `crap-core::domain::matching::compute_branch_coverage`,
-            // each `BranchCoverage` row represents ONE branch arm —
-            // total = N records, covered = records with taken > 0.
-            // So we fan one Istanbul branchId with K arms into K
-            // separate `BranchCoverage` rows at the branching site's
-            // line, each carrying that arm's `taken` count. (Summing
-            // arm hits into a single record would collapse partial
-            // coverage into 100% — see PR body's plan-of-record
-            // deviation note for the worked example.)
-            let mut branches: Vec<BranchCoverage> = Vec::new();
-            for (branch_id, arms) in &entry.b {
-                let Some(loc) = entry.branch_map.get(branch_id) else {
-                    diagnostics.push(IstanbulParseDiagnostic {
-                        file_path: entry.path.clone(),
-                        kind: IstanbulDiagnosticKind::BranchMismatch,
-                        message: format!(
-                            "branch coverage record for branchId `{branch_id}` references no entry in branchMap. This is likely a bug in your coverage tool — report at the coverage tool's issue tracker."
-                        ),
-                        line: None,
-                    });
-                    continue;
-                };
-                // Prefer the emitter-set `line` when present (some
-                // emitters set it to the branching keyword's line
-                // independent of `loc`); fall back to
-                // `loc.start.line`.
-                let line = loc.line.unwrap_or(loc.loc.start.line) as usize;
-                for hits in arms {
-                    branches.push(BranchCoverage {
-                        line,
-                        taken: Some(*hits),
-                    });
-                }
-            }
-            // Deterministic ordering for downstream consumers.
-            branches.sort_by_key(|b| b.line);
+            let lines = Self::line_coverage_for(&entry);
+            let branches = Self::branch_coverage_for(&entry, &mut diagnostics);
 
             let key = normalized.to_string_lossy().into_owned();
             coverage.insert(key.clone(), lines);
@@ -456,6 +375,109 @@ impl IstanbulCoverage {
             branches,
             diagnostics,
         }
+    }
+
+    /// `PathUnresolved` diagnostic for an entry whose `path` does not
+    /// resolve to a discovered source file under `effective_src`.
+    fn path_unresolved_diagnostic(&self, path: &str) -> IstanbulParseDiagnostic {
+        IstanbulParseDiagnostic {
+            file_path: path.to_string(),
+            kind: IstanbulDiagnosticKind::PathUnresolved,
+            message: format!(
+                "path '{}' does not resolve to a discovered source file under {}",
+                path,
+                self.effective_src.display()
+            ),
+            line: None,
+        }
+    }
+
+    /// `MissingField` diagnostic when exactly one half of the
+    /// statement-coverage pair (`s` / `statementMap`) is empty — a
+    /// partial / corrupt emitter record. `None` when both are present
+    /// or both are absent (a legitimately empty entry).
+    fn missing_field_diagnostic(entry: &IstanbulCoverageFile) -> Option<IstanbulParseDiagnostic> {
+        if entry.s.is_empty() == entry.statement_map.is_empty() {
+            return None;
+        }
+        let (present, missing) = if entry.s.is_empty() {
+            ("statementMap", "s")
+        } else {
+            ("s", "statementMap")
+        };
+        Some(IstanbulParseDiagnostic {
+            file_path: entry.path.clone(),
+            kind: IstanbulDiagnosticKind::MissingField,
+            message: format!(
+                "entry for '{}' has `{}` records but `{}` is empty; one half of the statement-coverage pair is missing",
+                entry.path, present, missing
+            ),
+            line: None,
+        })
+    }
+
+    /// Per-line coverage records (W1.1) for one entry: join `s`
+    /// (counts) to `statementMap` (line spans). Statements whose IDs do
+    /// not appear in `statementMap` are skipped; hits are keyed at the
+    /// start-of-statement line (Istanbul's emitter granularity). Sorted
+    /// by line for deterministic downstream consumption (mirrors the
+    /// LCOV parser's ordering).
+    fn line_coverage_for(entry: &IstanbulCoverageFile) -> Vec<LineCoverage> {
+        let mut lines: Vec<LineCoverage> = Vec::with_capacity(entry.s.len());
+        for (stmt_id, hits) in &entry.s {
+            if let Some(loc) = entry.statement_map.get(stmt_id) {
+                lines.push(LineCoverage {
+                    line: loc.start.line as usize,
+                    hits: *hits,
+                });
+            }
+        }
+        lines.sort_by_key(|lc| lc.line);
+        lines
+    }
+
+    /// Per-branch coverage records (W2.3) for one entry. Each branchId
+    /// in `b` is looked up in `branchMap`; a missing entry emits
+    /// `BranchMismatch` into `diagnostics` and skips THAT branch only
+    /// (the rest of the file still parses). Per the consumer contract
+    /// at `crap-core::domain::matching::compute_branch_coverage`, each
+    /// `BranchCoverage` row represents ONE branch arm — total = N
+    /// records, covered = records with taken > 0. So one Istanbul
+    /// branchId with K arms fans into K separate rows at the branching
+    /// site's line, each carrying that arm's `taken` count. (Summing
+    /// arm hits into a single record would collapse partial coverage
+    /// into 100% — see PR body's plan-of-record deviation note.)
+    /// Sorted by line for deterministic downstream consumers.
+    fn branch_coverage_for(
+        entry: &IstanbulCoverageFile,
+        diagnostics: &mut Vec<IstanbulParseDiagnostic>,
+    ) -> Vec<BranchCoverage> {
+        let mut branches: Vec<BranchCoverage> = Vec::new();
+        for (branch_id, arms) in &entry.b {
+            let Some(loc) = entry.branch_map.get(branch_id) else {
+                diagnostics.push(IstanbulParseDiagnostic {
+                    file_path: entry.path.clone(),
+                    kind: IstanbulDiagnosticKind::BranchMismatch,
+                    message: format!(
+                        "branch coverage record for branchId `{branch_id}` references no entry in branchMap. This is likely a bug in your coverage tool — report at the coverage tool's issue tracker."
+                    ),
+                    line: None,
+                });
+                continue;
+            };
+            // Prefer the emitter-set `line` when present (some emitters
+            // set it to the branching keyword's line independent of
+            // `loc`); fall back to `loc.start.line`.
+            let line = loc.line.unwrap_or(loc.loc.start.line) as usize;
+            for hits in arms {
+                branches.push(BranchCoverage {
+                    line,
+                    taken: Some(*hits),
+                });
+            }
+        }
+        branches.sort_by_key(|b| b.line);
+        branches
     }
 
     /// Try the one-level unwrap arm: `{"<single-key>": <flat-map>}`.

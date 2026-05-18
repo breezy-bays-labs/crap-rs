@@ -3,22 +3,9 @@ Feature: Arrow-function coverage accuracy
   I want crap4ts to count my arrow-function executions correctly
   So that my CRAP scores reflect what's actually exercised by my test suite
 
-  Background:
-    # Promoted from breadboard reflection note #5 to a W1.1 AC per CPO Concern 2.
-    # Istanbul records coverage in two parallel tables: `s` (statement counts +
-    # statementMap) and `f` (function counts + fnMap). Line-coverage-from-statements
-    # may undercount arrow-function invocations because the function-invocation
-    # site is in `f`/`fnMap`, not necessarily `s`/`statementMap`. Modern TS
-    # codebases are arrow-function-heavy (useCallback, hooks, Svelte stores).
-    # If this scenario fails on the W1.1 minimal parser, W2.3 grows to populate
-    # coverage from f/fnMap rather than just s/statementMap.
-    # CQO BDD audit: all 4 scenarios use concrete docstring fixtures + explicit
-    # expected percentages — assertions must distinguish 100% covered from 10%
-    # covered (the exact undercount failure mode this feature canary catches).
-
   @unwired
   Scenario: An invoked arrow function has matching coverage
-    # tracked: crap-rs#173 — W1.1 arrow-function fixture sanity; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript source file `src/arrow.ts` containing:
       """
       export const square = (x: number) => x * x;
@@ -32,7 +19,7 @@ Feature: Arrow-function coverage accuracy
 
   @unwired
   Scenario: A useCallback-style arrow has matching coverage
-    # tracked: crap-rs#173 — W1.1 React-idiom arrow-heavy fixture; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript source file `src/Button.tsx` containing:
       """
       import { useCallback } from 'react';
@@ -48,7 +35,7 @@ Feature: Arrow-function coverage accuracy
 
   @unwired
   Scenario: An array.map(arrow) covers the inner arrow
-    # tracked: crap-rs#173 — W1.1 functional-pattern arrow coverage; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript source file `src/map.ts` containing:
       """
       export function increment(xs: number[]): number[] {
@@ -62,7 +49,7 @@ Feature: Arrow-function coverage accuracy
 
   @unwired
   Scenario: Mixed function-expression / arrow / declared-function bodies in one file
-    # tracked: crap-rs#173 — W1.1 mixed-syntax fixture sanity; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript source file `src/mixed.ts` containing:
       """
       export function declared() { return 1; }

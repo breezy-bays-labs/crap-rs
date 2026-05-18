@@ -80,5 +80,28 @@ assert_cmd = { workspace = true }
 # Regression files in `proptest-regressions/` are committed to git.
 proptest = { workspace = true }
 
+# W3.3 (crap-rs#191): cucumber-rs harnesses execute the crap4ts Gherkin
+# specs as integration tests. `libtest` feature emits libtest-compatible
+# JSON so nextest's `--list` probe degrades gracefully; the harnesses
+# are still excluded from nextest via `.config/nextest.toml`'s
+# `binary(/.*_cucumber$/)` filter and run under `cargo test --test`.
+# The feature is crate-local (not lifted to workspace scope) — only
+# crap4rs and crap4ts run cucumber harnesses.
+cucumber = { workspace = true, features = ["libtest"] }
+tokio = { workspace = true }
+
 [build-dependencies]
 napi-build = { workspace = true }
+
+# ── Cucumber-rs test targets (crap-rs#191) ──
+# `harness = false` is mandatory for cucumber-rs (it prints its own
+# output instead of going through libtest). Names MUST end in
+# `_cucumber` so `.config/nextest.toml` excludes them from nextest
+# probing — the suffix is load-bearing, not cosmetic.
+[[test]]
+name = "cyclomatic_walker_cucumber"
+harness = false
+
+[[test]]
+name = "metric_unsupported_cucumber"
+harness = false
