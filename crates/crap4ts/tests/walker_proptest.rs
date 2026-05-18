@@ -91,6 +91,30 @@ enum Stmt {
     /// the enclosing function (invariant 4 — isolation); the nested
     /// function is its own complexity site.
     NestedFn(Box<Body>),
+    /// A `class _CN { _mN() { <inner> } }` declared **inside a function
+    /// body** (reached via `visit_statement`'s `Statement::Class
+    /// Declaration` arm, not the top-level path). The method
+    /// `_CN._mN` is its own complexity site holding `<inner>`; the
+    /// class adds ZERO decision points to the enclosing function (same
+    /// isolation as `NestedFn`). One discovered function site (the
+    /// method) plus whatever `<inner>` introduces.
+    ClassDecl(Box<Body>),
+    /// A labeled block `_lblN: { <inner> }`. The label is transparent:
+    /// `<inner>`'s decision points charge the *enclosing* function at
+    /// the *same* nesting depth (a labeled block, like a bare block,
+    /// does not bump nesting), and any nested function in `<inner>` is
+    /// its own site. Exercises `visit_statement`'s `LabeledStatement`
+    /// arm (`visit_statement(&l.body, …)`).
+    Labeled(Box<Body>),
+    /// `throw (() => { <inner> })();`. The IIFE arrow is a SEPARATE
+    /// complexity site holding `<inner>` (so `<inner>`'s decision points
+    /// charge the arrow, not the enclosing function — charges ZERO,
+    /// same isolation as `NestedFn`). Exercises `visit_statement`'s
+    /// `ThrowStatement` arm (`visit_expression(&th.argument, …)`).
+    /// Statements generated after a `throw` are unreachable but still
+    /// parse and are still walked — the oracle sums all statements, so
+    /// it stays consistent with the walker regardless of reachability.
+    Throw(Box<Body>),
     /// An IIFE arrow `(() => { <inner> })()` embedded inside a chosen
     /// expression context (`await`, array element, template-literal
     /// substitution, sequence, unary, `as`/`satisfies`/`!`,
@@ -177,8 +201,18 @@ impl Stmt {
             // `ExprWrap`'s decision points live inside its IIFE arrow
             // (a separate site), so it charges ZERO to the enclosing
             // function — same isolation as `NestedFn`.
-            Stmt::Noop | Stmt::NestedFn(_) | Stmt::ExprWrap(..) => 0,
-            Stmt::TryFinally(b) => b.increments(),
+            // `ClassDecl`'s decision points live in its method body (a
+            // separate site); `Throw`'s live in its IIFE arrow (a
+            // separate site) — both charge ZERO to the enclosing
+            // function, same isolation as `NestedFn`.
+            Stmt::Noop
+            | Stmt::NestedFn(_)
+            | Stmt::ExprWrap(..)
+            | Stmt::ClassDecl(_)
+            | Stmt::Throw(_) => 0,
+            // `Labeled` is transparent — its body charges the enclosing
+            // function exactly as if the label weren't there.
+            Stmt::TryFinally(b) | Stmt::Labeled(b) => b.increments(),
             // One decision point + whatever the inner body charges.
             Stmt::If(b)
             | Stmt::For(b)
@@ -286,6 +320,23 @@ impl Stmt {
                 b.emit(out, ctr, indent + 1);
                 out.push_str(&format!("{pad}}}\n"));
             }
+            Stmt::ClassDecl(b) => {
+                out.push_str(&format!("{pad}class _C{id} {{\n"));
+                out.push_str(&format!("{pad}  _m{id}(): void {{\n"));
+                b.emit(out, ctr, indent + 2);
+                out.push_str(&format!("{pad}  }}\n"));
+                out.push_str(&format!("{pad}}}\n"));
+            }
+            Stmt::Labeled(b) => {
+                out.push_str(&format!("{pad}_lbl{id}: {{\n"));
+                b.emit(out, ctr, indent + 1);
+                out.push_str(&format!("{pad}}}\n"));
+            }
+            Stmt::Throw(b) => {
+                out.push_str(&format!("{pad}throw (() => {{\n"));
+                b.emit(out, ctr, indent + 1);
+                out.push_str(&format!("{pad}}})();\n"));
+            }
             Stmt::ExprWrap(kind, b) => {
                 // Two nested function sites:
                 //   outer async IIFE  — makes `await` always legal
@@ -329,8 +380,15 @@ impl Stmt {
             | Stmt::DoWhile(b)
             | Stmt::Switch(b)
             | Stmt::TryCatch(b)
-            | Stmt::TryFinally(b) => b.nested_fn_count(),
+            | Stmt::TryFinally(b)
+            // `Labeled` is transparent: it introduces no site of its
+            // own; only its body's nested functions count.
+            | Stmt::Labeled(b) => b.nested_fn_count(),
             Stmt::NestedFn(b) => 1 + b.nested_fn_count(),
+            // `ClassDecl` introduces ONE site (the method `_C._m`);
+            // `Throw` introduces ONE site (the thrown IIFE arrow). Each
+            // body may itself introduce more.
+            Stmt::ClassDecl(b) | Stmt::Throw(b) => 1 + b.nested_fn_count(),
             // The wrapper introduces TWO IIFE sites (outer async +
             // inner); the inner's body may itself introduce more.
             Stmt::ExprWrap(_, b) => 2 + b.nested_fn_count(),
@@ -368,7 +426,15 @@ impl Stmt {
             // `ExprWrap`'s decision points live in its separate IIFE
             // arrow, so it contributes NOTHING to the enclosing
             // function's nesting multiset (same as `NestedFn`).
-            Stmt::Noop | Stmt::NestedFn(_) | Stmt::ExprWrap(..) => {}
+            // `ClassDecl`/`Throw` decision points live in their
+            // separate site (method body / thrown IIFE arrow), so they
+            // contribute NOTHING to the enclosing function's nesting
+            // multiset (same as `NestedFn`/`ExprWrap`).
+            Stmt::Noop
+            | Stmt::NestedFn(_)
+            | Stmt::ExprWrap(..)
+            | Stmt::ClassDecl(_)
+            | Stmt::Throw(_) => {}
             Stmt::If(b)
             | Stmt::For(b)
             | Stmt::ForIn(b)
@@ -384,8 +450,11 @@ impl Stmt {
                 // try-block body is NOT depth-bumped by visit_try.
                 b.collect_nestings(depth, out);
             }
-            Stmt::TryFinally(b) => {
-                // No contributor; body recurses at same depth.
+            // No contributor; body recurses at the SAME depth.
+            // `TryFinally`: `visit_try` does not bump the try-block.
+            // `Labeled`: a labeled block, like a bare block, does not
+            // bump nesting (the label is transparent).
+            Stmt::TryFinally(b) | Stmt::Labeled(b) => {
                 b.collect_nestings(depth, out);
             }
             Stmt::LogicalAnd
@@ -481,6 +550,9 @@ fn stmt_strategy() -> impl Strategy<Value = Stmt> {
             body.clone().prop_map(|b| Stmt::TryCatch(Box::new(b))),
             body.clone().prop_map(|b| Stmt::TryFinally(Box::new(b))),
             body.clone().prop_map(|b| Stmt::NestedFn(Box::new(b))),
+            body.clone().prop_map(|b| Stmt::ClassDecl(Box::new(b))),
+            body.clone().prop_map(|b| Stmt::Labeled(Box::new(b))),
+            body.clone().prop_map(|b| Stmt::Throw(Box::new(b))),
             (wrapkind_strategy(), body).prop_map(|(k, b)| Stmt::ExprWrap(k, Box::new(b))),
         ]
     })
@@ -515,6 +587,12 @@ enum Container {
     /// `function top() { return <div>{c && <span/>}</div>; <body> }`
     /// in a `.tsx` file — JSX-conditional decision point.
     JsxConditional,
+    /// `export default (function top() { <body> })();` at module scope
+    /// — exercises the `visit_export_default` expression-flavoured arm
+    /// (the default export is a call whose callee is the named function
+    /// expression `top` holding the body). Forced to a `.ts` extension
+    /// so the module-only `export default` always parses.
+    ExportDefaultExpr,
 }
 
 fn container_strategy() -> impl Strategy<Value = Container> {
@@ -527,6 +605,7 @@ fn container_strategy() -> impl Strategy<Value = Container> {
         Just(Container::Namespace),
         Just(Container::ComputedObjectKey),
         Just(Container::JsxConditional),
+        Just(Container::ExportDefaultExpr),
     ]
 }
 
@@ -578,6 +657,11 @@ impl Program {
             // JSX-conditional container; everything else honours the
             // generated extension.
             Container::JsxConditional => "tsx",
+            // `export default` is module-only — `.cjs` rejects it.
+            // Pin `.ts` (always a module SourceType in oxc) so the
+            // construct always parses and reliably exercises
+            // `visit_export_default`.
+            Container::ExportDefaultExpr => "ts",
             _ => self.ext,
         };
         format!("prop{}.{ext}", if self.unicode { "_uni" } else { "" })
@@ -649,6 +733,19 @@ impl Program {
                 self.body.emit(&mut out, &mut ctr, 1);
                 out.push_str("  return <div>{(_cond as any) && <span />}</div>;\n");
                 out.push_str("}\n");
+            }
+            Container::ExportDefaultExpr => {
+                // The default export is a CALL whose callee is the
+                // named function expression `top` holding the body —
+                // routed through `visit_export_default`'s
+                // expression-flavoured arm
+                // (`export_default_as_expression` → `visit_expression`).
+                // Deleting `visit_export_default` (or its expression
+                // arm) drops `top` from the discovered set, which the
+                // independent-oracle / isolation invariants catch.
+                out.push_str("export default (function top(): void {\n");
+                self.body.emit(&mut out, &mut ctr, 1);
+                out.push_str("})();\n");
             }
         }
         out
@@ -751,9 +848,14 @@ proptest! {
         // depends on the container shape.
         let holder_name: &str = match prog.container {
             Container::FunctionDecl
-            | Container::Namespace
-            | Container::JsxConditional => "top",
+            | Container::JsxConditional
+            // `export default (function top() {…})()` — the body holder
+            // is the named function expression `top`.
+            | Container::ExportDefaultExpr => "top",
             Container::ArrowConst => "top",
+            // `namespace N { export function top }` qualifies the body
+            // holder as `N.top` (mirrors class `C.m`).
+            Container::Namespace => "N.top",
             Container::ClassMethod
             | Container::ClassComputedKey => "C.m",
             Container::StaticBlock => "C.<static-init>",
@@ -812,8 +914,10 @@ proptest! {
 
         let holder_name: &str = match prog.container {
             Container::FunctionDecl
-            | Container::Namespace
-            | Container::ArrowConst => "top",
+            | Container::ArrowConst
+            | Container::ExportDefaultExpr => "top",
+            // `namespace N { export function top }` → `N.top`.
+            Container::Namespace => "N.top",
             Container::ClassMethod | Container::ClassComputedKey => "C.m",
             Container::StaticBlock => "C.<static-init>",
             Container::ComputedObjectKey | Container::JsxConditional => unreachable!(),

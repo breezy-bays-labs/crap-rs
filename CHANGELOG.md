@@ -61,6 +61,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no current producer triggered this; the change removes a latent
   whole-file-bail vector and locks the four producers as regression
   fixtures. (#214)
+- crap4ts now reports functions declared inside a TypeScript
+  `namespace` with a namespace-qualified name — `Foo.bar`, `A.B.f`
+  (dotted and block-nested forms both qualify), `Svc.Repo.find` for a
+  class method inside a namespace — instead of the bare local name.
+  This mirrors the existing class-method qualification (`C.m`) and
+  changes the `function` field in the JSON envelope and the
+  table/markdown reporters for any namespaced function. Qualification
+  is shallow: only direct namespace members carry the prefix;
+  functions nested inside them stay bare (`inner`, not `A.inner`),
+  matching how class-nested functions already behave. Forward-looking:
+  no first-party fixture corpus emits namespaced output today (the
+  wire-snapshot corpus has no `namespace`), so no captured snapshot
+  drifts; the change disambiguates namespace output and makes it
+  consistent with class output ahead of crap4ts@2.0.0. (#221)
 
 ### Changed (crap-core public API)
 
