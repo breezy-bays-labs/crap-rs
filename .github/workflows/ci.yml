@@ -127,6 +127,8 @@ jobs:
     name: Self-referential CRAP check
     runs-on: ubuntu-latest
     needs: [coverage, clippy, test]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
