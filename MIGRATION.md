@@ -1,7 +1,110 @@
 # Migration Guide
 
-Per-release migration notes for `crap4rs` consumers. Read the section
-that matches how you consume the tool.
+Per-release migration notes for `crap4rs`, `crap4ts`, and `crap-core`
+consumers. Read the section that matches how you consume the tool.
+
+---
+
+## crap4ts@1.x → crap4ts@2.0.0 (npm)
+
+The 2.x line is a from-scratch reimplementation of crap4ts on top of
+[`crap-rs`](https://github.com/breezy-bays-labs/crap-rs)'s Rust core,
+distributed as a [napi-rs](https://napi.rs/) Node addon. The CRAP
+formula, scorecard envelope, and reporter shapes are now shared
+verbatim with the Rust adapter `crap4rs` via the language-agnostic
+`crap-core` library.
+
+`2.0.0-rc.1` is the first published version of the 2.x line. There is
+a 48–72 h soak window before `2.0.0` is cut.
+
+### Install
+
+```sh
+npm install --save-dev crap4ts@2.0.0-rc.1
+# or pnpm add -D crap4ts@2.0.0-rc.1
+```
+
+Published platforms in `2.0.0-rc.1`:
+- macOS arm64 + x64
+- Linux x64 (glibc)
+
+Windows and Linux arm64 / musl are tracked for a later release.
+
+### Why are my scores different?
+
+`crap4ts@2.x` scores can diverge from `crap4ts@1.x` scores on the same
+codebase. Three compounding reasons account for the gap; each is
+documented so you can self-diagnose rather than chase a phantom
+regression:
+
+1. **The default threshold changed from `12` to `16`** (cyclomatic). This
+   is an intentional calibration introduced with `crap-rs` v0.5.0 —
+   `8 / 16 / 30` for `strict / default / lenient` on the cyclomatic
+   metric. v1.x's `12` was an undocumented intermediate. If you depend
+   on the v1.x default, pin it explicitly: `analyze({ threshold: 12, ... })`.
+2. **TS-specific threshold calibration has not been independently
+   validated.** The current cutoffs derive from the Rust corpus
+   (`crap4rs` history). A `type:research` follow-up validates them
+   against the `crap4ts@1.x` test corpus; until that completes, treat
+   the gate as a guideline rather than a ground truth. Track at
+   [`crap-rs`#173](https://github.com/breezy-bays-labs/crap-rs/issues/173).
+3. **Arrow-function coverage may count differently.** v1 derived
+   function-level coverage from Istanbul's `f` / `fnMap` arms (per-
+   function invocation counts). v2 reads `s` / `statementMap` only —
+   line-level statement coverage. The two paths agree for the common
+   case where every function's body contains at least one statement
+   counted in `s`, but they can diverge for arrow-heavy code that hits
+   statements without invoking the surrounding function, or vice
+   versa. If a single function's CRAP looks surprisingly different
+   between v1 and v2, eyeball its coverage and file an issue with the
+   fixture; the deliberate trade-off in `crap4ts@2.x` is that
+   modelling `f` / `fnMap` would re-introduce a whole-file bail
+   vector that the v2 parser explicitly avoids.
+
+### Subpath export removals
+
+`crap4ts@1.x` exposed four module entries; `crap4ts@2.x` ships a
+single `analyze()` export from the package root. Replacement recipes:
+
+| v1.x import | v2.x replacement |
+|---|---|
+| `import { computeCrap } from 'crap4ts/formula'` | Call `analyze()` and read `summary.crap_scores` fields from the returned JSON. |
+| `import { extractComplexity } from 'crap4ts/complexity'` | Not externally exposed in 2.x. The walker is internal; if you need raw complexity data, run the `crap4ts` CLI with `--format json` and parse the per-function entries. |
+| `import { parseLcov } from 'crap4ts/coverage'` | Not externally exposed in 2.x. crap4ts 2.x parses Istanbul JSON only; use the `crap4rs` Rust binary if you need LCOV. |
+
+The 1.x subpath consumer count is functionally zero (per the npm
+registry — v1.0.1 has no measurable install base), so the surface
+narrowing is a net simplification rather than a breaking change for
+real workloads.
+
+### Usage
+
+```js
+const { analyze } = require('crap4ts');
+
+const json = analyze({
+  sourceRoot: 'src',
+  coveragePath: 'coverage/coverage-final.json',
+  // Optional:
+  // threshold: 16,
+  // metric: 'cyclomatic',
+});
+
+const { result, diagnostics } = JSON.parse(json);
+console.log(result.summary);
+```
+
+Generate `coverage-final.json` via your test runner with Istanbul
+coverage enabled (`jest --coverage`, `vitest --coverage`,
+`c8 --reporter=json`, etc.).
+
+### Rollback
+
+If `2.0.0-rc.1` reveals a blocking regression, pin to `crap4ts@1.0.1`
+(the last 1.x release) until a corrective `2.0.0-rc.2` ships. The
+`npm unpublish` window is 72 h from publish; if the issue surfaces
+earlier, the broken RC can be pulled from the registry rather than
+held alongside the fix.
 
 ---
 

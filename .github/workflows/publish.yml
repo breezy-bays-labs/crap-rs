@@ -1,0 +1,158 @@
+name: publish crap4ts
+
+# Triggered by tags matching `crap4ts-v*` (e.g. `crap4ts-v2.0.0-rc.1`,
+# `crap4ts-v2.0.0`). Builds the napi-rs cdylib on three platforms,
+# bundles all three native binaries into the `crap4ts` npm package, and
+# publishes to npm using OIDC trusted publishing (--provenance).
+#
+# Single-package distribution: every platform's `.node` ships in the
+# same tarball; runtime dispatch lives in `packages/crap4ts/index.js`.
+# A move to scoped per-platform sub-packages with `optionalDependencies`
+# is on the table for GA if download size warrants it.
+
+on:
+  push:
+    tags:
+      - 'crap4ts-v*'
+
+# `id-token: write` lets the publish job mint an OIDC token that npm
+# verifies against its trusted-publisher config (set up out-of-band on
+# npmjs.com). Per-job permissions stay scoped; the build matrix only
+# needs `contents: read`.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build cdylib (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64-gnu
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: libcrap4ts.so
+            node_name: crap4ts.linux-x64-gnu.node
+          - platform: darwin-arm64
+            runner: macos-14
+            target: aarch64-apple-darwin
+            artifact: libcrap4ts.dylib
+            node_name: crap4ts.darwin-arm64.node
+          - platform: darwin-x64
+            runner: macos-13
+            target: x86_64-apple-darwin
+            artifact: libcrap4ts.dylib
+            node_name: crap4ts.darwin-x64.node
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: publish-${{ matrix.platform }}
+
+      - name: Build cdylib
+        env:
+          CARGO_TARGET: ${{ matrix.target }}
+        run: |
+          cargo build \
+            --package crap4ts \
+            --release \
+            --lib \
+            --features napi-binding \
+            --target "$CARGO_TARGET"
+
+      - name: Rename cdylib to napi .node filename
+        env:
+          CARGO_TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
+          NODE_NAME: ${{ matrix.node_name }}
+        run: |
+          cp "target/$CARGO_TARGET/release/$ARTIFACT" \
+             "packages/crap4ts/$NODE_NAME"
+          ls -la "packages/crap4ts/$NODE_NAME"
+
+      - name: Smoke-test cdylib loads in Node
+        env:
+          NODE_NAME: ${{ matrix.node_name }}
+        run: |
+          node --input-type=commonjs -e '
+            const name = process.env.NODE_NAME;
+            const lib = require("./packages/crap4ts/" + name);
+            if (typeof lib.analyze !== "function") {
+              throw new Error("cdylib loaded but analyze export missing");
+            }
+            console.log("OK: analyze export present");
+          '
+
+      - name: Upload cdylib artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdylib-${{ matrix.platform }}
+          path: packages/crap4ts/${{ matrix.node_name }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify tag matches package.json + Cargo.toml versions
+        # Belt-and-braces tag<->version check. The
+        # `release_tag_merge_commit` convention requires verifying this
+        # on the merge commit BEFORE pushing the tag; this CI gate
+        # catches the rare case where someone pushed a tag onto a
+        # commit that doesn't match.
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          TAG_VERSION="${REF_NAME#crap4ts-v}"
+          PKG_VERSION=$(node -p "require('./packages/crap4ts/package.json').version")
+          CARGO_VERSION=$(grep -m1 '^version' crates/crap4ts/Cargo.toml | sed -E 's/version *= *"(.*)"/\1/')
+          echo "tag:    ${TAG_VERSION}"
+          echo "npm:    ${PKG_VERSION}"
+          echo "cargo:  ${CARGO_VERSION}"
+          if [ "${TAG_VERSION}" != "${PKG_VERSION}" ] || [ "${TAG_VERSION}" != "${CARGO_VERSION}" ]; then
+            echo "::error::version mismatch between tag, package.json, and Cargo.toml"
+            exit 1
+          fi
+
+      - name: Download all cdylib artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cdylib-*
+          path: packages/crap4ts/
+          merge-multiple: true
+
+      - name: Confirm all platforms present in tarball
+        run: |
+          cd packages/crap4ts
+          ls -la *.node
+          for plat in crap4ts.linux-x64-gnu.node crap4ts.darwin-arm64.node crap4ts.darwin-x64.node; do
+            test -f "$plat" || { echo "::error::missing $plat"; exit 1; }
+          done
+
+      - name: Publish to npm with provenance (OIDC)
+        run: npm publish --provenance --access public
+        working-directory: packages/crap4ts

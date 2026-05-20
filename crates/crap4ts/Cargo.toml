@@ -1,12 +1,12 @@
 [package]
 name = "crap4ts"
-version = "2.0.0-alpha.1"
+version = "2.0.0-rc.1"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "TypeScript adapter for crap-rs (CRAP score analyzer) — ALPHA: oxc walker not yet shipped"
+description = "TypeScript adapter for crap-rs — Rust-powered CRAP score analyzer combining oxc AST complexity with Istanbul JSON coverage"
 keywords = ["crap", "complexity", "coverage", "typescript", "quality"]
 categories = ["development-tools::testing", "command-line-utilities"]
 
