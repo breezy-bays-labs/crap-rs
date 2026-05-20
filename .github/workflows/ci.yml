@@ -127,6 +127,8 @@ jobs:
     name: Self-referential CRAP check
     runs-on: ubuntu-latest
     needs: [coverage, clippy, test]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -155,6 +157,15 @@ jobs:
         run: ./target/release/crap4rs --coverage lcov.info --src crates/crap-core/src --strict --color always
       - name: Self-CRAP — crap4rs
         run: ./target/release/crap4rs --coverage lcov.info --src crates/crap4rs/src --strict --color always
+      # crap4ts/src is Rust — analyzed by the crap4rs binary, NOT crap4ts
+      # (which needs Istanbul JSON; there is no TS in crates/crap4ts/src).
+      # --strict (same as the two legs above) lowers the CRAP-score gate
+      # to 15 — i.e. every function must score CRAP <= 15. This is the
+      # CRAP-score cutoff, orthogonal to the cognitive-complexity metric
+      # default. Reuses the single ./target/release/crap4rs built once
+      # above (rust-cache warm) — no per-leg recompile.
+      - name: Self-CRAP — crap4ts (Rust source)
+        run: ./target/release/crap4rs --coverage lcov.info --src crates/crap4ts/src --strict --color always
 
   self-crap-view:
     name: domain/view.rs per-function CC <= 15

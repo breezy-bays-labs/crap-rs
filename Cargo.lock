@@ -413,6 +413,7 @@ version = "2.0.0-alpha.1"
 dependencies = [
  "assert_cmd",
  "crap-core",
+ "cucumber",
  "napi",
  "napi-build",
  "napi-derive",
@@ -421,6 +422,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]

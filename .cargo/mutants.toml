@@ -82,30 +82,57 @@ copy_target = true
 # mutants above this floor.
 minimum_test_timeout = 90
 
-# Pre-existing walker mutation gaps — surfaced when the per-merge
-# `crap4ts walker` mutants gate was revived.
+# Walker mutation gaps — long-latent, surfaced when the per-merge
+# `crap4ts walker` mutants gate was revived; partially re-anchored
+# when W3.3 refactored walker/mod.rs.
 #
-# This gate had been silently dead for several merges: a scoped
+# The gate had been silently dead for several merges: a scoped
 # `cargo mutants --package crap4ts` cannot build the `crap4rs` bin,
 # so an adapter-bin-shelling test panicked in the UNMUTATED baseline
 # and cargo-mutants aborted before testing a single mutant (exit 4,
 # zero mutants). The `--skip crap4rs_no_flag_default_cognitive_still_works`
-# entry in `additional_cargo_test_args` above fixes that abort, so
-# the gate now actually runs.
+# entry in `additional_cargo_test_args` above fixes that abort. W3.3
+# then introduced the first cucumber `harness = false` binaries into
+# the `crap4ts` crate; their strict clap CLI rejected the `--skip`
+# libtest args this config injects into every package test binary —
+# re-triggering the same UNMUTATED-baseline abort (the crap-rs#224
+# gate-zeroing class). That is fixed at the harness, not here, via
+# `with_default_cli()` in `cyclomatic_walker_cucumber.rs` /
+# `metric_unsupported_cucumber.rs` (which skip argv parsing). So the
+# gate genuinely runs again.
 #
-# Reviving it exposed 21 long-latent surviving mutants in walker code
-# that the change reviving the gate never touched — verified against
-# the origin/main baseline, where the identical 21 survive too, so
-# they are not a regression. Left un-excluded, the revived gate would
-# be permanently RED on every merge to main, which would in turn mask
-# any genuinely NEW walker regression behind the standing noise.
+# W3.3 also decomposed `IstanbulCoverage::build_parse_output` and
+# `FunctionFinder::visit_namespace_statement` to clear the new
+# crap4ts-self-CRAP CI leg (CRAP <= 15). The `qualify` free fn added
+# in the helper section shifts everything from `byte_to_line_col`
+# onward by +8 lines; the namespace-helper extraction is also below
+# the walker decision-point functions. So the `visit_if` /
+# `visit_for_init` / `visit_expression` / `visit_chain_element`
+# regions are UNSHIFTED (those anchors are preserved verbatim from
+# the revived-gate block); only the `byte_to_line_col` /
+# `property_key_name` / `for_init_as_expression` anchors moved +8 and
+# are re-anchored below. The revived-gate block was 21 hard gaps + 1
+# proptest-flaky `ImportExpression`; this block is 22 hard (+ the
+# long-standing `888:13 TSNonNullExpression` omission, see below) + 2
+# proptest-flaky (+ `884:13 TSSatisfiesExpression`, see below) = 24.
+# The earlier "refactor killed it down to 10" reading was a
+# stale-anchor artifact (run-1's old anchors still matched the
+# unshifted regions and kept suppressing them, so only the +8-shifted
+# gaps surfaced); the set did not shrink.
 #
-# So: exclude these 21 hard line-anchored gaps (plus one further
-# proptest-flaky arm parked separately in its own sub-block below — see
-# the paragraph preceding `exclude_re`) to keep the revived gate
-# green-and-meaningful (it can still catch NEW survivors). Closing
-# them — adding real mutation-killing coverage for these functions —
-# is the remaining acceptance work of the issue that revived the gate.
+# Two entries are NEW to this block, both in `visit_expression` and
+# both pre-existing since #182 (b77be7e, the original minimal
+# walker) — long-standing omissions from the revived-gate block, not
+# regressions and not #219 additions:
+#   * `888:13 TSNonNullExpression` — a HARD gap (MISSED in every
+#     verification pass); included with the other hard arms.
+#   * `884:13 TSSatisfiesExpression` — a SECOND proptest-flaky arm
+#     (CAUGHT under two seeds, MISSED under a third), same class as
+#     `880:13 ImportExpression`; grouped with it in the seed-flaky
+#     sub-block. The per-merge CI gate runs `--in-place` single-worker
+#     with a per-run proptest seed, so an un-excluded flaky arm makes
+#     the gate intermittently RED — both flaky arms must be pinned.
+# Closing either is crap-rs#224 work like every other entry.
 #
 # Each pattern is anchored on the exact `mod.rs:LINE:COL:` of one
 # known-surviving mutant so it pins precisely that mutant and nothing
@@ -115,32 +142,18 @@ minimum_test_timeout = 90
 # visibility, which is the behaviour #224 wants (it forces re-triage
 # rather than silently masking).
 #
-# One further entry sits in a SEPARATE category: the
-# `Expression::ImportExpression` arm is killed on origin/main only by
-# the randomized `walker_proptest.rs` suite, so whether it is CAUGHT or
-# MISSED depends on the proptest seed of a given run — flaky across
-# mutants passes rather than a hard untested gap. Its sibling array-path
-# arms (ArrayExpression / visit_array_elements / array_element_as_expression)
-# were pinned deterministically in this PR with a single
-# `array-literal-nested-fn.ts` fixture; an equivalent deterministic pin
-# for the dynamic-`import()` recursion path is owed but is not 5-minute
-# trivial (reaching a nested function through an `import()` argument is
-# contrived), so it is parked here under the same #224 ownership rather
-# than blocking this PR. It is grouped below its own sub-comment so the
-# distinction (proptest-dependent, deterministic pin owed) is not lost.
-#
 # tracked: crap-rs#224 — delete each line below as the matching
 # function gains a mutation-killing test; the issue stays open until
 # all entries are killed and this block is empty.
 exclude_re = [
-    # FunctionFinder::visit_if
+    # FunctionFinder::visit_if (unshifted)
     "mod\\.rs:682:17: delete match arm Statement::IfStatement\\(_\\) in",
     "mod\\.rs:683:71: replace \\+ with \\* in",
-    # FunctionFinder::visit_for_init
+    # FunctionFinder::visit_for_init (unshifted)
     "mod\\.rs:719:9: replace FunctionFinder<'src>::visit_for_init with \\(\\)",
-    # FunctionFinder::visit_chain_element
+    # FunctionFinder::visit_chain_element (unshifted)
     "mod\\.rs:1050:9: replace FunctionFinder<'src>::visit_chain_element with \\(\\)",
-    # FunctionFinder::visit_expression — untested match arms
+    # FunctionFinder::visit_expression — untested match arms (unshifted)
     "mod\\.rs:773:13: delete match arm Expression::ClassExpression\\(class\\) in",
     "mod\\.rs:787:13: delete match arm Expression::JSXFragment\\(frag\\) in",
     "mod\\.rs:834:21: delete match arm AT::PrivateFieldExpression\\(m\\) in",
@@ -149,18 +162,28 @@ exclude_re = [
     "mod\\.rs:887:13: delete match arm Expression::TSTypeAssertion\\(ts\\) in",
     "mod\\.rs:891:13: delete match arm Expression::TSInstantiationExpression\\(ts\\) in",
     "mod\\.rs:905:13: delete match arm Expression::PrivateFieldExpression\\(m\\) in",
-    # byte_to_line_col — arithmetic / comparison operators
-    "mod\\.rs:1478:27: replace == with != in",
-    "mod\\.rs:1479:20: replace \\+ with - in",
-    "mod\\.rs:1479:20: replace \\+ with \\* in",
-    "mod\\.rs:1481:25: replace - with \\+ in",
-    "mod\\.rs:1481:46: replace \\+ with \\* in",
-    # property_key_name — match arms
-    "mod\\.rs:1520:9: delete match arm PropertyKey::PrivateIdentifier\\(id\\) in",
-    "mod\\.rs:1521:9: delete match arm PropertyKey::StringLiteral\\(s\\) in",
-    "mod\\.rs:1522:9: delete match arm PropertyKey::NumericLiteral\\(n\\) in",
-    # for_init_as_expression
-    "mod\\.rs:1559:5: replace for_init_as_expression -> Option<&'b Expression<'b>> with None",
-    # proptest-dependent kill, deterministic pin owed (see paragraph above)
+    # FunctionFinder::visit_expression — long-standing omission, new to
+    # this block (arm exists since #182; seed luck masked it before).
+    "mod\\.rs:888:13: delete match arm Expression::TSNonNullExpression\\(ts\\) in",
+    # byte_to_line_col — arithmetic / comparison operators (+8 shift)
+    "mod\\.rs:1486:27: replace == with != in",
+    "mod\\.rs:1487:20: replace \\+ with - in",
+    "mod\\.rs:1487:20: replace \\+ with \\* in",
+    "mod\\.rs:1489:25: replace - with \\+ in",
+    "mod\\.rs:1489:46: replace \\+ with \\* in",
+    # property_key_name — match arms (+8 shift)
+    "mod\\.rs:1528:9: delete match arm PropertyKey::PrivateIdentifier\\(id\\) in",
+    "mod\\.rs:1529:9: delete match arm PropertyKey::StringLiteral\\(s\\) in",
+    "mod\\.rs:1530:9: delete match arm PropertyKey::NumericLiteral\\(n\\) in",
+    # for_init_as_expression (+8 shift)
+    "mod\\.rs:1567:5: replace for_init_as_expression -> Option<&'b Expression<'b>> with None",
+    # visit_expression — proptest-dependent kills (seed-flaky across
+    # mutants passes: each is CAUGHT under some walker_proptest.rs
+    # seeds, MISSED under others — observed flipping across three
+    # verification passes). Deterministic pins owed; parked under the
+    # same #224 ownership. Both unshifted (lines 880/884 in pre- and
+    # post-refactor trees). Pinned so the per-merge CI gate
+    # (`--in-place`, per-run seed) is not intermittently RED.
     "mod\\.rs:880:13: delete match arm Expression::ImportExpression\\(ie\\) in",
+    "mod\\.rs:884:13: delete match arm Expression::TSSatisfiesExpression\\(ts\\) in",
 ]

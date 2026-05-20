@@ -3,20 +3,9 @@ Feature: crap4ts@2 parity with crap4ts@1.x reference outputs
   I want CRAP scores that diverge only by documented, intentional reasons
   So that score regressions in CI surface real issues, not adapter swaps
 
-  Background:
-    # crap4ts@1.x source (~/Github/crap4ts/) is the primary TS test corpus
-    # AND the cross-validation oracle. W3.1 snapshots the v1.x source as
-    # `crates/crap4ts/tests/fixtures/crap4ts-v1/` and captures v1.x's own
-    # CRAP outputs as `crap4ts-v1-reference.json` via one-shot `pnpm run crap`.
-    # W3.2 cross-validates new crap4ts against the captured reference.
-    #
-    # Per CPO sharpening, the parity harness reports per-function CONTRIBUTOR
-    # BREAKDOWNS in its diff output, not just per-function score diffs —
-    # so divergence triage is one line, not manual grep + read per disagreement.
-
   @unwired
   Scenario: crap4ts@2 cyclomatic scores match crap4ts@1.x within tolerance
-    # tracked: crap-rs#173 — W3.2 score parity harness; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given the snapshotted crap4ts@1.x source corpus at `tests/fixtures/crap4ts-v1/`
     And the captured v1.x reference outputs at `tests/fixtures/crap4ts-v1-reference.json`
     When the parity harness runs `crap4ts --src tests/fixtures/crap4ts-v1/src --coverage <v1-coverage>` and compares
@@ -26,7 +15,7 @@ Feature: crap4ts@2 parity with crap4ts@1.x reference outputs
 
   @unwired
   Scenario: Divergence output shows per-function contributor breakdown, not just score diff
-    # tracked: crap-rs#173 — W3.2 diff is actionable (CPO sharpening); harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a function whose v1.x reference has cyclomatic 4 (contributors: 2× if-branch, 1× ternary)
     And whose v2 output has cyclomatic 3 (contributors: 2× if-branch only — ternary missed)
     When the parity harness reports the divergence
@@ -37,7 +26,7 @@ Feature: crap4ts@2 parity with crap4ts@1.x reference outputs
 
   @unwired
   Scenario: Risk classification labels match across versions (D8 invariance check)
-    # tracked: crap-rs#173 — W3.2 D8 risk-cutoffs metric-invariant cross-version check; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given the v1.x corpus + reference outputs
     When the parity harness compares risk labels function-by-function
     Then every function's risk classification matches v1.x to v2 exactly
@@ -45,7 +34,7 @@ Feature: crap4ts@2 parity with crap4ts@1.x reference outputs
 
   @unwired
   Scenario: Threshold-default difference is documented, not a parity failure
-    # tracked: crap-rs#173 — W3.2 threshold default 12→16 is intentional break, not a regression; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     # Three documented compounding reasons (per MIGRATION.md): threshold 12→16
     # calibration, Rust-derived calibration awaiting TS validation, possible
     # arrow-function undercount. The parity harness must distinguish these
@@ -58,7 +47,7 @@ Feature: crap4ts@2 parity with crap4ts@1.x reference outputs
 
   @unwired
   Scenario: A discovered score divergence triggers a tracked follow-up
-    # tracked: crap-rs#173 — W3.2 divergence response policy; harness lands in W3.3
+    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given the parity harness has identified a function with score divergence > ε
     When the divergence is NOT explained by threshold-default-change or arrow-function-undercount
     Then the harness output recommends filing a follow-up issue under epic #173
