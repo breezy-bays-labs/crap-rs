@@ -5,29 +5,19 @@
 //! against Node-provided `napi_*` symbols, so this module is excluded
 //! from the default build.
 //!
-//! A single `analyze()` export is the npm surface. Node consumers call
-//! it programmatically and parse the returned JSON themselves; the
-//! binding stays thin instead of re-shaping `AnalysisOutput` into napi
-//! object types.
+//! Thin shim — the orchestration logic lives in [`crate::analyze_to_json`]
+//! so it stays feature-independent and gets exercised by Rust
+//! integration tests + the LCOV coverage gate. This module only
+//! handles unpacking `AnalyzeOptions` and mapping `String` errors to
+//! `napi::Error`.
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use napi_derive::napi;
-use serde::Serialize;
 
-use crap_core::core::{AnalyzeOptions as CoreAnalyzeOptions, analyze as core_analyze};
-use crap_core::domain::threshold::{ThresholdConfig, ThresholdPreset};
-use crap_core::domain::types::{AnalysisDiagnostics, AnalysisResult, ComplexityMetric};
-use crap_core::ports::ParseDiagnostic;
+use crap_core::domain::types::ComplexityMetric;
 
-use crate::adapters::coverage::IstanbulCoverage;
-use crate::adapters::walker::OxcWalker;
-use crate::parse_diagnostic::IstanbulParseDiagnostic;
-
-/// File extensions the walker discovers. Mirrors
-/// `crates/crap4ts/src/main.rs`'s `EXTENSIONS` constant so the napi
-/// surface sees the same source set the CLI does.
-const EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx", "mjs", "cjs"];
+use crate::analyze_to_json;
 
 /// Inputs to [`analyze`]. JSON-side these map onto the same fields a
 /// `crap4ts` CLI invocation would set via `--src`, `--coverage`,
@@ -49,19 +39,6 @@ pub struct AnalyzeOptions {
     pub metric: Option<String>,
 }
 
-/// Wire shape for the JSON returned by [`analyze`]. Mirrors
-/// `crap_core::core::AnalysisOutput<P>`'s `{ result, diagnostics }`
-/// shape verbatim so Node consumers read the same fields a Rust
-/// embedder would. `#[serde(bound = "")]` suppresses serde's
-/// auto-generated bounds — `P: ParseDiagnostic` already requires
-/// `Serialize + DeserializeOwned`.
-#[derive(Serialize)]
-#[serde(bound = "")]
-struct AnalyzeWireOutput<'a, P: ParseDiagnostic> {
-    result: &'a AnalysisResult,
-    diagnostics: &'a AnalysisDiagnostics<P>,
-}
-
 fn parse_metric(s: &str) -> Result<ComplexityMetric, String> {
     match s {
         "cyclomatic" => Ok(ComplexityMetric::Cyclomatic),
@@ -78,53 +55,20 @@ fn parse_metric(s: &str) -> Result<ComplexityMetric, String> {
 ///
 /// Construction mirrors `crap4ts/src/main.rs`'s binary path: the same
 /// `OxcWalker` + `IstanbulCoverage` ports flow through
-/// `crap_core::core::analyze::<IstanbulParseDiagnostic>`. The JSON
-/// shape is `{ result: AnalysisResult, diagnostics: AnalysisDiagnostics }`.
+/// `crap_core::core::analyze::<IstanbulParseDiagnostic>` via the
+/// crate-internal [`crate::analyze_to_json`] helper. The JSON shape
+/// is `{ result: AnalysisResult, diagnostics: AnalysisDiagnostics }`.
 #[napi]
 pub fn analyze(opts: AnalyzeOptions) -> napi::Result<String> {
-    // Canonicalize matches `crap_core::core::AnalysisContext::new`'s
-    // own pre-canonicalization of `options.src`. The factory closure
-    // in `crap4ts::main` receives an already-canonical src from
-    // `cli::run`; the napi entry has no such pre-step, so without
-    // this alignment a relative or symlink'd `source_root` would
-    // produce coverage records keyed off the un-canonical path while
-    // the analyzer walked the canonical one — every record would
-    // fail `strip_prefix` and surface as a PathUnresolved diagnostic.
-    let src = PathBuf::from(&opts.source_root);
-    let src = src.canonicalize().unwrap_or(src);
-    let coverage = PathBuf::from(&opts.coverage_path);
-
     let metric = match opts.metric.as_deref() {
         Some(m) => parse_metric(m).map_err(napi::Error::from_reason)?,
         None => ComplexityMetric::Cyclomatic,
     };
-
-    let global_threshold = opts
-        .threshold
-        .unwrap_or_else(|| ThresholdPreset::Default.threshold(metric));
-
-    let analyze_options = CoreAnalyzeOptions {
-        src: src.clone(),
-        coverage,
-        threshold_config: ThresholdConfig {
-            global: global_threshold,
-            overrides: Vec::new(),
-        },
+    analyze_to_json(
+        Path::new(&opts.source_root),
+        Path::new(&opts.coverage_path),
+        opts.threshold,
         metric,
-        extensions: EXTENSIONS.iter().map(|&s| s.to_string()).collect(),
-        ..CoreAnalyzeOptions::default()
-    };
-
-    let walker = OxcWalker::new();
-    let coverage_adapter = IstanbulCoverage::new(src);
-
-    let output =
-        core_analyze::<IstanbulParseDiagnostic>(&analyze_options, &walker, &coverage_adapter)
-            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-
-    let wire = AnalyzeWireOutput {
-        result: &output.result,
-        diagnostics: &output.diagnostics,
-    };
-    serde_json::to_string(&wire).map_err(|e| napi::Error::from_reason(e.to_string()))
+    )
+    .map_err(napi::Error::from_reason)
 }
