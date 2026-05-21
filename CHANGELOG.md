@@ -10,6 +10,19 @@ versioning cadences: `crap-core`, `crap4rs` (Rust adapter + crate),
 and `crap4ts` (TypeScript adapter + npm package). Release sections
 are tagged with the published artifact + version they cut.
 
+## [crap4ts 2.0.0-rc.2] - 2026-05-21
+
+Corrective re-release of the `crap4ts` 2.x release candidate.
+`2.0.0-rc.1` declared `"libc": ["glibc"]` in `package.json`; npm
+evaluates `libc` on every platform, so the field blocked installation
+on macOS (`EBADPLATFORM` — macOS has no glibc). `2.0.0-rc.1` is
+deprecated on npm; the 48–72 h soak window restarts on this release.
+
+### Fixed (crap4ts on npm)
+- Removed the `"libc"` constraint from the npm package so the
+  single-package multi-OS tarball installs on macOS as well as
+  Linux/glibc. ([#242](https://github.com/breezy-bays-labs/crap-rs/issues/242))
+
 ## [crap4ts 2.0.0-rc.1] - 2026-05-19
 
 First release candidate of the from-scratch `crap4ts` 2.x line —
