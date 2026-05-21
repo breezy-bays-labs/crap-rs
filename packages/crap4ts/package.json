@@ -16,6 +16,9 @@
     "x64",
     "arm64"
   ],
+  "libc": [
+    "glibc"
+  ],
   "keywords": [
     "crap",
     "complexity",

@@ -35,10 +35,20 @@ pub mod parse_diagnostic;
 #[cfg(feature = "napi-binding")]
 pub mod napi;
 
-/// File extensions the walker discovers. Mirrors
-/// `crates/crap4ts/src/main.rs`'s `EXTENSIONS` constant so library
-/// callers see the same source set the CLI does.
-const EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx", "mjs", "cjs"];
+/// File extensions the walker discovers. The single source of truth
+/// for the crap4ts source set — the CLI binary (`src/main.rs`) and the
+/// library entry point [`analyze_to_json`] both reference this constant
+/// so a CLI run and a programmatic run analyze identical file sets.
+pub const EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx", "mjs", "cjs"];
+
+/// Glob patterns excluded from analysis by default — vendored
+/// dependencies (`node_modules`) and build / coverage output. The
+/// single source of truth: the CLI advertises these as the
+/// commented-out excludes its `init` subcommand writes, and the
+/// library entry point [`analyze_to_json`] applies them directly so a
+/// programmatic caller pointed at a project root does not walk into
+/// `node_modules` (which, for the CLI, the config-merge step filters).
+pub const DEFAULT_EXCLUDES: &[&str] = &["node_modules/**", "dist/**", "coverage/**"];
 
 /// Wire shape for the JSON returned by [`analyze_to_json`]. Mirrors
 /// `crap_core::core::AnalysisOutput<P>`'s `{ result, diagnostics }`
@@ -56,8 +66,8 @@ struct AnalyzeWireOutput<'a, P: ParseDiagnostic> {
 /// with Istanbul-format coverage. Returns the analysis output
 /// (functions + summary + diagnostics) as a JSON-encoded `String`.
 ///
-/// This is the feature-independent orchestration entry point — both
-/// the binary's library reuse and the napi cdylib shim funnel through
+/// This is the feature-independent orchestration entry point — the napi
+/// cdylib shim and the crate's integration tests both funnel through
 /// here. The function pre-canonicalizes `source_root` to match
 /// `crap_core::core::AnalysisContext::new`'s own canonicalization, so
 /// relative or symlink'd source paths do not surface as
@@ -65,6 +75,15 @@ struct AnalyzeWireOutput<'a, P: ParseDiagnostic> {
 ///
 /// `threshold` defaults to the metric-correct preset
 /// (`ThresholdPreset::Default`) when `None`.
+///
+/// [`DEFAULT_EXCLUDES`] is applied so a caller pointed at a project
+/// root does not walk into `node_modules`, `dist`, or `coverage`.
+///
+/// Inputs are validated up front: `source_root` must resolve to an
+/// existing directory, and `threshold` — when set — must be a finite
+/// non-negative number. Either failure returns a descriptive `Err`
+/// rather than walking an empty tree or scoring against a `NaN`
+/// threshold.
 ///
 /// Errors are returned as `String` so the napi shim can hand them
 /// directly to `napi::Error::from_reason`; library consumers wanting
@@ -76,6 +95,21 @@ pub fn analyze_to_json(
     threshold: Option<f64>,
     metric: ComplexityMetric,
 ) -> Result<String, String> {
+    if let Some(t) = threshold
+        && (!t.is_finite() || t < 0.0)
+    {
+        return Err(format!(
+            "crap4ts: invalid threshold {t}: expected a finite number >= 0"
+        ));
+    }
+
+    if !source_root.is_dir() {
+        return Err(format!(
+            "crap4ts: source_root '{}' does not exist or is not a directory",
+            source_root.display()
+        ));
+    }
+
     let src = source_root.to_path_buf();
     let src = src.canonicalize().unwrap_or(src);
     let coverage = coverage_path.to_path_buf();
@@ -91,6 +125,7 @@ pub fn analyze_to_json(
         },
         metric,
         extensions: EXTENSIONS.iter().map(|&s| s.to_string()).collect(),
+        exclude: DEFAULT_EXCLUDES.iter().map(|&s| s.to_string()).collect(),
         ..AnalyzeOptions::default()
     };
 

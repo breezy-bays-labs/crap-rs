@@ -94,13 +94,8 @@ fn analyze_to_json_explicit_threshold_overrides_default() {
     // metric-correct preset (cyclomatic: 16) would too on this
     // fixture, but pinning an explicit override exercises the
     // threshold-propagation path.
-    let json = analyze_to_json(
-        &root,
-        &coverage,
-        Some(1000.0),
-        ComplexityMetric::Cyclomatic,
-    )
-    .expect("analyze_to_json succeeds with explicit threshold");
+    let json = analyze_to_json(&root, &coverage, Some(1000.0), ComplexityMetric::Cyclomatic)
+        .expect("analyze_to_json succeeds with explicit threshold");
 
     let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
     let passed = parsed["result"]["passed"]
@@ -127,5 +122,62 @@ fn analyze_to_json_cognitive_metric_surfaces_not_supported_error() {
     assert!(
         err.to_lowercase().contains("cognitive"),
         "expected error message to mention `cognitive`, got: {err}"
+    );
+}
+
+#[test]
+fn analyze_to_json_negative_threshold_is_rejected() {
+    let (_tmp, root) = build_jest_fixture();
+    let coverage = root.join("coverage-final.json");
+
+    // A negative threshold is nonsensical for a CRAP score (always
+    // >= 1.0) — validate up front rather than silently flagging every
+    // function.
+    let err = analyze_to_json(&root, &coverage, Some(-1.0), ComplexityMetric::Cyclomatic)
+        .expect_err("negative threshold should be rejected");
+
+    assert!(
+        err.contains("threshold"),
+        "expected error message to mention `threshold`, got: {err}"
+    );
+}
+
+#[test]
+fn analyze_to_json_nan_threshold_is_rejected() {
+    let (_tmp, root) = build_jest_fixture();
+    let coverage = root.join("coverage-final.json");
+
+    // `NaN` can reach this entry point from a JS caller; comparisons
+    // against it are always false, so without an explicit check it
+    // would yield non-deterministic pass/fail classification.
+    let err = analyze_to_json(
+        &root,
+        &coverage,
+        Some(f64::NAN),
+        ComplexityMetric::Cyclomatic,
+    )
+    .expect_err("NaN threshold should be rejected");
+
+    assert!(
+        err.contains("threshold"),
+        "expected error message to mention `threshold`, got: {err}"
+    );
+}
+
+#[test]
+fn analyze_to_json_missing_source_root_is_rejected() {
+    let (_tmp, root) = build_jest_fixture();
+    let coverage = root.join("coverage-final.json");
+    let missing = root.join("does-not-exist");
+
+    // A `source_root` that does not resolve to a directory fails fast
+    // instead of walking an empty tree and returning a zero-function
+    // result the caller would have to diagnose themselves.
+    let err = analyze_to_json(&missing, &coverage, None, ComplexityMetric::Cyclomatic)
+        .expect_err("missing source_root should be rejected");
+
+    assert!(
+        err.contains("source_root"),
+        "expected error message to mention `source_root`, got: {err}"
     );
 }

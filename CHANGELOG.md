@@ -22,10 +22,14 @@ before promoting to `crap4ts 2.0.0` GA.**
 This release cuts only the `crap4ts` npm package — `crap-core` and
 `crap4rs` are not tagged to crates.io as part of this release. But
 because the published cdylib is built from workspace `HEAD`, every
-workspace-level change queued under [Unreleased] (including the #214
-Istanbul parser narrowing and #221 namespace-qualified naming that
-directly affect crap4ts behavior, plus #218 threshold metric
-calibration and #73 init subcommand) IS shipped inside this cdylib.
+workspace-level change queued under [Unreleased] IS shipped inside
+this cdylib, including:
+
+- #214 — Istanbul parser narrowing
+- #221 — namespace-qualified naming
+- #218 — threshold metric calibration
+- #73 — `init` subcommand
+
 The [Unreleased] section will move to a dedicated release section
 when `crap-core` / `crap4rs` next cut a crates.io release.
 

@@ -40,7 +40,7 @@ jobs:
             artifact: libcrap4ts.dylib
             node_name: crap4ts.darwin-arm64.node
           - platform: darwin-x64
-            runner: macos-13
+            runner: macos-15-intel
             target: x86_64-apple-darwin
             artifact: libcrap4ts.dylib
             node_name: crap4ts.darwin-x64.node
@@ -48,7 +48,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      # `persist-credentials: false` — this job never pushes; not
+      # persisting the checkout token keeps it out of the build env.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -110,7 +114,11 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # `persist-credentials: false` — npm publish authenticates via the
+      # OIDC `id-token`, not the git checkout token; don't persist it.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

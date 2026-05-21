@@ -5,11 +5,11 @@
 //! against Node-provided `napi_*` symbols, so this module is excluded
 //! from the default build.
 //!
-//! Thin shim — the orchestration logic lives in [`crate::analyze_to_json`]
-//! so it stays feature-independent and gets exercised by Rust
-//! integration tests + the LCOV coverage gate. This module only
-//! handles unpacking `AnalyzeOptions` and mapping `String` errors to
-//! `napi::Error`.
+//! Thin shim — the orchestration logic (and input validation) lives in
+//! [`crate::analyze_to_json`] so it stays feature-independent and gets
+//! exercised by Rust integration tests + the LCOV coverage gate. This
+//! module only handles unpacking `AnalyzeOptions`, parsing the metric
+//! string, and mapping `String` errors to `napi::Error`.
 
 use std::path::Path;
 
@@ -58,6 +58,12 @@ fn parse_metric(s: &str) -> Result<ComplexityMetric, String> {
 /// `crap_core::core::analyze::<IstanbulParseDiagnostic>` via the
 /// crate-internal [`crate::analyze_to_json`] helper. The JSON shape
 /// is `{ result: AnalysisResult, diagnostics: AnalysisDiagnostics }`.
+///
+/// Inputs are validated inside [`crate::analyze_to_json`]: a non-finite
+/// or negative `threshold`, or a `source_root` that does not resolve to
+/// a readable directory, each fail fast with a descriptive
+/// `napi::Error` rather than producing silently-wrong scores or an
+/// empty zero-function result.
 #[napi]
 pub fn analyze(opts: AnalyzeOptions) -> napi::Result<String> {
     let metric = match opts.metric.as_deref() {

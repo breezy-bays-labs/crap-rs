@@ -95,8 +95,8 @@ console.log(result.summary);
 ```
 
 Generate `coverage-final.json` via your test runner with Istanbul
-coverage enabled (`jest --coverage`, `vitest --coverage`,
-`c8 --reporter=json`, etc.).
+coverage enabled — e.g. `jest --coverage`, `vitest --coverage`, or
+`c8 --reporter=json`.
 
 ### Rollback
 

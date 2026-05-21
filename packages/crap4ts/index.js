@@ -25,7 +25,7 @@ function nativeBindingFilename() {
         default:
           throw new Error(
             `crap4ts: unsupported macOS architecture: ${arch}. ` +
-              `Published architectures for 2.0.0-rc.1: arm64, x64.`,
+              `Published architectures: arm64, x64.`,
           );
       }
     case 'linux':
@@ -34,12 +34,12 @@ function nativeBindingFilename() {
       }
       throw new Error(
         `crap4ts: unsupported Linux architecture: ${arch}. ` +
-          `Published architectures for 2.0.0-rc.1: x64 (glibc).`,
+          `Published architectures: x64 (glibc).`,
       );
     default:
       throw new Error(
         `crap4ts: unsupported platform: ${platform}. ` +
-          `Published platforms for 2.0.0-rc.1: darwin, linux.`,
+          `Published platforms: darwin, linux.`,
       );
   }
 }
