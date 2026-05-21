@@ -37,7 +37,7 @@ mod view_args;
 /// Complexity metric for CRAP score computation.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum MetricArg {
-    /// Nesting depth + structural complexity (default for Rust)
+    /// Nesting depth + structural complexity
     Cognitive,
     /// Decision-point count, classic CRAP metric
     Cyclomatic,
@@ -290,7 +290,7 @@ pub struct InputArgs {
     #[arg(long, value_name = "DIR", value_hint = ValueHint::DirPath)]
     pub src: Option<PathBuf>,
 
-    /// Complexity metric to use [default: cognitive]
+    /// Complexity metric to use
     #[arg(long, value_enum)]
     pub metric: Option<MetricArg>,
 
@@ -828,6 +828,18 @@ fn build_command(meta: &AdapterMeta) -> clap::Command {
     if !meta.after_help.is_empty() {
         cmd = cmd.after_help(meta.after_help);
     }
+    // The `--metric` help advertises the adapter's default metric. The
+    // doc-comment-derived help is static and shared between adapters,
+    // but the effective default differs per adapter (crap4rs resolves
+    // to cognitive, crap4ts to cyclomatic), so the displayed default is
+    // injected at runtime from `AdapterMeta::default_metric` rather
+    // than hardcoded in the comment.
+    cmd = cmd.mut_arg("metric", |arg| {
+        arg.help(format!(
+            "Complexity metric to use [default: {}]",
+            meta.default_metric
+        ))
+    });
     cmd
 }
 
