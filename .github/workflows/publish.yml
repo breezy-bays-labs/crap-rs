@@ -120,18 +120,26 @@ jobs:
         with:
           persist-credentials: false
 
+      # Node 24 + npm >= 11.5.1 are the floor for npm OIDC trusted
+      # publishing (https://docs.npmjs.com/trusted-publishers). Node 20
+      # ships npm 10.x, which cannot mint the OIDC token and 401s.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to an OIDC-capable version
+        run: npm install -g npm@^11.5.1
 
       - name: Verify tag matches package.json + Cargo.toml versions
         # Belt-and-braces tag<->version check. The
         # `release_tag_merge_commit` convention requires verifying this
         # on the merge commit BEFORE pushing the tag; this CI gate
         # catches the rare case where someone pushed a tag onto a
-        # commit that doesn't match.
+        # commit that doesn't match. The verified version is exported so
+        # the publish step derives the dist-tag without re-parsing.
+        id: verify
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
@@ -145,6 +153,7 @@ jobs:
             echo "::error::version mismatch between tag, package.json, and Cargo.toml"
             exit 1
           fi
+          echo "version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Download all cdylib artifacts
         uses: actions/download-artifact@v4
@@ -161,6 +170,20 @@ jobs:
             test -f "$plat" || { echo "::error::missing $plat"; exit 1; }
           done
 
+      # Prereleases (version contains a hyphen, e.g. `2.0.0-rc.1`) publish
+      # under the `rc` dist-tag so `latest` keeps pointing at the current
+      # stable release during a soak; a plain `2.0.0` publishes to
+      # `latest`. Without an explicit `--tag`, npm sends every version —
+      # prereleases included — to `latest`.
       - name: Publish to npm with provenance (OIDC)
-        run: npm publish --provenance --access public
+        env:
+          VERSION: ${{ steps.verify.outputs.version }}
+        run: |
+          if [[ "$VERSION" == *-* ]]; then
+            NPM_TAG="rc"
+          else
+            NPM_TAG="latest"
+          fi
+          echo "publishing crap4ts@${VERSION} under dist-tag '${NPM_TAG}'"
+          npm publish --provenance --access public --tag "$NPM_TAG"
         working-directory: packages/crap4ts
