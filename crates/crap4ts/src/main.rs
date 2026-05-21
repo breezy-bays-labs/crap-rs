@@ -20,7 +20,7 @@ use crap4ts::adapters::coverage::IstanbulCoverage;
 use crap4ts::adapters::walker::OxcWalker;
 use crap4ts::{DEFAULT_EXCLUDES, EXTENSIONS};
 
-const ABOUT: &str = "CRAP score analyzer for TypeScript";
+const ABOUT: &str = "CRAP score analyzer for TypeScript / JavaScript";
 const LONG_ABOUT: &str = "CRAP (Change Risk Anti-Patterns) score analyzer for TypeScript / \
                          JavaScript codebases.\n\n\
                          Combines AST complexity (via oxc) with Istanbul JSON coverage to \

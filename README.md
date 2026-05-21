@@ -15,7 +15,7 @@ This workspace ships two analyzers over one shared core:
 | **`crap4ts`** | TypeScript / JavaScript | Istanbul JSON | [npm](https://www.npmjs.com/package/crap4ts) — see its [package README](packages/crap4ts/README.md) |
 | **`crap-core`** | _shared library_ | — | internal: CRAP formula, thresholds, reporters, analysis types |
 
-Both adapters link the same `crap-core`, so Rust and TypeScript projects get identical CRAP semantics — the same formula, envelope, and reporters.
+Both adapters link the same `crap-core`, so Rust and TypeScript / JavaScript projects get identical CRAP semantics — the same formula, envelope, and reporters.
 
 ## What is CRAP?
 
@@ -428,7 +428,7 @@ crap-rs is a Cargo workspace built on a hexagonal (ports & adapters) core:
 |-------|------|
 | `crap-core` | Language-agnostic core — the CRAP formula, threshold model, result types, reporters, and analysis orchestration (`domain/` → `ports/` → `core/`). |
 | `crap4rs` | Rust adapter — `syn`-based complexity walker, LCOV coverage parser, and the Rust CLI. |
-| `crap4ts` | TypeScript adapter — `oxc`-based complexity walker, Istanbul JSON coverage parser, published to npm as a napi-rs addon. |
+| `crap4ts` | TypeScript / JavaScript adapter — `oxc`-based complexity walker, Istanbul JSON coverage parser, published to npm as a napi-rs addon. |
 
 Each adapter supplies its own `ComplexityPort` and `CoveragePort` implementations; `crap-core` never imports a language toolchain. An `ast-purity` CI gate enforces this — it bans `syn`, `oxc`, and coverage-format types from `crap-core/src/`. The CRAP math is shared; threshold policy stays language-specific, so `crap4rs` and `crap4ts` need not use identical thresholds.
 
