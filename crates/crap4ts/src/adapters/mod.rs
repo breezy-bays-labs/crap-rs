@@ -1,13 +1,12 @@
 //! crap4ts adapters — TypeScript-specific bindings for the language-
 //! agnostic `crap_core` analyzer.
 //!
-//! Two stubs live here; both runtime-panic via `unimplemented!()` and
-//! will be filled in by the follow-up TypeScript-adapter pipeline:
+//! Two adapter modules live here:
 //!
-//! - **`walker`**: `oxc`-based AST walker that will extract per-function
-//!   cognitive / cyclomatic complexity from `.ts`/`.tsx` sources.
+//! - **`walker`**: `oxc`-based AST walker that extracts per-function
+//!   cyclomatic complexity from TypeScript and JavaScript sources.
 //! - **`coverage`**: Istanbul JSON coverage parser
-//!   (`coverage-final.json`) that will convert vitest / jest coverage
+//!   (`coverage-final.json`) that converts jest / vitest / nyc coverage
 //!   into `ParseOutput<IstanbulParseDiagnostic>`.
 //!
 //! Both modules are TypeScript / oxc-toolchain coupled and live in

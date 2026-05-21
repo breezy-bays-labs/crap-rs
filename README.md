@@ -1,10 +1,21 @@
-# crap4rs
+# crap-rs
 
 [![CI](https://github.com/breezy-bays-labs/crap-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/breezy-bays-labs/crap-rs/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/crap4rs.svg)](https://crates.io/crates/crap4rs)
+[![npm](https://img.shields.io/npm/v/crap4ts.svg)](https://www.npmjs.com/package/crap4ts)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-CRAP (Change Risk Anti-Patterns) score analyzer for Rust codebases. Finds complex, under-tested functions.
+**CRAP (Change Risk Anti-Patterns) score analysis with a shared Rust core and language-specific adapters.** A CRAP score fuses a function's complexity with its test coverage into a single number — high complexity plus low coverage means high risk when the code changes.
+
+This workspace ships two analyzers over one shared core:
+
+| Crate / package | Analyzes | Coverage format | Published to |
+|-----------------|----------|-----------------|--------------|
+| **`crap4rs`** | Rust | LCOV | [crates.io](https://crates.io/crates/crap4rs) |
+| **`crap4ts`** | TypeScript / JavaScript | Istanbul JSON | [npm](https://www.npmjs.com/package/crap4ts) — see its [package README](packages/crap4ts/README.md) |
+| **`crap-core`** | _shared library_ | — | internal: CRAP formula, thresholds, reporters, analysis types |
+
+Both adapters link the same `crap-core`, so Rust and TypeScript projects get identical CRAP semantics — the same formula, envelope, and reporters.
 
 ## What is CRAP?
 
@@ -28,6 +39,10 @@ Every score lands in one of four risk levels. The classification is intrinsic to
 | > 30 | High |
 
 The build gate is a separate axis — see [Threshold (the gate)](#threshold-the-gate) below.
+
+## crap4rs — the Rust analyzer
+
+Everything from here down documents the `crap4rs` Rust CLI. For TypeScript / JavaScript projects, see the [crap4ts package README](packages/crap4ts/README.md).
 
 ## Usage
 
@@ -74,7 +89,7 @@ A function with CRAP `7` is `Acceptable` and never trips any preset. A function 
 
 Risk classification feeds SARIF severity (`high → error`, `moderate → warning`, `acceptable/low → note`); threshold feeds the exit code. Scorecard-row status (`Red`/`Yellow`/`Green`) — see [docs/scorecard-row-contract.md](docs/scorecard-row-contract.md) — is minted from the threshold gate, not from risk classification.
 
-These thresholds do not match `crap4ts` exactly. The long-term goal is shared CRAP math and shared analysis concepts via `crap-core`, with language-specific adapters and threshold policy above that core.
+`crap4rs` and `crap4ts` share the CRAP formula and analysis concepts through `crap-core`, but threshold policy is language-specific — the two analyzers deliberately do not use identical thresholds.
 
 ### Why cognitive by default?
 
@@ -405,45 +420,21 @@ cargo build --release
 
 - [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) for generating LCOV coverage data
 
-## Architecture
+## Workspace layout
 
-Hexagonal (ports & adapters) design for future extraction into a polyglot `crap-core` library:
+crap-rs is a Cargo workspace built on a hexagonal (ports & adapters) core:
 
-```
-domain/    Pure logic: CRAP formula, thresholds, types
-ports/     Trait definitions (ComplexityPort, CoveragePort)
-adapters/  syn walker, LCOV parser, reporters
-core/      Wires adapters through ports
-cli/       clap argument parsing
-```
+| Crate | Role |
+|-------|------|
+| `crap-core` | Language-agnostic core — the CRAP formula, threshold model, result types, reporters, and analysis orchestration (`domain/` → `ports/` → `core/`). |
+| `crap4rs` | Rust adapter — `syn`-based complexity walker, LCOV coverage parser, and the Rust CLI. |
+| `crap4ts` | TypeScript adapter — `oxc`-based complexity walker, Istanbul JSON coverage parser, published to npm as a napi-rs addon. |
 
-## Extraction roadmap
-
-This repo is the Rust implementation today, but the longer-term direction is a shared multi-language CRAP toolchain:
-
-- `crap-core` — shared CRAP math, thresholds model, result types, and language-agnostic analysis interfaces
-- `crap4rs` — Rust-specific complexity and coverage adapters plus Rust-facing CLI/package surfaces
-- `crap4ts` — TypeScript-specific complexity and coverage adapters plus npm-facing package surfaces
-
-That split means:
-
-- shared analysis concepts should converge in `crap-core`
-- language parsers, coverage formats, and default threshold policy remain language-specific
-- matching `crap4rs` and `crap4ts` behavior does not require identical thresholds
-
-The current directory layout already reflects that extraction boundary:
-
-- `domain/`, `ports/`, and `core/` are the future `crap-core` seam
-- `adapters/` is the Rust-specific layer
-- `cli/` is the Rust delivery surface that may later become part of a unified monorepo layout
+Each adapter supplies its own `ComplexityPort` and `CoveragePort` implementations; `crap-core` never imports a language toolchain. An `ast-purity` CI gate enforces this — it bans `syn`, `oxc`, and coverage-format types from `crap-core/src/`. The CRAP math is shared; threshold policy stays language-specific, so `crap4rs` and `crap4ts` need not use identical thresholds.
 
 ## Self-check
 
-The self-referential CI check runs at `--strict` (15) against `src`, excluding `cli/**`.
-
-## Related
-
-- [crap4ts](https://github.com/breezy-bays-labs/crap4ts) — CRAP analyzer for TypeScript
+crap-rs analyzes its own source as a CI gate — `crap4rs` runs at `--strict` against each workspace crate (`crap-core`, `crap4rs`, and `crap4ts`).
 
 ## License
 
