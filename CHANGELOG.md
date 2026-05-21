@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+The workspace ships multiple crates / packages on independent
+versioning cadences: `crap-core`, `crap4rs` (Rust adapter + crate),
+and `crap4ts` (TypeScript adapter + npm package). Release sections
+are tagged with the published artifact + version they cut.
+
+## [crap4ts 2.0.0-rc.1] - 2026-05-19
+
+First release candidate of the from-scratch `crap4ts` 2.x line —
+a [napi-rs](https://napi.rs/) Node addon that replaces the
+JavaScript-only `crap4ts` 1.x. CRAP formula, scorecard envelope, and
+reporter shapes are now shared with the Rust adapter `crap4rs` via
+the language-agnostic `crap-core` library. **48–72 h soak window
+before promoting to `crap4ts 2.0.0` GA.**
+
+This release cuts only the `crap4ts` npm package — `crap-core` and
+`crap4rs` are not tagged to crates.io as part of this release. But
+because the published cdylib is built from workspace `HEAD`, every
+workspace-level change queued under [Unreleased] IS shipped inside
+this cdylib, including:
+
+- #214 — Istanbul parser narrowing
+- #221 — namespace-qualified naming
+- #218 — threshold metric calibration
+- #73 — `init` subcommand
+
+The [Unreleased] section will move to a dedicated release section
+when `crap-core` / `crap4rs` next cut a crates.io release.
+
+### Added (crap4ts on npm)
+- New `crap4ts` npm package (v2.0.0-rc.1) shipping the napi-rs-built
+  cdylib alongside a single-package runtime dispatcher. Exposes one
+  `analyze({ sourceRoot, coveragePath, threshold?, metric? })`
+  function returning the analysis output (functions + summary +
+  diagnostics) as a JSON string. ([#192](https://github.com/breezy-bays-labs/crap-rs/issues/192))
+- Native bindings for macOS arm64, macOS x64, and Linux x64 (glibc).
+  All three live in the same tarball; `index.js` selects the right
+  `.node` at require-time via `process.platform` + `process.arch`.
+- `.github/workflows/publish.yml` — tag-triggered (`crap4ts-v*`)
+  matrix workflow with `id-token: write` for npm OIDC trusted
+  publishing (`npm publish --provenance`).
+- `MIGRATION.md` gains a `crap4ts@1.x → crap4ts@2.0.0` section with
+  the three reasons scores may diverge (threshold default `12 → 16`,
+  TS-specific calibration not yet validated, arrow-function coverage
+  handling) and subpath-export replacement recipes.
+
+### Migration
+
+See `MIGRATION.md` "crap4ts@1.x → crap4ts@2.0.0" section. Short
+version: a `2.0.0-rc.1` install replaces a `1.x` install; scores may
+differ for the three compounding reasons documented there.
+
 ## [Unreleased]
 
 ### Added

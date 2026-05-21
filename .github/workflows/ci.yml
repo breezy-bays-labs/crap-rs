@@ -98,6 +98,26 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build crap4ts bin (default features)
         run: cargo build --package crap4ts --release
+      - name: No-feature bin canary -- bin must not carry napi_ symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="target/release/crap4ts"
+          test -f "$BIN"
+          if nm "$BIN" 2>/dev/null | grep -q "napi_"; then
+            echo "::error::bin links napi_ symbols (feature-gate leakage)"
+            nm "$BIN" | grep "napi_" | head -10
+            exit 1
+          fi
+          case "$RUNNER_OS" in
+            macOS)
+              if otool -L "$BIN" | grep -i napi; then
+                echo "::error::bin has napi dylib linkage"
+                exit 1
+              fi
+              ;;
+          esac
+          echo "OK: no napi_ symbols in standalone bin"
       - name: Build crap4ts cdylib (napi-binding feature)
         run: cargo build --package crap4ts --features napi-binding --lib --release
 

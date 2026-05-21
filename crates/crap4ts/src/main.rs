@@ -21,6 +21,7 @@ use crap_core::cli::AdapterMeta;
 use crap_core::domain::types::ComplexityMetric;
 use crap4ts::adapters::coverage::IstanbulCoverage;
 use crap4ts::adapters::walker::OxcWalker;
+use crap4ts::{DEFAULT_EXCLUDES, EXTENSIONS};
 
 const ABOUT: &str = "CRAP score analyzer for TypeScript (alpha)";
 const LONG_ABOUT: &str = "CRAP (Change Risk Anti-Patterns) score analyzer for TypeScript / \
@@ -46,13 +47,6 @@ breezy-bays-labs/crap-rs.";
 
 const COVERAGE_HINT: &str = "ensure tests ran with coverage enabled (e.g. `c8 --reporter=json` or `vitest --coverage`) — \
      crap4ts parses Istanbul's `coverage-final.json`, not LCOV";
-
-const EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx", "mjs", "cjs"];
-
-/// Common TS/JS-project directories `init` writes as commented-out
-/// excludes — `node_modules` for vendored deps, build/coverage output
-/// dirs.
-const DEFAULT_EXCLUDES: &[&str] = &["node_modules/**", "dist/**", "coverage/**"];
 
 fn main() -> ExitCode {
     let meta = AdapterMeta {
