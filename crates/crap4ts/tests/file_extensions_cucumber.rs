@@ -202,10 +202,16 @@ fn when_run_crap4ts(world: &mut FileExtWorld) {
     world.exit_code = out.status.code();
     world.stderr = String::from_utf8_lossy(&out.stderr).into_owned();
     // Under `--no-fail` the run produces an envelope even when a file
-    // failed to parse; an empty stdout means a genuine hard failure.
-    world.functions = serde_json::from_slice::<Envelope>(&out.stdout)
-        .map(|e| e.result.functions)
-        .unwrap_or_default();
+    // failed to parse; a JSON-parse failure here is loud (silent
+    // swallow would let "doesn't include notes.txt" pass trivially on
+    // an empty Vec).
+    let envelope: Envelope = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "crap4ts --format json must emit a valid envelope: {e}\nstderr=\n{}",
+            String::from_utf8_lossy(&out.stderr),
+        )
+    });
+    world.functions = envelope.result.functions;
 }
 
 // ── Then ─────────────────────────────────────────────────────────────

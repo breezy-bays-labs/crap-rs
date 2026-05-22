@@ -43,6 +43,16 @@ fn write_file(root: &std::path::Path, name: &str, content: &str) {
     std::fs::write(root.join(name), content).expect("write fixture file");
 }
 
+/// Forward-slash-normalize a tempdir path before embedding it into a
+/// JSON fixture. Windows paths use `\` which would need JSON-string
+/// escaping; forward-slash is the canonical form Istanbul emitters use
+/// anyway and `normalize_path` strip-prefix works either way. Mirrors
+/// the pattern in `metric_unsupported_cucumber.rs` and
+/// `istanbul_smoke.rs::build_fixture`.
+fn json_root(p: &std::path::Path) -> String {
+    p.to_string_lossy().replace('\\', "/")
+}
+
 /// A canonicalized tempdir (macOS routes `/tmp` → `/private/tmp`, so the
 /// parser must see the same prefix the `{SRC_ROOT}`-substituted payload
 /// carries) with the named source files written into it.
@@ -133,7 +143,7 @@ fn given_jest(world: &mut IstanbulWorld) {
         ("map.ts", TS_MAP),
         ("mixed.ts", TS_MIXED),
     ]);
-    world.payload = Some(JEST_FIXTURE.replace("{SRC_ROOT}", &root.to_string_lossy()));
+    world.payload = Some(JEST_FIXTURE.replace("{SRC_ROOT}", &json_root(&root)));
     world.fixture = Some((tmp, root));
 }
 
@@ -150,7 +160,7 @@ fn given_vitest(world: &mut IstanbulWorld) {
         ("arrow.ts", TS_ARROW),
         ("map.ts", TS_MAP),
     ]);
-    world.payload = Some(VITEST_FIXTURE.replace("{SRC_ROOT}", &root.to_string_lossy()));
+    world.payload = Some(VITEST_FIXTURE.replace("{SRC_ROOT}", &json_root(&root)));
     world.fixture = Some((tmp, root));
 }
 
@@ -161,7 +171,7 @@ fn given_nyc(world: &mut IstanbulWorld) {
         ("arrow.ts", TS_ARROW),
         ("map.ts", TS_MAP),
     ]);
-    world.payload = Some(NYC_FIXTURE.replace("{SRC_ROOT}", &root.to_string_lossy()));
+    world.payload = Some(NYC_FIXTURE.replace("{SRC_ROOT}", &json_root(&root)));
     world.fixture = Some((tmp, root));
 }
 
@@ -178,7 +188,7 @@ fn given_one_orphan_entry(world: &mut IstanbulWorld) {
           "/private/build/transpiled/foo.js": {{ "path": "/private/build/transpiled/foo.js", "s": {{ "0": 1 }},
             "statementMap": {{ "0": {{ "start": {{ "line": 1, "column": 0 }}, "end": {{ "line": 1, "column": 5 }} }} }} }}
         }}"#,
-        root = root.to_string_lossy(),
+        root = json_root(&root),
     );
     world.payload = Some(payload);
     world.fixture = Some((tmp, root));
@@ -192,13 +202,23 @@ fn given_no_source_resolves(_world: &mut IstanbulWorld) {
 
 #[given(r#"a `coverage.json` whose top-level shape is `{ "foo": "bar" }` (not Istanbul)"#)]
 fn given_non_istanbul_json(world: &mut IstanbulWorld) {
-    world.payload = Some(r#"{ "foo": "bar" }"#.to_string());
+    // Write the bad JSON to disk so the When step can shell the binary
+    // alongside the lib parse — the spec's "exits non-zero" assertion is
+    // verified against the shipped binary, not just narrated against
+    // `parse()`'s `coverage.is_empty()` proxy.
+    let payload = r#"{ "foo": "bar" }"#;
+    let (tmp, root) = tempdir_with(&[]);
+    let cov_path = root.join("coverage.json");
+    std::fs::write(&cov_path, payload).expect("write coverage.json");
+    world.payload = Some(payload.to_string());
+    world.cov_path = Some(cov_path);
+    world.fixture = Some((tmp, root));
 }
 
 #[given("a `coverage-final.json` whose `b` record references branchId `42`")]
 fn given_orphan_branch(world: &mut IstanbulWorld) {
     let (tmp, root) = tempdir_with(&[("branch-heavy.ts", TS_BRANCH_HEAVY)]);
-    world.payload = Some(ORPHAN_BRANCH_FIXTURE.replace("{SRC_ROOT}", &root.to_string_lossy()));
+    world.payload = Some(ORPHAN_BRANCH_FIXTURE.replace("{SRC_ROOT}", &json_root(&root)));
     world.fixture = Some((tmp, root));
 }
 
@@ -215,7 +235,7 @@ fn given_empty_statement_maps(world: &mut IstanbulWorld) {
     let (tmp, root) = tempdir_with(&[("simple.ts", TS_SIMPLE)]);
     let payload = format!(
         r#"{{ "{root}/simple.ts": {{ "path": "{root}/simple.ts", "s": {{}}, "statementMap": {{}} }} }}"#,
-        root = root.to_string_lossy(),
+        root = json_root(&root),
     );
     let cov_path = root.join("coverage-final.json");
     std::fs::write(&cov_path, &payload).expect("write coverage file");
@@ -234,7 +254,7 @@ fn given_extra_fields(world: &mut IstanbulWorld) {
           "hash": "deadbeef", "contentHash": "cafef00d",
           "s": {{ "0": 3 }},
           "statementMap": {{ "0": {{ "start": {{ "line": 1, "column": 0 }}, "end": {{ "line": 1, "column": 9 }} }} }} }} }}"#,
-        root = root.to_string_lossy(),
+        root = json_root(&root),
     );
     world.payload = Some(payload);
     world.fixture = Some((tmp, root));
@@ -292,7 +312,23 @@ fn when_run_coverage_final(world: &mut IstanbulWorld) {
 
 #[when("the operator runs `crap4ts --coverage coverage.json --src src`")]
 fn when_run_coverage_json(world: &mut IstanbulWorld) {
+    // Lib-level: parse() returns Ok(SchemaUnrecognized diagnostic).
     world.run_parse();
+    // Binary-level: shell crap4ts so `then_exits_non_zero_schema` can
+    // assert the spec's exit-code claim against shipped behavior.
+    let root = world.root();
+    let cov = world
+        .cov_path
+        .clone()
+        .expect("schema-unrecognized Given writes the coverage file");
+    world.binary = Some(
+        assert_cmd::Command::cargo_bin("crap4ts")
+            .expect("crap4ts binary discoverable")
+            .args(["--coverage".as_ref(), cov.as_os_str()])
+            .args(["--src".as_ref(), root.as_os_str()])
+            .output()
+            .expect("crap4ts executes"),
+    );
 }
 
 #[when("the parser normalizes the entry paths")]
@@ -369,13 +405,23 @@ fn then_other_entries_survive(world: &mut IstanbulWorld) {
 
 #[then("`crap4ts` exits with a non-zero status")]
 fn then_exits_non_zero_schema(world: &mut IstanbulWorld) {
-    // Narration of the binary's downstream behavior: a parse that
-    // yields zero coverage produces a non-zero exit. The executable
-    // contract is the `SchemaUnrecognized` diagnostic — asserted below.
+    // Lib-level: a non-Istanbul shape yields zero coverage (the
+    // downstream gate for the CLI's non-zero exit).
     let out = world.ok();
     assert!(
         out.coverage.is_empty(),
-        "a non-Istanbul shape must yield no coverage (→ non-zero exit downstream)",
+        "a non-Istanbul shape must yield no coverage",
+    );
+    // Binary-level: verify the spec's exit-code claim directly against
+    // the shipped binary, not just the lib-level proxy above.
+    let bin = world
+        .binary
+        .as_ref()
+        .expect("schema-unrecognized When shells the binary");
+    assert!(
+        !bin.status.success(),
+        "crap4ts must exit non-zero on an unrecognized coverage shape; stderr=\n{}",
+        String::from_utf8_lossy(&bin.stderr),
     );
 }
 
