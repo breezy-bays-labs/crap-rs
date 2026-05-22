@@ -1,0 +1,75 @@
+name: Set up Rust
+description: >-
+  Install a working Rust toolchain and configure cargo caching. On macOS
+  runners the pre-installed rustup is reinstalled from the official source
+  first, to work around broken Homebrew rustup in recent runner images
+  (actions/runner-images#14097); on Linux that step is skipped and the
+  runner's rustup is used as-is. Caching runs Swatinem/rust-cache with
+  cache-bin disabled so the macOS reinstall is not stripped.
+
+inputs:
+  shared-key:
+    description: >-
+      Swatinem/rust-cache shared-key, scoping the cache across jobs.
+      Empty scopes the cache to the calling job.
+    required: false
+    default: ""
+  save-if:
+    description: >-
+      Expression string controlling whether rust-cache saves the cache.
+      Defaults to "true" (rust-cache's own default).
+    required: false
+    default: "true"
+  targets:
+    description: >-
+      Comma-separated rustup target triples to add, passed through to
+      dtolnay/rust-toolchain. Empty adds no extra targets.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Reinstall a clean rustup on macOS (broken Homebrew rustup workaround)
+      # actions/runner-images#14097: recent macOS runner images ship a
+      # broken rustup whose cargo/rustc proxies fall through to
+      # rustup-init — `cargo <subcommand>` then dies with
+      # "unexpected argument '<subcommand>' found / Usage: rustup-init".
+      # Replace it unconditionally with a clean rustup + stable toolchain
+      # from the official source so the macOS jobs never depend on the
+      # runner image's rustup. Unconditional (not health-gated) so the
+      # recovery path runs on every macOS job, not only when an image
+      # regresses. The dtolnay/rust-toolchain step below then finds this
+      # rustup and reuses it.
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        set -euo pipefail
+        brew uninstall --ignore-dependencies --force rustup 2>/dev/null || true
+        rm -rf "$HOME/.cargo" "$HOME/.rustup"
+        curl --proto '=https' --tlsv1.2 --retry 5 -fsSL https://sh.rustup.rs \
+          | sh -s -- -y --default-toolchain stable --profile minimal --no-modify-path
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        # Fail loudly here with a clear label if the install did not
+        # produce a working cargo, instead of a confusing "command not
+        # found" deeper in the job.
+        "$HOME/.cargo/bin/cargo" --version
+        "$HOME/.cargo/bin/rustup" --version
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ inputs.targets }}
+
+    - name: Cache cargo registry + target
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ inputs.shared-key }}
+        save-if: ${{ inputs.save-if }}
+        # rust-cache's default (cache-bin: true) strips pre-existing
+        # binaries from ~/.cargo/bin on restore — which would delete the
+        # clean cargo/rustc/rustup the macOS reset step above installs.
+        # Disable it: this repo installs its cargo subcommands via
+        # taiki-e/install-action into ~/.install-action/bin, so nothing
+        # cacheable ever lives in ~/.cargo/bin.
+        cache-bin: false
