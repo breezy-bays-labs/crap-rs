@@ -113,3 +113,11 @@ harness = false
 [[test]]
 name = "istanbul_parser_cucumber"
 harness = false
+
+[[test]]
+name = "arrow_function_coverage_cucumber"
+harness = false
+
+[[test]]
+name = "file_extensions_cucumber"
+harness = false
