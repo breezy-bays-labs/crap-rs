@@ -327,7 +327,10 @@ fn classify(v1: &FnRecord, v2: &FnRecord) -> Class {
 
 /// The full parity outcome. `gate_passes()` is the single source of
 /// truth for the test assertion; `render()` is the human-facing diff.
-#[derive(Debug)]
+///
+/// `Clone` lets a cucumber harness cache one real-corpus run in a
+/// `OnceLock` and hand each scenario its own owned copy.
+#[derive(Debug, Clone)]
 pub struct ParityReport {
     pub matched: usize,
     pub exact_cc: usize,
