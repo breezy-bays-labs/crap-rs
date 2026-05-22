@@ -35,7 +35,7 @@ jobs:
             artifact: libcrap4ts.so
             node_name: crap4ts.linux-x64-gnu.node
           - platform: darwin-arm64
-            runner: macos-14
+            runner: macos-15
             target: aarch64-apple-darwin
             artifact: libcrap4ts.dylib
             node_name: crap4ts.darwin-arm64.node
