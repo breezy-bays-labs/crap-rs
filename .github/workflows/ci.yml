@@ -46,11 +46,34 @@ jobs:
             name: macos-x86
     steps:
       - uses: actions/checkout@v4
+      - name: Reset rustup on macOS (broken Homebrew rustup in runner image)
+        # actions/runner-images#14097: recent macOS runner images ship a
+        # broken Homebrew rustup whose cargo/rustc proxies fall through to
+        # rustup-init — `cargo <subcommand>` then dies with
+        # "unexpected argument '<subcommand>' found / Usage: rustup-init".
+        # Removing every rustup install path makes `command -v rustup`
+        # return nothing, so the dtolnay/rust-toolchain step below
+        # self-installs a clean rustup from https://sh.rustup.rs.
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew uninstall --ignore-dependencies rustup 2>/dev/null || true
+          brew uninstall --ignore-dependencies rustup-init 2>/dev/null || true
+          rm -rf "$HOME/.cargo" "$HOME/.rustup"
+          echo "rustup reset — dtolnay/rust-toolchain will reinstall clean"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9
+      - name: Verify cargo + nextest resolve (broken-rustup canary)
+        # If a macOS runner's rustup is broken (actions/runner-images#14097)
+        # this fails here with a clear label instead of deep inside the
+        # test run. On a healthy toolchain it is a ~1s no-op.
+        run: |
+          cargo --version
+          cargo nextest --version
       - run: cargo nextest run --workspace --all-targets
       # Cucumber-rs targets (#115) speak their own CLI, not libtest's
       # `--list --format terse`; nextest excludes them via
@@ -91,6 +114,22 @@ jobs:
             name: macos-x86
     steps:
       - uses: actions/checkout@v4
+      - name: Reset rustup on macOS (broken Homebrew rustup in runner image)
+        # actions/runner-images#14097: recent macOS runner images ship a
+        # broken Homebrew rustup whose cargo/rustc proxies fall through to
+        # rustup-init — `cargo <subcommand>` then dies with
+        # "unexpected argument '<subcommand>' found / Usage: rustup-init".
+        # Removing every rustup install path makes `command -v rustup`
+        # return nothing, so the dtolnay/rust-toolchain step below
+        # self-installs a clean rustup from https://sh.rustup.rs.
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew uninstall --ignore-dependencies rustup 2>/dev/null || true
+          brew uninstall --ignore-dependencies rustup-init 2>/dev/null || true
+          rm -rf "$HOME/.cargo" "$HOME/.rustup"
+          echo "rustup reset — dtolnay/rust-toolchain will reinstall clean"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
