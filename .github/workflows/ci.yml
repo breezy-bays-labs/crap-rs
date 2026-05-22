@@ -46,11 +46,17 @@ jobs:
             name: macos-x86
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/setup-rust
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9
+      - name: Verify cargo + nextest resolve (broken-rustup canary)
+        # Bare `cargo` / `cargo nextest` here confirm the macOS rustup
+        # reinstall put ~/.cargo/bin on PATH and that nextest resolves —
+        # failing at a clearly-labelled step instead of deep in the run.
+        run: |
+          cargo --version
+          cargo nextest --version
       - run: cargo nextest run --workspace --all-targets
       # Cucumber-rs targets (#115) speak their own CLI, not libtest's
       # `--list --format terse`; nextest excludes them via
@@ -91,8 +97,7 @@ jobs:
             name: macos-x86
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/setup-rust
         with:
           shared-key: crap4ts-${{ matrix.name }}
           save-if: ${{ github.ref == 'refs/heads/main' }}

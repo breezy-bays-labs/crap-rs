@@ -54,15 +54,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
+      - name: Set up Rust
+        uses: ./.github/actions/setup-rust
         with:
           shared-key: publish-${{ matrix.platform }}
+          targets: ${{ matrix.target }}
 
       - name: Build cdylib
         env:
