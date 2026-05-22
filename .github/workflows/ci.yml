@@ -60,8 +60,18 @@ jobs:
       - run: cargo nextest run --workspace --all-targets
       # Cucumber-rs targets (#115) speak their own CLI, not libtest's
       # `--list --format terse`; nextest excludes them via
-      # `.config/nextest.toml` and they run via `cargo test`.
-      - run: cargo test --test json_reporter_cucumber
+      # `.config/nextest.toml` and they run via `cargo test`. Without
+      # this step the `@wired` BDD status would be enforced only by the
+      # `lefthook.yml` pre-push hook, not on every PR.
+      - run: >-
+          cargo test
+          --test json_reporter_cucumber
+          --test metric_unsupported_cucumber
+          --test cyclomatic_walker_cucumber
+          --test parity_with_v1_cucumber
+          --test istanbul_parser_cucumber
+          --test arrow_function_coverage_cucumber
+          --test file_extensions_cucumber
 
   crap4ts-build:
     # Per-platform build check for the new `crap4ts` shell crate (S5,
