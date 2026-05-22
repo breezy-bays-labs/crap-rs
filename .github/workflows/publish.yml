@@ -89,6 +89,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: publish-${{ matrix.platform }}
+          # The macOS reset step above reinstalls rustup into
+          # ~/.cargo/bin. rust-cache's default (cache-bin: true) strips
+          # pre-existing binaries from ~/.cargo/bin on restore, which
+          # would delete that fresh cargo/rustc/rustup. Leave it untouched.
+          cache-bin: false
 
       - name: Build cdylib
         env:

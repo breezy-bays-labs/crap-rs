@@ -73,6 +73,12 @@ jobs:
           "$HOME/.cargo/bin/rustup" --version
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          # The macOS reset step above reinstalls rustup into
+          # ~/.cargo/bin. rust-cache's default (cache-bin: true) strips
+          # pre-existing binaries from ~/.cargo/bin on restore, which
+          # would delete that fresh cargo/rustc/rustup. Leave it untouched.
+          cache-bin: false
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9
@@ -153,6 +159,11 @@ jobs:
         with:
           shared-key: crap4ts-${{ matrix.name }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          # The macOS reset step above reinstalls rustup into
+          # ~/.cargo/bin. rust-cache's default (cache-bin: true) strips
+          # pre-existing binaries from ~/.cargo/bin on restore, which
+          # would delete that fresh cargo/rustc/rustup. Leave it untouched.
+          cache-bin: false
       - name: Build crap4ts bin (default features)
         run: cargo build --package crap4ts --release
       - name: No-feature bin canary -- bin must not carry napi_ symbols
