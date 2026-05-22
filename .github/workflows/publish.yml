@@ -60,6 +60,15 @@ jobs:
           shared-key: publish-${{ matrix.platform }}
           targets: ${{ matrix.target }}
 
+      # Node 24 (npm 11.x) is pinned so the install-gating check below
+      # exercises an npm new enough to enforce the `libc` field, and so
+      # the path-require smoke test runs on a deterministic Node rather
+      # than whatever the runner image happens to ship.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: Build cdylib
         env:
           CARGO_TARGET: ${{ matrix.target }}
@@ -93,6 +102,36 @@ jobs:
             }
             console.log("OK: analyze export present");
           '
+
+      # The smoke test above require()s the .node directly, which bypasses
+      # npm's os/cpu/libc install-gating — so a bad gating field is invisible
+      # to it. crap4ts 2.0.0-rc.1 shipped a stray `libc` entry that made
+      # `npm install` reject every macOS install with EBADPLATFORM; the
+      # path-require smoke test stayed green and the defect reached npm,
+      # caught only by a sandbox install during the soak. Packing the
+      # package and installing the tarball into a clean project reproduces
+      # that gating on this runner's native platform, pre-publish, so a
+      # packaging defect fails the workflow instead of reaching the registry.
+      - name: Verify npm packaging + install-gating
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          ( cd packages/crap4ts && npm pack --pack-destination "$work" )
+          tarball="$(ls "$work"/crap4ts-*.tgz)"
+          echo "packed: $(basename "$tarball")"
+          consumer="$work/consumer"
+          mkdir -p "$consumer"
+          cd "$consumer"
+          npm init -y >/dev/null
+          # `npm install` exits non-zero on EBADPLATFORM; the explicit
+          # node_modules check is a backstop so the failure stays loud even
+          # if a future npm softens platform mismatch to a warning.
+          npm install --no-audit --no-fund "$tarball"
+          if [ ! -d node_modules/crap4ts ]; then
+            echo "::error::npm did not install crap4ts — os/cpu/libc gating rejected this platform (see EBADPLATFORM above). Packaging defect."
+            exit 1
+          fi
+          node -e 'const m = require("crap4ts"); if (typeof m.analyze !== "function") { throw new Error("crap4ts installed from the packed tarball but the analyze export is missing"); } console.log("OK: npm install-gating passed and analyze export present");'
 
       - name: Upload cdylib artifact
         uses: actions/upload-artifact@v4
@@ -161,7 +200,7 @@ jobs:
       - name: Confirm all platforms present in tarball
         run: |
           cd packages/crap4ts
-          ls -la *.node
+          ls -la ./*.node
           for plat in crap4ts.linux-x64-gnu.node crap4ts.darwin-arm64.node crap4ts.darwin-x64.node; do
             test -f "$plat" || { echo "::error::missing $plat"; exit 1; }
           done
