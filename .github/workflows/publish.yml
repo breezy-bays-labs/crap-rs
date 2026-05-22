@@ -54,22 +54,31 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Reset rustup on macOS (broken Homebrew rustup in runner image)
+      - name: Reinstall a clean rustup on macOS (broken Homebrew rustup workaround)
         # actions/runner-images#14097: recent macOS runner images ship a
-        # broken Homebrew rustup whose cargo/rustc proxies fall through to
+        # broken rustup whose cargo/rustc proxies fall through to
         # rustup-init — `cargo <subcommand>` then dies with
         # "unexpected argument '<subcommand>' found / Usage: rustup-init".
-        # Removing every rustup install path makes `command -v rustup`
-        # return nothing, so the dtolnay/rust-toolchain step below
-        # self-installs a clean rustup from https://sh.rustup.rs.
+        # Replace it unconditionally with a clean rustup + stable
+        # toolchain from the official source so the macOS jobs never
+        # depend on the runner image's rustup. Unconditional (not
+        # health-gated) so the recovery path runs on every macOS job, not
+        # only when an image regresses. The dtolnay/rust-toolchain step
+        # below then finds this rustup and reuses it.
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
-          brew uninstall --ignore-dependencies rustup 2>/dev/null || true
-          brew uninstall --ignore-dependencies rustup-init 2>/dev/null || true
+          brew uninstall --ignore-dependencies --force rustup 2>/dev/null || true
           rm -rf "$HOME/.cargo" "$HOME/.rustup"
-          echo "rustup reset — dtolnay/rust-toolchain will reinstall clean"
+          curl --proto '=https' --tlsv1.2 --retry 5 -fsSL https://sh.rustup.rs \
+            | sh -s -- -y --default-toolchain stable --profile minimal --no-modify-path
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          # Fail loudly here with a clear label if the install did not
+          # produce a working cargo, instead of a confusing "command not
+          # found" deeper in the job.
+          "$HOME/.cargo/bin/cargo" --version
+          "$HOME/.cargo/bin/rustup" --version
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
