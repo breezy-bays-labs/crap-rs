@@ -77,6 +77,22 @@ const ASSIGNMENT_STATIC_MEMBER_OBJECT_TS: &str =
 const UPDATE_STATIC_MEMBER_OBJECT_TS: &str =
     include_str!("fixtures/ts-fixtures/update-static-member-object.ts");
 
+// crap-rs#224: mutation-kill fixtures for the pinned walker survivors
+// previously parked in `.cargo/mutants.toml`'s `exclude_re` block.
+const IF_ELSE_NESTING_TS: &str = include_str!("fixtures/ts-fixtures/if-else-nesting.ts");
+const FOR_INIT_DECISION_TS: &str = include_str!("fixtures/ts-fixtures/for-init-decision.ts");
+const OPTIONAL_CALL_ARG_TS: &str = include_str!("fixtures/ts-fixtures/optional-call-arg.ts");
+const CLASS_EXPR_ARG_TS: &str = include_str!("fixtures/ts-fixtures/class-expr-arg.ts");
+const FRAGMENT_VIEW_TSX: &str = include_str!("fixtures/ts-fixtures/fragment-view.tsx");
+const PRIVATE_FIELD_RECURSION_TS: &str =
+    include_str!("fixtures/ts-fixtures/private-field-recursion.ts");
+const TS_EXPRESSION_WRAPPERS_TS: &str =
+    include_str!("fixtures/ts-fixtures/ts-expression-wrappers.ts");
+const LINE_COL_PRECISION_TS: &str = include_str!("fixtures/ts-fixtures/line-col-precision.ts");
+const KEYED_METHODS_TS: &str = include_str!("fixtures/ts-fixtures/keyed-methods.ts");
+const TEMPLATE_LITERAL_INTERP_TS: &str =
+    include_str!("fixtures/ts-fixtures/template-literal-interp.ts");
+
 fn extract(source: &str, file_path: &str) -> Vec<FunctionComplexity> {
     let walker = OxcWalker::new();
     walker
@@ -1038,4 +1054,220 @@ fn computed_class_key_iife_is_discovered() {
     );
     assert_eq!(regular.contributors.len(), 1);
     assert_eq!(regular.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+// ── crap-rs#224: mutation-kill coverage for the pinned walker survivors ──
+//
+// Each test below pins one or more mutants that were parked in the
+// `exclude_re` block of `.cargo/mutants.toml`. That block is removed in
+// the same change — these tests are what keep the per-merge walker
+// mutation gate green without it.
+
+#[test]
+fn if_else_ladder_records_nesting_depth_per_branch() {
+    // Pins `visit_if`: an `else if` is dispatched at the chain's depth,
+    // a plain `else` body one level deeper. The cyclomatic count is the
+    // same either way, so `nesting_depth` is the observable.
+    let fns = extract(IF_ELSE_NESTING_TS, "if-else-nesting.ts");
+    let f = find_fn(&fns, "classifyDepth");
+    assert_eq!(f.complexity, 4, "three `if` decision points + base 1");
+    assert_eq!(f.contributors.len(), 3);
+    for c in &f.contributors {
+        assert_eq!(c.kind, ContributorKind::IfBranch);
+    }
+    let lines: Vec<usize> = f.contributors.iter().map(|c| c.line).collect();
+    assert_eq!(
+        lines,
+        vec![7, 9, 12],
+        "if / else-if / inner-if keyword lines"
+    );
+    let nesting: Vec<u32> = f.contributors.iter().map(|c| c.nesting_depth).collect();
+    assert_eq!(
+        nesting,
+        vec![0, 0, 1],
+        "else-if stays at chain depth; the plain `else` body is one deeper"
+    );
+}
+
+#[test]
+fn for_loop_init_clause_decision_points_are_counted() {
+    // Pins `visit_for_init` (whole-body) + `for_init_as_expression`:
+    // `declInit` exercises the declaration-init arm, `bareInit` the
+    // bare-expression-init arm.
+    let fns = extract(FOR_INIT_DECISION_TS, "for-init-decision.ts");
+    for name in ["declInit", "bareInit"] {
+        let f = find_fn(&fns, name);
+        assert_eq!(
+            f.complexity, 3,
+            "{name}: base 1 + ForLoop + a Ternary inside the for-init clause"
+        );
+        // Contributors sort by (line, column); the `for` keyword
+        // precedes the for-init ternary on the same line.
+        assert_eq!(
+            f.contributors.len(),
+            2,
+            "{name}: exactly the ForLoop and the for-init ternary"
+        );
+        assert_eq!(f.contributors[0].kind, ContributorKind::ForLoop, "{name}");
+        assert_eq!(f.contributors[1].kind, ContributorKind::Ternary, "{name}");
+    }
+}
+
+#[test]
+fn optional_call_arguments_are_walked_for_nested_functions() {
+    // Pins `visit_chain_element`: the arguments of `obj?.run(...)` are
+    // walked, so the arrow passed in is discovered as its own function.
+    let fns = extract(OPTIONAL_CALL_ARG_TS, "optional-call-arg.ts");
+    assert_eq!(
+        fns.len(),
+        2,
+        "the host function + the nested arrow argument"
+    );
+    let host = find_fn(&fns, "optionalCallArg");
+    assert_eq!(host.complexity, 2, "base 1 + the `?.` OptionalChain");
+    assert_eq!(host.contributors.len(), 1);
+    assert_eq!(
+        host.contributors[0].kind,
+        ContributorKind::OptionalChain,
+        "the `?.` call still scores an OptionalChain"
+    );
+    let arrow = find_fn(&fns, "<arrow>");
+    assert_eq!(
+        arrow.complexity, 2,
+        "the arrow passed into `obj?.run(...)` carries its own `if`"
+    );
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
+}
+
+#[test]
+fn class_expression_in_argument_position_is_walked() {
+    // Pins the `visit_expression` ClassExpression arm: a class literal
+    // passed as a call argument still has its methods discovered.
+    let fns = extract(CLASS_EXPR_ARG_TS, "class-expr-arg.ts");
+    let render = find_fn(&fns, "Widget.render");
+    assert_eq!(render.complexity, 2, "the method's ternary is counted");
+    assert_eq!(render.contributors.len(), 1);
+    assert_eq!(render.contributors[0].kind, ContributorKind::Ternary);
+}
+
+#[test]
+fn jsx_fragment_children_are_walked() {
+    // Pins the `visit_expression` JSXFragment arm: a conditional inside
+    // a `<>...</>` fragment still scores its LogicalOperator.
+    let fns = extract(FRAGMENT_VIEW_TSX, "fragment-view.tsx");
+    let f = find_fn(&fns, "FragmentView");
+    assert_eq!(
+        f.complexity, 2,
+        "the conditional render inside the fragment scores"
+    );
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::LogicalOperator);
+}
+
+#[test]
+fn private_field_object_is_walked_in_every_position() {
+    // Pins the PrivateFieldExpression arms under `visit_expression`'s
+    // AssignmentExpression / UpdateExpression / member-expression cases.
+    // The ternary in the object position is the observable decision
+    // point that proves each arm recursed.
+    let fns = extract(PRIVATE_FIELD_RECURSION_TS, "private-field-recursion.ts");
+    for name in [
+        "PrivateFieldHost.assign",
+        "PrivateFieldHost.update",
+        "PrivateFieldHost.read",
+    ] {
+        let f = find_fn(&fns, name);
+        assert_eq!(
+            f.complexity, 2,
+            "{name}: the ternary in the private-field object position is counted"
+        );
+        assert_eq!(
+            f.contributors.len(),
+            1,
+            "{name}: exactly the object-position ternary"
+        );
+        assert_eq!(f.contributors[0].kind, ContributorKind::Ternary, "{name}");
+    }
+}
+
+#[test]
+fn ts_expression_wrappers_recurse_into_their_payload() {
+    // Pins the `visit_expression` arms for YieldExpression,
+    // TSTypeAssertion, TSNonNullExpression, TSInstantiationExpression,
+    // ImportExpression, TSSatisfiesExpression. Each function wraps one
+    // ternary that only scores if the wrapper recursed into its payload.
+    let fns = extract(TS_EXPRESSION_WRAPPERS_TS, "ts-expression-wrappers.ts");
+    for name in [
+        "yieldExpr",
+        "typeAssertion",
+        "nonNull",
+        "instantiation",
+        "dynImport",
+        "satisfiesExpr",
+    ] {
+        let f = find_fn(&fns, name);
+        assert_eq!(
+            f.complexity, 2,
+            "{name}: the wrapped ternary must be counted through the wrapper"
+        );
+        assert_eq!(
+            f.contributors.len(),
+            1,
+            "{name}: exactly the wrapped ternary"
+        );
+        assert_eq!(f.contributors[0].kind, ContributorKind::Ternary, "{name}");
+    }
+}
+
+#[test]
+fn byte_offset_to_line_column_is_precise() {
+    // Pins the five `byte_to_line_col` arithmetic / comparison mutants.
+    // The `if` keyword is indented four spaces, so its 1-based column is
+    // 5 — every mutant moves it off 5.
+    let fns = extract(LINE_COL_PRECISION_TS, "line-col-precision.ts");
+    let f = find_fn(&fns, "precise");
+    assert_eq!(f.contributors.len(), 1);
+    let c = &f.contributors[0];
+    assert_eq!(c.kind, ContributorKind::IfBranch);
+    assert_eq!(c.line, 6, "the `if` keyword is on the 6th line");
+    assert_eq!(
+        c.column,
+        Some(5),
+        "the `if` keyword is indented four spaces -> 1-based column 5"
+    );
+}
+
+#[test]
+fn class_method_names_resolve_from_non_identifier_keys() {
+    // Pins the `property_key_name` PrivateIdentifier / StringLiteral /
+    // NumericLiteral arms. A dropped arm renames the method to the
+    // `<computed>` sentinel, so `find_fn` fails to locate it.
+    let fns = extract(KEYED_METHODS_TS, "keyed-methods.ts");
+    for name in [
+        "KeyedMethods.#secret",
+        "KeyedMethods.string method",
+        "KeyedMethods.42",
+    ] {
+        let f = find_fn(&fns, name);
+        assert_eq!(f.complexity, 1, "{name}: no decision points, base 1");
+        assert!(
+            f.contributors.is_empty(),
+            "{name}: a base-complexity method has no contributors"
+        );
+    }
+}
+
+#[test]
+fn template_literal_interpolation_is_walked() {
+    // Pins the `visit_expression` TemplateLiteral arm: a decision point
+    // inside a template-literal placeholder must still be counted.
+    let fns = extract(TEMPLATE_LITERAL_INTERP_TS, "template-literal-interp.ts");
+    let f = find_fn(&fns, "templateInterp");
+    assert_eq!(
+        f.complexity, 2,
+        "the ternary inside the template interpolation is counted"
+    );
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::Ternary);
 }
