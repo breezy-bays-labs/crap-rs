@@ -1101,18 +1101,15 @@ fn for_loop_init_clause_decision_points_are_counted() {
             f.complexity, 3,
             "{name}: base 1 + ForLoop + a Ternary inside the for-init clause"
         );
-        assert!(
-            f.contributors
-                .iter()
-                .any(|c| c.kind == ContributorKind::ForLoop),
-            "{name}: expected a ForLoop contributor"
+        // Contributors sort by (line, column); the `for` keyword
+        // precedes the for-init ternary on the same line.
+        assert_eq!(
+            f.contributors.len(),
+            2,
+            "{name}: exactly the ForLoop and the for-init ternary"
         );
-        assert!(
-            f.contributors
-                .iter()
-                .any(|c| c.kind == ContributorKind::Ternary),
-            "{name}: the ternary in the for-init clause must be counted"
-        );
+        assert_eq!(f.contributors[0].kind, ContributorKind::ForLoop, "{name}");
+        assert_eq!(f.contributors[1].kind, ContributorKind::Ternary, "{name}");
     }
 }
 
@@ -1127,10 +1124,11 @@ fn optional_call_arguments_are_walked_for_nested_functions() {
         "the host function + the nested arrow argument"
     );
     let host = find_fn(&fns, "optionalCallArg");
-    assert!(
-        host.contributors
-            .iter()
-            .any(|c| c.kind == ContributorKind::OptionalChain),
+    assert_eq!(host.complexity, 2, "base 1 + the `?.` OptionalChain");
+    assert_eq!(host.contributors.len(), 1);
+    assert_eq!(
+        host.contributors[0].kind,
+        ContributorKind::OptionalChain,
         "the `?.` call still scores an OptionalChain"
     );
     let arrow = find_fn(&fns, "<arrow>");
@@ -1138,12 +1136,8 @@ fn optional_call_arguments_are_walked_for_nested_functions() {
         arrow.complexity, 2,
         "the arrow passed into `obj?.run(...)` carries its own `if`"
     );
-    assert!(
-        arrow
-            .contributors
-            .iter()
-            .any(|c| c.kind == ContributorKind::IfBranch)
-    );
+    assert_eq!(arrow.contributors.len(), 1);
+    assert_eq!(arrow.contributors[0].kind, ContributorKind::IfBranch);
 }
 
 #[test]
@@ -1153,12 +1147,8 @@ fn class_expression_in_argument_position_is_walked() {
     let fns = extract(CLASS_EXPR_ARG_TS, "class-expr-arg.ts");
     let render = find_fn(&fns, "Widget.render");
     assert_eq!(render.complexity, 2, "the method's ternary is counted");
-    assert!(
-        render
-            .contributors
-            .iter()
-            .any(|c| c.kind == ContributorKind::Ternary)
-    );
+    assert_eq!(render.contributors.len(), 1);
+    assert_eq!(render.contributors[0].kind, ContributorKind::Ternary);
 }
 
 #[test]
@@ -1171,11 +1161,8 @@ fn jsx_fragment_children_are_walked() {
         f.complexity, 2,
         "the conditional render inside the fragment scores"
     );
-    assert!(
-        f.contributors
-            .iter()
-            .any(|c| c.kind == ContributorKind::LogicalOperator)
-    );
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::LogicalOperator);
 }
 
 #[test]
@@ -1195,12 +1182,12 @@ fn private_field_object_is_walked_in_every_position() {
             f.complexity, 2,
             "{name}: the ternary in the private-field object position is counted"
         );
-        assert!(
-            f.contributors
-                .iter()
-                .any(|c| c.kind == ContributorKind::Ternary),
-            "{name}: expected a Ternary contributor"
+        assert_eq!(
+            f.contributors.len(),
+            1,
+            "{name}: exactly the object-position ternary"
         );
+        assert_eq!(f.contributors[0].kind, ContributorKind::Ternary, "{name}");
     }
 }
 
@@ -1224,12 +1211,12 @@ fn ts_expression_wrappers_recurse_into_their_payload() {
             f.complexity, 2,
             "{name}: the wrapped ternary must be counted through the wrapper"
         );
-        assert!(
-            f.contributors
-                .iter()
-                .any(|c| c.kind == ContributorKind::Ternary),
-            "{name}: expected a Ternary contributor"
+        assert_eq!(
+            f.contributors.len(),
+            1,
+            "{name}: exactly the wrapped ternary"
         );
+        assert_eq!(f.contributors[0].kind, ContributorKind::Ternary, "{name}");
     }
 }
 
@@ -1264,6 +1251,10 @@ fn class_method_names_resolve_from_non_identifier_keys() {
     ] {
         let f = find_fn(&fns, name);
         assert_eq!(f.complexity, 1, "{name}: no decision points, base 1");
+        assert!(
+            f.contributors.is_empty(),
+            "{name}: a base-complexity method has no contributors"
+        );
     }
 }
 
@@ -1277,9 +1268,6 @@ fn template_literal_interpolation_is_walked() {
         f.complexity, 2,
         "the ternary inside the template interpolation is counted"
     );
-    assert!(
-        f.contributors
-            .iter()
-            .any(|c| c.kind == ContributorKind::Ternary)
-    );
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::Ternary);
 }
