@@ -51,22 +51,24 @@ self-diagnose rather than chase a phantom regression:
 
 **Resolved in 2.0.0 — arrow-function coverage now reads correctly.**
 v2's Istanbul adapter consumes `s` / `statementMap` (not `f` / `fnMap`,
-which has known variance across emitters). The 2.0.0-rc.1 / rc.2
-releases emitted one `LineCoverage` record per Istanbul statement, so
-a single source line carrying both a `const` declaration and its arrow
-body produced two records — and the matcher's per-function rollup
-treated a never-invoked arrow as ~50% covered (the declaration's
-module-load hit dominated the body's zero-hit signal). `2.0.0`
-collapses multi-statement-per-line via `min(hits)`, matching the
-implicit per-line contract the LCOV adapter already obeys. The
+which has known variance across emitters). Earlier 2.0.0 release
+candidates emitted one `LineCoverage` record per Istanbul statement,
+so a single source line carrying both a `const` declaration and its
+arrow body produced two records — and the matcher's per-function
+rollup treated a never-invoked arrow as ~50% covered (the
+declaration's module-load hit dominated the body's zero-hit signal).
+`2.0.0` collapses multi-statement-per-line via `min(hits)`, matching
+the implicit per-line contract the LCOV adapter already obeys. The
 practical effect across the `crap4ts@1.x` parity corpus is that **v2
 now reports more accurate coverage than v1 did for any function whose
 body shares a source line with its declaration** — including
 single-line arrows, single-line function expressions, and inline
-`xs.map(arrow)` patterns. Both directions of v1-vs-v2 movement (v2
-deflating an undercount-masked uninvoked body, v2 inflating away
-phantom duplicate-uncovered statements) classify as improvements
-in the parity harness. Tracked: [`crap-rs`#252](https://github.com/breezy-bays-labs/crap-rs/issues/252).
+`xs.map(arrow)` patterns. Both directions of v1-vs-v2 movement
+classify as improvements in the parity harness: v2 reports **lower**
+coverage when a genuinely uninvoked body was previously masked by its
+declaration's module-load hit, and v2 reports **higher** coverage
+when phantom duplicate per-line records previously inflated the
+denominator. Tracked: [`crap-rs`#252](https://github.com/breezy-bays-labs/crap-rs/issues/252).
 
 ### Subpath export removals
 

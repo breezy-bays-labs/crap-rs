@@ -450,7 +450,11 @@ impl IstanbulCoverage {
     /// Sorted by line for deterministic downstream consumption (mirrors
     /// the LCOV parser's ordering).
     fn line_coverage_for(entry: &IstanbulCoverageFile) -> Vec<LineCoverage> {
-        let mut by_line: HashMap<u32, u64> = HashMap::new();
+        // Capacity hint: at most one record per statement (one-to-one
+        // upper bound; MIN aggregation only shrinks the map). Pre-
+        // allocating avoids rehashing during the grouping phase on
+        // large coverage files (gemini perf hint on PR #257).
+        let mut by_line: HashMap<u32, u64> = HashMap::with_capacity(entry.s.len());
         for (stmt_id, hits) in &entry.s {
             if let Some(loc) = entry.statement_map.get(stmt_id) {
                 by_line

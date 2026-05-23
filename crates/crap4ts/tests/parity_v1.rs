@@ -371,6 +371,23 @@ fn crap252_improvement_does_not_swallow_cc_drift() {
     );
     assert_eq!(absorbed.divergences[0].class, Class::Crap252Improvement);
 
+    // Same CC, coverage drift exceeds COV_EPS, but CRAP moves the
+    // WRONG way past CRAP_EPS — coverage went DOWN yet CRAP also went
+    // DOWN by more than the tolerance band. That can't be the #252
+    // mechanism (per-line MIN preserves the CRAP-is-monotone-decreasing
+    // -in-coverage relation at fixed CC), so it must surface as a
+    // real regression. Pins the directional guard in `classify()`
+    // against a same-CC false-positive (CodeRabbit #257 nitpick).
+    let inconsistent_direction = diff(
+        &[rec("h", 30, 2, 80.0, 2.5, "low", false, &[])],
+        &[rec("h", 30, 2, 40.0, 1.5, "low", false, &["if-branch"])],
+    );
+    assert_eq!(
+        inconsistent_direction.divergences[0].class,
+        Class::ScoreRegression
+    );
+    assert!(!inconsistent_direction.gate_passes());
+
     // CC drifts from v1 to v2: walker counted differently. Falls
     // through to ScoreRegression even though coverage moved in a
     // direction the structural rule otherwise allows.
