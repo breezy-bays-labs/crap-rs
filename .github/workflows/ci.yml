@@ -72,6 +72,7 @@ jobs:
           --test istanbul_parser_cucumber
           --test arrow_function_coverage_cucumber
           --test file_extensions_cucumber
+          --test branch_coverage_cucumber
 
   crap4ts-build:
     # Per-platform build check for the new `crap4ts` shell crate (S5,

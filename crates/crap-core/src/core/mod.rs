@@ -568,6 +568,14 @@ fn score_and_summarize(
                 complexity: comp.complexity,
                 complexity_metric: comp.metric,
                 coverage_percent: cov.line_coverage.percent,
+                // Surface the branch coverage already computed by
+                // `domain::matching::compute_branch_coverage`. `None`
+                // when the parser produced no branches for this file
+                // (LCOV runs, jest without branch instrumentation) or
+                // when none of the file's branches fell inside this
+                // function's span — both cases are collapsed at the
+                // matcher.
+                branch_coverage_percent: cov.branch_coverage.as_ref().map(|bc| bc.percent),
                 crap,
                 contributors: comp.contributors.clone(),
             },

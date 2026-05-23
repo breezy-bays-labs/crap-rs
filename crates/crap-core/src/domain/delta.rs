@@ -591,6 +591,7 @@ mod tests {
                 complexity: 5,
                 complexity_metric: ComplexityMetric::Cognitive,
                 coverage_percent: 50.0,
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: score,
                     risk_level: if score > 30.0 {

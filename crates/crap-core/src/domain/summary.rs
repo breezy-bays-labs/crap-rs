@@ -580,6 +580,7 @@ mod tests {
                 complexity: 1,
                 complexity_metric: ComplexityMetric::Cognitive,
                 coverage_percent: 100.0,
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: crap_value,
                     risk_level,
@@ -750,6 +751,7 @@ mod file_summary_tests {
                 complexity: 1,
                 complexity_metric: ComplexityMetric::Cognitive,
                 coverage_percent: 100.0,
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: crap_value,
                     risk_level,
@@ -930,6 +932,7 @@ mod file_summary_tests {
                 complexity: 1,
                 complexity_metric: ComplexityMetric::Cognitive,
                 coverage_percent: f64::NAN,
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: 5.0,
                     risk_level: RiskLevel::Low,
@@ -1133,6 +1136,7 @@ mod crap_delta_tests {
                 complexity: 1,
                 complexity_metric: ComplexityMetric::Cognitive,
                 coverage_percent: 100.0,
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: crap_value,
                     risk_level,

@@ -95,6 +95,7 @@ pre-push:
         --test istanbul_parser_cucumber
         --test arrow_function_coverage_cucumber
         --test file_extensions_cucumber
+        --test branch_coverage_cucumber
       timeout: 300s
     docs:
       env:
