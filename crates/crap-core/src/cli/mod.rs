@@ -2510,7 +2510,7 @@ mod tests {
 
         fn parse(
             &self,
-            _data: &str,
+            _path: &std::path::Path,
         ) -> Result<crate::ports::ParseOutput<Self::Diagnostic>, crate::domain::types::CrapError>
         {
             unreachable!("preflight tests never invoke parse")

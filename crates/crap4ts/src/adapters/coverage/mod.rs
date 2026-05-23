@@ -537,31 +537,17 @@ impl IstanbulCoverage {
     }
 }
 
-impl CoveragePort for IstanbulCoverage {
-    type Diagnostic = IstanbulParseDiagnostic;
-
-    /// Parse a `coverage-final.json` payload into per-file
-    /// `LineCoverage` + `BranchCoverage` records.
-    ///
-    /// **Top-level shape tolerance (W2.4)**:
-    ///
-    /// 1. Try the flat `{[path]: entry}` shape first (jest, vitest,
-    ///    nyc baseline).
-    /// 2. If that fails, parse as `serde_json::Value` and try a
-    ///    single-level unwrap (`{"coverage-final": {...flat...}}`).
-    /// 3. If neither matches, emit a `SchemaUnrecognized` diagnostic
-    ///    (with detected top-level keys) and return an empty
-    ///    `ParseOutput` carrying that diagnostic — the scorecard's
-    ///    downstream "no functions extracted" path then surfaces a
-    ///    non-zero exit. Never abort first-record.
-    /// 4. If the input is not valid JSON at all,
-    ///    `Err(CrapError::SourceParse("istanbul: ..."))` propagates
-    ///    (fatal — no recovery path).
-    ///
-    /// Per-entry errors (`PathUnresolved`, `MissingField`,
-    /// `BranchMismatch`) push an `IstanbulParseDiagnostic` and skip
-    /// the entry / branch; other entries still parse cleanly.
-    fn parse(&self, data: &str) -> Result<ParseOutput<IstanbulParseDiagnostic>, CrapError> {
+impl IstanbulCoverage {
+    /// Parse already-loaded Istanbul JSON text. Pure, no I/O — the
+    /// public [`CoveragePort::parse`] impl slurps the file and
+    /// delegates here so the parser can be exercised against string
+    /// literals (in-tree unit tests and the `crap4ts/tests/istanbul_smoke.rs`
+    /// integration suite) without materializing every fixture to a
+    /// tempfile. Public because the integration suite lives in a
+    /// separate crate; production callers should go through the port
+    /// (`<IstanbulCoverage as CoveragePort>::parse`) so the slurp
+    /// choice stays centralized.
+    pub fn parse_str(&self, data: &str) -> Result<ParseOutput<IstanbulParseDiagnostic>, CrapError> {
         // Path 1: flat-shape fast path.
         if let Ok(raw) = serde_json::from_str::<HashMap<String, IstanbulCoverageFile>>(data) {
             return Ok(self.build_parse_output(raw));
@@ -611,6 +597,44 @@ impl CoveragePort for IstanbulCoverage {
                 line: None,
             }],
         })
+    }
+}
+
+impl CoveragePort for IstanbulCoverage {
+    type Diagnostic = IstanbulParseDiagnostic;
+
+    /// Slurp the Istanbul JSON file at `path` and parse it into per-file
+    /// `LineCoverage` + `BranchCoverage` records.
+    ///
+    /// **Slurp choice**: `serde_json` needs the whole document in
+    /// memory to deserialize, so streaming is not applicable here.
+    /// `coverage-final.json` files emitted by jest / vitest / nyc on
+    /// real-world TypeScript projects sit comfortably under 10 MB; a
+    /// single read is the correct tradeoff. Pre-flight
+    /// [`Self::validate`] also slurps for the same reason.
+    ///
+    /// **Top-level shape tolerance (W2.4)** — implemented by
+    /// [`Self::parse_str`]:
+    ///
+    /// 1. Try the flat `{[path]: entry}` shape first (jest, vitest,
+    ///    nyc baseline).
+    /// 2. If that fails, parse as `serde_json::Value` and try a
+    ///    single-level unwrap (`{"coverage-final": {...flat...}}`).
+    /// 3. If neither matches, emit a `SchemaUnrecognized` diagnostic
+    ///    (with detected top-level keys) and return an empty
+    ///    `ParseOutput` carrying that diagnostic — the scorecard's
+    ///    downstream "no functions extracted" path then surfaces a
+    ///    non-zero exit. Never abort first-record.
+    /// 4. If the input is not valid JSON at all,
+    ///    `Err(CrapError::SourceParse("istanbul: ..."))` propagates
+    ///    (fatal — no recovery path).
+    ///
+    /// Per-entry errors (`PathUnresolved`, `MissingField`,
+    /// `BranchMismatch`) push an `IstanbulParseDiagnostic` and skip
+    /// the entry / branch; other entries still parse cleanly.
+    fn parse(&self, path: &Path) -> Result<ParseOutput<IstanbulParseDiagnostic>, CrapError> {
+        let data = std::fs::read_to_string(path).map_err(CrapError::Io)?;
+        self.parse_str(&data)
     }
 
     /// Pre-flight structural check: parse the file as Istanbul JSON and
@@ -674,7 +698,7 @@ mod tests {
     #[test]
     fn parse_empty_object_returns_ok_with_no_coverage() {
         let c = IstanbulCoverage::new(PathBuf::from("/tmp"));
-        let out = c.parse("{}").expect("empty JSON object parses cleanly");
+        let out = c.parse_str("{}").expect("empty JSON object parses cleanly");
         assert!(out.coverage.is_empty());
         assert!(out.diagnostics.is_empty());
         assert!(out.branches.is_none());
@@ -683,7 +707,7 @@ mod tests {
     #[test]
     fn parse_malformed_json_returns_source_parse_with_istanbul_prefix() {
         let c = IstanbulCoverage::new(PathBuf::from("/tmp"));
-        let err = c.parse("{not json").unwrap_err();
+        let err = c.parse_str("{not json").unwrap_err();
         match err {
             CrapError::SourceParse(msg) => {
                 assert!(msg.starts_with("istanbul: "), "msg: {msg}");

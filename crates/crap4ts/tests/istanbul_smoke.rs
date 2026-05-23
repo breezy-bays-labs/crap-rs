@@ -111,7 +111,7 @@ fn hits_at(lines: &[LineCoverage], line: usize) -> u64 {
 fn parses_jest_fixture_with_all_five_files() {
     let (_tmp, canonical, payload) = build_fixture();
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("happy path parses");
+    let out = parser.parse_str(&payload).expect("happy path parses");
 
     // All five fixture files surface in the coverage map.
     let keys: Vec<_> = out.coverage.keys().cloned().collect();
@@ -171,7 +171,9 @@ fn validate_returns_err_on_bad_shape() {
 #[test]
 fn parse_malformed_json_returns_source_parse_with_istanbul_prefix() {
     let parser = IstanbulCoverage::new(PathBuf::from("/tmp"));
-    let err = parser.parse("{ not json").expect_err("malformed rejected");
+    let err = parser
+        .parse_str("{ not json")
+        .expect_err("malformed rejected");
     match err {
         CrapError::SourceParse(msg) => {
             assert!(
@@ -198,7 +200,7 @@ fn parse_emits_path_unresolved_for_out_of_tree_entries() {
     }"#;
     let parser = IstanbulCoverage::new(canonical);
     let out = parser
-        .parse(stray)
+        .parse_str(stray)
         .expect("stray entry parses but diagnoses");
 
     assert!(
@@ -236,7 +238,7 @@ fn parse_emits_path_unresolved_for_out_of_tree_entries() {
 fn arrow_ac_5a_square_covered_cube_uncovered() {
     let (_tmp, canonical, payload) = build_fixture();
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("happy path");
+    let out = parser.parse_str(&payload).expect("happy path");
 
     let arrow = lines_for(&out, "arrow.ts");
 
@@ -284,7 +286,7 @@ fn arrow_ac_5a_square_covered_cube_uncovered() {
 fn arrow_ac_5b_button_and_use_callback_handle_both_100() {
     let (_tmp, canonical, payload) = build_fixture();
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("happy path");
+    let out = parser.parse_str(&payload).expect("happy path");
 
     let button = lines_for(&out, "Button.tsx");
 
@@ -322,7 +324,7 @@ fn arrow_ac_5b_button_and_use_callback_handle_both_100() {
 fn arrow_ac_5c_inner_map_arrow_covered() {
     let (_tmp, canonical, payload) = build_fixture();
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("happy path");
+    let out = parser.parse_str(&payload).expect("happy path");
 
     let map = lines_for(&out, "map.ts");
 
@@ -360,7 +362,7 @@ fn arrow_ac_5c_inner_map_arrow_covered() {
 fn arrow_ac_5d_mixed_bodies_all_covered() {
     let (_tmp, canonical, payload) = build_fixture();
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("happy path");
+    let out = parser.parse_str(&payload).expect("happy path");
 
     let mixed = lines_for(&out, "mixed.ts");
 
@@ -459,7 +461,7 @@ fn build_three_file_fixture(payload_template: &str) -> (TempDir, PathBuf, String
 fn w23_branches_populated_when_b_records_present() {
     let (_tmp, canonical, payload) = build_branch_heavy_fixture(BRANCHES_FIXTURE);
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("branch-heavy parses");
+    let out = parser.parse_str(&payload).expect("branch-heavy parses");
 
     let branches = out
         .branches
@@ -490,7 +492,7 @@ fn w23_branches_populated_when_b_records_present() {
 fn w23_branch_arms_fan_to_per_arm_rows_not_summed() {
     let (_tmp, canonical, payload) = build_branch_heavy_fixture(BRANCHES_FIXTURE);
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("branch-heavy parses");
+    let out = parser.parse_str(&payload).expect("branch-heavy parses");
 
     let branches = out.branches.unwrap();
     let file_branches = branches.get("branch-heavy.ts").unwrap();
@@ -522,7 +524,7 @@ fn w23_branch_arms_fan_to_per_arm_rows_not_summed() {
 fn w23_orphan_branch_id_emits_branch_mismatch_and_skips_only_that_branch() {
     let (_tmp, canonical, payload) = build_branch_heavy_fixture(ORPHAN_BRANCH_FIXTURE);
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("orphan-branch parses");
+    let out = parser.parse_str(&payload).expect("orphan-branch parses");
 
     // Exactly one `BranchMismatch` diagnostic — for branchId 42.
     let mismatches: Vec<_> = out
@@ -568,7 +570,7 @@ fn w23_orphan_branch_id_emits_branch_mismatch_and_skips_only_that_branch() {
 fn w23_regression_no_b_records_leaves_branches_none() {
     let (_tmp, canonical, payload) = build_fixture();
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("happy path");
+    let out = parser.parse_str(&payload).expect("happy path");
     assert!(
         out.branches.is_none(),
         "W1.1 jest fixture has `\"b\": {{}}` for every entry — branches must stay None"
@@ -583,7 +585,7 @@ fn w23_regression_no_b_records_leaves_branches_none() {
 fn w24_vitest_shape_parses_with_no_diagnostics() {
     let (_tmp, canonical, payload) = build_three_file_fixture(VITEST_FIXTURE);
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("vitest parses");
+    let out = parser.parse_str(&payload).expect("vitest parses");
 
     let keys: Vec<_> = out.coverage.keys().cloned().collect();
     assert!(keys.contains(&"simple.ts".to_string()), "keys: {keys:?}");
@@ -617,7 +619,7 @@ fn w24_vitest_null_columns_parse_without_bailing() {
 
     let parser = IstanbulCoverage::new(canonical);
     let out = parser
-        .parse(&payload)
+        .parse_str(&payload)
         .expect("null-column fixture parses successfully (regression for #211)");
 
     let keys: Vec<_> = out.coverage.keys().cloned().collect();
@@ -648,7 +650,7 @@ fn w24_vitest_null_columns_parse_without_bailing() {
 fn w24_nyc_absolute_paths_normalize_via_strip_prefix() {
     let (_tmp, canonical, payload) = build_three_file_fixture(NYC_FIXTURE);
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("nyc parses");
+    let out = parser.parse_str(&payload).expect("nyc parses");
 
     let keys: Vec<_> = out.coverage.keys().cloned().collect();
     assert!(keys.contains(&"simple.ts".to_string()), "keys: {keys:?}");
@@ -676,7 +678,9 @@ fn w24_wrapped_shape_parses_via_single_level_unwrap() {
     let payload = WRAPPED_FIXTURE.replace("{SRC_ROOT}", &canonical.to_string_lossy());
 
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("wrapped parses via unwrap");
+    let out = parser
+        .parse_str(&payload)
+        .expect("wrapped parses via unwrap");
 
     let keys: Vec<_> = out.coverage.keys().cloned().collect();
     assert!(keys.contains(&"simple.ts".to_string()), "keys: {keys:?}");
@@ -692,7 +696,7 @@ fn w24_wrapped_shape_parses_via_single_level_unwrap() {
 fn w24_unrecognized_shape_emits_schema_unrecognized_with_detected_keys() {
     let parser = IstanbulCoverage::new(PathBuf::from("/tmp"));
     let out = parser
-        .parse(r#"{"foo": "bar", "baz": 42}"#)
+        .parse_str(r#"{"foo": "bar", "baz": 42}"#)
         .expect("parse returns Ok with diagnostic; downstream produces non-zero exit");
 
     assert!(out.coverage.is_empty(), "no coverage on unrecognized shape");
@@ -718,7 +722,7 @@ fn w24_unrecognized_shape_emits_schema_unrecognized_with_detected_keys() {
 fn w24_orphan_path_emits_path_unresolved_and_valid_entries_still_parse() {
     let (_tmp, canonical, payload) = build_branch_heavy_fixture(ORPHAN_PATH_FIXTURE);
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("orphan-path parses");
+    let out = parser.parse_str(&payload).expect("orphan-path parses");
 
     let unresolved: Vec<_> = out
         .diagnostics
@@ -752,7 +756,7 @@ fn w24_orphan_path_emits_path_unresolved_and_valid_entries_still_parse() {
 fn w24_missing_field_emits_diagnostic_and_skips_only_that_entry() {
     let (_tmp, canonical, payload) = build_branch_heavy_fixture(MISSING_FIELD_FIXTURE);
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("missing-field parses");
+    let out = parser.parse_str(&payload).expect("missing-field parses");
 
     let missing: Vec<_> = out
         .diagnostics
@@ -780,7 +784,7 @@ fn w24_missing_field_emits_diagnostic_and_skips_only_that_entry() {
 #[test]
 fn w24_truly_malformed_json_still_returns_source_parse_error() {
     let parser = IstanbulCoverage::new(PathBuf::from("/tmp"));
-    let err = parser.parse("{not json at all").unwrap_err();
+    let err = parser.parse_str("{not json at all").unwrap_err();
     match err {
         CrapError::SourceParse(msg) => assert!(msg.starts_with("istanbul: "), "msg: {msg}"),
         other => panic!("expected SourceParse, got {other:?}"),
@@ -814,7 +818,7 @@ fn w24_validate_accepts_wrapped_shape_for_cli_parity_with_parse() {
 fn w24_top_level_array_emits_schema_unrecognized() {
     let parser = IstanbulCoverage::new(PathBuf::from("/tmp"));
     let out = parser
-        .parse(r#"["not", "istanbul"]"#)
+        .parse_str(r#"["not", "istanbul"]"#)
         .expect("returns Ok with diagnostic");
     assert_eq!(out.diagnostics.len(), 1);
     assert_eq!(
@@ -874,7 +878,7 @@ fn fix215_foreign_prefix_absolute_path_resolves_via_suffix_fallback() {
 
     let parser = IstanbulCoverage::new(canonical);
     let out = parser
-        .parse(&payload)
+        .parse_str(&payload)
         .expect("foreign-prefix absolute path parses via suffix fallback");
 
     assert!(
@@ -915,7 +919,7 @@ fn fix215_no_matching_suffix_still_emits_path_unresolved() {
     );
 
     let parser = IstanbulCoverage::new(canonical);
-    let out = parser.parse(&payload).expect("parses with diagnostic");
+    let out = parser.parse_str(&payload).expect("parses with diagnostic");
 
     let unresolved: Vec<_> = out
         .diagnostics
@@ -961,7 +965,7 @@ fn fix215_ambiguous_suffix_longest_wins_deterministically() {
 
     let parser = IstanbulCoverage::new(canonical);
     let out = parser
-        .parse(&payload)
+        .parse_str(&payload)
         .expect("ambiguous-suffix path parses");
 
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
@@ -1084,7 +1088,7 @@ fn fix216_parentdir_traversal_does_not_resolve_outside_effective_src() {
 
     let parser = IstanbulCoverage::new(src_root);
     let out = parser
-        .parse(&payload)
+        .parse_str(&payload)
         .expect("traversal path parses (with diagnostic), no panic");
 
     let unresolved: Vec<_> = out
@@ -1210,7 +1214,7 @@ fn assert_producer_well_formed(
 fn producer_jest29_parses_clean() {
     let (_t, c, p) = build_producer_fixture(PRODUCER_JEST);
     let out = IstanbulCoverage::new(c)
-        .parse(&p)
+        .parse_str(&p)
         .expect("jest 29 captured fixture parses");
     assert_producer_well_formed(&out);
     assert!(
@@ -1231,7 +1235,7 @@ fn producer_vitest4_parses_clean_with_null_columns() {
         "vitest4 fixture must carry null columns — that is the variance under test"
     );
     let out = IstanbulCoverage::new(c)
-        .parse(&p)
+        .parse_str(&p)
         .expect("vitest 4.x captured fixture parses despite null columns");
     assert_producer_well_formed(&out);
 }
@@ -1242,7 +1246,7 @@ fn producer_vitest4_parses_clean_with_null_columns() {
 fn producer_nyc17_parses_clean() {
     let (_t, c, p) = build_producer_fixture(PRODUCER_NYC);
     let out = IstanbulCoverage::new(c)
-        .parse(&p)
+        .parse_str(&p)
         .expect("nyc 17 captured fixture parses");
     assert_producer_well_formed(&out);
 }
@@ -1254,7 +1258,7 @@ fn producer_nyc17_parses_clean() {
 fn producer_c8_parses_clean() {
     let (_t, c, p) = build_producer_fixture(PRODUCER_C8);
     let out = IstanbulCoverage::new(c)
-        .parse(&p)
+        .parse_str(&p)
         .expect("c8 captured fixture parses");
     assert_producer_well_formed(&out);
 }

@@ -56,7 +56,20 @@ pub struct ParseOutput<P: ParseDiagnostic> {
 /// See ADR D9 for the mixed-dispatch rationale.
 pub trait CoveragePort {
     type Diagnostic: ParseDiagnostic;
-    fn parse(&self, data: &str) -> Result<ParseOutput<Self::Diagnostic>, CrapError>;
+
+    /// Parse the coverage file at `path` into per-file line / branch
+    /// hit data.
+    ///
+    /// Takes `&Path` (not `&str`) so each impl owns its read strategy:
+    /// LCOV stays free to stream line-by-line via `BufReader`, Istanbul
+    /// JSON slurps once and hands the buffer to `serde_json`. Forcing
+    /// the caller to pre-read into a `String` would (a) require slurp
+    /// universally even when streaming is viable and (b) double peak
+    /// RSS on every invocation since [`Self::validate`] already takes
+    /// `&Path` and may stream the same file. Per the
+    /// `feedback_trait_io_input_path_over_str` operational rule, port
+    /// methods that gate on file content take `&Path`.
+    fn parse(&self, path: &Path) -> Result<ParseOutput<Self::Diagnostic>, CrapError>;
 
     /// Adapter-aware pre-flight check: does the file at `path` contain
     /// at least one usable coverage record? Runs before the analyzer
@@ -69,13 +82,13 @@ pub trait CoveragePort {
     /// LCOV format easily exceeds 100 MB on large workspaces and
     /// loading the whole file into memory twice (once here, once in
     /// `parse`) would double peak RSS for no semantic gain. Adapters
-    /// that need random access (Istanbul JSON, post-implementation)
-    /// can still slurp via `read_to_string` internally.
+    /// that need random access (Istanbul JSON) can still slurp via
+    /// `read_to_string` internally.
     ///
     /// Default implementation returns `Ok(())` (skip validation) —
     /// adapters with a cheap structural signature override. The LCOV
     /// adapter checks for `SF:` + `DA:` records; the Istanbul adapter
-    /// will check for non-empty `statementMap` once implemented.
+    /// checks for at least one entry with a non-empty `statementMap`.
     ///
     /// The returned `Err(String)` is the structural reason
     /// (e.g., `"no SF/DA records"`); the CLI layer pairs it with the

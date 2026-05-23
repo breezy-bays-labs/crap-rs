@@ -156,6 +156,36 @@ differ for the three compounding reasons documented there.
   resolving a preset to a numeric cutoff must pass the effective
   metric. crap-core minor-bumped `0.2.0` → `0.3.0`; no external
   consumers. (#218)
+- `CoveragePort::parse` now takes `&Path` instead of `&str` so each
+  adapter owns its slurp-vs-stream decision internally. The shared
+  pre-read in `crap_core::core::Analyzer::parse_coverage` is removed,
+  eliminating the double-read trap where the orchestrator slurped a
+  100 MB LCOV file before handing the buffer to a parser that could
+  have streamed. `LcovParser` and `IstanbulCoverage` both slurp via
+  `std::fs::read_to_string` internally (size ceilings well below
+  peak-RSS concern); future streaming adapters drop in unchanged.
+  External `CoveragePort` impls — likely none today, the port has
+  been internal — migrate by changing the `parse` signature to
+  `fn parse(&self, path: &Path) -> Result<…>` and adding a slurp
+  or stream at the top of the body. Each impl owns its read
+  strategy; the trait makes no commitment. (#179)
+- `CrapError::LcovParse(String)` renamed to
+  `CrapError::CoverageParse(String)`. The variant was always
+  adapter-agnostic in intent — both the LCOV and Istanbul parsers
+  today either succeed (emitting per-record issues as non-fatal
+  `ParseOutput.diagnostics`) or fail via `CrapError::SourceParse`
+  for malformed top-level structure, so the rename has no
+  user-facing impact on current adapters. The variant stays as the
+  stable error surface for future adapter-format parse failures
+  that don't fit either bucket; tool-prefixed messages
+  (`"lcov: …"` / `"istanbul: …"`) render at construction sites.
+  `CrapError` remains `#[non_exhaustive]` so external matchers with
+  `_ => …` arms continue to compile; explicit
+  `CrapError::LcovParse(_)` matches need a one-line rename.
+  Mirrors the same anti-pattern class that closed #161. (#178)
+
+crap-core minor-bumped `0.3.0` → `0.4.0` to cover both breaking
+changes above in a single migration window.
 
 ## [0.5.0] - 2026-05-10
 

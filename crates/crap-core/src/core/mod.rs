@@ -272,15 +272,30 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
     }
 
     fn parse_coverage(&self) -> Result<ParseOutput<P>> {
-        let coverage_data = std::fs::read_to_string(&self.options.coverage).with_context(|| {
-            format!(
-                "failed to read coverage file: {}",
-                self.options.coverage.display()
-            )
-        })?;
+        // `CoveragePort::parse` takes `&Path` post-#179 — each adapter
+        // owns its slurp-vs-stream decision internally (LCOV slurps;
+        // Istanbul slurps; `validate` streams in the LCOV case). The
+        // orchestrator no longer pre-reads, eliminating the double-read
+        // trap that motivated `feedback_trait_io_input_path_over_str`.
+        //
+        // The pre-#179 implementation slurped here and wrapped any
+        // open/read failure with `"failed to read coverage file: <path>"`
+        // via `with_context`. The path-aware context is still load-
+        // bearing (test contract + user-facing error UX), so we
+        // re-add it at the orchestrator boundary — only when the
+        // adapter surfaces an I/O failure (the path-doesn't-exist
+        // case), letting per-adapter parse errors (malformed JSON,
+        // etc.) flow through their own messages.
         self.coverage
-            .parse(&coverage_data)
-            .map_err(|e| anyhow::anyhow!("{e}"))
+            .parse(&self.options.coverage)
+            .map_err(|e| match e {
+                crate::domain::types::CrapError::Io(io_err) => anyhow::anyhow!(
+                    "failed to read coverage file: {}: {}",
+                    self.options.coverage.display(),
+                    io_err
+                ),
+                other => anyhow::anyhow!("{other}"),
+            })
     }
 
     fn extract_complexities(&self, source_files: &[PathBuf]) -> Result<ExtractedComplexities> {

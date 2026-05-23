@@ -105,10 +105,15 @@ impl IstanbulWorld {
     }
 
     /// Parse `payload` under `root` and stash the outcome.
+    ///
+    /// Uses `IstanbulCoverage::parse_str` (the pure-string entry point)
+    /// rather than `<IstanbulCoverage as CoveragePort>::parse(&Path)` so
+    /// scenarios can feed JSON literals directly without staging every
+    /// payload to a tempfile. Production callers go through the port.
     fn run_parse(&mut self) {
         let payload = self.payload.clone().expect("a Given must set the payload");
         let parser = IstanbulCoverage::new(self.root());
-        self.parsed = Some(parser.parse(&payload));
+        self.parsed = Some(parser.parse_str(&payload));
     }
 
     fn ok(&self) -> &ParseOutput<IstanbulParseDiagnostic> {

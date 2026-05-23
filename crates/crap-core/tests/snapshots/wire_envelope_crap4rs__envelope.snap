@@ -3535,10 +3535,43 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 65,
+              "end_line": 71,
               "increment": 1,
               "kind": "for-loop",
-              "line": 63,
+              "line": 69,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "acceptable",
+            "value": 6.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "LcovParser::parse_str",
+            "span": {
+              "end_column": 5,
+              "end_line": 75,
+              "start_column": 5,
+              "start_line": 58
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 72,
+              "end_line": 94,
+              "increment": 1,
+              "kind": "try",
+              "line": 94,
               "nesting_depth": 0
             }
           ],
@@ -3552,9 +3585,9 @@ expression: pretty
             "qualified_name": "LcovParser::parse",
             "span": {
               "end_column": 5,
-              "end_line": 69,
+              "end_line": 96,
               "start_column": 5,
-              "start_line": 60
+              "start_line": 81
             }
           }
         },
@@ -3568,58 +3601,58 @@ expression: pretty
           "contributors": [
             {
               "column": 73,
-              "end_line": 84,
+              "end_line": 111,
               "increment": 1,
               "kind": "try",
-              "line": 84,
+              "line": 111,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 101,
+              "end_line": 128,
               "increment": 1,
               "kind": "for-loop",
-              "line": 87,
+              "line": 114,
               "nesting_depth": 0
             },
             {
               "column": 68,
-              "end_line": 88,
+              "end_line": 115,
               "increment": 1,
               "kind": "try",
-              "line": 88,
+              "line": 115,
               "nesting_depth": 1
             },
             {
               "column": 13,
-              "end_line": 92,
+              "end_line": 119,
               "increment": 2,
               "kind": "if-branch",
-              "line": 89,
+              "line": 116,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 91,
+              "end_line": 118,
               "increment": 1,
               "kind": "continue",
-              "line": 91,
+              "line": 118,
               "nesting_depth": 2
             },
             {
               "column": 13,
-              "end_line": 100,
+              "end_line": 127,
               "increment": 2,
               "kind": "if-branch",
-              "line": 93,
+              "line": 120,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 94,
+              "end_line": 121,
               "increment": 1,
               "kind": "logical-operator",
-              "line": 94,
+              "line": 121,
               "nesting_depth": 1
             }
           ],
@@ -3633,9 +3666,9 @@ expression: pretty
             "qualified_name": "LcovParser::validate",
             "span": {
               "end_column": 5,
-              "end_line": 103,
+              "end_line": 130,
               "start_column": 5,
-              "start_line": 71
+              "start_line": 98
             }
           }
         },
@@ -3649,26 +3682,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 110,
+              "end_line": 137,
               "increment": 1,
               "kind": "if-branch",
-              "line": 107,
+              "line": 134,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 115,
+              "end_line": 142,
               "increment": 1,
               "kind": "if-branch",
-              "line": 112,
+              "line": 139,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 119,
+              "end_line": 146,
               "increment": 1,
               "kind": "if-branch",
-              "line": 117,
+              "line": 144,
               "nesting_depth": 0
             }
           ],
@@ -3682,9 +3715,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 120,
+              "end_line": 147,
               "start_column": 1,
-              "start_line": 106
+              "start_line": 133
             }
           }
         },
@@ -3698,10 +3731,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 132,
+              "end_line": 159,
               "increment": 1,
               "kind": "if-branch",
-              "line": 125,
+              "line": 152,
               "nesting_depth": 0
             }
           ],
@@ -3715,9 +3748,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 133,
+              "end_line": 160,
               "start_column": 1,
-              "start_line": 122
+              "start_line": 149
             }
           }
         },
@@ -3731,18 +3764,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 138,
+              "end_line": 165,
               "increment": 1,
               "kind": "if-branch",
-              "line": 136,
+              "line": 163,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 143,
+              "end_line": 170,
               "increment": 1,
               "kind": "match",
-              "line": 140,
+              "line": 167,
               "nesting_depth": 0
             }
           ],
@@ -3756,9 +3789,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 144,
+              "end_line": 171,
               "start_column": 1,
-              "start_line": 135
+              "start_line": 162
             }
           }
         },
@@ -3772,18 +3805,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 149,
+              "end_line": 176,
               "increment": 1,
               "kind": "if-branch",
-              "line": 147,
+              "line": 174,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 156,
+              "end_line": 183,
               "increment": 1,
               "kind": "match",
-              "line": 151,
+              "line": 178,
               "nesting_depth": 0
             }
           ],
@@ -3797,9 +3830,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 157,
+              "end_line": 184,
               "start_column": 1,
-              "start_line": 146
+              "start_line": 173
             }
           }
         },
@@ -3821,9 +3854,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 166,
+              "end_line": 193,
               "start_column": 1,
-              "start_line": 159
+              "start_line": 186
             }
           }
         },
@@ -3837,42 +3870,42 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 171,
+              "end_line": 198,
               "increment": 1,
               "kind": "try",
-              "line": 171,
+              "line": 198,
               "nesting_depth": 0
             },
             {
               "column": 52,
-              "end_line": 173,
+              "end_line": 200,
               "increment": 1,
               "kind": "try",
-              "line": 173,
+              "line": 200,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 174,
+              "end_line": 201,
               "increment": 1,
               "kind": "try",
-              "line": 174,
+              "line": 201,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 177,
+              "end_line": 204,
               "increment": 1,
               "kind": "if-branch",
-              "line": 175,
+              "line": 202,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 178,
+              "end_line": 205,
               "increment": 1,
               "kind": "try",
-              "line": 178,
+              "line": 205,
               "nesting_depth": 0
             }
           ],
@@ -3886,9 +3919,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 180,
+              "end_line": 207,
               "start_column": 1,
-              "start_line": 168
+              "start_line": 195
             }
           }
         },
@@ -3902,82 +3935,82 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 187,
+              "end_line": 214,
               "increment": 1,
               "kind": "try",
-              "line": 187,
+              "line": 214,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 188,
+              "end_line": 215,
               "increment": 1,
               "kind": "try",
-              "line": 188,
+              "line": 215,
               "nesting_depth": 0
             },
             {
               "column": 44,
-              "end_line": 189,
+              "end_line": 216,
               "increment": 1,
               "kind": "try",
-              "line": 189,
+              "line": 216,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 190,
+              "end_line": 217,
               "increment": 1,
               "kind": "try",
-              "line": 190,
+              "line": 217,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 192,
+              "end_line": 219,
               "increment": 1,
               "kind": "try",
-              "line": 192,
+              "line": 219,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 195,
+              "end_line": 222,
               "increment": 1,
               "kind": "if-branch",
-              "line": 193,
+              "line": 220,
               "nesting_depth": 0
             },
             {
               "column": 55,
-              "end_line": 196,
+              "end_line": 223,
               "increment": 1,
               "kind": "try",
-              "line": 196,
+              "line": 223,
               "nesting_depth": 0
             },
             {
               "column": 57,
-              "end_line": 197,
+              "end_line": 224,
               "increment": 1,
               "kind": "try",
-              "line": 197,
+              "line": 224,
               "nesting_depth": 0
             },
             {
               "column": 17,
-              "end_line": 202,
+              "end_line": 229,
               "increment": 1,
               "kind": "if-branch",
-              "line": 198,
+              "line": 225,
               "nesting_depth": 0
             },
             {
               "column": 54,
-              "end_line": 201,
+              "end_line": 228,
               "increment": 1,
               "kind": "try",
-              "line": 201,
+              "line": 228,
               "nesting_depth": 1
             }
           ],
@@ -3991,9 +4024,9 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 205,
+              "end_line": 232,
               "start_column": 1,
-              "start_line": 182
+              "start_line": 209
             }
           }
         },
@@ -4007,10 +4040,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 211,
+              "end_line": 238,
               "increment": 1,
               "kind": "let-else",
-              "line": 208,
+              "line": 235,
               "nesting_depth": 0
             }
           ],
@@ -4024,9 +4057,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 216,
+              "end_line": 243,
               "start_column": 1,
-              "start_line": 207
+              "start_line": 234
             }
           }
         },
@@ -4040,18 +4073,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 225,
+              "end_line": 252,
               "increment": 1,
               "kind": "if-branch",
-              "line": 223,
+              "line": 250,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 230,
+              "end_line": 257,
               "increment": 1,
               "kind": "for-loop",
-              "line": 228,
+              "line": 255,
               "nesting_depth": 0
             }
           ],
@@ -4065,9 +4098,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 231,
+              "end_line": 258,
               "start_column": 1,
-              "start_line": 218
+              "start_line": 245
             }
           }
         },
@@ -4081,18 +4114,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 240,
+              "end_line": 267,
               "increment": 1,
               "kind": "if-branch",
-              "line": 238,
+              "line": 265,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 245,
+              "end_line": 272,
               "increment": 1,
               "kind": "for-loop",
-              "line": 243,
+              "line": 270,
               "nesting_depth": 0
             }
           ],
@@ -4106,9 +4139,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 246,
+              "end_line": 273,
               "start_column": 1,
-              "start_line": 233
+              "start_line": 260
             }
           }
         },
@@ -4130,9 +4163,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 253,
+              "end_line": 280,
               "start_column": 1,
-              "start_line": 248
+              "start_line": 275
             }
           }
         },
@@ -4154,9 +4187,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 264,
+              "end_line": 291,
               "start_column": 1,
-              "start_line": 255
+              "start_line": 282
             }
           }
         },
@@ -4170,10 +4203,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 272,
+              "end_line": 299,
               "increment": 1,
               "kind": "match",
-              "line": 267,
+              "line": 294,
               "nesting_depth": 0
             }
           ],
@@ -4187,9 +4220,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 273,
+              "end_line": 300,
               "start_column": 1,
-              "start_line": 266
+              "start_line": 293
             }
           }
         },
@@ -4211,9 +4244,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 278,
+              "end_line": 305,
               "start_column": 1,
-              "start_line": 275
+              "start_line": 302
             }
           }
         },
@@ -4235,9 +4268,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 306,
+              "end_line": 333,
               "start_column": 1,
-              "start_line": 280
+              "start_line": 307
             }
           }
         },
@@ -4259,9 +4292,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 313,
+              "end_line": 340,
               "start_column": 1,
-              "start_line": 308
+              "start_line": 335
             }
           }
         },
@@ -4283,9 +4316,9 @@ expression: pretty
             "qualified_name": "parser",
             "span": {
               "end_column": 5,
-              "end_line": 322,
+              "end_line": 349,
               "start_column": 5,
-              "start_line": 320
+              "start_line": 347
             }
           }
         },
@@ -4307,9 +4340,9 @@ expression: pretty
             "qualified_name": "parse",
             "span": {
               "end_column": 5,
-              "end_line": 326,
+              "end_line": 353,
               "start_column": 5,
-              "start_line": 324
+              "start_line": 351
             }
           }
         },
@@ -4331,9 +4364,9 @@ expression: pretty
             "qualified_name": "empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 333,
+              "end_line": 360,
               "start_column": 5,
-              "start_line": 328
+              "start_line": 355
             }
           }
         },
@@ -4355,9 +4388,9 @@ expression: pretty
             "qualified_name": "validate_str",
             "span": {
               "end_column": 5,
-              "end_line": 347,
+              "end_line": 374,
               "start_column": 5,
-              "start_line": 337
+              "start_line": 364
             }
           }
         },
@@ -4379,9 +4412,9 @@ expression: pretty
             "qualified_name": "validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 352,
+              "end_line": 379,
               "start_column": 5,
-              "start_line": 349
+              "start_line": 376
             }
           }
         },
@@ -4403,9 +4436,9 @@ expression: pretty
             "qualified_name": "validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 357,
+              "end_line": 384,
               "start_column": 5,
-              "start_line": 354
+              "start_line": 381
             }
           }
         },
@@ -4427,9 +4460,9 @@ expression: pretty
             "qualified_name": "validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 362,
+              "end_line": 389,
               "start_column": 5,
-              "start_line": 359
+              "start_line": 386
             }
           }
         },
@@ -4451,9 +4484,9 @@ expression: pretty
             "qualified_name": "validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 367,
+              "end_line": 394,
               "start_column": 5,
-              "start_line": 364
+              "start_line": 391
             }
           }
         },
@@ -4475,9 +4508,9 @@ expression: pretty
             "qualified_name": "validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 372,
+              "end_line": 399,
               "start_column": 5,
-              "start_line": 369
+              "start_line": 396
             }
           }
         },
@@ -4499,9 +4532,9 @@ expression: pretty
             "qualified_name": "validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 382,
+              "end_line": 409,
               "start_column": 5,
-              "start_line": 374
+              "start_line": 401
             }
           }
         },
@@ -4523,9 +4556,9 @@ expression: pretty
             "qualified_name": "validate_missing_path_returns_open_error",
             "span": {
               "end_column": 5,
-              "end_line": 394,
+              "end_line": 421,
               "start_column": 5,
-              "start_line": 384
+              "start_line": 411
             }
           }
         },
@@ -4547,9 +4580,9 @@ expression: pretty
             "qualified_name": "single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 404,
+              "end_line": 431,
               "start_column": 5,
-              "start_line": 396
+              "start_line": 423
             }
           }
         },
@@ -4571,9 +4604,9 @@ expression: pretty
             "qualified_name": "multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 414,
+              "end_line": 441,
               "start_column": 5,
-              "start_line": 406
+              "start_line": 433
             }
           }
         },
@@ -4595,9 +4628,9 @@ expression: pretty
             "qualified_name": "multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 423,
+              "end_line": 450,
               "start_column": 5,
-              "start_line": 416
+              "start_line": 443
             }
           }
         },
@@ -4619,9 +4652,9 @@ expression: pretty
             "qualified_name": "hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 431,
+              "end_line": 458,
               "start_column": 5,
-              "start_line": 425
+              "start_line": 452
             }
           }
         },
@@ -4643,9 +4676,9 @@ expression: pretty
             "qualified_name": "path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 437,
+              "end_line": 464,
               "start_column": 5,
-              "start_line": 433
+              "start_line": 460
             }
           }
         },
@@ -4667,9 +4700,9 @@ expression: pretty
             "qualified_name": "non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 443,
+              "end_line": 470,
               "start_column": 5,
-              "start_line": 439
+              "start_line": 466
             }
           }
         },
@@ -4691,9 +4724,9 @@ expression: pretty
             "qualified_name": "backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 450,
+              "end_line": 477,
               "start_column": 5,
-              "start_line": 445
+              "start_line": 472
             }
           }
         },
@@ -4715,9 +4748,9 @@ expression: pretty
             "qualified_name": "path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 456,
+              "end_line": 483,
               "start_column": 5,
-              "start_line": 452
+              "start_line": 479
             }
           }
         },
@@ -4739,9 +4772,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 470,
+              "end_line": 497,
               "start_column": 5,
-              "start_line": 458
+              "start_line": 485
             }
           }
         },
@@ -4763,9 +4796,9 @@ expression: pretty
             "qualified_name": "duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 479,
+              "end_line": 506,
               "start_column": 5,
-              "start_line": 472
+              "start_line": 499
             }
           }
         },
@@ -4787,9 +4820,9 @@ expression: pretty
             "qualified_name": "duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 491,
+              "end_line": 518,
               "start_column": 5,
-              "start_line": 481
+              "start_line": 508
             }
           }
         },
@@ -4803,10 +4836,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 507,
+              "end_line": 534,
               "increment": 1,
               "kind": "match",
-              "line": 498,
+              "line": 525,
               "nesting_depth": 0
             }
           ],
@@ -4820,9 +4853,9 @@ expression: pretty
             "qualified_name": "malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 508,
+              "end_line": 535,
               "start_column": 5,
-              "start_line": 493
+              "start_line": 520
             }
           }
         },
@@ -4844,9 +4877,9 @@ expression: pretty
             "qualified_name": "malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 516,
+              "end_line": 543,
               "start_column": 5,
-              "start_line": 510
+              "start_line": 537
             }
           }
         },
@@ -4868,9 +4901,9 @@ expression: pretty
             "qualified_name": "da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 526,
+              "end_line": 553,
               "start_column": 5,
-              "start_line": 518
+              "start_line": 545
             }
           }
         },
@@ -4892,9 +4925,9 @@ expression: pretty
             "qualified_name": "da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 536,
+              "end_line": 563,
               "start_column": 5,
-              "start_line": 528
+              "start_line": 555
             }
           }
         },
@@ -4908,10 +4941,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 551,
+              "end_line": 578,
               "increment": 1,
               "kind": "match",
-              "line": 542,
+              "line": 569,
               "nesting_depth": 0
             }
           ],
@@ -4925,9 +4958,9 @@ expression: pretty
             "qualified_name": "da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 552,
+              "end_line": 579,
               "start_column": 5,
-              "start_line": 538
+              "start_line": 565
             }
           }
         },
@@ -4949,9 +4982,9 @@ expression: pretty
             "qualified_name": "end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 563,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 554
+              "start_line": 581
             }
           }
         },
@@ -4973,9 +5006,9 @@ expression: pretty
             "qualified_name": "unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 570,
+              "end_line": 597,
               "start_column": 5,
-              "start_line": 565
+              "start_line": 592
             }
           }
         },
@@ -4997,9 +5030,9 @@ expression: pretty
             "qualified_name": "empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 581,
+              "end_line": 608,
               "start_column": 5,
-              "start_line": 572
+              "start_line": 599
             }
           }
         },
@@ -5021,9 +5054,9 @@ expression: pretty
             "qualified_name": "da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 590,
+              "end_line": 617,
               "start_column": 5,
-              "start_line": 583
+              "start_line": 610
             }
           }
         },
@@ -5045,9 +5078,9 @@ expression: pretty
             "qualified_name": "non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 604,
+              "end_line": 631,
               "start_column": 5,
-              "start_line": 592
+              "start_line": 619
             }
           }
         },
@@ -5069,9 +5102,9 @@ expression: pretty
             "qualified_name": "brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 616,
+              "end_line": 643,
               "start_column": 5,
-              "start_line": 608
+              "start_line": 635
             }
           }
         },
@@ -5093,9 +5126,9 @@ expression: pretty
             "qualified_name": "brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 623,
+              "end_line": 650,
               "start_column": 5,
-              "start_line": 618
+              "start_line": 645
             }
           }
         },
@@ -5117,9 +5150,9 @@ expression: pretty
             "qualified_name": "brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 630,
+              "end_line": 657,
               "start_column": 5,
-              "start_line": 625
+              "start_line": 652
             }
           }
         },
@@ -5141,9 +5174,9 @@ expression: pretty
             "qualified_name": "brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 637,
+              "end_line": 664,
               "start_column": 5,
-              "start_line": 632
+              "start_line": 659
             }
           }
         },
@@ -5165,9 +5198,9 @@ expression: pretty
             "qualified_name": "duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 647,
+              "end_line": 674,
               "start_column": 5,
-              "start_line": 639
+              "start_line": 666
             }
           }
         },
@@ -5189,9 +5222,9 @@ expression: pretty
             "qualified_name": "brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 655,
+              "end_line": 682,
               "start_column": 5,
-              "start_line": 649
+              "start_line": 676
             }
           }
         },
@@ -5205,10 +5238,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 670,
+              "end_line": 697,
               "increment": 1,
               "kind": "match",
-              "line": 661,
+              "line": 688,
               "nesting_depth": 0
             }
           ],
@@ -5222,9 +5255,9 @@ expression: pretty
             "qualified_name": "malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 671,
+              "end_line": 698,
               "start_column": 5,
-              "start_line": 657
+              "start_line": 684
             }
           }
         },
@@ -5246,9 +5279,9 @@ expression: pretty
             "qualified_name": "brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 682,
+              "end_line": 709,
               "start_column": 5,
-              "start_line": 673
+              "start_line": 700
             }
           }
         },
@@ -5270,9 +5303,9 @@ expression: pretty
             "qualified_name": "brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 693,
+              "end_line": 720,
               "start_column": 5,
-              "start_line": 684
+              "start_line": 711
             }
           }
         },
@@ -5286,10 +5319,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 712,
+              "end_line": 739,
               "increment": 1,
               "kind": "for-loop",
-              "line": 710,
+              "line": 737,
               "nesting_depth": 0
             }
           ],
@@ -5303,9 +5336,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 722,
+              "end_line": 749,
               "start_column": 5,
-              "start_line": 695
+              "start_line": 722
             }
           }
         },
@@ -5327,9 +5360,9 @@ expression: pretty
             "qualified_name": "brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 732,
+              "end_line": 759,
               "start_column": 5,
-              "start_line": 724
+              "start_line": 751
             }
           }
         },
@@ -5351,9 +5384,9 @@ expression: pretty
             "qualified_name": "no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 738,
+              "end_line": 765,
               "start_column": 5,
-              "start_line": 734
+              "start_line": 761
             }
           }
         },
@@ -5375,9 +5408,9 @@ expression: pretty
             "qualified_name": "arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 748,
+              "end_line": 775,
               "start_column": 5,
-              "start_line": 746
+              "start_line": 773
             }
           }
         },
@@ -5391,10 +5424,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 756,
+              "end_line": 783,
               "increment": 2,
               "kind": "for-loop",
-              "line": 753,
+              "line": 780,
               "nesting_depth": 1
             }
           ],
@@ -5408,9 +5441,9 @@ expression: pretty
             "qualified_name": "arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 760,
+              "end_line": 787,
               "start_column": 5,
-              "start_line": 750
+              "start_line": 777
             }
           }
         },
@@ -5432,9 +5465,9 @@ expression: pretty
             "qualified_name": "arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 764,
+              "end_line": 791,
               "start_column": 5,
-              "start_line": 762
+              "start_line": 789
             }
           }
         },
@@ -5620,11 +5653,11 @@ expression: pretty
     ],
     "passed": false,
     "summary": {
-      "average_complexity": 1.5198019801980198,
+      "average_complexity": 1.522167487684729,
       "average_coverage": 0.0,
-      "average_crap": 5.7227722772277225,
+      "average_crap": 5.724137931034483,
       "distribution": {
-        "acceptable": 29,
+        "acceptable": 30,
         "high": 6,
         "low": 153,
         "moderate": 14
@@ -5640,15 +5673,15 @@ expression: pretty
       "median_crap": 2.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 202,
+      "total_functions": 203,
       "worst_function": {
         "file_path": "adapters/coverage/mod.rs",
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 205,
+          "end_line": 232,
           "start_column": 1,
-          "start_line": 182
+          "start_line": 209
         }
       }
     }
@@ -5658,7 +5691,7 @@ expression: pretty
   "timestamp": "[STRIPPED:timestamp]",
   "tool_version": "[STRIPPED:tool_version]",
   "view": {
-    "eligible_count": 202,
+    "eligible_count": 203,
     "grouped": null,
     "shown": [
       {
@@ -5669,82 +5702,82 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 187,
+              "end_line": 214,
               "increment": 1,
               "kind": "try",
-              "line": 187,
+              "line": 214,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 188,
+              "end_line": 215,
               "increment": 1,
               "kind": "try",
-              "line": 188,
+              "line": 215,
               "nesting_depth": 0
             },
             {
               "column": 44,
-              "end_line": 189,
+              "end_line": 216,
               "increment": 1,
               "kind": "try",
-              "line": 189,
+              "line": 216,
               "nesting_depth": 0
             },
             {
               "column": 43,
-              "end_line": 190,
+              "end_line": 217,
               "increment": 1,
               "kind": "try",
-              "line": 190,
+              "line": 217,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 192,
+              "end_line": 219,
               "increment": 1,
               "kind": "try",
-              "line": 192,
+              "line": 219,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 195,
+              "end_line": 222,
               "increment": 1,
               "kind": "if-branch",
-              "line": 193,
+              "line": 220,
               "nesting_depth": 0
             },
             {
               "column": 55,
-              "end_line": 196,
+              "end_line": 223,
               "increment": 1,
               "kind": "try",
-              "line": 196,
+              "line": 223,
               "nesting_depth": 0
             },
             {
               "column": 57,
-              "end_line": 197,
+              "end_line": 224,
               "increment": 1,
               "kind": "try",
-              "line": 197,
+              "line": 224,
               "nesting_depth": 0
             },
             {
               "column": 17,
-              "end_line": 202,
+              "end_line": 229,
               "increment": 1,
               "kind": "if-branch",
-              "line": 198,
+              "line": 225,
               "nesting_depth": 0
             },
             {
               "column": 54,
-              "end_line": 201,
+              "end_line": 228,
               "increment": 1,
               "kind": "try",
-              "line": 201,
+              "line": 228,
               "nesting_depth": 1
             }
           ],
@@ -5758,9 +5791,9 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 205,
+              "end_line": 232,
               "start_column": 1,
-              "start_line": 182
+              "start_line": 209
             }
           }
         },
@@ -5774,58 +5807,58 @@ expression: pretty
           "contributors": [
             {
               "column": 73,
-              "end_line": 84,
+              "end_line": 111,
               "increment": 1,
               "kind": "try",
-              "line": 84,
+              "line": 111,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 101,
+              "end_line": 128,
               "increment": 1,
               "kind": "for-loop",
-              "line": 87,
+              "line": 114,
               "nesting_depth": 0
             },
             {
               "column": 68,
-              "end_line": 88,
+              "end_line": 115,
               "increment": 1,
               "kind": "try",
-              "line": 88,
+              "line": 115,
               "nesting_depth": 1
             },
             {
               "column": 13,
-              "end_line": 92,
+              "end_line": 119,
               "increment": 2,
               "kind": "if-branch",
-              "line": 89,
+              "line": 116,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 91,
+              "end_line": 118,
               "increment": 1,
               "kind": "continue",
-              "line": 91,
+              "line": 118,
               "nesting_depth": 2
             },
             {
               "column": 13,
-              "end_line": 100,
+              "end_line": 127,
               "increment": 2,
               "kind": "if-branch",
-              "line": 93,
+              "line": 120,
               "nesting_depth": 1
             },
             {
               "column": 17,
-              "end_line": 94,
+              "end_line": 121,
               "increment": 1,
               "kind": "logical-operator",
-              "line": 94,
+              "line": 121,
               "nesting_depth": 1
             }
           ],
@@ -5839,9 +5872,9 @@ expression: pretty
             "qualified_name": "LcovParser::validate",
             "span": {
               "end_column": 5,
-              "end_line": 103,
+              "end_line": 130,
               "start_column": 5,
-              "start_line": 71
+              "start_line": 98
             }
           }
         },
@@ -6010,42 +6043,42 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 171,
+              "end_line": 198,
               "increment": 1,
               "kind": "try",
-              "line": 171,
+              "line": 198,
               "nesting_depth": 0
             },
             {
               "column": 52,
-              "end_line": 173,
+              "end_line": 200,
               "increment": 1,
               "kind": "try",
-              "line": 173,
+              "line": 200,
               "nesting_depth": 0
             },
             {
               "column": 58,
-              "end_line": 174,
+              "end_line": 201,
               "increment": 1,
               "kind": "try",
-              "line": 174,
+              "line": 201,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 177,
+              "end_line": 204,
               "increment": 1,
               "kind": "if-branch",
-              "line": 175,
+              "line": 202,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 178,
+              "end_line": 205,
               "increment": 1,
               "kind": "try",
-              "line": 178,
+              "line": 205,
               "nesting_depth": 0
             }
           ],
@@ -6059,9 +6092,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 180,
+              "end_line": 207,
               "start_column": 1,
-              "start_line": 168
+              "start_line": 195
             }
           }
         },
@@ -6239,26 +6272,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 110,
+              "end_line": 137,
               "increment": 1,
               "kind": "if-branch",
-              "line": 107,
+              "line": 134,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 115,
+              "end_line": 142,
               "increment": 1,
               "kind": "if-branch",
-              "line": 112,
+              "line": 139,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 119,
+              "end_line": 146,
               "increment": 1,
               "kind": "if-branch",
-              "line": 117,
+              "line": 144,
               "nesting_depth": 0
             }
           ],
@@ -6272,9 +6305,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 120,
+              "end_line": 147,
               "start_column": 1,
-              "start_line": 106
+              "start_line": 133
             }
           }
         },
@@ -6452,18 +6485,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 138,
+              "end_line": 165,
               "increment": 1,
               "kind": "if-branch",
-              "line": 136,
+              "line": 163,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 143,
+              "end_line": 170,
               "increment": 1,
               "kind": "match",
-              "line": 140,
+              "line": 167,
               "nesting_depth": 0
             }
           ],
@@ -6477,9 +6510,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 144,
+              "end_line": 171,
               "start_column": 1,
-              "start_line": 135
+              "start_line": 162
             }
           }
         },
@@ -6493,18 +6526,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 149,
+              "end_line": 176,
               "increment": 1,
               "kind": "if-branch",
-              "line": 147,
+              "line": 174,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 156,
+              "end_line": 183,
               "increment": 1,
               "kind": "match",
-              "line": 151,
+              "line": 178,
               "nesting_depth": 0
             }
           ],
@@ -6518,9 +6551,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 157,
+              "end_line": 184,
               "start_column": 1,
-              "start_line": 146
+              "start_line": 173
             }
           }
         },
@@ -6534,18 +6567,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 225,
+              "end_line": 252,
               "increment": 1,
               "kind": "if-branch",
-              "line": 223,
+              "line": 250,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 230,
+              "end_line": 257,
               "increment": 1,
               "kind": "for-loop",
-              "line": 228,
+              "line": 255,
               "nesting_depth": 0
             }
           ],
@@ -6559,9 +6592,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 231,
+              "end_line": 258,
               "start_column": 1,
-              "start_line": 218
+              "start_line": 245
             }
           }
         },
@@ -6575,18 +6608,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 240,
+              "end_line": 267,
               "increment": 1,
               "kind": "if-branch",
-              "line": 238,
+              "line": 265,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 245,
+              "end_line": 272,
               "increment": 1,
               "kind": "for-loop",
-              "line": 243,
+              "line": 270,
               "nesting_depth": 0
             }
           ],
@@ -6600,9 +6633,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 246,
+              "end_line": 273,
               "start_column": 1,
-              "start_line": 233
+              "start_line": 260
             }
           }
         },
@@ -6616,10 +6649,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 756,
+              "end_line": 783,
               "increment": 2,
               "kind": "for-loop",
-              "line": 753,
+              "line": 780,
               "nesting_depth": 1
             }
           ],
@@ -6633,9 +6666,9 @@ expression: pretty
             "qualified_name": "arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 760,
+              "end_line": 787,
               "start_column": 5,
-              "start_line": 750
+              "start_line": 777
             }
           }
         },
@@ -7309,10 +7342,43 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 65,
+              "end_line": 71,
               "increment": 1,
               "kind": "for-loop",
-              "line": 63,
+              "line": 69,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 0.0,
+          "crap": {
+            "risk_level": "acceptable",
+            "value": 6.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "LcovParser::parse_str",
+            "span": {
+              "end_column": 5,
+              "end_line": 75,
+              "start_column": 5,
+              "start_line": 58
+            }
+          }
+        },
+        "threshold": 25.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 72,
+              "end_line": 94,
+              "increment": 1,
+              "kind": "try",
+              "line": 94,
               "nesting_depth": 0
             }
           ],
@@ -7326,9 +7392,9 @@ expression: pretty
             "qualified_name": "LcovParser::parse",
             "span": {
               "end_column": 5,
-              "end_line": 69,
+              "end_line": 96,
               "start_column": 5,
-              "start_line": 60
+              "start_line": 81
             }
           }
         },
@@ -7342,10 +7408,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 132,
+              "end_line": 159,
               "increment": 1,
               "kind": "if-branch",
-              "line": 125,
+              "line": 152,
               "nesting_depth": 0
             }
           ],
@@ -7359,9 +7425,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 133,
+              "end_line": 160,
               "start_column": 1,
-              "start_line": 122
+              "start_line": 149
             }
           }
         },
@@ -7375,10 +7441,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 211,
+              "end_line": 238,
               "increment": 1,
               "kind": "let-else",
-              "line": 208,
+              "line": 235,
               "nesting_depth": 0
             }
           ],
@@ -7392,9 +7458,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 216,
+              "end_line": 243,
               "start_column": 1,
-              "start_line": 207
+              "start_line": 234
             }
           }
         },
@@ -7408,10 +7474,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 272,
+              "end_line": 299,
               "increment": 1,
               "kind": "match",
-              "line": 267,
+              "line": 294,
               "nesting_depth": 0
             }
           ],
@@ -7425,9 +7491,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 273,
+              "end_line": 300,
               "start_column": 1,
-              "start_line": 266
+              "start_line": 293
             }
           }
         },
@@ -7441,10 +7507,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 507,
+              "end_line": 534,
               "increment": 1,
               "kind": "match",
-              "line": 498,
+              "line": 525,
               "nesting_depth": 0
             }
           ],
@@ -7458,9 +7524,9 @@ expression: pretty
             "qualified_name": "malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 508,
+              "end_line": 535,
               "start_column": 5,
-              "start_line": 493
+              "start_line": 520
             }
           }
         },
@@ -7474,10 +7540,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 551,
+              "end_line": 578,
               "increment": 1,
               "kind": "match",
-              "line": 542,
+              "line": 569,
               "nesting_depth": 0
             }
           ],
@@ -7491,9 +7557,9 @@ expression: pretty
             "qualified_name": "da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 552,
+              "end_line": 579,
               "start_column": 5,
-              "start_line": 538
+              "start_line": 565
             }
           }
         },
@@ -7507,10 +7573,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 670,
+              "end_line": 697,
               "increment": 1,
               "kind": "match",
-              "line": 661,
+              "line": 688,
               "nesting_depth": 0
             }
           ],
@@ -7524,9 +7590,9 @@ expression: pretty
             "qualified_name": "malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 671,
+              "end_line": 698,
               "start_column": 5,
-              "start_line": 657
+              "start_line": 684
             }
           }
         },
@@ -7540,10 +7606,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 712,
+              "end_line": 739,
               "increment": 1,
               "kind": "for-loop",
-              "line": 710,
+              "line": 737,
               "nesting_depth": 0
             }
           ],
@@ -7557,9 +7623,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 722,
+              "end_line": 749,
               "start_column": 5,
-              "start_line": 695
+              "start_line": 722
             }
           }
         },
@@ -9990,9 +10056,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 166,
+              "end_line": 193,
               "start_column": 1,
-              "start_line": 159
+              "start_line": 186
             }
           }
         },
@@ -10014,9 +10080,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 253,
+              "end_line": 280,
               "start_column": 1,
-              "start_line": 248
+              "start_line": 275
             }
           }
         },
@@ -10038,9 +10104,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 264,
+              "end_line": 291,
               "start_column": 1,
-              "start_line": 255
+              "start_line": 282
             }
           }
         },
@@ -10062,9 +10128,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 278,
+              "end_line": 305,
               "start_column": 1,
-              "start_line": 275
+              "start_line": 302
             }
           }
         },
@@ -10086,9 +10152,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 306,
+              "end_line": 333,
               "start_column": 1,
-              "start_line": 280
+              "start_line": 307
             }
           }
         },
@@ -10110,9 +10176,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 313,
+              "end_line": 340,
               "start_column": 1,
-              "start_line": 308
+              "start_line": 335
             }
           }
         },
@@ -10134,9 +10200,9 @@ expression: pretty
             "qualified_name": "parser",
             "span": {
               "end_column": 5,
-              "end_line": 322,
+              "end_line": 349,
               "start_column": 5,
-              "start_line": 320
+              "start_line": 347
             }
           }
         },
@@ -10158,9 +10224,9 @@ expression: pretty
             "qualified_name": "parse",
             "span": {
               "end_column": 5,
-              "end_line": 326,
+              "end_line": 353,
               "start_column": 5,
-              "start_line": 324
+              "start_line": 351
             }
           }
         },
@@ -10182,9 +10248,9 @@ expression: pretty
             "qualified_name": "empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 333,
+              "end_line": 360,
               "start_column": 5,
-              "start_line": 328
+              "start_line": 355
             }
           }
         },
@@ -10206,9 +10272,9 @@ expression: pretty
             "qualified_name": "validate_str",
             "span": {
               "end_column": 5,
-              "end_line": 347,
+              "end_line": 374,
               "start_column": 5,
-              "start_line": 337
+              "start_line": 364
             }
           }
         },
@@ -10230,9 +10296,9 @@ expression: pretty
             "qualified_name": "validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 352,
+              "end_line": 379,
               "start_column": 5,
-              "start_line": 349
+              "start_line": 376
             }
           }
         },
@@ -10254,9 +10320,9 @@ expression: pretty
             "qualified_name": "validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 357,
+              "end_line": 384,
               "start_column": 5,
-              "start_line": 354
+              "start_line": 381
             }
           }
         },
@@ -10278,9 +10344,9 @@ expression: pretty
             "qualified_name": "validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 362,
+              "end_line": 389,
               "start_column": 5,
-              "start_line": 359
+              "start_line": 386
             }
           }
         },
@@ -10302,9 +10368,9 @@ expression: pretty
             "qualified_name": "validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 367,
+              "end_line": 394,
               "start_column": 5,
-              "start_line": 364
+              "start_line": 391
             }
           }
         },
@@ -10326,9 +10392,9 @@ expression: pretty
             "qualified_name": "validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 372,
+              "end_line": 399,
               "start_column": 5,
-              "start_line": 369
+              "start_line": 396
             }
           }
         },
@@ -10350,9 +10416,9 @@ expression: pretty
             "qualified_name": "validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 382,
+              "end_line": 409,
               "start_column": 5,
-              "start_line": 374
+              "start_line": 401
             }
           }
         },
@@ -10374,9 +10440,9 @@ expression: pretty
             "qualified_name": "validate_missing_path_returns_open_error",
             "span": {
               "end_column": 5,
-              "end_line": 394,
+              "end_line": 421,
               "start_column": 5,
-              "start_line": 384
+              "start_line": 411
             }
           }
         },
@@ -10398,9 +10464,9 @@ expression: pretty
             "qualified_name": "single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 404,
+              "end_line": 431,
               "start_column": 5,
-              "start_line": 396
+              "start_line": 423
             }
           }
         },
@@ -10422,9 +10488,9 @@ expression: pretty
             "qualified_name": "multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 414,
+              "end_line": 441,
               "start_column": 5,
-              "start_line": 406
+              "start_line": 433
             }
           }
         },
@@ -10446,9 +10512,9 @@ expression: pretty
             "qualified_name": "multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 423,
+              "end_line": 450,
               "start_column": 5,
-              "start_line": 416
+              "start_line": 443
             }
           }
         },
@@ -10470,9 +10536,9 @@ expression: pretty
             "qualified_name": "hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 431,
+              "end_line": 458,
               "start_column": 5,
-              "start_line": 425
+              "start_line": 452
             }
           }
         },
@@ -10494,9 +10560,9 @@ expression: pretty
             "qualified_name": "path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 437,
+              "end_line": 464,
               "start_column": 5,
-              "start_line": 433
+              "start_line": 460
             }
           }
         },
@@ -10518,9 +10584,9 @@ expression: pretty
             "qualified_name": "non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 443,
+              "end_line": 470,
               "start_column": 5,
-              "start_line": 439
+              "start_line": 466
             }
           }
         },
@@ -10542,9 +10608,9 @@ expression: pretty
             "qualified_name": "backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 450,
+              "end_line": 477,
               "start_column": 5,
-              "start_line": 445
+              "start_line": 472
             }
           }
         },
@@ -10566,9 +10632,9 @@ expression: pretty
             "qualified_name": "path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 456,
+              "end_line": 483,
               "start_column": 5,
-              "start_line": 452
+              "start_line": 479
             }
           }
         },
@@ -10590,9 +10656,9 @@ expression: pretty
             "qualified_name": "repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 470,
+              "end_line": 497,
               "start_column": 5,
-              "start_line": 458
+              "start_line": 485
             }
           }
         },
@@ -10614,9 +10680,9 @@ expression: pretty
             "qualified_name": "duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 479,
+              "end_line": 506,
               "start_column": 5,
-              "start_line": 472
+              "start_line": 499
             }
           }
         },
@@ -10638,9 +10704,9 @@ expression: pretty
             "qualified_name": "duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 491,
+              "end_line": 518,
               "start_column": 5,
-              "start_line": 481
+              "start_line": 508
             }
           }
         },
@@ -10662,9 +10728,9 @@ expression: pretty
             "qualified_name": "malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 516,
+              "end_line": 543,
               "start_column": 5,
-              "start_line": 510
+              "start_line": 537
             }
           }
         },
@@ -10686,9 +10752,9 @@ expression: pretty
             "qualified_name": "da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 526,
+              "end_line": 553,
               "start_column": 5,
-              "start_line": 518
+              "start_line": 545
             }
           }
         },
@@ -10710,9 +10776,9 @@ expression: pretty
             "qualified_name": "da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 536,
+              "end_line": 563,
               "start_column": 5,
-              "start_line": 528
+              "start_line": 555
             }
           }
         },
@@ -10734,9 +10800,9 @@ expression: pretty
             "qualified_name": "end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 563,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 554
+              "start_line": 581
             }
           }
         },
@@ -10758,9 +10824,9 @@ expression: pretty
             "qualified_name": "unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 570,
+              "end_line": 597,
               "start_column": 5,
-              "start_line": 565
+              "start_line": 592
             }
           }
         },
@@ -10782,9 +10848,9 @@ expression: pretty
             "qualified_name": "empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 581,
+              "end_line": 608,
               "start_column": 5,
-              "start_line": 572
+              "start_line": 599
             }
           }
         },
@@ -10806,9 +10872,9 @@ expression: pretty
             "qualified_name": "da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 590,
+              "end_line": 617,
               "start_column": 5,
-              "start_line": 583
+              "start_line": 610
             }
           }
         },
@@ -10830,9 +10896,9 @@ expression: pretty
             "qualified_name": "non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 604,
+              "end_line": 631,
               "start_column": 5,
-              "start_line": 592
+              "start_line": 619
             }
           }
         },
@@ -10854,9 +10920,9 @@ expression: pretty
             "qualified_name": "brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 616,
+              "end_line": 643,
               "start_column": 5,
-              "start_line": 608
+              "start_line": 635
             }
           }
         },
@@ -10878,9 +10944,9 @@ expression: pretty
             "qualified_name": "brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 623,
+              "end_line": 650,
               "start_column": 5,
-              "start_line": 618
+              "start_line": 645
             }
           }
         },
@@ -10902,9 +10968,9 @@ expression: pretty
             "qualified_name": "brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 630,
+              "end_line": 657,
               "start_column": 5,
-              "start_line": 625
+              "start_line": 652
             }
           }
         },
@@ -10926,9 +10992,9 @@ expression: pretty
             "qualified_name": "brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 637,
+              "end_line": 664,
               "start_column": 5,
-              "start_line": 632
+              "start_line": 659
             }
           }
         },
@@ -10950,9 +11016,9 @@ expression: pretty
             "qualified_name": "duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 647,
+              "end_line": 674,
               "start_column": 5,
-              "start_line": 639
+              "start_line": 666
             }
           }
         },
@@ -10974,9 +11040,9 @@ expression: pretty
             "qualified_name": "brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 655,
+              "end_line": 682,
               "start_column": 5,
-              "start_line": 649
+              "start_line": 676
             }
           }
         },
@@ -10998,9 +11064,9 @@ expression: pretty
             "qualified_name": "brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 682,
+              "end_line": 709,
               "start_column": 5,
-              "start_line": 673
+              "start_line": 700
             }
           }
         },
@@ -11022,9 +11088,9 @@ expression: pretty
             "qualified_name": "brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 693,
+              "end_line": 720,
               "start_column": 5,
-              "start_line": 684
+              "start_line": 711
             }
           }
         },
@@ -11046,9 +11112,9 @@ expression: pretty
             "qualified_name": "brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 732,
+              "end_line": 759,
               "start_column": 5,
-              "start_line": 724
+              "start_line": 751
             }
           }
         },
@@ -11070,9 +11136,9 @@ expression: pretty
             "qualified_name": "no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 738,
+              "end_line": 765,
               "start_column": 5,
-              "start_line": 734
+              "start_line": 761
             }
           }
         },
@@ -11094,9 +11160,9 @@ expression: pretty
             "qualified_name": "arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 748,
+              "end_line": 775,
               "start_column": 5,
-              "start_line": 746
+              "start_line": 773
             }
           }
         },
@@ -11118,9 +11184,9 @@ expression: pretty
             "qualified_name": "arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 764,
+              "end_line": 791,
               "start_column": 5,
-              "start_line": 762
+              "start_line": 789
             }
           }
         },
@@ -11272,11 +11338,11 @@ expression: pretty
       }
     ],
     "shown_summary": {
-      "average_complexity": 1.5198019801980198,
+      "average_complexity": 1.522167487684729,
       "average_coverage": 0.0,
-      "average_crap": 5.7227722772277225,
+      "average_crap": 5.724137931034483,
       "distribution": {
-        "acceptable": 29,
+        "acceptable": 30,
         "high": 6,
         "low": 153,
         "moderate": 14
@@ -11292,15 +11358,15 @@ expression: pretty
       "median_crap": 2.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 202,
+      "total_functions": 203,
       "worst_function": {
         "file_path": "adapters/coverage/mod.rs",
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 205,
+          "end_line": 232,
           "start_column": 1,
-          "start_line": 182
+          "start_line": 209
         }
       }
     },
