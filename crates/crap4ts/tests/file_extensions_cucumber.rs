@@ -377,8 +377,12 @@ fn then_parse_failure_alone_does_not_gate(world: &mut FileExtWorld) {
 
 #[tokio::main]
 async fn main() {
-    // `@wired`-only filter (AGENTS.md rule 5) — the `.d.ts` scenario
-    // stays `@unwired` (crap-rs#253) and is skipped, not failed.
+    // `@wired`-only filter (AGENTS.md rule 5) — every scenario in this
+    // feature is wired post-crap-rs#253 (the `.d.ts` skip closed the
+    // last `@unwired` here), so the filter is currently a no-op pass-
+    // through. Kept for shape consistency with other crap4ts cucumber
+    // harnesses + so a future `@unwired` regression is mechanically
+    // gated out rather than silently passing as a skipped scenario.
     // `with_default_cli()` skips argv parsing so the `--skip` libtest
     // args `cargo mutants --package crap4ts` injects do not abort
     // cucumber's strict clap CLI (the crap-rs#224 gate-zeroing class).
