@@ -5,7 +5,9 @@ Feature: Arrow-function coverage accuracy
 
   @unwired
   Scenario: An invoked arrow function has matching coverage
-    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
+    # tracked: crap-rs#252 — a never-invoked single-line arrow reports ~50%
+    # function coverage, not 0.0, because the `const` declaration statement
+    # shares the body's line; this scenario waits on the per-function rollup fix
     Given a TypeScript source file `src/arrow.ts` containing:
       """
       export const square = (x: number) => x * x;
@@ -17,9 +19,8 @@ Feature: Arrow-function coverage accuracy
     And the report shows function `cube` with line coverage 0.0
     And the report does NOT show `square` as 0.0 (would be silent undercount)
 
-  @unwired
+  @wired
   Scenario: A useCallback-style arrow has matching coverage
-    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript source file `src/Button.tsx` containing:
       """
       import { useCallback } from 'react';
@@ -31,11 +32,10 @@ Feature: Arrow-function coverage accuracy
     And a jest-emitted `coverage-final.json` recording `Button` invoked 5 times and the `handle` arrow invoked 5 times (both at 100% line coverage)
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report shows function `Button` with line coverage 100.0
-    And the report shows function `handle` (the useCallback arrow) with line coverage 100.0
+    And the report shows the useCallback arrow with line coverage 100.0
 
-  @unwired
+  @wired
   Scenario: An array.map(arrow) covers the inner arrow
-    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript source file `src/map.ts` containing:
       """
       export function increment(xs: number[]): number[] {
@@ -47,9 +47,8 @@ Feature: Arrow-function coverage accuracy
     Then the inner arrow's line coverage in the report is 100.0
     And `increment`'s CRAP score is computed using the arrow's coverage value
 
-  @unwired
+  @wired
   Scenario: Mixed function-expression / arrow / declared-function bodies in one file
-    # tracked: crap-rs#229 — cucumber harness deferred from W3.3 #191 (pre-GA)
     Given a TypeScript source file `src/mixed.ts` containing:
       """
       export function declared() { return 1; }

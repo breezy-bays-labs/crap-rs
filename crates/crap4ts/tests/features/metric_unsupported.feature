@@ -24,7 +24,7 @@ Feature: --metric cognitive returns a helpful error in crap4ts@2.0.0
 
   @unwired
   Scenario: crap4rs's --metric cognitive default continues to work (sanity)
-    # tracked: crap-rs#229 — this crap4rs-shelling scenario stays deferred: a crap4ts cucumber
+    # tracked: crap-rs#169 — this crap4rs-shelling scenario stays deferred: a crap4ts cucumber
     # harness shelling the crap4rs bin re-triggers the crap-rs#224 mutants-baseline class
     # (CARGO_BIN_EXE_crap4rs unset under `cargo mutants --package crap4ts`). Contract stays
     # pinned by the mutants-skipped metric_unsupported_smoke.rs::crap4rs_no_flag_default_cognitive_still_works.
