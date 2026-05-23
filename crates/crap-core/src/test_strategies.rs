@@ -67,6 +67,11 @@ pub fn arb_verdict() -> impl Strategy<Value = FunctionVerdict> {
                     complexity,
                     complexity_metric: ComplexityMetric::Cognitive,
                     coverage_percent: coverage,
+                    // Branch coverage is independent of the line-coverage path
+                    // these proptest strategies exercise — leaving it `None`
+                    // keeps the verdict shape default for sort / filter / view
+                    // invariants without coupling the strategies to branch data.
+                    branch_coverage_percent: None,
                     crap: CrapScore {
                         value: crap_value,
                         risk_level: risk,
@@ -112,6 +117,9 @@ pub fn arb_verdict_with_nan_coverage() -> impl Strategy<Value = FunctionVerdict>
                         complexity,
                         complexity_metric: ComplexityMetric::Cognitive,
                         coverage_percent: coverage,
+                        // NaN-coverage strategy exercises line-coverage sort
+                        // paths only; branch coverage stays `None`.
+                        branch_coverage_percent: None,
                         crap: CrapScore {
                             value: crap_value,
                             risk_level: risk,

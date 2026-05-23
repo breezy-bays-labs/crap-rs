@@ -90,25 +90,19 @@ pub fn format_table_with_explain(
 
     let shown: &[&crate::domain::types::FunctionVerdict] = &view.shown;
 
-    // Build table
-    let mut table = Table::new();
-    table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(vec!["File", "Function", "CC", "Cov%", "CRAP", "Risk"]);
+    // Conditional `Branch%` column (crap-rs#251). The column appears
+    // when at least one row in the shaped view carries
+    // `branch_coverage_percent: Some(_)` — i.e. the coverage parser
+    // produced branch records that fell inside at least one function's
+    // span. When no row has it (LCOV runs, jest without branch
+    // instrumentation, or branches that all fell outside function
+    // spans), the column is omitted entirely so the default Rust /
+    // line-only scorecard stays byte-identical to its pre-#251 width.
+    let has_branch_coverage = shown
+        .iter()
+        .any(|v| v.scored.branch_coverage_percent.is_some());
 
-    for verdict in shown {
-        let s = &verdict.scored;
-        let cov_str = format!("{:.1}", s.coverage_percent);
-        let crap_str = format!("{:.2}", s.crap.value);
-
-        table.add_row(vec![
-            s.identity.file_path.clone(),
-            s.identity.qualified_name.clone(),
-            s.complexity.to_string(),
-            coverage_color(s.coverage_percent, &cov_str),
-            crap_color(verdict.exceeds, &crap_str),
-            risk_color(&s.crap.risk_level, &s.crap.risk_level.to_string()),
-        ]);
-    }
+    let table = build_function_table(shown, has_branch_coverage);
 
     output.push('\n');
 
@@ -144,6 +138,77 @@ while/for/loop bodies, let-else diverging branches, and closures.\n",
     }
 
     output
+}
+
+/// Build the per-function `comfy_table::Table` body. Header and row
+/// shape are parameterised by `has_branch_coverage` — when true the
+/// `Branch%` column is woven in between `Cov%` and `CRAP`; when false
+/// the table renders the pre-#251 line-only shape byte-identically.
+///
+/// Extracted from `format_table_with_explain` so that body stays
+/// focused on flow control (grouped-vs-default, breakdown subrows,
+/// summary block, delta block); CRAP fingerprint sits well below the
+/// strict-mode threshold this way (focus #251 cross-impact note).
+fn build_function_table(
+    shown: &[&crate::domain::types::FunctionVerdict],
+    has_branch_coverage: bool,
+) -> Table {
+    let mut table = Table::new();
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+
+    let mut header: Vec<&str> = vec!["File", "Function", "CC", "Cov%"];
+    if has_branch_coverage {
+        header.push("Branch%");
+    }
+    header.extend(["CRAP", "Risk"]);
+    table.set_header(header);
+
+    for verdict in shown {
+        table.add_row(build_function_row(verdict, has_branch_coverage));
+    }
+    table
+}
+
+/// Render a single function verdict as the cell vector its row needs.
+/// Pushes the optional `Branch%` cell in the same conditional shape as
+/// the header — keeping the two in lockstep means a missing-column /
+/// shifted-row bug surface can't open up at the row builder alone.
+fn build_function_row(
+    verdict: &crate::domain::types::FunctionVerdict,
+    has_branch_coverage: bool,
+) -> Vec<String> {
+    let s = &verdict.scored;
+    let cov_str = format!("{:.1}", s.coverage_percent);
+    let crap_str = format!("{:.2}", s.crap.value);
+
+    let mut row: Vec<String> = vec![
+        s.identity.file_path.clone(),
+        s.identity.qualified_name.clone(),
+        s.complexity.to_string(),
+        coverage_color(s.coverage_percent, &cov_str),
+    ];
+    if has_branch_coverage {
+        row.push(format_branch_cell(s.branch_coverage_percent));
+    }
+    row.push(crap_color(verdict.exceeds, &crap_str));
+    row.push(risk_color(
+        &s.crap.risk_level,
+        &s.crap.risk_level.to_string(),
+    ));
+    row
+}
+
+/// Format the `Branch%` cell for one row. `Some(p)` ⇒ one-decimal
+/// percentage coloured by the same coverage-band gradient line
+/// coverage uses (a low branch number reads as red just as a low line
+/// number does). `None` ⇒ the `—` (em-dash) sentinel, deliberately
+/// distinct from `0.0` so absent data and zero-covered data don't
+/// alias visually. Mirrors the grouped table's `worst_fn` "—" fallback.
+fn format_branch_cell(branch_coverage_percent: Option<f64>) -> String {
+    match branch_coverage_percent {
+        Some(p) => coverage_color(p, &format!("{:.1}", p)),
+        None => "—".to_string(),
+    }
 }
 
 /// Append the delta block. Reads `view.full.summary` (the unshapeable
@@ -431,7 +496,7 @@ static COLOR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 mod tests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::*;
-    use crate::domain::types::{AnalysisResult, RiskLevel};
+    use crate::domain::types::{AnalysisResult, AnalysisSummary, RiskLevel};
 
     // ── Snapshot tests (color disabled) ────────────────────────────────
 
@@ -570,6 +635,140 @@ mod tests {
             TEST_TOOL_VERSION,
         );
         assert!(output.contains("85.0"));
+    }
+
+    // ── Branch% column (crap-rs#251) ──────────────────────────────────
+
+    /// The Rust / line-only path stays byte-identical: when no verdict
+    /// carries `branch_coverage_percent`, the `Branch%` column is
+    /// absent from the header entirely.
+    #[test]
+    fn branch_column_omitted_when_no_branch_data() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let result = make_single_function_result(
+            "no_branches",
+            "src/lib.rs",
+            1,
+            100.0,
+            1.0,
+            RiskLevel::Low,
+            8.0,
+        );
+        let output = format_table(
+            &make_view_default(&result),
+            8.0,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+        );
+        assert!(
+            !output.contains("Branch%"),
+            "expected no `Branch%` column when no verdict has branch data; got:\n{output}",
+        );
+    }
+
+    /// When at least one verdict has `branch_coverage_percent = Some(_)`
+    /// the `Branch%` column appears and renders the value to one
+    /// decimal — the same precision as the line `Cov%` column.
+    #[test]
+    fn branch_column_present_when_branch_data_some() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+        let mut result = make_single_function_result(
+            "classify",
+            "src/lib.rs",
+            3,
+            100.0,
+            3.0,
+            RiskLevel::Low,
+            8.0,
+        );
+        // Mutate the single verdict to carry branch data — mirrors what
+        // a real branch-rich Istanbul fixture would produce after
+        // `score_and_summarize` lifts `cov.branch_coverage.percent`
+        // onto `ScoredFunction.branch_coverage_percent`.
+        result.functions[0].scored.branch_coverage_percent = Some(66.7);
+
+        let output = format_table(
+            &make_view_default(&result),
+            8.0,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+        );
+        assert!(
+            output.contains("Branch%"),
+            "expected `Branch%` column when a verdict has branch data; got:\n{output}",
+        );
+        assert!(
+            output.contains("66.7"),
+            "expected branch percentage `66.7` in the row; got:\n{output}",
+        );
+    }
+
+    /// Mixed view (some functions have branch data, others don't): the
+    /// column appears once at the header, and rows without branch data
+    /// show the `—` sentinel — visibly distinct from a genuine `0.0`.
+    #[test]
+    fn branch_column_dash_for_rows_without_branch_data() {
+        let _guard = COLOR_LOCK.lock().unwrap();
+        colored::control::set_override(false);
+
+        // Two verdicts: one carries branch coverage, one doesn't.
+        let v_with = {
+            let mut v = make_verdict(
+                "with_branches",
+                "src/with.rs",
+                3,
+                100.0,
+                3.0,
+                RiskLevel::Low,
+                8.0,
+            );
+            v.scored.branch_coverage_percent = Some(100.0);
+            v
+        };
+        let v_without = make_verdict(
+            "without_branches",
+            "src/without.rs",
+            1,
+            100.0,
+            1.0,
+            RiskLevel::Low,
+            8.0,
+        );
+        let result = AnalysisResult {
+            functions: vec![v_with, v_without],
+            summary: AnalysisSummary {
+                total_functions: 2,
+                total_files: 2,
+                exceeding_threshold: 0,
+                average_crap: 2.0,
+                median_crap: 2.0,
+                ..Default::default()
+            },
+            passed: true,
+        };
+
+        let output = format_table(
+            &make_view_default(&result),
+            8.0,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+        );
+        assert!(
+            output.contains("Branch%"),
+            "expected `Branch%` column when any verdict has branch data; got:\n{output}",
+        );
+        // The `—` (em-dash) sentinel marks rows with no branch data so
+        // they're visibly distinct from a genuine zero — see the row
+        // builder in `format_table_with_explain`.
+        assert!(
+            output.contains("—"),
+            "expected `—` sentinel in the branch column for the verdict without branch data; got:\n{output}",
+        );
     }
 
     #[test]
@@ -1505,6 +1704,11 @@ mod proptests {
                         complexity,
                         complexity_metric: crate::domain::types::ComplexityMetric::Cognitive,
                         coverage_percent: coverage,
+                        // The table-reporter proptest strategies focus
+                        // on the line-coverage rendering path; branch
+                        // coverage gets dedicated coverage in the
+                        // `branch_column_*` unit tests below.
+                        branch_coverage_percent: None,
                         crap: CrapScore {
                             value: crap_value,
                             risk_level: risk,

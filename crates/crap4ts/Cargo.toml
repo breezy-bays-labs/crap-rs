@@ -121,3 +121,7 @@ harness = false
 [[test]]
 name = "file_extensions_cucumber"
 harness = false
+
+[[test]]
+name = "branch_coverage_cucumber"
+harness = false

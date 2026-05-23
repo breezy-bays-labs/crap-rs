@@ -794,6 +794,7 @@ mod tests {
                 complexity: contributors.iter().map(|c| c.increment).sum::<u32>().max(1),
                 complexity_metric: ComplexityMetric::Cognitive,
                 coverage_percent: 100.0,
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: 50.0,
                     risk_level: RiskLevel::High,

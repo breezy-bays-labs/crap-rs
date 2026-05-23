@@ -609,6 +609,11 @@ mod tests {
                 complexity,
                 complexity_metric: ComplexityMetric::Cognitive,
                 coverage_percent: coverage,
+                // View-layer test fixtures don't exercise branch
+                // coverage today; branch_coverage_percent stays None so
+                // sort / filter / truncate invariants are isolated from
+                // the new field.
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: crap_value,
                     risk_level,

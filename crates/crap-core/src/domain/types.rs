@@ -353,6 +353,27 @@ pub struct ScoredFunction {
     pub complexity: u32,
     pub complexity_metric: ComplexityMetric,
     pub coverage_percent: f64,
+    /// Branch coverage percentage for this function, when branch data
+    /// is available. `None` when no branch records overlap the
+    /// function's span — either the parser produced no branches at all
+    /// (LCOV runs, jest without branch instrumentation), or the
+    /// function's span contained no usable branch arms (every
+    /// `BranchMismatch`-orphaned branchId fell out at parse time).
+    ///
+    /// Wire shape uses `#[serde(skip_serializing_if = "Option::is_none")]`
+    /// so envelopes for non-branch-aware runs stay byte-identical to
+    /// the pre-#251 shape — the field is absent when no signal exists.
+    /// Crosses to the JSON envelope automatically via serde; the table
+    /// reporter renders a conditional `Branch%` column when any
+    /// function in the shaped view has `Some`.
+    ///
+    /// Computed in `core::score_and_summarize` from
+    /// `FunctionCoverage::branch_coverage` (which itself is produced by
+    /// `domain::matching::compute_branch_coverage`); not gating —
+    /// `--threshold` continues to apply against line coverage only
+    /// (`coverage_percent`). Gating-on-branch would be a separate ADR.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch_coverage_percent: Option<f64>,
     pub crap: CrapScore,
     /// Individual constructs that contributed to the complexity score.
     /// Always present; empty when complexity == 1.

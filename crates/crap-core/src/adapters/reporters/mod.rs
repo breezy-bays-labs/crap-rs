@@ -165,6 +165,7 @@ pub(crate) mod test_fixtures {
                 complexity,
                 complexity_metric: crate::domain::types::ComplexityMetric::Cognitive,
                 coverage_percent: coverage_pct,
+                branch_coverage_percent: None,
                 crap: CrapScore {
                     value: crap_value,
                     risk_level: risk,
