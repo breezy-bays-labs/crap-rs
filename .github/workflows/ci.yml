@@ -583,11 +583,24 @@ jobs:
     #
     # Mirrors the `lefthook.yml` pre-push step — single source of truth in
     # `scripts/mutants-skip-lint.py`.
+    #
+    # SHA pinning of `actions/checkout@v4` is deliberately deferred to the
+    # repo-wide hardening sweep tracked at crap-rs#233 (`type:chore`,
+    # `priority:later`) — pinning this one job in isolation would diverge
+    # from the rest of the workflow. The two cheap additions that DON'T
+    # require coordinated SHA selection — `permissions: contents: read`
+    # (least privilege) and `persist-credentials: false` (no GITHUB_TOKEN
+    # left in `.git/config` on the runner) — are applied here so the new
+    # job ships hardened by default and #233 only needs to flip the SHA.
     name: mutants-skip lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Lint .cargo/mutants.toml `--skip` coverage of adapter-bin-shelling tests
         run: python3 scripts/mutants-skip-lint.py
 

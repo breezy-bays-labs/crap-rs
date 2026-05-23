@@ -18,19 +18,30 @@ Scope-by-directory (mirrors the two scoped mutants gates):
     walker per-merge gate). The `crap4ts` bin IS built, so only literal
     `cargo_bin("crap4rs")` calls require a `--skip`.
 
-Limitation: detects literal `cargo_bin("crap4rs"|"crap4ts")` calls that
-appear DIRECTLY inside a `#[test]` fn body. Literals nested inside
-helper fns (e.g. `fn crap4rs_threshold(...) { Command::cargo_bin("crap4rs")... }`
-in `default_gate_threshold.rs`) are SILENTLY SKIPPED — those helpers
-are dangerous only if they're called from a non-`--skip`'d test fn, and
-that requires call-graph analysis the lint does not perform. The pattern
-in scope today is "helper called exclusively from `--skip`'d tests"
-(verified empirically: the `crap4{rs,ts}_threshold` helpers in
-`default_gate_threshold.rs` are called only from `default_gate_*` tests
-covered by `--skip default_gate`). Helper-mediated calls with variable
-bin names (`run_bin("crap4rs", ...)` → internal `cargo_bin(name)`) are
-also out of scope. If either pattern produces a real regression, extend
-the lint to walk the call graph.
+Limitations (all verified empirically against the current codebase):
+
+* **Helper fns silently skipped.** Literals nested inside helper fns
+  (e.g. `fn crap4rs_threshold(...) { Command::cargo_bin("crap4rs")... }`
+  in `default_gate_threshold.rs`) are silently skipped — those helpers
+  are dangerous only if they're called from a non-`--skip`'d test fn,
+  and that requires call-graph analysis the lint does not perform. The
+  pattern in scope today is "helper called exclusively from `--skip`'d
+  tests" (the `crap4{rs,ts}_threshold` helpers in
+  `default_gate_threshold.rs` are called only from `default_gate_*`
+  tests covered by `--skip default_gate`).
+* **Parameterised helpers not detected.** Helper-mediated calls with
+  variable bin names (`run_bin("crap4rs", ...)` → internal
+  `cargo_bin(name)`) are not detected. None present today.
+* **Sync `#[test]` only.** `#[tokio::test]` / `#[async_std::test]` /
+  other test-runner attributes are not detected by `TEST_ATTR_RE`.
+  None present today; if introduced, extend the regex.
+* **Brace tracking is line-comment-aware but not string- or
+  block-comment-aware.** `//` line comments are stripped before
+  brace counting, but `/* { */` block comments and `{` inside
+  string literals can theoretically skew the fn range. No current
+  test file exhibits the pattern.
+
+If any of these gaps produces a real regression, extend the lint.
 """
 
 from __future__ import annotations
@@ -44,21 +55,34 @@ SCOPES: list[tuple[Path, str, frozenset[str]]] = [
     (Path("crates/crap4ts/tests"), "crap4ts", frozenset({"crap4rs"})),
 ]
 
-CARGO_BIN_RE = re.compile(r'cargo_bin\("(crap4rs|crap4ts)"\)')
+# DOTALL on CARGO_BIN_RE allows the literal to span lines — rustfmt
+# can wrap `cargo_bin("crap4rs")` across newlines if the surrounding
+# call gets long, often with a trailing comma:
+#   cargo_bin(
+#       "crap4rs",
+#   )
+# The line-by-line scan would have missed those. Trailing comma is
+# optional so both the formatted-wide and rustfmt-wrapped shapes match.
+CARGO_BIN_RE = re.compile(r'cargo_bin\(\s*"(crap4rs|crap4ts)"\s*,?\s*\)', re.DOTALL)
 TEST_ATTR_RE = re.compile(r"^\s*#\[test\]\s*$")
 FN_DECL_RE = re.compile(r"^\s*fn\s+([a-zA-Z_][a-zA-Z_0-9]*)\s*[(<]")
 
 
 def extract_skip_tokens(mutants_toml: Path) -> list[str]:
+    # Anchor at start-of-line (MULTILINE) so a commented-out
+    # `# additional_cargo_test_args = [...]` line does not match.
     body_match = re.search(
-        r"additional_cargo_test_args\s*=\s*\[(.*?)\]",
+        r"^additional_cargo_test_args\s*=\s*\[(.*?)\]",
         mutants_toml.read_text(),
-        re.DOTALL,
+        re.DOTALL | re.MULTILINE,
     )
     if not body_match:
         return []
     strings = re.findall(r'"([^"]+)"', body_match.group(1))
-    return [s for s in strings if s not in ("--", "--skip")]
+    # Reject any `-`-prefixed string so unrelated cargo-test flags
+    # (e.g. `--nocapture`, `--test-threads=1`) cannot accidentally
+    # be treated as `--skip` substring tokens.
+    return [s for s in strings if not s.startswith("-")]
 
 
 def find_test_fn_ranges(lines: list[str]) -> list[tuple[str, int, int]]:
@@ -86,7 +110,12 @@ def find_test_fn_ranges(lines: list[str]) -> list[tuple[str, int, int]]:
                     seen = False
                     end = j
                     for k in range(j, n):
-                        for c in lines[k]:
+                        # Strip `//` line comments before counting — a
+                        # comment containing `{` or `}` would otherwise
+                        # skew fn-range detection. Block comments and
+                        # string-literal braces are out of scope (see
+                        # module docstring "Limitations").
+                        for c in lines[k].split("//", 1)[0]:
                             if c == "{":
                                 depth += 1
                                 seen = True
@@ -126,37 +155,42 @@ def lint(repo_root: Path) -> int:
         if not abs_dir.exists():
             continue
         for rs_file in sorted(abs_dir.rglob("*.rs")):
-            lines = rs_file.read_text().splitlines()
+            text = rs_file.read_text()
+            lines = text.splitlines()
             ranges = find_test_fn_ranges(lines)
-            for lineno0, line in enumerate(lines):
-                for m in CARGO_BIN_RE.finditer(line):
-                    bin_name = m.group(1)
-                    if bin_name not in gate_bins:
-                        continue
-                    fn_name = next(
-                        (name for name, s, e in ranges if s <= lineno0 <= e),
-                        None,
-                    )
-                    if fn_name is None:
-                        # Literal in helper fn — see "Limitation" in module
-                        # docstring. Out of scope; silently skip.
-                        continue
-                    if is_covered(fn_name, tokens):
-                        continue
-                    rel = rs_file.relative_to(repo_root)
-                    print(
-                        f"\nmutants-skip-lint: uncovered adapter-bin shelling test\n"
-                        f"  {rel}:{lineno0 + 1}  fn {fn_name}\n"
-                        f'  shells cargo_bin("{bin_name}") under '
-                        f"`--package {scope}` mutants scope\n"
-                        f"  but `{fn_name}` is not covered by any --skip substring in\n"
-                        f"  .cargo/mutants.toml's additional_cargo_test_args.\n\n"
-                        f"  Fix: add a substring of `{fn_name}` (or the literal name) to\n"
-                        f"  that array. See the explanatory comment at the top of\n"
-                        f"  .cargo/mutants.toml for why.\n",
-                        file=sys.stderr,
-                    )
-                    errors += 1
+            # Scan whole-file text so the regex can match a
+            # `cargo_bin(...)` call split across lines by rustfmt
+            # (CARGO_BIN_RE is DOTALL). Recompute the line number
+            # from the match's character offset.
+            for m in CARGO_BIN_RE.finditer(text):
+                bin_name = m.group(1)
+                if bin_name not in gate_bins:
+                    continue
+                lineno0 = text.count("\n", 0, m.start())
+                fn_name = next(
+                    (name for name, s, e in ranges if s <= lineno0 <= e),
+                    None,
+                )
+                if fn_name is None:
+                    # Literal in helper fn — see "Limitations" in module
+                    # docstring. Out of scope; silently skip.
+                    continue
+                if is_covered(fn_name, tokens):
+                    continue
+                rel = rs_file.relative_to(repo_root)
+                print(
+                    f"\nmutants-skip-lint: uncovered adapter-bin shelling test\n"
+                    f"  {rel}:{lineno0 + 1}  fn {fn_name}\n"
+                    f'  shells cargo_bin("{bin_name}") under '
+                    f"`--package {scope}` mutants scope\n"
+                    f"  but `{fn_name}` is not covered by any --skip substring in\n"
+                    f"  .cargo/mutants.toml's additional_cargo_test_args.\n\n"
+                    f"  Fix: add a substring of `{fn_name}` (or the literal name) to\n"
+                    f"  that array. See the explanatory comment at the top of\n"
+                    f"  .cargo/mutants.toml for why.\n",
+                    file=sys.stderr,
+                )
+                errors += 1
 
     if errors > 0:
         print(
