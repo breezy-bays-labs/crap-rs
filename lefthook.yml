@@ -40,6 +40,20 @@ pre-push:
           exit 1
         fi
       timeout: 30s
+    mutants-skip-lint:
+      # Mechanical enforcement of the carry-forward rule documented at
+      # the top of `.cargo/mutants.toml`: every test that shells
+      # `cargo_bin("crap4rs"|"crap4ts")` under a scoped `cargo mutants`
+      # gate that doesn't build that bin must carry a `--skip` substring
+      # token in `additional_cargo_test_args`. #224's root cause was that
+      # rule being silently violated when a new test landed without the
+      # token, aborting the whole walker mutants run (cargo-mutants exits
+      # 4, zero mutants tested). Documentation alone enforces nothing;
+      # this hook is the local-velocity layer of the same check that
+      # `.github/workflows/ci.yml`'s `mutants-skip-lint` job runs on
+      # every push. Single source of truth: `scripts/mutants-skip-lint.py`.
+      run: python3 scripts/mutants-skip-lint.py
+      timeout: 30s
     clippy:
       run: cargo clippy --workspace --all-targets -- -D warnings
       timeout: 300s

@@ -225,3 +225,21 @@ mutants is scoped to mutants only; every PR's `Test (linux-x86)` /
 `Test (macos-arm)` / `Test (macos-x86)` job still runs both canaries
 via `cargo nextest run --workspace --all-targets`, which DOES build the
 bins first.
+
+The same rule applies to any other test that shells
+`cargo_bin("crap4rs"|"crap4ts")` from a `#[test]` fn body — without a
+matching `--skip` substring token in `additional_cargo_test_args`, the
+scoped mutants run's unmutated baseline panics on
+`CARGO_BIN_EXE_<bin>` being unset, cargo-mutants exits 4 ("cargo test
+failed in an unmutated tree"), and zero mutants get tested — the gate
+silently goes dead. This was #224's root cause: a new test landed
+without the token. The rule was documented but not enforced, so this
+repo now enforces it mechanically — the `mutants-skip-lint` job in
+`.github/workflows/ci.yml` and the matching `lefthook.yml` pre-push
+hook both run `scripts/mutants-skip-lint.py`, which fails the build
+if any in-scope `#[test]` fn shelling either adapter bin lacks a
+covering `--skip` substring. Add a new shelling test → either pick a
+fn name that an existing token already covers as a substring (cheap),
+or add a new token to `.cargo/mutants.toml` in the same PR (also
+cheap, just remember). The lint's failure message walks the
+contributor through the fix.

@@ -565,6 +565,45 @@ jobs:
           fi
           echo "crap-core adapter-name literals: clean (comment-only references allowed)"
 
+  mutants-skip-lint:
+    # Mechanical enforcement of the carry-forward rule documented at the top
+    # of `.cargo/mutants.toml`: every test that shells `cargo_bin("crap4rs"|
+    # "crap4ts")` under a scoped `cargo mutants` gate that doesn't build
+    # that bin must carry a `--skip` substring token in
+    # `additional_cargo_test_args`. #224's root cause was that rule being
+    # silently violated when `crap4rs_no_flag_default_cognitive_still_works`
+    # landed without the matching token, which aborted the entire `crap4ts`
+    # walker mutants run (`cargo mutants` exited 4, zero mutants tested,
+    # gate went silently dead). The rule was documented but not enforced;
+    # this job is the enforcement.
+    #
+    # See `scripts/mutants-skip-lint.py` for the limitation notes (literal
+    # `cargo_bin("X")` in `#[test]` fn body only; helper-mediated and
+    # parameterized-bin-name calls are out of scope).
+    #
+    # Mirrors the `lefthook.yml` pre-push step — single source of truth in
+    # `scripts/mutants-skip-lint.py`.
+    #
+    # SHA pinning of `actions/checkout@v4` is deliberately deferred to the
+    # repo-wide hardening sweep tracked at crap-rs#233 (`type:chore`,
+    # `priority:later`) — pinning this one job in isolation would diverge
+    # from the rest of the workflow. The two cheap additions that DON'T
+    # require coordinated SHA selection — `permissions: contents: read`
+    # (least privilege) and `persist-credentials: false` (no GITHUB_TOKEN
+    # left in `.git/config` on the runner) — are applied here so the new
+    # job ships hardened by default and #233 only needs to flip the SHA.
+    name: mutants-skip lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Lint .cargo/mutants.toml `--skip` coverage of adapter-bin-shelling tests
+        run: python3 scripts/mutants-skip-lint.py
+
   docs:
     name: cargo doc (warnings as errors)
     runs-on: ubuntu-latest
