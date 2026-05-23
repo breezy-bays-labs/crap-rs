@@ -164,6 +164,66 @@ fn analyze_to_json_nan_threshold_is_rejected() {
     );
 }
 
+/// `.d.ts` declaration files are skipped on the library / napi entry
+/// point the same way they're skipped on the CLI path (crap-rs#253).
+/// `analyze_to_json` populates `AnalyzeOptions.exclude` with
+/// `FORCED_EXCLUDES` (chained into `DEFAULT_EXCLUDES`), so a tempdir
+/// containing both a `.ts` file and a `.d.ts` file must produce only
+/// the `.ts` file's functions. Without this, programmatic (Node)
+/// callers would see ambient-type entries the CLI doesn't.
+#[test]
+fn analyze_to_json_skips_dts_declaration_files() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let canonical = std::fs::canonicalize(tmp.path()).expect("canonicalize tempdir");
+
+    // Two sibling files: a normal `.ts` carrying an executable
+    // function, and a `.d.ts` carrying an ambient declaration. Both
+    // syntactically parse with oxc; the `forced_excludes` skip stops
+    // discovery from feeding the `.d.ts` into the AST walker at all.
+    std::fs::write(
+        canonical.join("app.ts"),
+        "export function app() { return 1; }\n",
+    )
+    .expect("write app.ts");
+    std::fs::write(
+        canonical.join("types.d.ts"),
+        "export declare function ambient(): number;\n",
+    )
+    .expect("write types.d.ts");
+
+    // Coverage covers `app.ts` only — Istanbul never instruments
+    // declaration files (no statements to wrap), so omitting the
+    // `.d.ts` entry from the fixture mirrors what a real jest run
+    // produces.
+    let abs = canonical.to_string_lossy().replace('\\', "/");
+    let coverage_payload = format!(
+        r#"{{ "{abs}/app.ts": {{ "path": "{abs}/app.ts", "s": {{ "0": 1 }}, "statementMap": {{ "0": {{ "start": {{ "line": 1, "column": 0 }}, "end": {{ "line": 1, "column": 5 }} }} }} }} }}"#
+    );
+    let coverage = canonical.join("coverage-final.json");
+    std::fs::write(&coverage, coverage_payload).expect("write coverage-final.json");
+
+    let json = analyze_to_json(&canonical, &coverage, None, ComplexityMetric::Cyclomatic)
+        .expect("analyze_to_json succeeds on app.ts + types.d.ts");
+
+    let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+    let functions = parsed["result"]["functions"]
+        .as_array()
+        .expect("`result.functions` is an array");
+    let file_paths: Vec<&str> = functions
+        .iter()
+        .filter_map(|f| f["scored"]["identity"]["file_path"].as_str())
+        .collect();
+
+    assert!(
+        file_paths.contains(&"app.ts"),
+        "expected `app.ts` in report; got {file_paths:?}",
+    );
+    assert!(
+        !file_paths.iter().any(|p| p.ends_with(".d.ts")),
+        "no `.d.ts` file should appear in the report (crap-rs#253); got {file_paths:?}",
+    );
+}
+
 #[test]
 fn analyze_to_json_missing_source_root_is_rejected() {
     let (_tmp, root) = build_jest_fixture();

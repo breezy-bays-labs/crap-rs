@@ -7,9 +7,10 @@
 //! `--format json` and reads the per-function `file_path` set out of
 //! the envelope — mirroring `metric_unsupported_cucumber.rs`.
 //!
-//! Scenario "A .d.ts file is skipped by default" stays `@unwired`:
-//! crap4ts@2 currently analyzes `.d.ts` declaration files rather than
-//! skipping them — tracked at crap-rs#253.
+//! Scenario "A .d.ts file is skipped by default" is `@wired` post-
+//! crap-rs#253: `AdapterMeta::forced_excludes` carries `**/*.d.ts` for
+//! crap4ts, so declaration files are dropped by the source-discovery
+//! walker before they reach the AST walker.
 //!
 //! Named `*_cucumber` (suffix) so `.config/nextest.toml`'s
 //! `binary(/.*_cucumber$/)` filter excludes it from nextest probing.
@@ -170,6 +171,32 @@ fn given_app_and_notes(world: &mut FileExtWorld) {
     world.cov_path = Some(write_coverage(&root, &["app.ts"]));
 }
 
+#[given("a source tree under `src/` containing `types.d.ts` and `app.ts`")]
+fn given_dts_and_app(world: &mut FileExtWorld) {
+    // `types.d.ts` is a declaration file (ambient types only); `app.ts`
+    // carries an executable function so we can assert positive
+    // discovery alongside the negative-discovery assertion on
+    // `types.d.ts`. The walker can syntactically parse declaration
+    // files (oxc accepts `export declare function`); the
+    // `forced_excludes` skip happens at filesystem discovery so the
+    // AST walker never sees them.
+    world.write("types.d.ts", "export declare function ambient(): number;\n");
+    world.write("app.ts", "export function app() { return 1; }\n");
+    let root = world.root();
+    // Coverage covers `app.ts` only — Istanbul never emits coverage
+    // for `.d.ts` (no statements to instrument), so excluding it from
+    // the fixture mirrors what a real jest run produces.
+    world.cov_path = Some(write_coverage(&root, &["app.ts"]));
+}
+
+#[given("the operator's `crap4ts.toml` does NOT explicitly include `.d.ts`")]
+fn given_no_dts_include_in_config(_world: &mut FileExtWorld) {
+    // No `crap4ts.toml` is written; the default skip applies. There
+    // is no `include` flag for `.d.ts` today (crap-rs#253) — the skip
+    // is unconditional. This Given is narration that pins the
+    // contract for future readers.
+}
+
 #[given(
     "a source tree under `src/` containing `good.ts` (parses cleanly) and `broken.ts` (syntactically invalid)"
 )]
@@ -264,6 +291,22 @@ fn then_excludes_test(world: &mut FileExtWorld) {
     );
 }
 
+#[then("the report does NOT include entries from `types.d.ts`")]
+fn then_excludes_dts_entries(world: &mut FileExtWorld) {
+    // The discovery walker drops `*.d.ts` via `forced_excludes`
+    // before the AST walker runs, so neither file paths nor function
+    // entries from declaration files reach the envelope.
+    let files = world.files_with_functions();
+    assert!(
+        !files.iter().any(|f| f.ends_with(".d.ts")),
+        "no .d.ts file should contribute a function entry; got {files:?}",
+    );
+    assert!(
+        !files.contains(&"types.d.ts"),
+        "`types.d.ts` must not appear in the report; got {files:?}",
+    );
+}
+
 #[then("the report does NOT mention `notes.txt`")]
 fn then_no_notes(world: &mut FileExtWorld) {
     assert!(
@@ -334,8 +377,12 @@ fn then_parse_failure_alone_does_not_gate(world: &mut FileExtWorld) {
 
 #[tokio::main]
 async fn main() {
-    // `@wired`-only filter (AGENTS.md rule 5) — the `.d.ts` scenario
-    // stays `@unwired` (crap-rs#253) and is skipped, not failed.
+    // `@wired`-only filter (AGENTS.md rule 5) — every scenario in this
+    // feature is wired post-crap-rs#253 (the `.d.ts` skip closed the
+    // last `@unwired` here), so the filter is currently a no-op pass-
+    // through. Kept for shape consistency with other crap4ts cucumber
+    // harnesses + so a future `@unwired` regression is mechanically
+    // gated out rather than silently passing as a skipped scenario.
     // `with_default_cli()` skips argv parsing so the `--skip` libtest
     // args `cargo mutants --package crap4ts` injects do not abort
     // cucumber's strict clap CLI (the crap-rs#224 gate-zeroing class).

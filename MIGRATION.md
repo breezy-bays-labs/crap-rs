@@ -33,7 +33,7 @@ Windows and Linux arm64 / musl are tracked for a later release.
 ### Why are my scores different?
 
 `crap4ts@2.x` scores can diverge from `crap4ts@1.x` scores on the same
-codebase. Two compounding reasons account for the gap (a third was
+codebase. Three compounding reasons account for the gap (a fourth was
 resolved in 2.0.0 — see below); each is documented so you can
 self-diagnose rather than chase a phantom regression:
 
@@ -48,6 +48,16 @@ self-diagnose rather than chase a phantom regression:
    against the `crap4ts@1.x` test corpus; until that completes, treat
    the gate as a guideline rather than a ground truth. Track at
    [`crap-rs`#173](https://github.com/breezy-bays-labs/crap-rs/issues/173).
+3. **`.d.ts` declaration files are skipped by default.** `crap4ts@2.x`
+   drops `**/*.d.ts` at the source-discovery boundary (declaration
+   files contain only ambient types — no executable code — so they
+   contribute zero useful CRAP signal). The skip is unconditional;
+   there is no opt-in to include them. If your v1.x scorecard listed
+   functions from `.d.ts` files (e.g. a `types.d.ts` entry with
+   suspicious 0% coverage), v2 will simply omit them — the function
+   count drops, the report is shorter, and the codebase-level summary
+   improves slightly. This matches the convention every other TS
+   tool (`eslint`, `tsc --noEmit`, `vitest`, …) already follows.
 
 **Resolved in 2.0.0 — arrow-function coverage now reads correctly.**
 v2's Istanbul adapter consumes `s` / `statementMap` (not `f` / `fnMap`,

@@ -118,6 +118,36 @@ mod tests {
         );
     }
 
+    /// A `**/*.d.ts` glob in the exclude list drops TypeScript
+    /// declaration files while a sibling `app.ts` survives — pins the
+    /// `ignore::overrides` contract the crap4ts `forced_excludes`
+    /// wiring in `cli::merge_exclude` relies on (crap-rs#253). The
+    /// adapter passes `**/*.d.ts` via `AdapterMeta::forced_excludes`;
+    /// this test confirms the walker mechanism honors that glob shape.
+    #[test]
+    fn discover_source_files_dts_excluded_by_glob() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::write(src.join("app.ts"), "").unwrap();
+        fs::write(src.join("types.d.ts"), "").unwrap();
+        fs::write(src.join("sub").join("nested.d.ts"), "").unwrap();
+        fs::write(src.join("sub").join("nested.ts"), "").unwrap();
+
+        let exclude = vec!["**/*.d.ts".to_string()];
+        let files =
+            discover_source_files(&src, &exclude, false, &["ts", "tsx", "js", "jsx"]).unwrap();
+        let names: Vec<_> = files
+            .iter()
+            .filter_map(|f| f.file_name().and_then(|n| n.to_str()))
+            .collect();
+        assert_eq!(names, vec!["app.ts", "nested.ts"]);
+        assert!(
+            !names.iter().any(|n| n.ends_with(".d.ts")),
+            "`**/*.d.ts` glob must drop every declaration file in the tree, including nested ones",
+        );
+    }
+
     /// Empty `extensions` returns no files — the only sane behavior
     /// when the caller forgot to set `AnalyzeOptions::extensions`.
     /// `core::ensure_source_files_found` then surfaces the diagnostic.
