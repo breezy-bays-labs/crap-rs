@@ -90,10 +90,13 @@ fn lines_for<'a>(
         .as_slice()
 }
 
-/// Sum hits at a specific 1-based source line. Multiple statements
-/// can share a line in Istanbul (e.g. the body of a single-expression
-/// arrow lives on the same line as the function-declaration statement),
-/// so the per-line "did it execute" answer is `sum(hits) > 0`.
+/// Hits at a specific 1-based source line.
+///
+/// Post-#252, `IstanbulCoverage::line_coverage_for` collapses
+/// multi-statement-per-line via MIN, so each `(file, line)` has at most
+/// one record. Summing across the filter is therefore a no-op in the
+/// common case — kept as a sum for safety against a future emitter that
+/// might (incorrectly) round-trip duplicates through this helper.
 fn hits_at(lines: &[LineCoverage], line: usize) -> u64 {
     lines
         .iter()
@@ -219,8 +222,15 @@ fn parse_emits_path_unresolved_for_out_of_tree_entries() {
     );
 }
 
-// ── 5a. arrow.ts: square=100 hits at body line; cube=0 hits ───────────
-// Per CQO ADVISORY-6: BOTH assertions required, not just one.
+// ── 5a. arrow.ts: square covered, cube uncovered (#252 function-level) ─
+//
+// Pre-#252 the parser emitted one record per Istanbul statement, so the
+// `cube` line carried TWO records (decl=1, body=0) and the matcher's
+// per-function rollup saw 1/2 = 50% — the silent-undercount bug.
+// Post-#252 `line_coverage_for` collapses multi-statement-per-line via
+// MIN, so an uninvoked single-line arrow's line reports exactly `hits=0`
+// (matching the worse-of-decl-and-body) and the function-level rollup
+// correctly reports 0%.
 
 #[test]
 fn arrow_ac_5a_square_covered_cube_uncovered() {
@@ -230,26 +240,41 @@ fn arrow_ac_5a_square_covered_cube_uncovered() {
 
     let arrow = lines_for(&out, "arrow.ts");
 
-    // square's body is at line 1 (single-line arrow). 100 invocations.
-    let square_hits = hits_at(arrow, 1);
-    assert!(
-        square_hits >= 100,
-        "expected `square` arrow body at line 1 to record >= 100 hits; got {square_hits}; lines={arrow:?}"
-    );
-
-    // cube's body is at line 2. 0 invocations.
-    let cube_body_stmt_hits: Vec<u64> = arrow
+    // After MIN aggregation, each line carries exactly one record.
+    let line1: Vec<u64> = arrow
+        .iter()
+        .filter(|lc| lc.line == 1)
+        .map(|lc| lc.hits)
+        .collect();
+    let line2: Vec<u64> = arrow
         .iter()
         .filter(|lc| lc.line == 2)
         .map(|lc| lc.hits)
         .collect();
-    // The declaration statement at line 2 still has hits=1 (the const
-    // declaration ran during module load), but the arrow body
-    // statement at line 2 has hits=0. AT LEAST ONE statement at line 2
-    // must report 0 hits — that's the "cube body uncovered" signal.
+    assert_eq!(
+        line1.len(),
+        1,
+        "post-#252: arrow.ts line 1 must have exactly one record (MIN-aggregated across decl + body); got {line1:?}"
+    );
+    assert_eq!(
+        line2.len(),
+        1,
+        "post-#252: arrow.ts line 2 must have exactly one record (MIN-aggregated across decl + body); got {line2:?}"
+    );
+
+    // square's line 1 = MIN(declaration=1, body=100) = 1 (covered).
     assert!(
-        cube_body_stmt_hits.contains(&0),
-        "expected at least one statement at line 2 to have 0 hits (the `cube` arrow body); got hits={cube_body_stmt_hits:?}"
+        line1[0] >= 1,
+        "expected `square` line 1 to record >= 1 hit after MIN aggregation; got {}",
+        line1[0]
+    );
+
+    // cube's line 2 = MIN(declaration=1, body=0) = 0 (uncovered) — the
+    // signal the per-function rollup needs to compute 0% for `cube`.
+    assert_eq!(
+        line2[0], 0,
+        "expected `cube` line 2 to record 0 hits after MIN aggregation across decl=1 + body=0 (#252 silent-undercount fix); got {}",
+        line2[0]
     );
 }
 
@@ -264,8 +289,13 @@ fn arrow_ac_5b_button_and_use_callback_handle_both_100() {
     let button = lines_for(&out, "Button.tsx");
 
     // Button function body spans lines 2-5. Line 3 is the useCallback
-    // declaration statement, line 4 is the return. Both must have
-    // non-zero hits.
+    // declaration statement + the handle arrow body, line 4 is the
+    // return. Both must have non-zero hits.
+    //
+    // Post-#252, multi-statement-per-line collapses via MIN. Both the
+    // useCallback declaration and the handle arrow body record 5 hits in
+    // the fixture (Button rendered 5×, handle invoked 5×), so MIN(5, 5)
+    // = 5 — the >= 5 assertion still holds.
     let line3 = hits_at(button, 3);
     let line4 = hits_at(button, 4);
     assert!(
@@ -277,13 +307,12 @@ fn arrow_ac_5b_button_and_use_callback_handle_both_100() {
         "Button line 4 (return) must be covered; got {line4}"
     );
 
-    // The `handle` arrow body sits on line 3 (same line as the
-    // useCallback call). Its statement hits >= 5 (matches Button's
-    // invocation count).
-    let line3_total = hits_at(button, 3);
+    // Post-#252: line 3's hits = MIN(decl=5, body=5) = 5. Asserts the
+    // worse-case (uninvoked-handle) signal would have surfaced — if
+    // `handle` had been invoked 0 times, MIN would have produced 0 here.
     assert!(
-        line3_total >= 5,
-        "handle arrow body (line 3) must accumulate >= 5 hits; got {line3_total}"
+        line3 >= 5,
+        "handle arrow body (line 3) must record >= 5 hits after MIN aggregation; got {line3}"
     );
 }
 
@@ -298,31 +327,30 @@ fn arrow_ac_5c_inner_map_arrow_covered() {
     let map = lines_for(&out, "map.ts");
 
     // The inner arrow body sits on line 2 (same line as `return xs.map(x => x + 1)`).
-    // Statement hits on line 2 must be non-zero (the outer return + inner arrow body).
+    // Post-#252, line 2 carries one MIN-aggregated record: MIN(outer
+    // return=1, inner arrow=3) = 1. The parser-level signal we need is
+    // "line 2 is covered (hits > 0)"; the function-level rollup ("the
+    // inner arrow's line coverage in the report is 100.0 AND
+    // `increment`'s CRAP score uses the arrow's coverage value") is
+    // verified by `arrow_function_coverage_cucumber.rs` scenarios 3/4
+    // against the binary's full envelope.
     let line2 = hits_at(map, 2);
     assert!(
         line2 > 0,
         "map.ts line 2 (return + inner arrow) must be covered; got {line2}"
     );
 
-    // The arrow-specific statement (stmt id "1" in the fixture) has 3 hits.
-    // Per AC 5c: "the inner arrow's line coverage in the report is 100.0
-    // AND increment's CRAP score uses the arrow's coverage value".
-    // At parser level we verify the arrow's hits propagate into the
-    // per-line records keyed at line 2; the CRAP-score computation
-    // happens in crap-core::core which consumes our `LineCoverage`
-    // output. Verifying that the arrow's hit count is at least the
-    // arrow's `f` count (3) ensures the downstream join sees a
-    // non-trivial coverage value for line 2.
-    let line2_max = map
+    // Sanity: post-#252 exactly one record at line 2 (not the pre-fix
+    // two-records-per-statement shape).
+    let line2_records: Vec<u64> = map
         .iter()
         .filter(|lc| lc.line == 2)
         .map(|lc| lc.hits)
-        .max()
-        .unwrap_or(0);
-    assert!(
-        line2_max >= 3,
-        "expected at least one statement on map.ts line 2 to record >= 3 hits (the arrow's f count); got max={line2_max}"
+        .collect();
+    assert_eq!(
+        line2_records.len(),
+        1,
+        "post-#252: map.ts line 2 must have exactly one MIN-aggregated record; got {line2_records:?}"
     );
 }
 

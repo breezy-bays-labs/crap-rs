@@ -8,11 +8,13 @@
 //! per-function `coverage_percent` out of the envelope, mirroring
 //! `parity_v1.rs` / `metric_unsupported_cucumber.rs`.
 //!
-//! Scenario 1 ("An invoked arrow function has matching coverage") stays
-//! `@unwired`: it asserts a never-invoked single-line arrow reports 0.0
-//! function coverage, but crap4ts@2 reports ~50% because the `const`
-//! declaration statement shares the arrow body's line — tracked at
-//! crap-rs#252.
+//! Scenario 1 ("An invoked arrow function has matching coverage") asserts
+//! a never-invoked single-line arrow reports 0.0 function coverage. It is
+//! `@wired` post-crap-rs#252 — the per-function rollup now reads MIN-
+//! aggregated `LineCoverage` records (one per source line, regardless of
+//! how many statements Istanbul originally emitted), so the `const`
+//! declaration's module-load hit no longer masks the arrow body's
+//! zero-hit signal.
 //!
 //! Named `*_cucumber` (suffix) so `.config/nextest.toml`'s
 //! `binary(/.*_cucumber$/)` filter excludes it from nextest probing.
@@ -169,6 +171,25 @@ fn when_run_crap4ts(world: &mut ArrowWorld) {
 
 // ── Then ─────────────────────────────────────────────────────────────
 
+#[then(regex = r"^the report does NOT show `(\w+)` as (\d+\.\d+) \(would be silent undercount\)$")]
+fn then_not_named_function_coverage(world: &mut ArrowWorld, name: String, forbidden: f64) {
+    // Negative assertion guarding against the inverse of #252: if a
+    // future regression swapped square's and cube's coverage values
+    // (or the matcher's MIN became MAX, etc.), `square` would silently
+    // report 0.0 and the scenario's positive Then would still pass for
+    // `cube`. This guard explicitly fails if `square` slipped to 0.0.
+    let actual = world
+        .functions
+        .iter()
+        .find(|f| f.scored.identity.qualified_name == name)
+        .map(|f| f.scored.coverage_percent)
+        .unwrap_or_else(|| panic!("function `{name}` not found in the report"));
+    assert!(
+        (actual - forbidden).abs() > 1e-6,
+        "`{name}` line coverage must NOT be {forbidden} (silent-undercount guard); got {actual}",
+    );
+}
+
 #[then(regex = r"^the report shows function `(\w+)` with line coverage (\d+\.\d+)$")]
 fn then_named_function_coverage(world: &mut ArrowWorld, name: String, expected: f64) {
     // The named functions in these scenarios are unique across the
@@ -222,8 +243,7 @@ fn then_increment_uses_arrow_coverage(world: &mut ArrowWorld) {
 
 #[tokio::main]
 async fn main() {
-    // `@wired`-only filter (AGENTS.md rule 5) — scenario 1 stays
-    // `@unwired` (crap-rs#252) and is skipped, not failed.
+    // `@wired`-only filter (AGENTS.md rule 5).
     // `with_default_cli()` skips argv parsing so the `--skip` libtest
     // args `cargo mutants --package crap4ts` injects do not abort
     // cucumber's strict clap CLI (the crap-rs#224 gate-zeroing class).

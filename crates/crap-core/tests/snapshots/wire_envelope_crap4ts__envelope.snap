@@ -86,10 +86,10 @@ expression: pretty
           "complexity": 1,
           "complexity_metric": "cyclomatic",
           "contributors": [],
-          "coverage_percent": 50.0,
+          "coverage_percent": 0.0,
           "crap": {
             "risk_level": "low",
-            "value": 1.13
+            "value": 2.0
           },
           "identity": {
             "file_path": "arrow.ts",
@@ -252,8 +252,8 @@ expression: pretty
     "passed": true,
     "summary": {
       "average_complexity": 1.0,
-      "average_coverage": 95.0,
-      "average_crap": 1.013,
+      "average_coverage": 90.0,
+      "average_crap": 1.1,
       "distribution": {
         "acceptable": 0,
         "high": 0,
@@ -264,12 +264,12 @@ expression: pretty
       "max_complexity": 1,
       "max_crap": {
         "risk_level": "low",
-        "value": 1.13
+        "value": 2.0
       },
       "median_complexity": 1.0,
       "median_coverage": 100.0,
       "median_crap": 1.0,
-      "min_coverage": 50.0,
+      "min_coverage": 0.0,
       "total_files": 5,
       "total_functions": 10,
       "worst_function": {
@@ -298,10 +298,10 @@ expression: pretty
           "complexity": 1,
           "complexity_metric": "cyclomatic",
           "contributors": [],
-          "coverage_percent": 50.0,
+          "coverage_percent": 0.0,
           "crap": {
             "risk_level": "low",
-            "value": 1.13
+            "value": 2.0
           },
           "identity": {
             "file_path": "arrow.ts",
@@ -535,8 +535,8 @@ expression: pretty
     ],
     "shown_summary": {
       "average_complexity": 1.0,
-      "average_coverage": 95.0,
-      "average_crap": 1.013,
+      "average_coverage": 90.0,
+      "average_crap": 1.1,
       "distribution": {
         "acceptable": 0,
         "high": 0,
@@ -547,12 +547,12 @@ expression: pretty
       "max_complexity": 1,
       "max_crap": {
         "risk_level": "low",
-        "value": 1.13
+        "value": 2.0
       },
       "median_complexity": 1.0,
       "median_coverage": 100.0,
       "median_crap": 1.0,
-      "min_coverage": 50.0,
+      "min_coverage": 0.0,
       "total_files": 5,
       "total_functions": 10,
       "worst_function": {

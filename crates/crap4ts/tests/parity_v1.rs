@@ -298,6 +298,99 @@ fn crap37_improvement_passes_and_absorbs_risk_shift() {
     );
 }
 
+/// Direction-1 #252: v1.x's multi-statement-per-line conflation
+/// overcounted coverage on a single-line arrow's body (the `cube` case)
+/// — v2's MIN aggregation deflates to the correct value. Coverage
+/// drops, CRAP rises, risk class moves up by one step.
+#[test]
+fn crap252_improvement_direction_one_coverage_deflation_passes() {
+    // cube-shaped values: pre-fix v1 reported 50% (declaration's
+    // module-load hit dominated the body's zero-hit), v2 now reports
+    // 0%. CC = 1 (no contributors), CRAP 1.13 → 2.0, risk low → low.
+    let oracle = vec![rec("cube", 2, 1, 50.0, 1.13, "low", false, &[])];
+    let v2 = vec![rec("cube", 2, 1, 0.0, 2.0, "low", false, &[])];
+    let r = diff(&oracle, &v2);
+    assert_eq!(r.divergences[0].class, Class::Crap252Improvement);
+    assert!(
+        r.gate_passes(),
+        "a crap-rs#252 deflation improvement must pass"
+    );
+}
+
+/// Direction-2 #252: v1.x's conflation also INFLATED coverage when a
+/// function's span contained lines with multiple duplicate uncovered
+/// statements (phantom denominator weight). v2's MIN collapses these
+/// to one record, raising coverage. CRAP barely moves (within
+/// `CRAP_EPS`); risk class stays.
+#[test]
+fn crap252_improvement_direction_two_coverage_inflation_passes() {
+    // createAutoDetectCoveragePort-shaped values: v1 75%, v2 78.5%, cc
+    // = 1, CRAP 1.02 → 1.01. The coverage rise is small but exceeds
+    // COV_EPS; CRAP is essentially flat.
+    let oracle = vec![rec(
+        "createAutoDetectCoveragePort",
+        42,
+        1,
+        75.0,
+        1.02,
+        "low",
+        false,
+        &[],
+    )];
+    let v2 = vec![rec(
+        "createAutoDetectCoveragePort",
+        42,
+        1,
+        78.5,
+        1.01,
+        "low",
+        false,
+        &[],
+    )];
+    let r = diff(&oracle, &v2);
+    assert_eq!(r.divergences[0].class, Class::Crap252Improvement);
+    assert!(
+        r.gate_passes(),
+        "a crap-rs#252 inflation improvement must pass"
+    );
+}
+
+/// Negative case: a coverage drop with CRAP rising MORE than
+/// `CRAP_EPS` past the consistency bound is not absorbed — that is the
+/// signature of a real regression (something v1 got right that v2
+/// broke), not the structural #252 mechanism. CC mismatches also stay
+/// in `ScoreRegression`: the classifier must not swallow walker drifts
+/// under the #252 banner.
+#[test]
+fn crap252_improvement_does_not_swallow_cc_drift() {
+    // Same CC pre/post, but the CRAP rise is consistent with the
+    // coverage drop direction — this DOES pass under #252.
+    let absorbed = diff(
+        &[rec("f", 10, 2, 80.0, 2.32, "low", false, &[])],
+        &[rec("f", 10, 2, 60.0, 2.51, "low", false, &["if-branch"])],
+    );
+    assert_eq!(absorbed.divergences[0].class, Class::Crap252Improvement);
+
+    // CC drifts from v1 to v2: walker counted differently. Falls
+    // through to ScoreRegression even though coverage moved in a
+    // direction the structural rule otherwise allows.
+    let cc_drift = diff(
+        &[rec("f", 10, 2, 80.0, 2.32, "low", false, &[])],
+        &[rec(
+            "f",
+            10,
+            3,
+            60.0,
+            4.91,
+            "low",
+            false,
+            &["if-branch", "logical-operator"],
+        )],
+    );
+    assert_eq!(cc_drift.divergences[0].class, Class::ScoreRegression);
+    assert!(!cc_drift.gate_passes());
+}
+
 /// Discovery contract: an oracle function crap4ts@2 fails to discover
 /// is a hard gate failure (crap4ts@2 must be a superset of v1.x).
 #[test]

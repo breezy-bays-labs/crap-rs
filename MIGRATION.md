@@ -33,9 +33,9 @@ Windows and Linux arm64 / musl are tracked for a later release.
 ### Why are my scores different?
 
 `crap4ts@2.x` scores can diverge from `crap4ts@1.x` scores on the same
-codebase. Three compounding reasons account for the gap; each is
-documented so you can self-diagnose rather than chase a phantom
-regression:
+codebase. Two compounding reasons account for the gap (a third was
+resolved in 2.0.0 — see below); each is documented so you can
+self-diagnose rather than chase a phantom regression:
 
 1. **The default threshold changed from `12` to `16`** (cyclomatic). This
    is an intentional calibration introduced with `crap-rs` v0.5.0 —
@@ -48,18 +48,25 @@ regression:
    against the `crap4ts@1.x` test corpus; until that completes, treat
    the gate as a guideline rather than a ground truth. Track at
    [`crap-rs`#173](https://github.com/breezy-bays-labs/crap-rs/issues/173).
-3. **Arrow-function coverage may count differently.** v1 derived
-   function-level coverage from Istanbul's `f` / `fnMap` arms (per-
-   function invocation counts). v2 reads `s` / `statementMap` only —
-   line-level statement coverage. The two paths agree for the common
-   case where every function's body contains at least one statement
-   counted in `s`, but they can diverge for arrow-heavy code that hits
-   statements without invoking the surrounding function, or vice
-   versa. If a single function's CRAP looks surprisingly different
-   between v1 and v2, eyeball its coverage and file an issue with the
-   fixture; the deliberate trade-off in `crap4ts@2.x` is that
-   modelling `f` / `fnMap` would re-introduce a whole-file bail
-   vector that the v2 parser explicitly avoids.
+
+**Resolved in 2.0.0 — arrow-function coverage now reads correctly.**
+v2's Istanbul adapter consumes `s` / `statementMap` (not `f` / `fnMap`,
+which has known variance across emitters). The 2.0.0-rc.1 / rc.2
+releases emitted one `LineCoverage` record per Istanbul statement, so
+a single source line carrying both a `const` declaration and its arrow
+body produced two records — and the matcher's per-function rollup
+treated a never-invoked arrow as ~50% covered (the declaration's
+module-load hit dominated the body's zero-hit signal). `2.0.0`
+collapses multi-statement-per-line via `min(hits)`, matching the
+implicit per-line contract the LCOV adapter already obeys. The
+practical effect across the `crap4ts@1.x` parity corpus is that **v2
+now reports more accurate coverage than v1 did for any function whose
+body shares a source line with its declaration** — including
+single-line arrows, single-line function expressions, and inline
+`xs.map(arrow)` patterns. Both directions of v1-vs-v2 movement (v2
+deflating an undercount-masked uninvoked body, v2 inflating away
+phantom duplicate-uncovered statements) classify as improvements
+in the parity harness. Tracked: [`crap-rs`#252](https://github.com/breezy-bays-labs/crap-rs/issues/252).
 
 ### Subpath export removals
 

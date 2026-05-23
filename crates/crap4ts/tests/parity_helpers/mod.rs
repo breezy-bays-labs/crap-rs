@@ -237,6 +237,19 @@ pub enum Class {
     /// v1.x reported 0% coverage on a function v2 covers (crap4ts#37
     /// v1.x matcher bug). Passes, logged as an improvement.
     Crap37Improvement,
+    /// crap-rs#252: v1.x's per-function rollup OVERcounted coverage on
+    /// any function whose body shared a source line with its `const`/
+    /// `let`/`var` declaration (single-line arrows, function expressions,
+    /// inline `array.map(arrow)` patterns, mixed bodies with declared +
+    /// expression on the same line). v2's `line_coverage_for` MIN
+    /// aggregation deflates per-line hits to the worst-statement value,
+    /// catching the uncovered body even when the declaration ran at
+    /// module load. Direction is consistent across the v1 corpus:
+    /// `same_cc && v2.coverage ≤ v1.coverage && v2.crap ≥ v1.crap`.
+    /// Risk class typically moves UP by one step (low → acceptable,
+    /// acceptable → moderate) — the natural consequence of more honest
+    /// coverage. Passes, logged as an improvement.
+    Crap252Improvement,
     /// A genuine adapter divergence. Fails the parity gate.
     ScoreRegression,
 }
@@ -298,6 +311,45 @@ fn classify(v1: &FnRecord, v2: &FnRecord) -> Class {
     // containment recovers it. Same complexity + v1 0% + v2 > 0%.
     if same_cc && v1.coverage == 0.0 && v2.coverage > 0.0 {
         return Class::Crap37Improvement;
+    }
+
+    // crap-rs#252: v1.x's per-function rollup conflated multi-statement
+    // lines. Every Istanbul statement at the same source line was
+    // emitted as a separate covered-line record, so:
+    //   - For single-line arrows where the body shared its `const`
+    //     declaration's line, an uncovered body was masked by the
+    //     module-load hit on the declaration (the cube case →
+    //     coverage moves DOWN under MIN).
+    //   - For functions whose span carried lines with multiple
+    //     uncovered duplicate statements, the duplicates inflated the
+    //     denominator without contributing to covered count
+    //     (coverage moves UP under MIN as the phantom uncovered
+    //     statements collapse).
+    // v2's `line_coverage_for` MIN aggregation deflates each line to
+    // its worst-statement hit count, so both directions land on the
+    // more accurate per-line answer.
+    //
+    // The signature is structural: same CC (no walker change), a
+    // coverage drift > `COV_EPS` (the change is real, not noise), and
+    // CRAP movement in the direction consistent with coverage's
+    // direction (CRAP is monotone-decreasing in coverage at fixed CC,
+    // so a coverage rise must not push CRAP up by more than the
+    // tolerance band, and a coverage drop must not push CRAP down by
+    // more than the band either). CC mismatches stay in
+    // `ScoreRegression` so walker drifts can't slip through here.
+    if same_cc && (v2.coverage - v1.coverage).abs() > COV_EPS {
+        let crap_consistent_with_coverage_direction = if v2.coverage > v1.coverage {
+            // Coverage rose → CRAP should stay flat or fall (never rise
+            // beyond noise). Bounded by `CRAP_EPS`.
+            v2.crap <= v1.crap + CRAP_EPS
+        } else {
+            // Coverage fell → CRAP should stay flat or rise (never fall
+            // beyond noise). Bounded by `CRAP_EPS`.
+            v2.crap >= v1.crap - CRAP_EPS
+        };
+        if crap_consistent_with_coverage_direction {
+            return Class::Crap252Improvement;
+        }
     }
 
     if same_cc && cov_unchanged && crap_unchanged {
@@ -395,10 +447,12 @@ impl ParityReport {
         ));
         s.push_str(&format!(
             "  buckets: {} match · {} threshold-default-change · \
-             {} crap4ts#37-improvement · {} score-regression\n",
+             {} crap4ts#37-improvement · {} crap-rs#252-improvement · \
+             {} score-regression\n",
             self.count(Class::Match),
             self.count(Class::ThresholdDefaultChange),
             self.count(Class::Crap37Improvement),
+            self.count(Class::Crap252Improvement),
             self.count(Class::ScoreRegression),
         ));
 
@@ -421,6 +475,7 @@ impl ParityReport {
                     Class::Match => "match",
                     Class::ThresholdDefaultChange => "threshold-default-change",
                     Class::Crap37Improvement => "crap4ts#37-improvement",
+                    Class::Crap252Improvement => "crap-rs#252-improvement",
                     Class::ScoreRegression => "SCORE-REGRESSION",
                 };
                 s.push_str(&format!(

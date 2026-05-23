@@ -419,19 +419,53 @@ impl IstanbulCoverage {
     /// Per-line coverage records (W1.1) for one entry: join `s`
     /// (counts) to `statementMap` (line spans). Statements whose IDs do
     /// not appear in `statementMap` are skipped; hits are keyed at the
-    /// start-of-statement line (Istanbul's emitter granularity). Sorted
-    /// by line for deterministic downstream consumption (mirrors the
-    /// LCOV parser's ordering).
+    /// start-of-statement line (Istanbul's emitter granularity).
+    ///
+    /// **Multi-statement-per-line aggregation (#252).** Istanbul records
+    /// one entry per statement, and a single source line can carry
+    /// multiple statements — most notably `export const cube = (x) => x*x*x;`
+    /// emits TWO statements at the same line: the `const` declaration
+    /// (runs at module load → hits = 1) and the arrow body (runs only when
+    /// the arrow is invoked → hits = 0 when uninvoked). Emitting both as
+    /// separate `LineCoverage` records would make the matcher's per-function
+    /// rollup see total=2/covered=1 = 50% for an uninvoked single-line
+    /// arrow, which `crap-rs#252` documents as the silent-undercount bug.
+    /// LCOV by construction emits one `DA:line,hits` per line (its
+    /// `BTreeMap` per block dedupes by line), so the
+    /// `crap-core::domain::matching` line-range join is implicitly
+    /// contracted as "one record per line per file". This collapse aligns
+    /// the Istanbul parser with that contract.
+    ///
+    /// The aggregation rule is **`min(hits)` across all statements on the
+    /// same source line**: a line counts as covered iff every statement
+    /// on it executed at least once. For the arrow case this gives the
+    /// correct answer (uninvoked cube → `min(1, 0) = 0` → uncovered;
+    /// invoked square → `min(1, 100) = 1` → covered). The MIN semantic
+    /// is conservative: a line where one of several statements never ran
+    /// is treated as uncovered even if the others did. That matches CRAP's
+    /// risk-scoring intent — partial line coverage is partial coverage,
+    /// not full coverage, so the rollup should err toward "this line
+    /// isn't fully exercised."
+    ///
+    /// Sorted by line for deterministic downstream consumption (mirrors
+    /// the LCOV parser's ordering).
     fn line_coverage_for(entry: &IstanbulCoverageFile) -> Vec<LineCoverage> {
-        let mut lines: Vec<LineCoverage> = Vec::with_capacity(entry.s.len());
+        let mut by_line: HashMap<u32, u64> = HashMap::new();
         for (stmt_id, hits) in &entry.s {
             if let Some(loc) = entry.statement_map.get(stmt_id) {
-                lines.push(LineCoverage {
-                    line: loc.start.line as usize,
-                    hits: *hits,
-                });
+                by_line
+                    .entry(loc.start.line)
+                    .and_modify(|h| *h = (*h).min(*hits))
+                    .or_insert(*hits);
             }
         }
+        let mut lines: Vec<LineCoverage> = by_line
+            .into_iter()
+            .map(|(line, hits)| LineCoverage {
+                line: line as usize,
+                hits,
+            })
+            .collect();
         lines.sort_by_key(|lc| lc.line);
         lines
     }
@@ -652,5 +686,114 @@ mod tests {
             }
             other => panic!("expected SourceParse, got {other:?}"),
         }
+    }
+
+    // ── #252: multi-statement-per-line MIN aggregation ────────────────
+    //
+    // Direct unit tests for `line_coverage_for` against the conflation
+    // pattern Istanbul emits for single-line arrow declarations:
+    //   `export const cube = (x) => x*x*x;`
+    // produces TWO statements at the same line — the `const` declaration
+    // (hits = N at module load) and the arrow body (hits = M when invoked).
+    // The matcher's per-line contract demands one record per line; MIN
+    // collapses them so an uninvoked-arrow signal (body hits = 0)
+    // survives even when the declaration ran.
+
+    /// Helper to construct an `IstanbulCoverageFile` for tests below
+    /// without a fixture file or path normalization.
+    fn entry_with_statements(stmts: &[(&str, u64, u32)]) -> IstanbulCoverageFile {
+        let s = stmts
+            .iter()
+            .map(|(id, hits, _)| ((*id).to_string(), *hits))
+            .collect();
+        let statement_map = stmts
+            .iter()
+            .map(|(id, _, line)| {
+                (
+                    (*id).to_string(),
+                    StatementLoc {
+                        start: Position { line: *line },
+                    },
+                )
+            })
+            .collect();
+        IstanbulCoverageFile {
+            path: "irrelevant.ts".to_string(),
+            s,
+            statement_map,
+            b: HashMap::new(),
+            branch_map: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn line_coverage_collapses_two_statements_at_same_line_to_min() {
+        // arrow.ts cube case: declaration runs once, body never runs.
+        let entry = entry_with_statements(&[
+            ("decl", 1, 2), // const cube = ... declaration
+            ("body", 0, 2), // arrow body x*x*x
+        ]);
+        let lines = IstanbulCoverage::line_coverage_for(&entry);
+        assert_eq!(
+            lines.len(),
+            1,
+            "expected one collapsed record; got {lines:?}"
+        );
+        assert_eq!(lines[0].line, 2);
+        assert_eq!(
+            lines[0].hits, 0,
+            "MIN(1, 0) = 0 (uninvoked body wins — the silent-undercount fix)"
+        );
+    }
+
+    #[test]
+    fn line_coverage_collapses_two_covered_statements_to_smaller_hits() {
+        // Both statements ran but with different hit counts (e.g. Button
+        // useCallback decl 5× + handle body 5× collapse to 5; but here we
+        // construct an asymmetric pair to verify MIN, not AVG/SUM).
+        let entry = entry_with_statements(&[("a", 100, 1), ("b", 1, 1)]);
+        let lines = IstanbulCoverage::line_coverage_for(&entry);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].hits, 1, "MIN(100, 1) = 1");
+    }
+
+    #[test]
+    fn line_coverage_handles_three_statements_at_same_line() {
+        let entry = entry_with_statements(&[
+            ("a", 10, 5),
+            ("b", 3, 5),
+            ("c", 0, 5), // one uncovered statement poisons the line under MIN
+        ]);
+        let lines = IstanbulCoverage::line_coverage_for(&entry);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].hits, 0, "MIN(10, 3, 0) = 0");
+    }
+
+    #[test]
+    fn line_coverage_multiple_lines_aggregated_independently() {
+        // square's line 1 (decl=1, body=100) MIN → 1
+        // cube's line 2 (decl=1, body=0) MIN → 0
+        let entry = entry_with_statements(&[
+            ("sq_decl", 1, 1),
+            ("sq_body", 100, 1),
+            ("cu_decl", 1, 2),
+            ("cu_body", 0, 2),
+        ]);
+        let lines = IstanbulCoverage::line_coverage_for(&entry);
+        assert_eq!(lines.len(), 2, "two distinct lines, two records");
+        // Sorted by line.
+        assert_eq!(lines[0].line, 1);
+        assert_eq!(lines[0].hits, 1);
+        assert_eq!(lines[1].line, 2);
+        assert_eq!(lines[1].hits, 0);
+    }
+
+    #[test]
+    fn line_coverage_single_statement_passes_through_unchanged() {
+        let entry = entry_with_statements(&[("only", 42, 7)]);
+        let lines = IstanbulCoverage::line_coverage_for(&entry);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].line, 7);
+        assert_eq!(lines[0].hits, 42);
     }
 }

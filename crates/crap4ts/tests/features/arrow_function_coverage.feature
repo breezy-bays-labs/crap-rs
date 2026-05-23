@@ -3,11 +3,12 @@ Feature: Arrow-function coverage accuracy
   I want crap4ts to count my arrow-function executions correctly
   So that my CRAP scores reflect what's actually exercised by my test suite
 
-  @unwired
+  @wired
   Scenario: An invoked arrow function has matching coverage
-    # tracked: crap-rs#252 — a never-invoked single-line arrow reports ~50%
-    # function coverage, not 0.0, because the `const` declaration statement
-    # shares the body's line; this scenario waits on the per-function rollup fix
+    # Fixed in crap-rs#252 — `IstanbulCoverage::line_coverage_for` now
+    # collapses multi-statement-per-line via MIN, so an uninvoked
+    # single-line arrow's body hit count survives the declaration's
+    # module-load hit (`min(1, 0) = 0`).
     Given a TypeScript source file `src/arrow.ts` containing:
       """
       export const square = (x: number) => x * x;
