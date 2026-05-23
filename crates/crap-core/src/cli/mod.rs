@@ -684,7 +684,27 @@ pub struct AdapterMeta {
     /// and ignorable artifacts live" differs per ecosystem. May be
     /// empty — init then emits the `# exclude = [ … ]` block without
     /// per-language entries.
+    ///
+    /// This field is **init-template only** — it does NOT affect the
+    /// analyzer's effective exclude list at runtime. The runtime
+    /// exclude list is built from `cli.filter.exclude` plus the user's
+    /// `crap4ts.toml`/`crap4rs.toml` `exclude` entries, with adapter-
+    /// mandated patterns prepended via `forced_excludes` (below).
     pub default_excludes: &'static [&'static str],
+    /// Adapter-mandated exclude patterns prepended to every analysis
+    /// run, regardless of CLI flags or user config. Use for files that
+    /// are **structurally never source** for the adapter's language —
+    /// e.g. crap4ts sets `&["**/*.d.ts"]` because TypeScript
+    /// declaration files contain only ambient types, never executable
+    /// code. crap4rs has no such suffix today and sets `&[]`.
+    ///
+    /// Distinct from `default_excludes` (above): forced excludes are
+    /// load-bearing at analysis time and cannot be turned off by the
+    /// operator, whereas `default_excludes` is init-template
+    /// scaffolding. If an operator genuinely needs `.d.ts` files in
+    /// their report, the path is forking the adapter or filing a
+    /// follow-up to add an opt-out — not a config knob (crap-rs#253).
+    pub forced_excludes: &'static [&'static str],
     /// The default complexity metric the adapter binary uses when
     /// neither CLI nor config file specifies one. crap4rs sets
     /// `Cognitive`; crap4ts sets `Cyclomatic` (the only metric crap4ts
@@ -1042,7 +1062,7 @@ fn merge_effective_inputs(
         .or_else(|| file_config.as_ref().and_then(|c| c.metric))
         .unwrap_or(meta.default_metric);
     let (threshold_config, threshold) = merge_threshold(cli, file_config, metric);
-    let exclude = merge_exclude(cli, file_config);
+    let exclude = merge_exclude(cli, file_config, meta);
     EffectiveInputs {
         src,
         metric,
@@ -1522,14 +1542,31 @@ fn merge_threshold(
     (config, global)
 }
 
-fn merge_exclude(cli: &Cli, file_config: &Option<FileConfig>) -> Vec<String> {
-    let mut exclude = cli.filter.exclude.clone();
+/// Build the effective exclude list applied to the source walker:
+/// `meta.forced_excludes` first (adapter-mandated, structural skips
+/// like `**/*.d.ts` for crap4ts — see `AdapterMeta::forced_excludes`),
+/// then CLI `--exclude` flags, then patterns from the user's config
+/// file. Duplicates are dropped so the override builder doesn't see
+/// the same pattern twice. Order matters because `ignore::overrides`
+/// is order-sensitive on shadowed patterns; forced excludes lead so a
+/// user can't accidentally re-include a structurally-skipped file.
+fn merge_exclude(cli: &Cli, file_config: &Option<FileConfig>, meta: &AdapterMeta) -> Vec<String> {
+    let mut exclude: Vec<String> = meta
+        .forced_excludes
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+    let mut seen: std::collections::HashSet<String> = exclude.iter().cloned().collect();
+    for pattern in &cli.filter.exclude {
+        if seen.insert(pattern.clone()) {
+            exclude.push(pattern.clone());
+        }
+    }
     if let Some(fc) = file_config
         && let Some(fc_exclude) = &fc.exclude
     {
-        let seen: std::collections::HashSet<String> = exclude.iter().cloned().collect();
         for pattern in fc_exclude {
-            if !seen.contains(pattern) {
+            if seen.insert(pattern.clone()) {
                 exclude.push(pattern.clone());
             }
         }
@@ -2266,7 +2303,7 @@ mod tests {
             exclude: Some(vec!["benches/**".to_string()]),
             ..FileConfig::default()
         });
-        let exclude = merge_exclude(&cli, &file_config);
+        let exclude = merge_exclude(&cli, &file_config, &fake_meta());
         assert_eq!(exclude, vec!["tests/**", "benches/**"]);
     }
 
@@ -2277,8 +2314,63 @@ mod tests {
             exclude: Some(vec!["tests/**".to_string()]),
             ..FileConfig::default()
         });
-        let exclude = merge_exclude(&cli, &file_config);
+        let exclude = merge_exclude(&cli, &file_config, &fake_meta());
         assert_eq!(exclude, vec!["tests/**"]);
+    }
+
+    /// `AdapterMeta::forced_excludes` patterns are prepended to the
+    /// effective exclude list at analysis time so an adapter can
+    /// structurally skip files that are never source code in its
+    /// language (`**/*.d.ts` for crap4ts — crap-rs#253). CLI flags and
+    /// config-file entries layer on top, with duplicates dropped.
+    #[test]
+    fn merge_exclude_prepends_forced_excludes_from_adapter_meta() {
+        let cli = parse(&["--coverage", "lcov.info", "--exclude", "tests/**"]).unwrap();
+        let file_config = Some(FileConfig {
+            exclude: Some(vec!["benches/**".to_string()]),
+            ..FileConfig::default()
+        });
+        let meta = AdapterMeta {
+            forced_excludes: &["**/*.d.ts"],
+            ..fake_meta()
+        };
+        let exclude = merge_exclude(&cli, &file_config, &meta);
+        assert_eq!(exclude, vec!["**/*.d.ts", "tests/**", "benches/**"]);
+    }
+
+    /// Empty `forced_excludes` (crap4rs's setting today) is a no-op —
+    /// the merge is identical to the pre-#253 behavior of CLI then
+    /// file-config patterns.
+    #[test]
+    fn merge_exclude_with_empty_forced_excludes_matches_legacy_behavior() {
+        let cli = parse(&["--coverage", "lcov.info", "--exclude", "tests/**"]).unwrap();
+        let file_config = Some(FileConfig {
+            exclude: Some(vec!["benches/**".to_string()]),
+            ..FileConfig::default()
+        });
+        let meta = AdapterMeta {
+            forced_excludes: &[],
+            ..fake_meta()
+        };
+        let exclude = merge_exclude(&cli, &file_config, &meta);
+        assert_eq!(exclude, vec!["tests/**", "benches/**"]);
+    }
+
+    /// A `forced_excludes` pattern already present in CLI flags is
+    /// deduplicated — appears once, in its forced-prefix position.
+    #[test]
+    fn merge_exclude_forced_excludes_deduplicates_against_cli_and_config() {
+        let cli = parse(&["--coverage", "lcov.info", "--exclude", "**/*.d.ts"]).unwrap();
+        let file_config = Some(FileConfig {
+            exclude: Some(vec!["**/*.d.ts".to_string(), "benches/**".to_string()]),
+            ..FileConfig::default()
+        });
+        let meta = AdapterMeta {
+            forced_excludes: &["**/*.d.ts"],
+            ..fake_meta()
+        };
+        let exclude = merge_exclude(&cli, &file_config, &meta);
+        assert_eq!(exclude, vec!["**/*.d.ts", "benches/**"]);
     }
 
     // ── --diff flag tests ───────────────────────────────────────────
@@ -2791,6 +2883,11 @@ mod tests {
             rule_help_uri: "https://example.invalid/fake-adapter#rules",
             config_file_name: "fake-adapter.toml",
             default_excludes: &["fixtures/**"],
+            // Empty in the shared fake so tests that don't care don't
+            // see an unexpected prefix; the two `merge_exclude` tests
+            // that DO care construct their own AdapterMeta with an
+            // explicit `forced_excludes`.
+            forced_excludes: &[],
             // `Cognitive` preserves the pre-W2.5 fallthrough semantics
             // for tests that don't care which default they get (the two
             // tests that DO care construct their own AdapterMeta with

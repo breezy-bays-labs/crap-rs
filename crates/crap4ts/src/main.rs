@@ -18,7 +18,7 @@ use crap_core::cli::AdapterMeta;
 use crap_core::domain::types::ComplexityMetric;
 use crap4ts::adapters::coverage::IstanbulCoverage;
 use crap4ts::adapters::walker::OxcWalker;
-use crap4ts::{DEFAULT_EXCLUDES, EXTENSIONS};
+use crap4ts::{DEFAULT_EXCLUDES, EXTENSIONS, FORCED_EXCLUDES};
 
 const ABOUT: &str = "CRAP score analyzer for TypeScript / JavaScript";
 const LONG_ABOUT: &str = "CRAP (Change Risk Anti-Patterns) score analyzer for TypeScript / \
@@ -54,6 +54,13 @@ fn main() -> ExitCode {
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_name: "crap4ts.toml",
         default_excludes: DEFAULT_EXCLUDES,
+        // `.d.ts` declaration files contain ambient types only (no
+        // executable code); skip them at the discovery boundary so
+        // they never reach the AST walker (crap-rs#253). Operators
+        // cannot opt back in via `crap4ts.toml` — if a corpus
+        // legitimately needs declaration-file CRAP, fork the adapter
+        // or file a follow-up to add an opt-out flag.
+        forced_excludes: FORCED_EXCLUDES,
         // crap4ts ships --metric cyclomatic as the only supported
         // metric in 2.0.0; cognitive returns CrapError::MetricNotSupported
         // from the walker (D5 + locked decision #2).

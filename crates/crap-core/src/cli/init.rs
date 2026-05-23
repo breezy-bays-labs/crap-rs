@@ -288,6 +288,11 @@ mod tests {
             rule_help_uri: "https://example.invalid",
             config_file_name: "fake-adapter.toml",
             default_excludes: &["tests/**", "benches/**", "examples/**"],
+            // `init` doesn't render forced_excludes (they're load-bearing
+            // at analysis time, not template scaffolding); empty here
+            // keeps the round-trip assertions focused on what `init`
+            // actually emits.
+            forced_excludes: &[],
             // Cognitive matches the pre-W2.5 fallthrough — init's
             // round-trip / comment-rendering assertions don't probe
             // the metric default; this keeps the field meaningful

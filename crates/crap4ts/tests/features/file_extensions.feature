@@ -20,10 +20,12 @@ Feature: TypeScript file extension discovery and parsing
       | .mjs      | `export function greet(name) { return 'hello ' + name; }`                            |
       | .cjs      | `module.exports.greet = function(name) { return 'hello ' + name; };`                 |
 
-  @unwired
+  @wired
   Scenario: A .d.ts file is skipped by default (declaration-only, no executable code)
-    # tracked: crap-rs#253 — crap4ts currently analyzes `.d.ts` declaration files
-    # instead of skipping them; this scenario waits on the discovery-walker skip
+    # crap-rs#253 — `**/*.d.ts` is in `AdapterMeta::forced_excludes` for crap4ts,
+    # so the source-discovery walker drops declaration files before they reach
+    # the AST walker. There is no opt-out: declaration files contribute zero
+    # useful CRAP signal (ambient types only, no executable code).
     Given a source tree under `src/` containing `types.d.ts` and `app.ts`
     And the operator's `crap4ts.toml` does NOT explicitly include `.d.ts`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`

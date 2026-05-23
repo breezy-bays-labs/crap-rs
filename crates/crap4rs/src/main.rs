@@ -89,6 +89,10 @@ fn main() -> ExitCode {
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_name: "crap4rs.toml",
         default_excludes: DEFAULT_EXCLUDES,
+        // No Rust file suffix is "structurally never source" the way
+        // TypeScript's `.d.ts` is (crap-rs#253) — `mod.rs`, `lib.rs`,
+        // `build.rs`, etc. all carry executable code. Empty here.
+        forced_excludes: &[],
         // crap4rs supports both cognitive and cyclomatic. Cognitive
         // remains the default (locked decision #2) — explicit here so
         // the per-adapter default flows through `AdapterMeta` for both

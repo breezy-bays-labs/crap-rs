@@ -50,6 +50,17 @@ pub const EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 /// `node_modules` (which, for the CLI, the config-merge step filters).
 pub const DEFAULT_EXCLUDES: &[&str] = &["node_modules/**", "dist/**", "coverage/**"];
 
+/// Adapter-mandated structural skips applied to every analysis run
+/// regardless of CLI flags or operator config. crap4ts skips
+/// TypeScript declaration files (`*.d.ts`) because they contain only
+/// ambient type declarations — never executable code — so they
+/// contribute zero useful complexity or coverage signal and showing
+/// them in a CRAP report is always misleading (crap-rs#253). Flowed
+/// through both the CLI path (`AdapterMeta::forced_excludes`) and the
+/// library / napi path ([`analyze_to_json`]) so a programmatic caller
+/// gets the same skip behavior as the CLI.
+pub const FORCED_EXCLUDES: &[&str] = &["**/*.d.ts"];
+
 /// Wire shape for the JSON returned by [`analyze_to_json`]. Mirrors
 /// `crap_core::core::AnalysisOutput<P>`'s `{ result, diagnostics }`
 /// shape verbatim. `#[serde(bound = "")]` suppresses serde's
@@ -78,6 +89,10 @@ struct AnalyzeWireOutput<'a, P: ParseDiagnostic> {
 ///
 /// [`DEFAULT_EXCLUDES`] is applied so a caller pointed at a project
 /// root does not walk into `node_modules`, `dist`, or `coverage`.
+/// [`FORCED_EXCLUDES`] is also applied so `.d.ts` declaration files
+/// are skipped on this path (the napi shim funnels through here);
+/// without it, programmatic callers would see ambient-type entries
+/// the CLI doesn't (crap-rs#253).
 ///
 /// Inputs are validated up front: `source_root` must resolve to an
 /// existing directory, and `threshold` — when set — must be a finite
@@ -125,7 +140,14 @@ pub fn analyze_to_json(
         },
         metric,
         extensions: EXTENSIONS.iter().map(|&s| s.to_string()).collect(),
-        exclude: DEFAULT_EXCLUDES.iter().map(|&s| s.to_string()).collect(),
+        // Forced excludes lead so a programmatic caller can't override
+        // structural skips (`*.d.ts` per crap-rs#253), DEFAULT_EXCLUDES
+        // follows for vendored / build / coverage paths.
+        exclude: FORCED_EXCLUDES
+            .iter()
+            .chain(DEFAULT_EXCLUDES.iter())
+            .map(|&s| s.to_string())
+            .collect(),
         ..AnalyzeOptions::default()
     };
 
