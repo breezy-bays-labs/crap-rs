@@ -144,23 +144,26 @@ commit SHA isn't).
    depends on). The conscious tradeoff: reproducible CI (SHA-locked)
    at the cost of manual upkeep on the toolchain-action pin.
 
-3. **Resolve SHAs via `gh api`.** For tag-pinned actions:
+3. **Resolve SHAs via `gh api repos/foo/bar/commits/<tag>`.** This
+   form returns the underlying **commit SHA** for any tag —
+   lightweight or annotated — without the caller having to know the
+   difference:
 
    ```bash
-   gh api repos/foo/bar/git/ref/tags/vX --jq '.object.sha'
+   gh api repos/foo/bar/commits/vX --jq '.sha'
    ```
 
+   The alternative `gh api repos/foo/bar/git/ref/tags/<tag> --jq
+   '.object.sha'` returns the *tag object* SHA for annotated tags
+   (only the commit SHA for lightweight ones), which mixes
+   representations across actions and risks pin drift. Use the
+   `commits/<tag>` form unconditionally — both `@v4`-style
+   floating-major and `@v1.18.1`-style pinned-release tags work.
    For branch-pinned actions:
 
    ```bash
    gh api repos/foo/bar/branches/<branch> --jq '.commit.sha'
    ```
-
-   For floating-version tags (e.g. `@v2` that points at the v2
-   major-version head rather than a specific release), the same
-   `git/ref/tags/<tag>` call returns the head SHA the moving tag
-   currently resolves to — pin to that and Dependabot keeps it
-   fresh as `@v2` advances.
 
 4. **Local composite actions (`./.github/actions/<name>`) don't get
    pinned.** They're paths within this repo, not external

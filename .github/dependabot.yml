@@ -50,8 +50,13 @@ updates:
       # see the full supply-chain delta at once instead of one PR per
       # action. Excludes major-version bumps — those land as separate
       # PRs that need human review (breaking-change semantics).
+      # `patterns: ["*"]` is the explicit selector (Dependabot groups
+      # require at least one of `patterns`, `exclude-patterns`, or
+      # `dependency-type`); `update-types` then narrows the scope.
       github-actions:
         applies-to: version-updates
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
