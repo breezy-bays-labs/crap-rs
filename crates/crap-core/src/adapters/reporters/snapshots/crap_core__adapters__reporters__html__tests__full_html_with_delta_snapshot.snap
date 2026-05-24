@@ -1,0 +1,2078 @@
+---
+source: crates/crap-core/src/adapters/reporters/html.rs
+assertion_line: 1486
+expression: out
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>test-adapter v0.4.0 — CRAP score analysis</title>
+<style>
+
+/* Sakura.css v1.5.0
+ * ================
+ * Minimal css theme.
+ * Project: https://github.com/oxalorg/sakura/
+ */
+/* Body */
+html {
+  font-size: 62.5%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+body {
+  font-size: 1.8rem;
+  line-height: 1.618;
+  max-width: 38em;
+  margin: auto;
+  color: #4a4a4a;
+  background-color: #f9f9f9;
+  padding: 13px;
+}
+
+@media (max-width: 684px) {
+  body {
+    font-size: 1.53rem;
+  }
+}
+@media (max-width: 382px) {
+  body {
+    font-size: 1.35rem;
+  }
+}
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-weight: 700;
+  margin-top: 3rem;
+  margin-bottom: 1.5rem;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  -ms-word-break: break-all;
+  word-break: break-word;
+}
+
+h1 {
+  font-size: 2.35em;
+}
+
+h2 {
+  font-size: 2em;
+}
+
+h3 {
+  font-size: 1.75em;
+}
+
+h4 {
+  font-size: 1.5em;
+}
+
+h5 {
+  font-size: 1.25em;
+}
+
+h6 {
+  font-size: 1em;
+}
+
+p {
+  margin-top: 0px;
+  margin-bottom: 2.5rem;
+}
+
+small, sub, sup {
+  font-size: 75%;
+}
+
+hr {
+  border-color: #1d7484;
+}
+
+a {
+  text-decoration: none;
+  color: #1d7484;
+}
+a:visited {
+  color: #144f5a;
+}
+a:hover {
+  color: #982c61;
+  border-bottom: 2px solid #4a4a4a;
+}
+
+ul {
+  padding-left: 1.4em;
+  margin-top: 0px;
+  margin-bottom: 2.5rem;
+}
+
+li {
+  margin-bottom: 0.4em;
+}
+
+blockquote {
+  margin-left: 0px;
+  margin-right: 0px;
+  padding-left: 1em;
+  padding-top: 0.8em;
+  padding-bottom: 0.8em;
+  padding-right: 0.8em;
+  border-left: 5px solid #1d7484;
+  margin-bottom: 2.5rem;
+  background-color: #f1f1f1;
+}
+
+blockquote p {
+  margin-bottom: 0;
+}
+
+img, video {
+  height: auto;
+  max-width: 100%;
+  margin-top: 0px;
+  margin-bottom: 2.5rem;
+}
+
+/* Pre and Code */
+pre {
+  background-color: #f1f1f1;
+  display: block;
+  padding: 1em;
+  overflow-x: auto;
+  margin-top: 0px;
+  margin-bottom: 2.5rem;
+  font-size: 0.9em;
+}
+
+code, kbd, samp {
+  font-size: 0.9em;
+  padding: 0 0.5em;
+  background-color: #f1f1f1;
+  white-space: pre-wrap;
+}
+
+pre > code {
+  padding: 0;
+  background-color: transparent;
+  white-space: pre;
+  font-size: 1em;
+}
+
+/* Tables */
+table {
+  text-align: justify;
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2rem;
+}
+
+td, th {
+  padding: 0.5em;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+/* Buttons, forms and input */
+input, textarea {
+  border: 1px solid #4a4a4a;
+}
+input:focus, textarea:focus {
+  border: 1px solid #1d7484;
+}
+
+textarea {
+  width: 100%;
+}
+
+.button, button, input[type=submit], input[type=reset], input[type=button], input[type=file]::file-selector-button {
+  display: inline-block;
+  padding: 5px 10px;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  background-color: #1d7484;
+  color: #f9f9f9;
+  border-radius: 1px;
+  border: 1px solid #1d7484;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.button[disabled], button[disabled], input[type=submit][disabled], input[type=reset][disabled], input[type=button][disabled], input[type=file]::file-selector-button[disabled] {
+  cursor: default;
+  opacity: 0.5;
+}
+.button:hover, button:hover, input[type=submit]:hover, input[type=reset]:hover, input[type=button]:hover, input[type=file]::file-selector-button:hover {
+  background-color: #982c61;
+  color: #f9f9f9;
+  outline: 0;
+}
+.button:focus-visible, button:focus-visible, input[type=submit]:focus-visible, input[type=reset]:focus-visible, input[type=button]:focus-visible, input[type=file]::file-selector-button:focus-visible {
+  outline-style: solid;
+  outline-width: 2px;
+}
+
+textarea, select, input {
+  color: #4a4a4a;
+  padding: 6px 10px; /* The 6px vertically centers text on FF, ignored by Webkit */
+  margin-bottom: 10px;
+  background-color: #f1f1f1;
+  border: 1px solid #f1f1f1;
+  border-radius: 4px;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+textarea:focus, select:focus, input:focus {
+  border: 1px solid #1d7484;
+  outline: 0;
+}
+
+input[type=checkbox]:focus {
+  outline: 1px dotted #1d7484;
+}
+
+label, legend, fieldset {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+/* ─────────────────────────────────────────────────────────────────────────
+   Sakura Reports — structural styles
+   Drop-in CSS for the patterns documented in /README.md.
+   Layer order: this file extends colors_and_type.css.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Scope banner ────────────────────────────────────────────────────────
+   Plain text near the top of the report stating what's in scope and what
+   the comparison baseline is. Don't add chrome — the words are the UI. */
+.scope-banner {
+  padding: 0;
+  margin: 0 0 1rem;
+  color: var(--text);
+}
+.scope-banner code {
+  background: var(--bg-elevated);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+}
+
+/* ── Callout block ───────────────────────────────────────────────────────
+   The one consistently-styled box in the system. Use for the test
+   description, or any "here's what this thing is about" prose block.
+   Gray background + teal left rule. Don't reuse this treatment elsewhere
+   in the same report; its scarcity is what makes it readable. */
+.callout {
+  background: var(--bg-elevated);
+  border-left: 5px solid var(--accent);
+  padding: 0.875rem 1.125rem;
+  margin: 0 0 1.25rem;
+}
+
+/* ── Cascade selector ────────────────────────────────────────────────────
+   Two-step "Model → Item" picker. Each <select> shares the same type
+   scale, monospace, and min-width so the rhythm is consistent. */
+.selector-row {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.selector-field { display: flex; flex-direction: column; min-width: 16rem; }
+.selector-field label {
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 0.3rem;
+}
+.selector-arrow {
+  padding-bottom: 0.9rem;
+  color: var(--text-muted);
+  font-size: 1.125rem;
+}
+.selector-count {
+  padding-bottom: 1rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Diagram block (Mermaid DAG / flowchart) ───────────────────────────── */
+.diagram-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.125rem;
+  margin: 0 0 1rem;
+  background: var(--bg);
+}
+.diagram-header { display: block; margin-bottom: 0.5rem; }
+.diagram-header h2 { margin: 0 0 0.15rem; }
+.diagram-subtitle {
+  margin: 0 0 0.25rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.diagram-host {
+  display: flex; justify-content: center; overflow-x: auto;
+  padding: 0.5rem 0;
+}
+.diagram-host svg { max-width: 100%; height: auto; }
+.diagram-host g.node:hover .label { text-decoration: underline; }
+
+/* ── Diagram legend ──────────────────────────────────────────────────────
+   Two flex groups (role + edge type) with breathing room. Swatches
+   communicate shape *and* color so colorblind users get the same info. */
+.diagram-legend {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+  font-size: var(--fs-small);
+  display: flex; flex-wrap: wrap; gap: 0.75rem 2.5rem;
+}
+.legend-group {
+  display: flex; flex-wrap: wrap;
+  gap: 0.45rem 0.9rem; align-items: center;
+}
+.legend-title {
+  font-weight: 600;
+  color: var(--text);
+  margin-right: 0.25rem;
+}
+.legend-items {
+  display: inline-flex; flex-wrap: wrap;
+  gap: 0.5rem 1.25rem; align-items: center;
+}
+.legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+.legend-swatch {
+  display: inline-block; width: 22px; height: 14px;
+  border: 1.5px solid currentColor; background: var(--bg);
+}
+.legend-swatch.shape-stadium  { border-radius: 999px; }
+.legend-swatch.shape-hexagon  {
+  clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%);
+  border: 0;
+}
+.legend-edge {
+  display: inline-block; width: 28px; height: 3px; border-radius: 2px;
+}
+.legend-edge.is-dashed {
+  background: transparent;
+  border-top: 3px dashed;
+  height: 0;
+}
+
+/* ── Two-panel comparison region ─────────────────────────────────────────
+   `minmax(0, 1fr)` — without the 0 min, grid columns won't shrink below
+   content and the overflow-detection logic in your JS can't trip. */
+.panel-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  margin: 0 0 1.5rem;
+}
+.panel-row.is-stacked { grid-template-columns: 1fr; }
+.panel-row.is-stacked .reference-panel { position: static; }
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--panel-pad);
+  background: var(--bg);
+}
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; margin-bottom: 0.75rem;
+}
+
+/* The "reference" panel (Expected / Golden / Target). Outlined heavier
+   than the left so it reads as the source of truth. Sticky in side-by-
+   side, static when stacked. */
+.reference-panel {
+  border: 2px solid var(--text);
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+}
+
+/* ── Segmented toggle ────────────────────────────────────────────────────
+   For switching the left panel between two modes (e.g. detail / overview).
+   No third position — if you need three options, use a select. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--bg-elevated);
+}
+.segmented button {
+  appearance: none;
+  border: 0; background: transparent;
+  color: var(--text-muted);
+  font: inherit; font-size: var(--fs-small);
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.segmented button:hover { color: var(--text); }
+.segmented button.is-active {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* ── Code block with copy button ─────────────────────────────────────────
+   Wrapper is positioned so the button can float over the top-right of
+   the code. The pre inside the wrap reserves padding for the button
+   so the first line of code can't run under it. Button is muted by
+   default, opaque on hover/focus; click handler must stopPropagation
+   so it doesn't toggle a parent <details>. */
+.code-block-wrap { position: relative; }
+.code-block-wrap > pre {
+  padding-top: 1.875rem;
+  padding-right: 4rem;
+}
+.code-copy {
+  position: absolute; top: 8px; right: 8px;
+  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 0.78em;
+  padding: 0.1rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  cursor: pointer; opacity: 0.55;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+.code-block-wrap:hover .code-copy,
+.code-copy:focus-visible { opacity: 1; }
+.code-copy:hover { background: var(--bg-elevated); }
+.code-copy.copied {
+  background: var(--success-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
+}
+.code-copy.copy-failed {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+  opacity: 1;
+}
+
+/* SQL syntax highlight tokens. Plain-text fallback colors come from
+   colors_and_type.css. */
+.sql-keyword { color: var(--sql-keyword); font-weight: 700; }
+.sql-string  { color: var(--sql-string); }
+.sql-comment { color: var(--sql-comment); font-style: italic; }
+.sql-jinja   { color: var(--sql-jinja); }
+
+/* ── Tables ──────────────────────────────────────────────────────────────
+   Tables size to content but cover the column. Cells nowrap so numeric
+   tables stay readable; headers wrap at <wbr> boundaries (your JS
+   injects them after underscores in snake_case headers). */
+.table-fit { width: 100%; overflow-x: auto; }
+.table-fit table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-td);
+}
+.table-fit th {
+  text-align: left;
+  padding: var(--table-cell-pad);
+  font-family: var(--font-mono);
+  font-size: var(--fs-th);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-th);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+  white-space: normal;       /* allow <wbr> wrap */
+  max-width: 12rem;
+  vertical-align: bottom;
+  line-height: var(--line-height-tight);
+}
+.table-fit td {
+  padding: var(--table-cell-pad);
+  border-bottom: 1px solid var(--hairline);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.table-fit tr:last-child td { border-bottom: 0; }
+.cell-null { color: var(--text-muted); font-style: italic; }
+.cell-num  { text-align: right; }
+
+/* Table title row above each table */
+.table-header {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  margin: 0.4rem 0 0.2rem;
+}
+.table-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-h4);
+  color: var(--text);
+}
+.row-count-badge {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Empty / hint states ─────────────────────────────────────────────── */
+.empty-hint {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+}
+
+.empty-callout {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-style: italic;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Dormant error card ──────────────────────────────────────────────────
+   Designed and shipped *hidden*. Reveal via URL #explain (a hashchange
+   listener in your JS toggles `.is-visible`) for design review without
+   polluting normal runs. */
+.error-card {
+  display: none;
+  border: 2px solid var(--danger);
+  background: var(--danger-bg);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin: 0 0 1.5rem;
+}
+.error-card.is-visible { display: block; }
+.error-card h2 { margin: 0 0 0.5rem; color: var(--danger); }
+.error-card .error-id {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--danger);
+  margin-bottom: 0.5rem;
+}
+.error-card .error-remediation { margin: 0; }
+
+/* ── Details prose (test / item metadata) ───────────────────────────────
+   Three short prose lines beats a key/value grid for scanability. */
+.details-body {
+  padding: 0.6rem 0 0;
+  margin-top: 0.35rem;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  gap: 0.3rem;
+  font-size: var(--fs-small);
+}
+.details-line { line-height: var(--line-height-body); }
+.details-label { color: var(--text-muted); }
+.details-tag,
+.details-meta-key,
+.details-meta-val {
+  font-family: var(--font-mono);
+}
+.details-meta-key { color: var(--text-muted); }
+.details-source {
+  font-family: var(--font-mono);
+  background: var(--bg-elevated);
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CI / static-analysis primitives
+   These were promoted from the crap-rs report mockup. They generalize to
+   any tool that scores items against a threshold and groups them by
+   severity (lint, audit, coverage, perf, security).
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Verdict pill ────────────────────────────────────────────────────────
+   The single "did this run pass" stamp. Three states only: PASS / WARN
+   / FAIL. Live in a hero region, near the headline. Don't use this for
+   per-row classification — that's what `.risk-pill` is for. */
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-md);
+  border: 2px solid currentColor;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.95em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.verdict.is-pass { color: var(--verdict-pass); background: var(--risk-1-tint); }
+.verdict.is-warn { color: var(--verdict-warn); background: var(--risk-3-tint); }
+.verdict.is-fail { color: var(--verdict-fail); background: var(--risk-4-tint); }
+.verdict .verdict-glyph {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 1.1em;
+  line-height: 1;
+  display: inline-block;
+}
+
+/* ── Risk pill (per-row classification) ──────────────────────────────────
+   Inline classifier that labels a single item: a function, a finding,
+   a row. Driven by `data-risk="1|2|3|4"` so the same markup styles
+   regardless of which vocabulary the tool uses (low/notice/warn/error,
+   etc). For convenience the legacy class names also work. */
+.risk-pill {
+  display: inline-flex; align-items: center;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  border: 1px solid transparent;
+  line-height: 1.5;
+  vertical-align: 0.05em;
+}
+.risk-pill[data-risk="1"], .risk-pill.is-1 { color: var(--risk-1-on); background: var(--risk-1-tint); border-color: var(--risk-1); }
+.risk-pill[data-risk="2"], .risk-pill.is-2 { color: var(--risk-2-on); background: var(--risk-2-tint); border-color: var(--risk-2); }
+.risk-pill[data-risk="3"], .risk-pill.is-3 { color: var(--risk-3-on); background: var(--risk-3-tint); border-color: var(--risk-3); }
+.risk-pill[data-risk="4"], .risk-pill.is-4 { color: var(--risk-4-on); background: var(--risk-4-tint); border-color: var(--risk-4); }
+
+/* ── KPI grid ────────────────────────────────────────────────────────────
+   A row of summary tiles. `auto-fit` keeps it balanced — 3 KPIs render as
+   3 columns, 6 wrap into 3×2 on mid widths, single-column on narrow.
+   Each tile is label / value / footnote-or-bar. */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+}
+.kpi {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  padding: 0.7rem 0.875rem 0.75rem;
+  display: flex; flex-direction: column; gap: 0.25rem;
+  min-width: 0;
+}
+.kpi-label {
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.kpi-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: var(--text);
+  line-height: 1.1;
+  display: inline-flex; align-items: baseline; gap: 0.25rem;
+}
+.kpi-value .kpi-unit {
+  font-size: 0.6em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.kpi-foot {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+.kpi-foot code { background: transparent; padding: 0; }
+
+/* ── Bar (inline progress / ratio) ──────────────────────────────────────
+   Tiny horizontal bar. Use inside a KPI or table cell. The fill class
+   carries the semantic — `.is-1` … `.is-4` to map onto the risk ladder. */
+.bar {
+  height: 4px;
+  background: var(--hairline);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bar > span { display: block; height: 100%; border-radius: inherit; background: var(--text-muted); }
+.bar > span.is-1 { background: var(--risk-1); }
+.bar > span.is-2 { background: var(--risk-2); }
+.bar > span.is-3 { background: var(--risk-3); }
+.bar > span.is-4 { background: var(--risk-4); }
+.bar.is-thick { height: 6px; }
+
+/* ── Distribution bar ────────────────────────────────────────────────────
+   One horizontal bar split into N segments, each weighted by count.
+   For showing how a population falls across the risk bands. Segments use
+   `flex-grow: <count>` to size by data, and `min-width` so a single-item
+   band stays visible. */
+.dist-bar {
+  display: flex; align-items: stretch;
+  width: 100%; height: 28px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin: 0.25rem 0 0.5rem;
+}
+.dist-seg {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0.4rem;
+  min-width: 2.5rem;
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: #fff;
+  padding: 0 0.6rem;
+  white-space: nowrap;
+}
+.dist-seg .dist-count { font-weight: 700; }
+.dist-seg .dist-label { opacity: 0.85; }
+.dist-seg[data-risk="1"], .dist-seg.is-1 { background: var(--risk-1); }
+.dist-seg[data-risk="2"], .dist-seg.is-2 { background: var(--risk-2); }
+.dist-seg[data-risk="3"], .dist-seg.is-3 { background: var(--risk-3); }
+.dist-seg[data-risk="4"], .dist-seg.is-4 { background: var(--risk-4); }
+.dist-legend {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+  font-size: var(--fs-small); color: var(--text-muted);
+}
+.dist-legend .legend-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  vertical-align: 0.05em;
+}
+
+/* ── Severity card (collapsible group with stripe) ──────────────────────
+   A `<details>` whose summary row carries a 4px-wide colored stripe on
+   the left edge, driven by `data-risk`. Use this for any "list of items
+   grouped by classification" surface: lint findings per file, slow
+   queries per table, etc.
+
+   Caret is a static glyph rotated 90deg when open. No spring easing —
+   matches Sakura's existing 120ms ease convention. */
+.severity-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  margin: 0 0 0.625rem;
+  overflow: hidden;
+}
+.severity-card > summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 4px 1rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.875rem 0.6rem 0;
+  user-select: none;
+}
+.severity-card > summary::-webkit-details-marker { display: none; }
+.severity-card > summary .stripe {
+  width: 4px; align-self: stretch;
+  background: var(--border);
+}
+.severity-card[data-risk="1"] > summary .stripe { background: var(--risk-1); }
+.severity-card[data-risk="2"] > summary .stripe { background: var(--risk-2); }
+.severity-card[data-risk="3"] > summary .stripe { background: var(--risk-3); }
+.severity-card[data-risk="4"] > summary .stripe { background: var(--risk-4); }
+.severity-card > summary .caret {
+  width: 1rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-align: center;
+  transition: transform 120ms ease;
+}
+.severity-card[open] > summary .caret { transform: rotate(90deg); }
+.severity-card > summary .sev-path {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.severity-card > summary .sev-meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  white-space: nowrap;
+}
+.severity-card > summary .sev-meta b { color: var(--text); font-weight: 600; }
+.severity-card > summary:hover { background: var(--bg-elevated); }
+
+/* Optional ratio sparkline inside the summary, showing the per-band
+   breakdown for THIS card. Widths are inline styles — `width: 16px` etc. */
+.sev-ratio { display: inline-flex; gap: 2px; }
+.sev-ratio span { height: 10px; border-radius: 2px; }
+.sev-ratio .is-1 { background: var(--risk-1); }
+.sev-ratio .is-2 { background: var(--risk-2); }
+.sev-ratio .is-3 { background: var(--risk-3); }
+.sev-ratio .is-4 { background: var(--risk-4); }
+
+.severity-card-body {
+  border-top: 1px solid var(--hairline);
+  padding: 0;
+}
+
+/* ── Filter chips ────────────────────────────────────────────────────────
+   Small flat buttons with an optional count badge. Use for filtering a
+   list ("All / Exceeding / High"). Distinct from `.segmented`: a
+   segmented control is a single value, chips can stack with other
+   filters (search, scope segmented) and intersect.
+
+   Keeps Sakura's small-radius rule — 4px, not 999px. */
+.chips {
+  display: inline-flex; gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.chip {
+  appearance: none;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.chip:hover { color: var(--text); border-color: var(--text-muted); }
+.chip.is-active {
+  color: var(--text);
+  border-color: var(--text);
+  background: var(--bg-elevated);
+}
+.chip-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+.chip.is-active .chip-count { color: var(--text); }
+
+/* ── Search input ────────────────────────────────────────────────────────
+   Plain text field with a magnifying-glass SVG baked into the
+   background-image. Pair with a keyboard shortcut (`/`) — see
+   PATTERNS.md for the handler. */
+.search-input {
+  height: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg);
+  padding: 0 0.625rem 0 1.85rem;
+  font: inherit;
+  font-size: var(--fs-small);
+  color: var(--text);
+  width: 16rem;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236a6a72' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 0.6rem center;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.search-input::placeholder { color: var(--text-muted); }
+.search-input:focus { border-color: var(--text); }
+
+/* ── Tabs (page-level navigation) ────────────────────────────────────────
+   Distinct from `.segmented` (single-value mode switch). Tabs are for
+   top-of-page navigation between views of the same report — e.g.
+   "Current run" vs "Delta vs baseline". Flat underline; no pill chrome. */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0 0 1rem;
+}
+.tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  padding: 0.4rem 0.75rem 0.5rem;
+  margin-bottom: -1px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tab .tab-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+.tab .tab-dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  display: inline-block;
+}
+
+/* ── Offenders list (ranked items) ──────────────────────────────────────
+   Numbered list of "worst N" items: each row carries a rank pill, a mono
+   identifier, a mono path, the primary metric (large, right-aligned),
+   and a classification pill. The pattern is the same whether you're
+   ranking by CRAP score, query duration, error count, or lint hits. */
+.offenders {
+  list-style: none;
+  margin: 0; padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.offender {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1.4fr) minmax(0, 1.2fr) auto auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.offender:last-child { border-bottom: 0; }
+.offender:hover { background: var(--bg-elevated); }
+.offender .rank {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  text-align: right;
+}
+.offender .fn-name {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.offender .fn-path {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.offender .fn-path .line-range { color: var(--text-muted); opacity: 0.7; }
+.offender .metric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+}
+/* ─────────────────────────────────────────────────────────────────────────
+   Sakura Reports — colors and type
+   The token layer for CLI-tool HTML reports.
+
+   Sakura.css 1.5.0 is the baseline. These tokens override Sakura's
+   prose-reader defaults to land at a dashboard density without taking
+   on a full design system.
+
+   Light + dark values are both defined. The dark block applies when
+   the document carries `data-theme="dark"` on the root element. Tools
+   that don't want a theme toggle can omit the dark stylesheet entirely
+   and ship light-only.
+   ───────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Type ──────────────────────────────────────────────────────────── */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-body:     0.8125rem;  /* 13px — body. Headers scale above this.       */
+  --fs-h1:       2em;        /* 26px — page title                            */
+  --fs-h2:       1.5em;      /* 19.5px — page-level section heading          */
+  --fs-h3:       1.25em;     /* 16.25px — in-panel title                     */
+  --fs-h4:       1.1em;      /* ~14.3px — table title                        */
+  --fs-label:    0.78em;     /* uppercase section labels */
+  --fs-small:    0.85em;     /* captions, hints */
+  --fs-th:       0.6875rem;  /* table column headers */
+  --fs-td:       0.75rem;    /* table cells */
+  --fs-code:     0.8125rem;  /* compiled SQL blocks */
+
+  --tracking-label: 0.06em;
+  --tracking-th:    0.04em;
+  --line-height-body: 1.5;
+  --line-height-tight: 1.25;
+
+  /* ── Semantic neutrals ─────────────────────────────────────────────── */
+  --bg:            #ffffff;
+  --bg-elevated:   #f1f1f1;    /* callouts, code blocks */
+  --text:          #4a4a4a;
+  --text-muted:    #6a6a72;
+  --border:        #c4c4c4;
+  --hairline:      #e1e1e1;
+
+  --accent:        #1d7484;    /* Sakura teal — links, callout border */
+  --accent-hover:  #982c61;    /* Sakura magenta — link:hover */
+
+  /* ── Status ────────────────────────────────────────────────────────── */
+  --danger:        #b3261e;
+  --danger-bg:     #fdecea;
+  --success:       #006d3a;
+  --success-bg:    #e1eedb;
+
+  /* ── Selection (DAG nodes, etc.) ───────────────────────────────────── */
+  --selected:      #E91E63;    /* hot pink — reserved for selection only */
+
+  /* ── Risk band ladder (ordinal severity) ───────────────────────────────
+     A four-step ordinal scale for CI / static-analysis tools that classify
+     items into severity bands. Distinct from the edge vocabulary below:
+     edges are *categorical* (LEFT JOIN ≠ INNER JOIN, no ordering); risk
+     bands are *ordinal* (1 < 2 < 3 < 4).
+
+     Token names are intentionally abstract (`--risk-1` … `--risk-4`) so
+     each tool can label them in its own vocabulary
+     (low/acceptable/moderate/high, ok/notice/warn/error, etc.).
+
+     Each band has three values:
+       --risk-N        primary color (used on stripe / pill bg / bar fill)
+       --risk-N-on     darkened tone for text on the tint
+       --risk-N-tint   pale background for tinted rows / chip fills          */
+  --risk-1:        #2c6a37;   /* green   — lowest / safest                  */
+  --risk-1-on:     #1f4d27;
+  --risk-1-tint:   #e4efe5;
+  --risk-2:        #2e5c8a;   /* blue    — minor / informational            */
+  --risk-2-on:     #21426a;
+  --risk-2-tint:   #e1eaf3;
+  --risk-3:        #a06320;   /* amber   — caution                          */
+  --risk-3-on:     #7a4a18;
+  --risk-3-tint:   #f5e9d7;
+  --risk-4:        #b3261e;   /* red     — highest / critical (=--danger)   */
+  --risk-4-on:     #8a1e17;
+  --risk-4-tint:   #fdecea;
+
+  /* Verdict colors map to the risk ladder. Don't introduce new hues here;
+     the point is that PASS = the same green as the lowest risk band. */
+  --verdict-pass:  var(--risk-1);
+  --verdict-warn:  var(--risk-3);
+  --verdict-fail:  var(--risk-4);
+
+  /* ── Categorical legend palette ────────────────────────────────────────
+     Seven-step *categorical* palette for chart series, diagram nodes /
+     edges, tag colors, status legends — any place where N items need
+     distinct, side-by-side colors with no implied ordering.
+
+     Distinct from the risk ladder above: legend colors are categorical
+     (legend-3 ≠ "higher than" legend-2), the ladder is ordinal. Use the
+     right one for the job.
+
+     Colorblind-safe, derived from the Okabe-Ito palette. `--legend-1` is
+     a dark anchor so it stays readable for "default" / "structural" /
+     "no category" series; the dark-mode override flips it to light for
+     the same purpose. Line-style variation (dashed, dotted) is
+     orthogonal — see `.line.is-dashed` / `.legend-edge.is-dashed`. */
+  --legend-1:    #1c1c1f;   /* near-black — structural / anchor             */
+  --legend-2:    #009E73;   /* green                                        */
+  --legend-3:    #0072B2;   /* blue                                         */
+  --legend-4:    #56B4E9;   /* light blue                                   */
+  --legend-5:    #CC79A7;   /* pink                                         */
+  --legend-6:    #982c61;   /* magenta                                      */
+  --legend-7:    #E69F00;   /* orange                                       */
+
+  /* ── SQL syntax highlighting ───────────────────────────────────────── */
+  --sql-keyword: #1d7484;
+  --sql-string:  #006d3a;
+  --sql-comment: #6a6a72;
+  --sql-jinja:   #982c61;
+
+  /* ── Spacing ───────────────────────────────────────────────────────── */
+  --page-max-width: min(120rem, 100% - 4rem);
+  --section-gap:    1rem;
+  --panel-pad:      1rem;
+  --table-cell-pad: 0.2rem 0.5rem;
+  --radius-sm:      4px;
+  --radius-md:      6px;
+  --radius-lg:      8px;
+}
+
+html[data-theme="dark"] {
+  --bg:            #0e0e10;
+  --bg-elevated:   #17171a;
+  --text:          #e7e7e7;
+  --text-muted:    #9a9aa0;
+  --border:        #2c2c30;
+  --hairline:      #1f1f22;
+
+  --accent:        #4ea3df;
+  --accent-hover:  #ff7eb1;
+
+  --danger:        #ff6b63;
+  --danger-bg:     #2a1311;
+
+  --selected:      #ff5fa2;
+
+  --legend-1:    #e7e7e7;   /* anchor flips light for dark backgrounds */
+  --sql-keyword: #4ea3df;
+  --sql-string:  #6fc69a;
+  --sql-jinja:   #E69F00;
+
+  /* Risk ladder — lifted in lightness for dark backgrounds, but the
+     hue family stays the same so semantics carry over. */
+  --risk-1:        #4f9a5d;
+  --risk-1-on:     #8fcf99;
+  --risk-1-tint:   #1a2e1f;
+  --risk-2:        #5e8fc2;
+  --risk-2-on:     #a3c1e0;
+  --risk-2-tint:   #182333;
+  --risk-3:        #d18f3a;
+  --risk-3-on:     #ecbf80;
+  --risk-3-tint:   #2e2516;
+  --risk-4:        #ff6b63;   /* matches dark --danger */
+  --risk-4-on:     #ff9d97;
+  --risk-4-tint:   #2a1311;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────── */
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+body {
+  font-size: var(--fs-body);
+  line-height: var(--line-height-body);
+  max-width: var(--page-max-width);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  font-weight: 600;
+}
+h1 { font-size: var(--fs-h1); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+h4 { font-size: var(--fs-h4); }
+
+p { margin-bottom: 0.875rem; }
+
+a, a:visited { color: var(--accent); }
+a:hover      { color: var(--accent-hover); }
+
+code, pre, kbd { font-family: var(--font-mono); }
+code, kbd {
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-sm);
+}
+pre code { background: transparent; padding: 0; }
+
+::selection { background: var(--accent); color: #fff; }
+
+/* ── Section labels (panel headers, etc.) ────────────────────────────── */
+.section-label,
+.panel-header h2,
+.cte-dag-header h2 {
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ── Muted text ──────────────────────────────────────────────────────── */
+.muted { color: var(--text-muted); }
+
+/* ── Report-specific tweaks (small layer over the design system) ──── */
+
+body { padding: 1.25rem 2rem 3rem; }
+
+.report-header {
+  display: flex; align-items: baseline;
+  gap: 0.75rem; flex-wrap: wrap;
+  margin: 0 0 0.25rem;
+}
+.report-header h1 { margin: 0; font-size: var(--fs-h1); }
+.report-header .ver {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.report-header .grow { flex: 1; }
+.report-header .actions {
+  display: inline-flex; gap: 0.4rem; align-items: center;
+}
+/* Sakura paints every <button> teal/white by default; reset for our
+   utility buttons so they pick up our tokens instead. */
+.icon-btn {
+  appearance: none;
+  box-sizing: border-box;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  width: 1.75rem; height: 1.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.icon-btn:hover,
+.icon-btn:focus-visible {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: var(--bg-elevated);
+  outline: 0;
+}
+.icon-btn svg { width: 14px; height: 14px; stroke-width: 2; display: block; }
+
+/* Sakura's button:hover paints magenta/white — undo for chrome buttons. */
+.chip:hover,
+.chip:focus-visible {
+  background-color: var(--bg-elevated);
+  color: var(--text);
+  outline: 0;
+}
+
+/* Scope banner */
+.scope-banner p { margin: 0; }
+.scope-banner .meta { color: var(--text-muted); }
+
+section + section { margin-top: 1.25rem; }
+.panel h2 { margin: 0 0 0.5rem; }
+
+.files-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap;
+  margin: 1.25rem 0 0.75rem;
+}
+.files-header h2 { margin: 0; }
+.files-header .files-sub { color: var(--text-muted); font-size: var(--fs-small); margin: 0.15rem 0 0; }
+.files-header .controls { display: inline-flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+/* Severity card — per-file (extends design system) */
+.file-card .file-fns {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-td);
+  font-variant-numeric: tabular-nums;
+}
+.file-card .file-fns th {
+  text-align: left;
+  padding: 0.4rem 0.875rem;
+  font-family: var(--font-mono);
+  font-size: var(--fs-th);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-th);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+}
+.file-card .file-fns th.num { text-align: right; }
+.file-card .file-fns td {
+  padding: 0.45rem 0.875rem;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+}
+.file-card .file-fns tr:last-child td { border-bottom: 0; }
+.file-card .file-fns tr.is-exceeds td { background: var(--risk-4-tint); }
+.file-card .file-fns td.num { text-align: right; }
+.file-card .file-fns td .fn-name {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-weight: 500;
+}
+.file-card .file-fns td .fn-loc {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  margin-left: 0.5rem;
+}
+.metric-cell {
+  display: flex; flex-direction: column; gap: 3px;
+  min-width: 7rem;
+}
+.metric-cell .num-line {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.metric-cell .num-line .note { color: var(--text-muted); font-size: var(--fs-small); }
+.crap-cell {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.crap-cell .over-by {
+  color: var(--risk-4-on); font-weight: 500; font-size: var(--fs-small);
+}
+
+.dist-legend { margin-top: 0.5rem; }
+.offender .metric { font-size: var(--fs-h4); }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+}
+
+.file-card > summary .meta .over {
+  color: var(--risk-4-on);
+  font-weight: 600;
+}
+
+footer.report-footer {
+  margin-top: 2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+}
+.footer-adapters {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.15rem;
+  align-items: baseline;
+  text-align: left;
+  max-width: 60%;
+}
+.footer-adapters .label {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  align-self: start;
+}
+.footer-adapters .adapter {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.footer-adapters .adapter .ad-name { font-weight: 600; }
+.footer-adapters .adapter .ad-meta { color: var(--text-muted); font-weight: 400; }
+
+/* ── Delta tab (crap-rs#306) ────────────────────────────────────────────
+   CSS layer for the optional delta tab. `.tabs` + `.tab` selectors
+   already live in report-styles.css from #260; everything below is
+   the additive layer for the second panel + delta UI primitives.
+
+   This whole block is gated on `has_delta` so the no-baseline output
+   stays byte-identical to v0.5.0 — every existing consumer of
+   `--format html` without `--baseline` gets exactly the same bytes. */
+
+/* Hide inactive tab panels. data-active is set by the JS tab switcher
+   (and pre-set on the Current panel via the template). */
+.tab-panel { display: none; }
+.tab-panel[data-active] { display: block; }
+
+.delta-hero { display: flex; flex-direction: column; gap: 0.25rem; }
+.delta-hero .verdict {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  margin: 0 0.5rem;
+}
+
+.delta-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.delta-kpi {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.7rem 0.9rem;
+  background: var(--bg);
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.delta-kpi-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+}
+.delta-kpi-ba {
+  display: flex; align-items: baseline; gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  color: var(--text);
+}
+.delta-kpi-ba .before { color: var(--text-muted); font-weight: 500; }
+.delta-kpi-ba .arrow { color: var(--text-muted); font-weight: 400; }
+.delta-kpi-foot { font-size: var(--fs-small); color: var(--text-muted); }
+
+/* Chip — color picks itself off `data-regression`. A regression (worse
+   than baseline) paints red; a non-regression (better, or neutral)
+   paints green/neutral. `data-direction` is informational only — the
+   coverage KPI flips the polarity (lower = worse) and we still want
+   the chip painted correctly. */
+.delta-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.delta-chip[data-regression="1"] {
+  background: var(--risk-4-tint);
+  color: var(--risk-4-on);
+  border-color: var(--risk-4);
+}
+.delta-chip[data-direction="down"]:not([data-regression="1"]) {
+  background: var(--risk-1-tint);
+  color: var(--risk-1-on);
+  border-color: var(--risk-1);
+}
+.delta-chip .chip-glyph { font-size: 0.85em; }
+
+.delta-section-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.delta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-td);
+  font-variant-numeric: tabular-nums;
+  margin: 0.5rem 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.delta-table th {
+  text-align: left;
+  padding: 0.45rem 0.875rem;
+  font-family: var(--font-mono);
+  font-size: var(--fs-th);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-th);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+}
+.delta-table th.num { text-align: right; }
+.delta-table td {
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+}
+.delta-table tr:last-child td { border-bottom: 0; }
+.delta-table tr[data-exceeds="1"] td { background: var(--risk-4-tint); }
+.delta-table td.num { text-align: right; }
+.delta-table td .fn-name {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-weight: 500;
+  display: block;
+}
+.delta-table td .fn-loc {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  display: block;
+}
+
+.ba-cell {
+  display: inline-flex; align-items: baseline; gap: 0.25rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.ba-cell .b { color: var(--text-muted); }
+.ba-cell .arrow { color: var(--text-muted); }
+
+.transition-pill {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  flex-wrap: wrap;
+}
+.transition-pill .arrow { color: var(--text-muted); }
+
+.delta-unchanged {
+  margin: 0.5rem 0 1rem;
+  padding: 0.6rem 0.9rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────── -->
+<header class="report-header">
+  <h1>test-adapter report</h1>
+  <span class="ver">v0.4.0</span>
+  <span class="grow"></span>
+  <span class="verdict is-fail" aria-label="Verdict: FAIL">
+    <span class="verdict-glyph">✕</span>
+    FAIL
+  </span>
+  <span class="actions">
+    <button class="icon-btn" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button class="icon-btn" id="print-button" title="Print" aria-label="Print" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    </button>
+  </span>
+</header>
+<nav class="tabs" role="tablist" aria-label="Report views">
+  <button class="tab" role="tab" aria-selected="true" data-tab="current" id="tab-current" type="button">
+    Current run <span class="tab-count">3</span>
+  </button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="delta" id="tab-delta" type="button">
+    Delta vs baseline
+    <span class="tab-dot" aria-hidden="true"></span>
+    <span class="tab-count">4 changed</span>
+  </button>
+</nav>
+<div class="tab-panel" data-tab="current" data-active role="tabpanel" aria-labelledby="tab-current">
+
+
+
+<!-- ── Scope banner ─────────────────────────────────────────────────── -->
+<section class="scope-banner" aria-label="Scope">
+  <p>
+    <strong>2 of 3</strong>
+    functions exceed their adapter threshold.
+    
+    Worst offender scores <code>30.00</code>.
+    
+    <span class="meta">3 files</span>
+  </p>
+</section>
+
+<!-- ── KPI tiles ────────────────────────────────────────────────────── -->
+<section class="kpi-grid" aria-label="Summary">
+  <div class="kpi">
+    <span class="kpi-label">Exceeding threshold</span>
+    <span class="kpi-value">2<span class="kpi-unit">/ 3 · 66.7%</span></span>
+    <span class="kpi-foot">2 functions over CRAP 8.00</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Average CRAP</span>
+    <span class="kpi-value">18.33</span>
+    <span class="kpi-foot">median <code>22.00</code> · max <code>30.00</code></span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Avg line coverage</span>
+    <span class="kpi-value">0.0<span class="kpi-unit">%</span></span>
+    <div class="bar is-thick" aria-hidden="true"><span class="is-4" style="width:0.0%"></span></div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Avg complexity</span>
+    <span class="kpi-value">0.0</span>
+    <span class="kpi-foot">median <code>0.0</code> · max <code>0</code> cognitive</span>
+  </div>
+</section>
+
+<!-- ── Risk distribution ───────────────────────────────────────────── -->
+<section class="panel" aria-label="Risk distribution">
+  <div class="panel-header"><h2>Risk distribution</h2></div>
+  <div class="dist-bar">
+    <span class="dist-seg" data-risk="1" style="flex:1" title="low: 1 functions">
+      <span class="dist-count">1</span><span class="dist-label">low</span>
+    </span>
+    <span class="dist-seg" data-risk="2" style="flex:0" title="acceptable: 0 functions">
+      <span class="dist-count">0</span><span class="dist-label">acceptable</span>
+    </span>
+    <span class="dist-seg" data-risk="3" style="flex:0" title="moderate: 0 functions">
+      <span class="dist-count">0</span><span class="dist-label">moderate</span>
+    </span>
+    <span class="dist-seg" data-risk="4" style="flex:2" title="high: 2 functions">
+      <span class="dist-count">2</span><span class="dist-label">high</span>
+    </span>
+  </div>
+  <div class="dist-legend">
+    <span><i class="legend-dot" style="background:var(--risk-1)"></i>low — CRAP ≤ 5</span>
+    <span><i class="legend-dot" style="background:var(--risk-2)"></i>acceptable — 5 &lt; CRAP ≤ 10</span>
+    <span><i class="legend-dot" style="background:var(--risk-3)"></i>moderate — 10 &lt; CRAP ≤ 30</span>
+    <span><i class="legend-dot" style="background:var(--risk-4)"></i>high — CRAP &gt; 30</span>
+  </div>
+</section>
+
+
+<!-- ── Worst offenders ─────────────────────────────────────────────── -->
+<section aria-label="Worst offenders">
+  <h2>Worst offenders</h2>
+  <ol class="offenders">
+    
+    <li class="offender">
+      <span class="rank">1</span>
+      <span class="fn-name">new_fn</span>
+      <span class="fn-path">src/adapters/baseline.rs <span class="line-range">L1–10</span></span>
+      <span class="metric">30.00</span>
+      <span class="risk-pill" data-risk="4">high</span>
+    </li>
+    
+    <li class="offender">
+      <span class="rank">2</span>
+      <span class="fn-name">parse_record</span>
+      <span class="fn-path">src/adapters/coverage/mod.rs <span class="line-range">L1–10</span></span>
+      <span class="metric">22.00</span>
+      <span class="risk-pill" data-risk="4">high</span>
+    </li>
+    
+    <li class="offender">
+      <span class="rank">3</span>
+      <span class="fn-name">simple_fn</span>
+      <span class="fn-path">src/lib.rs <span class="line-range">L1–10</span></span>
+      <span class="metric">3.00</span>
+      <span class="risk-pill" data-risk="1">low</span>
+    </li>
+    
+  </ol>
+</section>
+
+
+<!-- ── Files ───────────────────────────────────────────────────────── -->
+<section aria-label="Functions by file">
+  <div class="files-header">
+    <div>
+      <h2>Functions by file</h2>
+      <p class="files-sub">3 files · sorted by max CRAP</p>
+    </div>
+    <div class="controls">
+      <input id="filter" class="search-input" type="search" placeholder="Filter file or function… (/)" autocomplete="off">
+      <div class="chips">
+        <button class="chip is-active" data-filter="all" type="button">All <span class="chip-count">3</span></button>
+        <button class="chip" data-filter="exceeding" type="button">Exceeding <span class="chip-count">2</span></button>
+        <button class="chip" data-filter="high" type="button">High <span class="chip-count">2</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="file-list">
+    
+    <details class="severity-card file-card" data-risk="4" data-exceeds="1" open>
+      <summary>
+        <span class="stripe"></span>
+        <span class="caret">›</span>
+        <span class="sev-path">src/adapters/baseline.rs</span>
+        <span class="sev-meta">
+          <span><b>1</b> fn</span>
+          <span>max CRAP <b>30.00</b></span>
+          
+          <span class="over"><b>1 over</b></span>
+          
+        </span>
+      </summary>
+      <div class="severity-card-body">
+        <table class="file-fns">
+          <thead><tr>
+            <th>Function</th><th>Lines</th><th>Complexity</th><th>Coverage</th><th class="num">CRAP</th>
+          </tr></thead>
+          <tbody>
+            
+            <tr class="is-exceeds">
+              <td><span class="fn-name">new_fn</span><span class="fn-loc">10 LOC</span></td>
+              <td>1–10</td>
+              <td><div class="metric-cell"><div class="num-line"><span>10</span><span class="note">cognitive</span></div><div class="bar"><span class="is-3" style="width:50%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>40.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-3" style="width:40.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">30.00 <span class="risk-pill" data-risk="4">high</span><span class="over-by">+22.00</span></span></td>
+            </tr>
+            
+          </tbody>
+        </table>
+      </div>
+    </details>
+    
+    <details class="severity-card file-card" data-risk="4" data-exceeds="1" open>
+      <summary>
+        <span class="stripe"></span>
+        <span class="caret">›</span>
+        <span class="sev-path">src/adapters/coverage/mod.rs</span>
+        <span class="sev-meta">
+          <span><b>1</b> fn</span>
+          <span>max CRAP <b>22.00</b></span>
+          
+          <span class="over"><b>1 over</b></span>
+          
+        </span>
+      </summary>
+      <div class="severity-card-body">
+        <table class="file-fns">
+          <thead><tr>
+            <th>Function</th><th>Lines</th><th>Complexity</th><th>Coverage</th><th class="num">CRAP</th>
+          </tr></thead>
+          <tbody>
+            
+            <tr class="is-exceeds">
+              <td><span class="fn-name">parse_record</span><span class="fn-loc">10 LOC</span></td>
+              <td>1–10</td>
+              <td><div class="metric-cell"><div class="num-line"><span>6</span><span class="note">cognitive</span></div><div class="bar"><span class="is-2" style="width:30%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>60.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-2" style="width:60.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">22.00 <span class="risk-pill" data-risk="4">high</span><span class="over-by">+14.00</span></span></td>
+            </tr>
+            
+          </tbody>
+        </table>
+      </div>
+    </details>
+    
+    <details class="severity-card file-card" data-risk="1" data-exceeds="0">
+      <summary>
+        <span class="stripe"></span>
+        <span class="caret">›</span>
+        <span class="sev-path">src/lib.rs</span>
+        <span class="sev-meta">
+          <span><b>1</b> fn</span>
+          <span>max CRAP <b>3.00</b></span>
+          
+          <span>0 over</span>
+          
+        </span>
+      </summary>
+      <div class="severity-card-body">
+        <table class="file-fns">
+          <thead><tr>
+            <th>Function</th><th>Lines</th><th>Complexity</th><th>Coverage</th><th class="num">CRAP</th>
+          </tr></thead>
+          <tbody>
+            
+            <tr>
+              <td><span class="fn-name">simple_fn</span><span class="fn-loc">10 LOC</span></td>
+              <td>1–10</td>
+              <td><div class="metric-cell"><div class="num-line"><span>2</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:10%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>95.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:95.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">3.00 <span class="risk-pill" data-risk="1">low</span></span></td>
+            </tr>
+            
+          </tbody>
+        </table>
+      </div>
+    </details>
+    
+  </div>
+
+  <div class="empty-state" id="empty-state" hidden>
+    No files or functions match. Try a different term or clear filters.
+  </div>
+</section>
+
+
+</div>
+
+<div class="tab-panel" data-tab="delta" role="tabpanel" aria-labelledby="tab-delta">
+
+  
+  <section class="scope-banner delta-hero" aria-label="Delta scope">
+    <p>
+      <strong>Comparing</strong> current run vs <code>baseline</code>.
+      <span class="verdict is-fail" aria-label="Delta verdict: REGRESSED">
+        <span class="verdict-glyph">▲</span>
+        REGRESSED
+      </span>
+      <span class="meta">
+        1 added · 1 removed · 2 modified ·
+        1 regression ·
+        0 improvements ·
+        1 new violation
+      </span>
+    </p>
+  </section>
+
+  
+  <section class="delta-kpi-grid" aria-label="Delta summary">
+    
+    <div class="delta-kpi" data-direction="flat">
+      <span class="delta-kpi-label">Exceeding threshold</span>
+      <div class="delta-kpi-ba">
+        <span class="before">2</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span class="after">2</span>
+      </div>
+      
+      
+      <span class="delta-kpi-foot">1 new function broke the threshold.</span>
+      
+    </div>
+    
+    <div class="delta-kpi" data-direction="down">
+      <span class="delta-kpi-label">Max CRAP</span>
+      <div class="delta-kpi-ba">
+        <span class="before">45.20</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span class="after">30.00</span>
+      </div>
+      
+      <span class="delta-chip" data-direction="down">
+        <span class="chip-glyph" aria-hidden="true">▼</span>
+        <span class="chip-value">-15.20</span>
+      </span>
+      
+      
+    </div>
+    
+    <div class="delta-kpi" data-direction="down">
+      <span class="delta-kpi-label">Average CRAP</span>
+      <div class="delta-kpi-ba">
+        <span class="before">21.07</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span class="after">18.33</span>
+      </div>
+      
+      <span class="delta-chip" data-direction="down">
+        <span class="chip-glyph" aria-hidden="true">▼</span>
+        <span class="chip-value">-2.74</span>
+      </span>
+      
+      
+      <span class="delta-kpi-foot">1 added · 1 removed · 2 modified</span>
+      
+    </div>
+    
+    <div class="delta-kpi" data-direction="down" data-regression="1">
+      <span class="delta-kpi-label">Avg coverage</span>
+      <div class="delta-kpi-ba">
+        <span class="before">65.8%</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span class="after">0.0%</span>
+      </div>
+      
+      <span class="delta-chip" data-direction="down" data-regression="1">
+        <span class="chip-glyph" aria-hidden="true">▼</span>
+        <span class="chip-value">-65.8 pp</span>
+      </span>
+      
+      
+      <span class="delta-kpi-foot">Coverage dropped.</span>
+      
+    </div>
+    
+  </section>
+
+  
+  
+  <section aria-label="Regressions">
+    <h2>Regressions <span class="delta-section-count">1</span></h2>
+    <table class="delta-table regressions">
+      <thead><tr>
+        <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+      </tr></thead>
+      <tbody>
+        
+        <tr data-exceeds="1">
+          <td>
+            <span class="fn-name">parse_record</span>
+            <span class="fn-loc">src/adapters/coverage/mod.rs L1–10</span>
+          </td>
+          <td class="num">15.00</td>
+          <td class="num">22.00</td>
+          <td><span class="ba-cell"><span class="b">72.5%</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">60.0%</span></span></td>
+          <td>
+            <span class="transition-pill">
+              <span class="risk-pill" data-risk="3">moderate</span>
+              <span class="arrow" aria-hidden="true">→</span>
+              <span class="risk-pill" data-risk="4">high</span>
+            </span>
+          </td>
+          <td class="num"><span class="delta-chip" data-direction="up" data-regression="1"><span class="chip-glyph" aria-hidden="true">▲</span> <span class="chip-value">+7.00</span></span></td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </section>
+  
+
+  
+  
+
+  
+  
+  <section aria-label="New functions">
+    <h2>New functions <span class="delta-section-count">1</span></h2>
+    <table class="delta-table new-functions">
+      <thead><tr>
+        <th>Function</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk</th>
+      </tr></thead>
+      <tbody>
+        
+        <tr data-exceeds="1">
+          <td>
+            <span class="fn-name">new_fn</span>
+            <span class="fn-loc">src/adapters/baseline.rs L1–10</span>
+          </td>
+          <td class="num">30.00</td>
+          <td class="num">40.0%</td>
+          <td><span class="risk-pill" data-risk="4">high</span></td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </section>
+  
+
+  
+  
+  <p class="delta-unchanged">
+    1 function
+    unchanged (CRAP score within ±0.005). Expand the <strong>Current run</strong> tab to inspect it.
+  </p>
+  
+</div>
+
+<footer class="report-footer">
+  <span>Generated by test-adapter v0.4.0</span>
+  <span class="footer-adapters">
+    <span class="label">Adapter</span>
+    <span class="adapter"><span class="ad-name">Test</span> <span class="ad-meta">· cognitive complexity · line coverage · threshold <code>CRAP&nbsp;≤&nbsp;8.00</code></span></span>
+  </span>
+</footer>
+
+<script>
+  // ── Dark mode (persisted) ──────────────────────────────────────────
+  (function () {
+    var root = document.documentElement;
+    var KEY = "crap-rs.theme";
+    var stored = localStorage.getItem(KEY);
+    if (stored === "dark") root.setAttribute("data-theme", "dark");
+    var btn = document.getElementById("theme-toggle");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        var dark = root.getAttribute("data-theme") === "dark";
+        if (dark) { root.removeAttribute("data-theme"); localStorage.setItem(KEY, "light"); }
+        else      { root.setAttribute("data-theme", "dark"); localStorage.setItem(KEY, "dark"); }
+      });
+    }
+  })();
+
+  // ── Print button ───────────────────────────────────────────────────
+  (function () {
+    var btn = document.getElementById("print-button");
+    if (btn) btn.addEventListener("click", function () { window.print(); });
+  })();
+
+  // ── File filter + chips + search ──────────────────────────────────
+  (function () {
+    var input = document.getElementById("filter");
+    var chips = [].slice.call(document.querySelectorAll(".chip[data-filter]"));
+    var cards = [].slice.call(document.querySelectorAll(".file-card"));
+    var empty = document.getElementById("empty-state");
+    if (!input || !empty) return;
+    var activeChip = "all";
+
+    function apply() {
+      var q = (input.value || "").trim().toLowerCase();
+      var visible = 0;
+      cards.forEach(function (card) {
+        var text = card.textContent.toLowerCase();
+        var exceeds = +card.dataset.exceeds > 0;
+        var isHigh = card.dataset.risk === "4";
+        var matchesChip = activeChip === "all" ||
+          (activeChip === "exceeding" && exceeds) ||
+          (activeChip === "high" && isHigh);
+        var matchesQuery = !q || text.indexOf(q) !== -1;
+        var show = matchesChip && matchesQuery;
+        card.hidden = !show;
+        if (show) visible++;
+      });
+      empty.hidden = visible !== 0;
+    }
+
+    input.addEventListener("input", apply);
+    chips.forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        chips.forEach(function (c) { c.classList.remove("is-active"); });
+        chip.classList.add("is-active");
+        activeChip = chip.dataset.filter;
+        apply();
+      });
+    });
+  })();
+
+  // Keyboard shortcut "/" focuses filter
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && document.activeElement && document.activeElement.tagName !== "INPUT") {
+      e.preventDefault();
+      var f = document.getElementById("filter");
+      if (f) f.focus();
+    }
+  });
+  // ── Tab switcher (Current / Delta) ─────────────────────────────────
+  // Only emitted when a baseline was supplied — otherwise dead code
+  // breaks the no-baseline byte-identical contract with v0.5.0.
+  // Restores from `location.hash` on first load so CI sticky-comment
+  // links can deep-link directly to `#delta`.
+  (function () {
+    var tabs = [].slice.call(document.querySelectorAll(".tabs .tab[data-tab]"));
+    var panels = [].slice.call(document.querySelectorAll(".tab-panel[data-tab]"));
+    if (tabs.length === 0 || panels.length === 0) return;
+
+    function activate(name) {
+      tabs.forEach(function (t) {
+        t.setAttribute("aria-selected", String(t.dataset.tab === name));
+      });
+      panels.forEach(function (p) {
+        if (p.dataset.tab === name) p.setAttribute("data-active", "");
+        else p.removeAttribute("data-active");
+      });
+      if (location.hash !== "#" + name) {
+        history.replaceState(null, "", "#" + name);
+      }
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () { activate(t.dataset.tab); });
+    });
+
+    var hash = (location.hash || "").replace("#", "");
+    if (hash === "delta" || hash === "current") activate(hash);
+  })();
+</script>
+
+</body>
+</html>

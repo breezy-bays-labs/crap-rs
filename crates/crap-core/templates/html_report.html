@@ -193,6 +193,169 @@ footer.report-footer {
 }
 .footer-adapters .adapter .ad-name { font-weight: 600; }
 .footer-adapters .adapter .ad-meta { color: var(--text-muted); font-weight: 400; }
+{%- if has_delta %}
+
+/* ── Delta tab (crap-rs#306) ────────────────────────────────────────────
+   CSS layer for the optional delta tab. `.tabs` + `.tab` selectors
+   already live in report-styles.css from #260; everything below is
+   the additive layer for the second panel + delta UI primitives.
+
+   This whole block is gated on `has_delta` so the no-baseline output
+   stays byte-identical to v0.5.0 — every existing consumer of
+   `--format html` without `--baseline` gets exactly the same bytes. */
+
+/* Hide inactive tab panels. data-active is set by the JS tab switcher
+   (and pre-set on the Current panel via the template). */
+.tab-panel { display: none; }
+.tab-panel[data-active] { display: block; }
+
+.delta-hero { display: flex; flex-direction: column; gap: 0.25rem; }
+.delta-hero .verdict {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  margin: 0 0.5rem;
+}
+
+.delta-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.delta-kpi {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.7rem 0.9rem;
+  background: var(--bg);
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.delta-kpi-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+}
+.delta-kpi-ba {
+  display: flex; align-items: baseline; gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  color: var(--text);
+}
+.delta-kpi-ba .before { color: var(--text-muted); font-weight: 500; }
+.delta-kpi-ba .arrow { color: var(--text-muted); font-weight: 400; }
+.delta-kpi-foot { font-size: var(--fs-small); color: var(--text-muted); }
+
+/* Chip — color picks itself off `data-regression`. A regression (worse
+   than baseline) paints red; a non-regression (better, or neutral)
+   paints green/neutral. `data-direction` is informational only — the
+   coverage KPI flips the polarity (lower = worse) and we still want
+   the chip painted correctly. */
+.delta-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.delta-chip[data-regression="1"] {
+  background: var(--risk-4-tint);
+  color: var(--risk-4-on);
+  border-color: var(--risk-4);
+}
+.delta-chip[data-direction="down"]:not([data-regression="1"]) {
+  background: var(--risk-1-tint);
+  color: var(--risk-1-on);
+  border-color: var(--risk-1);
+}
+.delta-chip .chip-glyph { font-size: 0.85em; }
+
+.delta-section-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.delta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-td);
+  font-variant-numeric: tabular-nums;
+  margin: 0.5rem 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.delta-table th {
+  text-align: left;
+  padding: 0.45rem 0.875rem;
+  font-family: var(--font-mono);
+  font-size: var(--fs-th);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-th);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+}
+.delta-table th.num { text-align: right; }
+.delta-table td {
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+}
+.delta-table tr:last-child td { border-bottom: 0; }
+.delta-table tr[data-exceeds="1"] td { background: var(--risk-4-tint); }
+.delta-table td.num { text-align: right; }
+.delta-table td .fn-name {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-weight: 500;
+  display: block;
+}
+.delta-table td .fn-loc {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  display: block;
+}
+
+.ba-cell {
+  display: inline-flex; align-items: baseline; gap: 0.25rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.ba-cell .b { color: var(--text-muted); }
+.ba-cell .arrow { color: var(--text-muted); }
+
+.transition-pill {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  flex-wrap: wrap;
+}
+.transition-pill .arrow { color: var(--text-muted); }
+
+.delta-unchanged {
+  margin: 0.5rem 0 1rem;
+  padding: 0.6rem 0.9rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+{%- endif %}
 </style>
 </head>
 <body>
@@ -215,6 +378,26 @@ footer.report-footer {
     </button>
   </span>
 </header>
+{#- ── Tabs nav ──────────────────────────────────────────────────────────
+   Only emitted when a baseline was supplied (`has_delta == true`). The
+   no-baseline output stays byte-identical to v0.5.0 — every existing
+   consumer of `--format html` without `--baseline` gets exactly the
+   same bytes. Current tab opens by default (data-active); Delta tab is
+   one click away. URL hash `#delta` deep-links into the delta tab via
+   the inline `<script>` hook below. -#}
+{%- if has_delta %}
+<nav class="tabs" role="tablist" aria-label="Report views">
+  <button class="tab" role="tab" aria-selected="true" data-tab="current" id="tab-current" type="button">
+    Current run <span class="tab-count">{{ current_tab_count }}</span>
+  </button>
+  <button class="tab" role="tab" aria-selected="false" data-tab="delta" id="tab-delta" type="button">
+    {% if let Some(panel) = delta_panel %}Delta vs {{ panel.baseline_ref }}{% endif %}
+    {% if delta_has_news %}<span class="tab-dot" aria-hidden="true"></span>{% endif %}
+    <span class="tab-count">{{ delta_tab_count }} changed</span>
+  </button>
+</nav>
+<div class="tab-panel" data-tab="current" data-active role="tabpanel" aria-labelledby="tab-current">
+{%- endif %}
 
 {% if is_empty %}
 
@@ -373,6 +556,154 @@ footer.report-footer {
 
 {% endif %}
 
+{#- ── Close current tab panel + open delta panel ─────────────────────── -#}
+{%- if has_delta %}
+</div>{# /tab-panel[current] #}
+{% if let Some(panel) = delta_panel %}
+<div class="tab-panel" data-tab="delta" role="tabpanel" aria-labelledby="tab-delta">
+
+  {# ── Delta hero ──────────────────────────────────────────────────── #}
+  <section class="scope-banner delta-hero" aria-label="Delta scope">
+    <p>
+      <strong>Comparing</strong> current run vs <code>{{ panel.baseline_ref }}</code>.
+      <span class="verdict is-{{ panel.verdict_class }}" aria-label="Delta verdict: {{ panel.verdict_label }}">
+        <span class="verdict-glyph">{{ panel.verdict_glyph }}</span>
+        {{ panel.verdict_label }}
+      </span>
+      <span class="meta">
+        {{ panel.summary.added }} added · {{ panel.summary.removed }} removed · {{ panel.summary.modified }} modified ·
+        {{ panel.summary.regressions }} {% if panel.summary.regressions == 1 %}regression{% else %}regressions{% endif %} ·
+        {{ panel.summary.improvements }} {% if panel.summary.improvements == 1 %}improvement{% else %}improvements{% endif %} ·
+        {{ panel.summary.new_violations }} new {% if panel.summary.new_violations == 1 %}violation{% else %}violations{% endif %}
+      </span>
+    </p>
+  </section>
+
+  {# ── Delta KPI grid (4 tiles — locked count) ─────────────────────── #}
+  <section class="delta-kpi-grid" aria-label="Delta summary">
+    {% for kpi in panel.kpis %}
+    <div class="delta-kpi" data-direction="{{ kpi.direction }}"{% if kpi.is_regression %} data-regression="1"{% endif %}>
+      <span class="delta-kpi-label">{{ kpi.label }}</span>
+      <div class="delta-kpi-ba">
+        <span class="before">{{ kpi.before }}</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span class="after">{{ kpi.after }}</span>
+      </div>
+      {% if !kpi.chip_value.is_empty() %}
+      <span class="delta-chip" data-direction="{{ kpi.direction }}"{% if kpi.is_regression %} data-regression="1"{% endif %}>
+        {% if !kpi.chip_glyph.is_empty() %}<span class="chip-glyph" aria-hidden="true">{{ kpi.chip_glyph }}</span>{% endif %}
+        <span class="chip-value">{{ kpi.chip_value }}</span>
+      </span>
+      {% endif %}
+      {% if !kpi.note.is_empty() %}
+      <span class="delta-kpi-foot">{{ kpi.note }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+
+  {# ── Regressions ─────────────────────────────────────────────────── #}
+  {% if !panel.regressions.is_empty() %}
+  <section aria-label="Regressions">
+    <h2>Regressions <span class="delta-section-count">{{ panel.regressions.len() }}</span></h2>
+    <table class="delta-table regressions">
+      <thead><tr>
+        <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+      </tr></thead>
+      <tbody>
+        {% for row in panel.regressions %}
+        <tr{% if row.exceeds %} data-exceeds="1"{% endif %}>
+          <td>
+            <span class="fn-name">{{ row.qualified_name }}</span>
+            <span class="fn-loc">{{ row.file }} L{{ row.start_line }}–{{ row.end_line }}</span>
+          </td>
+          <td class="num">{{ row.baseline_crap }}</td>
+          <td class="num">{{ row.current_crap }}</td>
+          <td><span class="ba-cell"><span class="b">{{ row.baseline_cov }}</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">{{ row.current_cov }}</span></span></td>
+          <td>
+            <span class="transition-pill">
+              <span class="risk-pill" data-risk="{{ row.baseline_risk }}">{{ row.baseline_risk_label }}</span>
+              <span class="arrow" aria-hidden="true">→</span>
+              <span class="risk-pill" data-risk="{{ row.current_risk }}">{{ row.current_risk_label }}</span>
+            </span>
+          </td>
+          <td class="num"><span class="delta-chip" data-direction="{{ row.delta_direction }}" data-regression="1">{% if !row.delta_glyph.is_empty() %}<span class="chip-glyph" aria-hidden="true">{{ row.delta_glyph }}</span>{% endif %} <span class="chip-value">{{ row.delta_value }}</span></span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {# ── Improvements ────────────────────────────────────────────────── #}
+  {% if !panel.improvements.is_empty() %}
+  <section aria-label="Improvements">
+    <h2>Improvements <span class="delta-section-count">{{ panel.improvements.len() }}</span></h2>
+    <table class="delta-table improvements">
+      <thead><tr>
+        <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+      </tr></thead>
+      <tbody>
+        {% for row in panel.improvements %}
+        <tr>
+          <td>
+            <span class="fn-name">{{ row.qualified_name }}</span>
+            <span class="fn-loc">{{ row.file }} L{{ row.start_line }}–{{ row.end_line }}</span>
+          </td>
+          <td class="num">{{ row.baseline_crap }}</td>
+          <td class="num">{{ row.current_crap }}</td>
+          <td><span class="ba-cell"><span class="b">{{ row.baseline_cov }}</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">{{ row.current_cov }}</span></span></td>
+          <td>
+            <span class="transition-pill">
+              <span class="risk-pill" data-risk="{{ row.baseline_risk }}">{{ row.baseline_risk_label }}</span>
+              <span class="arrow" aria-hidden="true">→</span>
+              <span class="risk-pill" data-risk="{{ row.current_risk }}">{{ row.current_risk_label }}</span>
+            </span>
+          </td>
+          <td class="num"><span class="delta-chip" data-direction="{{ row.delta_direction }}">{% if !row.delta_glyph.is_empty() %}<span class="chip-glyph" aria-hidden="true">{{ row.delta_glyph }}</span>{% endif %} <span class="chip-value">{{ row.delta_value }}</span></span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {# ── New functions ──────────────────────────────────────────────── #}
+  {% if !panel.new_functions.is_empty() %}
+  <section aria-label="New functions">
+    <h2>New functions <span class="delta-section-count">{{ panel.new_functions.len() }}</span></h2>
+    <table class="delta-table new-functions">
+      <thead><tr>
+        <th>Function</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk</th>
+      </tr></thead>
+      <tbody>
+        {% for row in panel.new_functions %}
+        <tr{% if row.exceeds %} data-exceeds="1"{% endif %}>
+          <td>
+            <span class="fn-name">{{ row.qualified_name }}</span>
+            <span class="fn-loc">{{ row.file }} L{{ row.start_line }}–{{ row.end_line }}</span>
+          </td>
+          <td class="num">{{ row.current_crap }}</td>
+          <td class="num">{{ row.current_cov }}</td>
+          <td><span class="risk-pill" data-risk="{{ row.current_risk }}">{{ row.current_risk_label }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {# ── Unchanged (single-line note, not a full table — chat1.md trim) ─ #}
+  {% if panel.unchanged_count > 0 %}
+  <p class="delta-unchanged">
+    {{ panel.unchanged_count }} {% if panel.unchanged_count == 1 %}function{% else %}functions{% endif %}
+    unchanged (CRAP score within ±0.005). Expand the <strong>Current run</strong> tab to inspect {% if panel.unchanged_count == 1 %}it{% else %}them{% endif %}.
+  </p>
+  {% endif %}
+</div>{# /tab-panel[delta] #}
+{%- endif %}
+{%- endif %}
+
 <footer class="report-footer">
   <span>Generated by {{ tool_name }} v{{ tool_version }}</span>
   <span class="footer-adapters">
@@ -450,6 +781,39 @@ footer.report-footer {
       if (f) f.focus();
     }
   });
+{%- if has_delta %}
+  // ── Tab switcher (Current / Delta) ─────────────────────────────────
+  // Only emitted when a baseline was supplied — otherwise dead code
+  // breaks the no-baseline byte-identical contract with v0.5.0.
+  // Restores from `location.hash` on first load so CI sticky-comment
+  // links can deep-link directly to `#delta`.
+  (function () {
+    var tabs = [].slice.call(document.querySelectorAll(".tabs .tab[data-tab]"));
+    var panels = [].slice.call(document.querySelectorAll(".tab-panel[data-tab]"));
+    if (tabs.length === 0 || panels.length === 0) return;
+
+    function activate(name) {
+      tabs.forEach(function (t) {
+        t.setAttribute("aria-selected", String(t.dataset.tab === name));
+      });
+      panels.forEach(function (p) {
+        if (p.dataset.tab === name) p.setAttribute("data-active", "");
+        else p.removeAttribute("data-active");
+      });
+      if (location.hash !== "#" + name) {
+        history.replaceState(null, "", "#" + name);
+      }
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () { activate(t.dataset.tab); });
+    });
+
+    var hash = (location.hash || "").replace("#", "");
+    if (hash === "delta" || hash === "current") activate(hash);
+  })();
+{%- endif %}
 </script>
 
 </body>
