@@ -46,12 +46,29 @@ pub fn format_github_annotations(
     annotation_limit: usize,
 ) -> String {
     let mut eligible: Vec<_> = view.full.functions.iter().filter(|v| v.exceeds).collect();
+    // CRAP DESC is the primary key; tie-break on (file_path, start_line)
+    // so equal-CRAP runs are deterministic across walker orderings (the
+    // syn walker is sequential today but a future parallel walker
+    // would otherwise leak nondeterminism into PR annotations).
     eligible.sort_by(|a, b| {
         b.scored
             .crap
             .value
             .partial_cmp(&a.scored.crap.value)
             .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                a.scored
+                    .identity
+                    .file_path
+                    .cmp(&b.scored.identity.file_path)
+            })
+            .then_with(|| {
+                a.scored
+                    .identity
+                    .span
+                    .start_line
+                    .cmp(&b.scored.identity.span.start_line)
+            })
     });
 
     let total = eligible.len();
@@ -61,7 +78,7 @@ pub fn format_github_annotations(
     let mut out = String::new();
     for verdict in eligible.iter().take(take) {
         let s = &verdict.scored;
-        let file = relativize_path(&s.identity.file_path, cwd.as_deref());
+        let raw_file = relativize_path(&s.identity.file_path, cwd.as_deref());
         let line = s.identity.span.start_line;
         let raw_message = format!(
             "Function `{}` has CRAP {:.2} (complexity={}, coverage={:.1}%) which exceeds threshold {:.1}",
@@ -71,10 +88,19 @@ pub fn format_github_annotations(
             s.coverage_percent,
             verdict.threshold,
         );
-        // Only the data after `::` carries dynamic text — file/line/title
-        // property values are deterministic (path, integer, score-only)
-        // so they need no delimiter escaping. The message data only
-        // needs percent / CR / LF escaping per the GH Actions spec.
+        // Two escape contexts per the GH Actions workflow-command spec:
+        //   * property values (between `name=` and the next `,` or `::`)
+        //     escape `%`, `\r`, `\n`, plus the delimiters `:` and `,`
+        //   * message data (after the final `::`) escapes only `%`,
+        //     `\r`, `\n` — `:` and `,` are legal in message content
+        // `line` is an integer (no escape needed); `title` is built
+        // from a deterministic `CRAP <f64>` (no delimiter chars
+        // possible). `file` is the only dynamic property value and
+        // MUST go through property-level escaping — POSIX file paths
+        // legally contain `:` and `,`, and an unescaped delimiter
+        // here would corrupt the runner's parse of the workflow
+        // command.
+        let file = gha_escape_property(&raw_file);
         let message = gha_escape(&raw_message);
         out.push_str(&format!(
             "::warning file={file},line={line},title=CRAP {crap:.1}::{message}\n",
@@ -97,10 +123,10 @@ pub fn format_github_annotations(
 
 /// Percent-encode the three characters that would otherwise terminate
 /// or corrupt a workflow-command message: `%`, `\r`, `\n`. Per the GH
-/// Actions spec, only the message data needs this escape — property
-/// values (`file=`, `line=`, `title=`) are separately delimited by `,`
-/// and `:` and require different escaping IF they carry dynamic data
-/// (we keep them deterministic so they do not).
+/// Actions spec, this is the message-data escape (applied to text
+/// after the final `::` in the workflow command). Property values use
+/// a stricter escape via [`gha_escape_property`] which also covers
+/// the property-list delimiters.
 ///
 /// `%` must be escaped first so the `%25` from the subsequent CR/LF
 /// substitutions does not get re-escaped.
@@ -108,6 +134,23 @@ fn gha_escape(s: &str) -> String {
     s.replace('%', "%25")
         .replace('\r', "%0D")
         .replace('\n', "%0A")
+}
+
+/// Percent-encode all five characters the GH Actions spec requires in
+/// property-value positions: `%`, `\r`, `\n`, plus the property-list
+/// delimiters `:` and `,`. The runner parses each annotation as
+/// `name=value,name=value,...::message`, so an unescaped `:` or `,`
+/// inside a dynamic value (most realistically a `file=` path on
+/// POSIX, where both characters are legal) would split or terminate
+/// the property list and corrupt the annotation.
+///
+/// The five-step order matters: `%` is escaped first via [`gha_escape`]
+/// so the `%25` introduced for `\r`/`\n` is not re-escaped; `:` and
+/// `,` are then appended for property-only escaping, and their own
+/// percent-encoded forms (`%3A`, `%2C`) are not subject to further
+/// substitution because no later step touches `%`.
+fn gha_escape_property(s: &str) -> String {
+    gha_escape(s).replace(':', "%3A").replace(',', "%2C")
 }
 
 /// Strip a CWD prefix from `file_path` so PR annotations reference
@@ -231,6 +274,90 @@ mod tests {
         );
         assert_eq!(gha_escape("a,b,c"), "a,b,c", "commas legal in message");
         assert_eq!(gha_escape(""), "");
+    }
+
+    #[test]
+    fn gha_escape_property_covers_colon_and_comma() {
+        // Five-char property escape: %, CR, LF, :, ,
+        assert_eq!(
+            gha_escape_property("src:weird,file.rs"),
+            "src%3Aweird%2Cfile.rs"
+        );
+        // % is still escaped (inherits from gha_escape) so a literal
+        // % in a path doesn't get confused with our percent-encoded
+        // sequences.
+        assert_eq!(gha_escape_property("f%o.rs"), "f%25o.rs");
+        // CR / LF still get the message-data escape (we never want
+        // them to land in property values either).
+        assert_eq!(gha_escape_property("a\rb\nc"), "a%0Db%0Ac");
+        // No-op on a plain path.
+        assert_eq!(gha_escape_property("src/lib.rs"), "src/lib.rs");
+    }
+
+    #[test]
+    fn file_property_escapes_delimiters_in_path() {
+        // A path that legally contains both delimiters must not corrupt
+        // the workflow command. The annotation should still parse as
+        // a single `name=value,name=value::message` triple.
+        let result = make_single_function_result(
+            "weird_fn",
+            "src/a:b,c.rs",
+            10,
+            0.0,
+            42.0,
+            RiskLevel::High,
+            8.0,
+        );
+        let view = make_view_default(&result);
+        let out = fmt(&view, usize::MAX);
+        let line = out.lines().next().expect("one warning line");
+        assert!(
+            line.contains("file=src/a%3Ab%2Cc.rs"),
+            "file= must escape `:` and `,`, got: {line}"
+        );
+        // Exactly two `,` separators between three properties
+        // (file/line/title), then the `::` data marker.
+        let before_message = line.split("::").nth(1).expect("`::` separator present");
+        assert_eq!(
+            before_message.matches(',').count(),
+            2,
+            "property list must have exactly two `,` separators between (file/line/title), got: {before_message}"
+        );
+    }
+
+    #[test]
+    fn equal_crap_scores_sort_by_file_path_then_line() {
+        use crate::domain::types::{AnalysisResult, AnalysisSummary};
+        // Three exceeders with identical CRAP score; deliberately
+        // shuffled file/line order on input. Tie-break must produce
+        // (z.rs, a.rs:5, a.rs:10) → sorted by file ASC, then line ASC.
+        let v_z = make_verdict("z_fn", "z.rs", 10, 0.0, 42.0, RiskLevel::High, 8.0);
+        let v_a_10 = make_verdict("a_late", "a.rs", 10, 0.0, 42.0, RiskLevel::High, 8.0);
+        let mut v_a_5 = make_verdict("a_early", "a.rs", 10, 0.0, 42.0, RiskLevel::High, 8.0);
+        v_a_5.scored.identity.span.start_line = 5;
+        let mut v_a_10_at_10 = v_a_10.clone();
+        v_a_10_at_10.scored.identity.span.start_line = 10;
+        let result = AnalysisResult {
+            functions: vec![v_z, v_a_10_at_10, v_a_5], // intentionally shuffled
+            summary: AnalysisSummary {
+                total_functions: 3,
+                ..Default::default()
+            },
+            passed: false,
+        };
+        let view = make_view_default(&result);
+        let out = fmt(&view, usize::MAX);
+        let lines: Vec<&str> = out.lines().collect();
+        // Expected order: a.rs:5 (a_early), a.rs:10 (a_late), z.rs (z_fn).
+        assert!(
+            lines[0].contains("a_early"),
+            "tie-break by file ASC then line ASC: a.rs:5 first, got:\n{out}"
+        );
+        assert!(
+            lines[1].contains("a_late"),
+            "tie-break by line within file: a.rs:10 second, got:\n{out}"
+        );
+        assert!(lines[2].contains("z_fn"), "z.rs last, got:\n{out}");
     }
 
     #[test]
