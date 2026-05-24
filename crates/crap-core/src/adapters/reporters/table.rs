@@ -489,8 +489,25 @@ fn crap_color(exceeds: bool, text: &str) -> String {
 /// All tests that call `set_override` must hold this lock to prevent
 /// races under `cargo test` (threaded). Nextest doesn't need this
 /// (process isolation) but the lock is harmless there.
+///
+/// Acquired via `acquire_color_lock()`, which recovers from
+/// `PoisonError` by extracting the inner guard rather than panicking.
+/// Without recovery, a single test panicking inside the locked region
+/// (historically: comfy-table width detection under non-PTY
+/// `cargo test`) cascades into 43+ unrelated failures as every
+/// subsequent `lock().unwrap()` re-panics on the poisoned mutex. The
+/// lock guards a flag flip, not invariant state — a poison from the
+/// previous holder doesn't leave behind inconsistent data, so
+/// recovering is safe and breaks the cascade. (crap-rs#202.)
 #[cfg(test)]
 static COLOR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
+fn acquire_color_lock() -> std::sync::MutexGuard<'static, ()> {
+    COLOR_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 #[cfg(test)]
 mod tests {
@@ -502,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_empty_shows_no_functions() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_empty_result();
         let output = format_table(
@@ -520,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_sorted_by_crap_descending() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(
@@ -552,7 +569,7 @@ mod tests {
 
     #[test]
     fn test_all_columns_present() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_single_function_result(
             "test_fn",
@@ -580,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_function_details_in_columns() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_single_function_result(
             "parse_record",
@@ -607,7 +624,7 @@ mod tests {
 
     #[test]
     fn test_crap_two_decimal_places() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 5.0, RiskLevel::Low, 8.0);
@@ -623,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_coverage_one_decimal_place() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 85.0, 1.0, RiskLevel::Low, 8.0);
@@ -644,7 +661,7 @@ mod tests {
     /// absent from the header entirely.
     #[test]
     fn branch_column_omitted_when_no_branch_data() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_single_function_result(
             "no_branches",
@@ -673,7 +690,7 @@ mod tests {
     /// decimal — the same precision as the line `Cov%` column.
     #[test]
     fn branch_column_present_when_branch_data_some() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let mut result = make_single_function_result(
             "classify",
@@ -712,7 +729,7 @@ mod tests {
     /// show the `—` sentinel — visibly distinct from a genuine `0.0`.
     #[test]
     fn branch_column_dash_for_rows_without_branch_data() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
 
         // Two verdicts: one carries branch coverage, one doesn't.
@@ -773,7 +790,7 @@ mod tests {
 
     #[test]
     fn test_version_header() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_empty_result();
         // `tool_name` and `tool_version` are caller-supplied. In-crate
@@ -792,7 +809,7 @@ mod tests {
 
     #[test]
     fn test_summary_line_contents() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(
@@ -810,7 +827,7 @@ mod tests {
 
     #[test]
     fn test_summary_pass_variant() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result =
             make_single_function_result("f", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
@@ -827,7 +844,7 @@ mod tests {
 
     #[test]
     fn test_summary_distribution() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(
@@ -883,7 +900,7 @@ mod tests {
 
     #[test]
     fn test_breakdown_off_no_sub_rows() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict("my_fn", "src/lib.rs", 5, 30.0, 45.0, RiskLevel::High, 8.0),
@@ -913,7 +930,7 @@ mod tests {
 
     #[test]
     fn test_breakdown_on_exceeding_shows_sub_rows() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict(
@@ -959,7 +976,7 @@ mod tests {
 
     #[test]
     fn test_breakdown_on_within_threshold_no_sub_rows() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict("safe_fn", "src/lib.rs", 2, 90.0, 2.0, RiskLevel::Low, 8.0),
@@ -986,7 +1003,7 @@ mod tests {
 
     #[test]
     fn test_breakdown_tree_chars_last_uses_corner() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict(
@@ -1022,7 +1039,7 @@ mod tests {
 
     #[test]
     fn test_breakdown_nesting_suffix() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict(
@@ -1057,7 +1074,7 @@ mod tests {
 
     #[test]
     fn test_explain_adds_legend_for_nested_breakdown() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict(
@@ -1094,7 +1111,7 @@ mod tests {
 
     #[test]
     fn test_explain_without_breakdown_is_inert() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict(
@@ -1128,7 +1145,7 @@ mod tests {
 
     #[test]
     fn test_explain_suppressed_without_nested_contributors() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let verdict = make_verdict_with_contributors(
             make_verdict(
@@ -1169,7 +1186,7 @@ mod tests {
     #[test]
     fn test_breakdown_sorted_by_line() {
         use crate::domain::types::{ComplexityContributor, ContributorKind};
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         // Contributors must be pre-sorted by (line, column) — as FunctionFinder guarantees.
         let verdict = make_verdict_with_contributors(
@@ -1227,7 +1244,7 @@ mod tests {
         // If one name is a prefix of another, both match the same table row.
         // Assert each function's contributors appear exactly once.
         use crate::domain::types::{ComplexityContributor, ContributorKind};
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
 
         let v1 = make_verdict_with_contributors(
@@ -1294,7 +1311,7 @@ mod tests {
         // next char is `/`, failing the word-boundary check and silently skipping
         // sub-row injection. The fix loops all occurrences until one passes.
         use crate::domain::types::{ComplexityContributor, ContributorKind};
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
 
         let v = make_verdict_with_contributors(
@@ -1338,7 +1355,7 @@ mod tests {
 
     #[test]
     fn test_varied_thresholds_detected() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
 
         let mut result = make_multi_function_result();
@@ -1362,7 +1379,7 @@ mod tests {
 
     #[test]
     fn test_uniform_thresholds_not_varied() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
 
         let result = make_multi_function_result();
@@ -1381,7 +1398,7 @@ mod tests {
 
     #[test]
     fn test_single_function_not_varied() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
 
         let result =
@@ -1400,7 +1417,7 @@ mod tests {
 
     #[test]
     fn test_risk_color_low_green() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::Low, "low");
         assert!(out.contains("\x1b[32m"), "Expected green ANSI: {out:?}");
@@ -1408,7 +1425,7 @@ mod tests {
 
     #[test]
     fn test_risk_color_acceptable_no_color() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::Acceptable, "acceptable");
         assert!(!out.contains("\x1b["), "Expected no ANSI escapes: {out:?}");
@@ -1417,7 +1434,7 @@ mod tests {
 
     #[test]
     fn test_risk_color_moderate_yellow() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::Moderate, "moderate");
         assert!(out.contains("\x1b[33m"), "Expected yellow ANSI: {out:?}");
@@ -1425,7 +1442,7 @@ mod tests {
 
     #[test]
     fn test_risk_color_high_bold_red() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let out = risk_color(&RiskLevel::High, "high");
         // colored combines bold+red as \x1b[1;31m
@@ -1437,7 +1454,7 @@ mod tests {
 
     #[test]
     fn test_coverage_color_thresholds() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let low = coverage_color(30.0, "30.0");
         assert!(low.contains("\x1b[31m"), "Expected red for <50%: {low:?}");
@@ -1457,7 +1474,7 @@ mod tests {
 
     #[test]
     fn test_coverage_color_boundary_50() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let at_50 = coverage_color(50.0, "50.0");
         assert!(
@@ -1468,7 +1485,7 @@ mod tests {
 
     #[test]
     fn test_coverage_color_boundary_80() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let at_80 = coverage_color(80.0, "80.0");
         assert!(
@@ -1479,7 +1496,7 @@ mod tests {
 
     #[test]
     fn test_crap_exceeding_bold_red() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let out = crap_color(true, "15.00");
         assert!(
@@ -1490,7 +1507,7 @@ mod tests {
 
     #[test]
     fn test_crap_within_no_emphasis() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(true);
         let out = crap_color(false, "5.00");
         assert!(!out.contains("\x1b["), "Expected no ANSI: {out:?}");
@@ -1499,7 +1516,7 @@ mod tests {
 
     #[test]
     fn test_full_table_snapshot() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table(
@@ -1515,7 +1532,7 @@ mod tests {
     #[test]
     fn grouped_table_has_per_file_header() {
         use crate::domain::view::{self, GroupKey, ViewSpec};
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let view = view::apply(
@@ -1551,7 +1568,7 @@ mod tests {
     #[test]
     fn grouped_table_snapshot() {
         use crate::domain::view::{self, GroupKey, ViewSpec};
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let view = view::apply(
@@ -1569,7 +1586,7 @@ mod tests {
 
     #[test]
     fn delta_block_renders_header_and_summary_line() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let delta = make_sample_delta();
         let dview = make_delta_view_default(&delta);
@@ -1599,7 +1616,7 @@ mod tests {
 
     #[test]
     fn delta_block_includes_change_rows_with_kind_column() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let delta = make_sample_delta();
         let dview = make_delta_view_default(&delta);
@@ -1623,7 +1640,7 @@ mod tests {
 
     #[test]
     fn no_baseline_means_no_delta_block() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let result = make_multi_function_result();
         let output = format_table_with_explain(
@@ -1640,7 +1657,7 @@ mod tests {
 
     #[test]
     fn delta_block_full_snapshot() {
-        let _guard = COLOR_LOCK.lock().unwrap();
+        let _guard = acquire_color_lock();
         colored::control::set_override(false);
         let delta = make_sample_delta();
         let dview = make_delta_view_default(&delta);
@@ -1797,7 +1814,7 @@ mod proptests {
 
         #[test]
         fn prop_format_table_never_panics(result in arb_analysis_result()) {
-            let _guard = super::COLOR_LOCK.lock().unwrap();
+            let _guard = super::acquire_color_lock();
             colored::control::set_override(false);
             let _ = format_table(&make_view_default(&result), 8.0, false, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         }
@@ -1807,7 +1824,7 @@ mod proptests {
             mut result in arb_analysis_result(),
             contributors in prop::collection::vec(arb_contributor(), 0..5),
         ) {
-            let _guard = super::COLOR_LOCK.lock().unwrap();
+            let _guard = super::acquire_color_lock();
             colored::control::set_override(false);
             // Inject contributors into the first exceeding function (if any)
             if let Some(v) = result.functions.iter_mut().find(|v| v.exceeds) {
@@ -1819,7 +1836,7 @@ mod proptests {
 
         #[test]
         fn prop_format_table_row_count(result in arb_analysis_result()) {
-            let _guard = super::COLOR_LOCK.lock().unwrap();
+            let _guard = super::acquire_color_lock();
             colored::control::set_override(false);
             let output = format_table(&make_view_default(&result), 8.0, false, TEST_TOOL_NAME, TEST_TOOL_VERSION);
             if result.functions.is_empty() {

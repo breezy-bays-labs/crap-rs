@@ -658,6 +658,34 @@ jobs:
       - name: Lint .cargo/mutants.toml `--skip` coverage of adapter-bin-shelling tests
         run: python3 scripts/mutants-skip-lint.py
 
+  bdd-tracked-lint:
+    # Mechanical enforcement of AGENTS.md "BDD hygiene" Rule 2: every
+    # `@unwired` or `@wip` scenario across `crates/*/tests/features/`
+    # must carry a `# tracked: crap-rs#<n>` comment inside its
+    # scenario block, naming the issue that owns the wiring deferral.
+    # Without this gate, the rule was documented but unenforced —
+    # documentation rots; CI doesn't.
+    #
+    # See `scripts/bdd-tracked-lint.py` for the parser shape and
+    # limitations. Mirrors the `lefthook.yml` pre-push step — single
+    # source of truth in the script.
+    #
+    # Conventions follow the post-#264 supply-chain hardening: scoped
+    # `permissions: contents: read`, `persist-credentials: false` on
+    # checkout, no cache (the lint is pure-Python and finishes in
+    # under a second; caching is overhead, not savings).
+    name: bdd-tracked-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: 'Lint `# tracked: crap-rs#<n>` comment coverage of @unwired/@wip scenarios'
+        run: python3 scripts/bdd-tracked-lint.py
+
   docs:
     name: cargo doc (warnings as errors)
     runs-on: ubuntu-latest

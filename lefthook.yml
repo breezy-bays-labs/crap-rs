@@ -54,6 +54,16 @@ pre-push:
       # every push. Single source of truth: `scripts/mutants-skip-lint.py`.
       run: python3 scripts/mutants-skip-lint.py
       timeout: 30s
+    bdd-tracked-lint:
+      # Mechanical enforcement of AGENTS.md "BDD hygiene" Rule 2: every
+      # `@unwired` or `@wip` scenario across `crates/*/tests/features/`
+      # must carry a `# tracked: crap-rs#<n>` comment inside its
+      # scenario block, naming the issue that owns the wiring deferral.
+      # Local-velocity layer of the same check that
+      # `.github/workflows/ci.yml`'s `bdd-tracked-lint` job runs on
+      # every push. Single source of truth: `scripts/bdd-tracked-lint.py`.
+      run: python3 scripts/bdd-tracked-lint.py
+      timeout: 30s
     clippy:
       run: cargo clippy --workspace --all-targets -- -D warnings
       timeout: 300s
@@ -82,19 +92,14 @@ pre-push:
       # documentation alone enforces the wire-snapshot contract;
       # "documentation rots, CI doesn't."
       #
-      # `--test-runner=nextest` is load-bearing — the default
-      # `cargo-test` backend runs tests in-process with thread
-      # parallelism, which interacts poorly with the
-      # `colored::set_override` global mutex used by the table
-      # reporter (see `~/.claude/projects/.../feedback_colored-set-
-      # override-mutex` memory). Under non-PTY environments (lefthook,
-      # CI) one test's width-detection panic poisons the mutex and
-      # cascades into 43+ unrelated failures. Nextest runs each test
-      # in its own process, so a panic in one test doesn't poison any
-      # other test's mutex state. This is the same runner the
-      # workspace's `test:` step above uses; switching insta to it
-      # keeps the two parallel testing layers consistent.
-      run: cargo insta test --workspace --check --test-runner=nextest
+      # Note: this step previously pinned `--test-runner=nextest` as
+      # a workaround for the `colored::set_override` mutex-poison
+      # cascade in the table reporter test suite (crap-rs#202). The
+      # cascade is now structurally broken by `acquire_color_lock()`
+      # in `crates/crap-core/src/adapters/reporters/table.rs`, which
+      # recovers from `PoisonError` instead of re-panicking. The
+      # default backend is safe again, so the override is removed.
+      run: cargo insta test --workspace --check
       timeout: 180s
     cucumber:
       # cucumber-rs harness=false targets bypass libtest's
