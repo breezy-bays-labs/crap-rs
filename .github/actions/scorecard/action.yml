@@ -127,6 +127,16 @@ runs:
             *) echo "::error::cannot infer language from coverage path '$COVERAGE'; set inputs.language explicitly"; exit 1 ;;
           esac
         fi
+        # Whitelist the resolved value so an explicit unsupported
+        # `inputs.language` fails fast instead of silently skipping
+        # every conditional step and returning empty outputs.
+        case "$resolved" in
+          rust|typescript) ;;
+          *)
+            echo "::error::unsupported language '$resolved'; expected one of: rust, typescript, auto"
+            exit 1
+            ;;
+        esac
         echo "language=$resolved" >> "$GITHUB_OUTPUT"
         echo "Resolved language: $resolved"
 

@@ -463,8 +463,10 @@ jobs:
     # outputs land as the rust dispatch.
     name: Scorecard action smoke — TypeScript (analysis-only)
     runs-on: ubuntu-latest
+    # comment-mode: 'none' below — this job never posts a PR comment,
+    # so `contents: read` is sufficient. The rust-side `scorecard-smoke`
+    # job owns the per-PR sticky-comment slot and elevates accordingly.
     permissions:
-      pull-requests: write
       contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

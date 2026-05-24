@@ -14,7 +14,7 @@ composite action's `outputs.row-json`). Aggregators (any downstream CI
 or PR-comment tooling) compose those rows into a single scorecard
 envelope.
 
-```
+```text
        crap4rs --format scorecard-row    ─┐
        crap4ts --format scorecard-row    ─┼──►  any aggregator (CI workflow,  ──►  composed PR comment
        (other producers e.g. coverage,   ─┤        PR-comment bot, dashboard)        / dashboard / artifact
