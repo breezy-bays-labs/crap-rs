@@ -798,17 +798,31 @@ jobs:
         # NOT `--extended-regex` (which is grep's `-E`). Bare
         # invocation `rg PATTERN PATH` is the right shape.
         #
+        # Tool-presence check: `rg` must be on PATH or the gate
+        # would silently pass via `|| true` (the false-sense-of-
+        # security trap). On `ubuntu-latest` ripgrep is preinstalled.
+        #
         # Doc/inline/block comments are allowed to mention these
         # tokens (the awk filter skips lines whose content starts
-        # with //, /*, *). Same comment-filter shape as the #161
-        # adapter-name literal check above; only the token list and
-        # the `"[^"]*X[^"]*"` candidate scan
-        # (substring-within-string-literal) differ.
+        # with `//`, `/*`, `* ` followed by space, or bare `*` at
+        # end of line — covering `///`, `//!`, `/* … */` openers,
+        # and ` * ` / ` *` continuation lines without swallowing
+        # Rust deref-assignment like `*ptr = "LCOV"`).
+        #
+        # The bare `*` form (no space) is intentionally NOT
+        # comment-skipped — Rust comment continuation uses ` * `
+        # (space-asterisk-space) or a bare ` *` (space-asterisk-EOL).
+        # Deref-assign idioms (`*ptr = "Istanbul";`) must still
+        # trip the lint.
         #
         # No untrusted input interpolated; `rg`/`awk` patterns are
         # literal static strings.
         run: |
           set -euo pipefail
+          if ! command -v rg >/dev/null 2>&1; then
+            echo "::error::ripgrep (rg) is required by the ast-purity-strings lint but is not on PATH"
+            exit 1
+          fi
           hits=$(rg -n '"[^"]*(LCOV|Istanbul|TypeScript|LCOV-flavou?red)[^"]*"' crates/crap-core/src 2>/dev/null || true)
           if [ -z "$hits" ]; then
             echo "crap-core adapter-vocabulary literals: clean"
@@ -819,7 +833,7 @@ jobs:
               content = ""
               for (i = 3; i <= NF; i++) content = content (i > 3 ? ":" : "") $i
               gsub(/^[ \t]+/, "", content)
-              if (content !~ /^(\/\/|\/\*|\*)/) print
+              if (content !~ /^(\/\/|\/\*|\* |\*$)/) print
             }
           ')
           if [ -n "$non_comment_hits" ]; then

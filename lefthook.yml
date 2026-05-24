@@ -47,13 +47,21 @@ pre-push:
       # `TypeScript`, `LCOV-flavou?red`, case-sensitive) inside
       # `crates/crap-core/src/`. The case-sensitive match
       # distinguishes user-prose leaks from lowercase filename
-      # literals (`"lcov.info"`). Doc/inline/block comments are
-      # allowed (awk filter strips lines starting with //, /*, *).
+      # literals (`"lcov.info"`). Comment-skip awk filter accepts
+      # `//`, `/*`, `* ` (space after), and bare `*` at EOL — the
+      # space/EOL constraint preserves Rust deref-assign visibility
+      # (`*ptr = "LCOV"` correctly fires).
+      # Up-front `command -v rg` check prevents the lint silently
+      # passing if ripgrep is missing.
       # Local-velocity layer so violations fail at `git push` time
       # rather than waiting for CI. See ci.yml for full rationale
       # and #261.
       run: |
         set -euo pipefail
+        if ! command -v rg >/dev/null 2>&1; then
+          echo "ripgrep (rg) is required by the ast-purity-strings lint but is not on PATH"
+          exit 1
+        fi
         hits=$(rg -n '"[^"]*(LCOV|Istanbul|TypeScript|LCOV-flavou?red)[^"]*"' crates/crap-core/src 2>/dev/null || true)
         if [ -z "$hits" ]; then exit 0; fi
         non_comment_hits=$(echo "$hits" | awk -F: '
@@ -61,7 +69,7 @@ pre-push:
             content = ""
             for (i = 3; i <= NF; i++) content = content (i > 3 ? ":" : "") $i
             gsub(/^[ \t]+/, "", content)
-            if (content !~ /^(\/\/|\/\*|\*)/) print
+            if (content !~ /^(\/\/|\/\*|\* |\*$)/) print
           }
         ')
         if [ -n "$non_comment_hits" ]; then
