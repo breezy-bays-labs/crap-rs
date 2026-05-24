@@ -23,7 +23,7 @@ authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
 # Rust adapter. Future siblings (`crap4ts`) inherit the same pins.
 [workspace.dependencies]
 # ── In-workspace crates ──
-crap-core = { path = "crates/crap-core", version = "0.4.0" }
+crap-core = { path = "crates/crap-core", version = "0.5.0" }
 
 # ── CLI (crap4rs only today) ──
 clap = { version = "4", features = ["derive", "string"] }
@@ -75,6 +75,13 @@ ignore = "0.4"
 
 # ── Glob matching for per-path threshold overrides ──
 globset = "0.4"
+
+# ── Compile-time templates for HTML and Markdown reporters ──
+# askama 0.16 ships compile-time-checked Jinja-like templates with
+# auto-escaping by extension (.html → html escape, .txt → none).
+# MSRV 1.88 — comfortably below the workspace floor of 1.93. License
+# MIT OR Apache-2.0, matches the workspace.
+askama = "0.16"
 
 # ── Dev-dependency catalog (consumed via `{ workspace = true }`) ──
 proptest = "1"

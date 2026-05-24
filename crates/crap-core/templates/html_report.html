@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+{# Inline Sakura base + report tokens + structural styles. `{% include %}`
+   pastes verbatim — no escaping — so CSS selectors like `details > summary`
+   pass through unmangled. Order matters: tokens MUST come last so they
+   override Sakura's prose-reader defaults. #}
+{% include "assets/sakura-1.5.0.css" %}
+{% include "assets/report-styles.css" %}
+{% include "assets/colors_and_type.css" %}
+
+/* ── Report-specific tweaks (small layer over the design system) ──── */
+
+body { padding: 1.25rem 2rem 3rem; }
+
+.report-header {
+  display: flex; align-items: baseline;
+  gap: 0.75rem; flex-wrap: wrap;
+  margin: 0 0 0.25rem;
+}
+.report-header h1 { margin: 0; font-size: var(--fs-h1); }
+.report-header .ver {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.report-header .grow { flex: 1; }
+.report-header .actions {
+  display: inline-flex; gap: 0.4rem; align-items: center;
+}
+/* Sakura paints every <button> teal/white by default; reset for our
+   utility buttons so they pick up our tokens instead. */
+.icon-btn {
+  appearance: none;
+  box-sizing: border-box;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  width: 1.75rem; height: 1.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.icon-btn:hover,
+.icon-btn:focus-visible {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: var(--bg-elevated);
+  outline: 0;
+}
+.icon-btn svg { width: 14px; height: 14px; stroke-width: 2; display: block; }
+
+/* Sakura's button:hover paints magenta/white — undo for chrome buttons. */
+.chip:hover,
+.chip:focus-visible {
+  background-color: var(--bg-elevated);
+  color: var(--text);
+  outline: 0;
+}
+
+/* Scope banner */
+.scope-banner p { margin: 0; }
+.scope-banner .meta { color: var(--text-muted); }
+
+section + section { margin-top: 1.25rem; }
+.panel h2 { margin: 0 0 0.5rem; }
+
+.files-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap;
+  margin: 1.25rem 0 0.75rem;
+}
+.files-header h2 { margin: 0; }
+.files-header .files-sub { color: var(--text-muted); font-size: var(--fs-small); margin: 0.15rem 0 0; }
+.files-header .controls { display: inline-flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+/* Severity card — per-file (extends design system) */
+.file-card .file-fns {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-td);
+  font-variant-numeric: tabular-nums;
+}
+.file-card .file-fns th {
+  text-align: left;
+  padding: 0.4rem 0.875rem;
+  font-family: var(--font-mono);
+  font-size: var(--fs-th);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-th);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+}
+.file-card .file-fns th.num { text-align: right; }
+.file-card .file-fns td {
+  padding: 0.45rem 0.875rem;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+}
+.file-card .file-fns tr:last-child td { border-bottom: 0; }
+.file-card .file-fns tr.is-exceeds td { background: var(--risk-4-tint); }
+.file-card .file-fns td.num { text-align: right; }
+.file-card .file-fns td .fn-name {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-weight: 500;
+}
+.file-card .file-fns td .fn-loc {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  margin-left: 0.5rem;
+}
+.metric-cell {
+  display: flex; flex-direction: column; gap: 3px;
+  min-width: 7rem;
+}
+.metric-cell .num-line {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.metric-cell .num-line .note { color: var(--text-muted); font-size: var(--fs-small); }
+.crap-cell {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.crap-cell .over-by {
+  color: var(--risk-4-on); font-weight: 500; font-size: var(--fs-small);
+}
+
+.dist-legend { margin-top: 0.5rem; }
+.offender .metric { font-size: var(--fs-h4); }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+}
+
+.file-card > summary .meta .over {
+  color: var(--risk-4-on);
+  font-weight: 600;
+}
+
+footer.report-footer {
+  margin-top: 2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+}
+.footer-adapters {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.15rem;
+  align-items: baseline;
+  text-align: left;
+  max-width: 60%;
+}
+.footer-adapters .label {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  align-self: start;
+}
+.footer-adapters .adapter {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.footer-adapters .adapter .ad-name { font-weight: 600; }
+.footer-adapters .adapter .ad-meta { color: var(--text-muted); font-weight: 400; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────── -->
+<header class="report-header">
+  <h1>{{ tool_name }} report</h1>
+  <span class="ver">v{{ tool_version }}</span>
+  <span class="grow"></span>
+  <span class="verdict is-{{ verdict_class }}" aria-label="Verdict: {{ verdict_label }}">
+    <span class="verdict-glyph">{{ verdict_glyph }}</span>
+    {{ verdict_label }}
+  </span>
+  <span class="actions">
+    <button class="icon-btn" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button class="icon-btn" id="print-button" title="Print" aria-label="Print" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    </button>
+  </span>
+</header>
+
+{% if is_empty %}
+
+<!-- ── Empty state ─────────────────────────────────────────────────── -->
+<section class="scope-banner" aria-label="Scope">
+  <p><strong>No functions analyzed.</strong></p>
+</section>
+
+<div class="empty-state">No functions to display.</div>
+
+{% else %}
+
+<!-- ── Scope banner ─────────────────────────────────────────────────── -->
+<section class="scope-banner" aria-label="Scope">
+  <p>
+    <strong>{{ summary.exceeding_threshold }} of {{ summary.total_functions }}</strong>
+    {% if summary.exceeding_threshold == 1 -%}
+    function exceeds its adapter threshold.
+    {%- else -%}
+    functions exceed their adapter threshold.
+    {%- endif %}
+    {% if summary.has_max_crap %}
+    Worst offender scores <code>{{ summary.max_crap }}</code>.
+    {% endif %}
+    <span class="meta">{{ summary.total_files }}{% if summary.total_files == 1 %} file{% else %} files{% endif %}</span>
+  </p>
+</section>
+
+<!-- ── KPI tiles ────────────────────────────────────────────────────── -->
+<section class="kpi-grid" aria-label="Summary">
+  <div class="kpi">
+    <span class="kpi-label">Exceeding threshold</span>
+    <span class="kpi-value">{{ summary.exceeding_threshold }}<span class="kpi-unit">/ {{ summary.total_functions }} · {{ summary.exceeding_pct }}%</span></span>
+    <span class="kpi-foot">{{ summary.exceeding_threshold }} {% if summary.exceeding_threshold == 1 %}function{% else %}functions{% endif %} over CRAP {{ summary.threshold }}</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Average CRAP</span>
+    <span class="kpi-value">{{ summary.crap_avg }}</span>
+    <span class="kpi-foot">median <code>{{ summary.crap_med }}</code> · max <code>{{ summary.max_crap }}</code></span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Avg line coverage</span>
+    <span class="kpi-value">{{ summary.cov_avg }}<span class="kpi-unit">%</span></span>
+    <div class="bar is-thick" aria-hidden="true"><span class="is-{{ summary.cov_avg_risk }}" style="width:{{ summary.cov_avg }}%"></span></div>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">Avg complexity</span>
+    <span class="kpi-value">{{ summary.cx_avg }}</span>
+    <span class="kpi-foot">median <code>{{ summary.cx_med }}</code> · max <code>{{ summary.cx_max }}</code> {{ metric_label }}</span>
+  </div>
+</section>
+
+<!-- ── Risk distribution ───────────────────────────────────────────── -->
+<section class="panel" aria-label="Risk distribution">
+  <div class="panel-header"><h2>Risk distribution</h2></div>
+  <div class="dist-bar">
+    <span class="dist-seg" data-risk="1" style="flex:{{ summary.dist_low }}" title="low: {{ summary.dist_low }} functions">
+      <span class="dist-count">{{ summary.dist_low }}</span><span class="dist-label">low</span>
+    </span>
+    <span class="dist-seg" data-risk="2" style="flex:{{ summary.dist_acceptable }}" title="acceptable: {{ summary.dist_acceptable }} functions">
+      <span class="dist-count">{{ summary.dist_acceptable }}</span><span class="dist-label">acceptable</span>
+    </span>
+    <span class="dist-seg" data-risk="3" style="flex:{{ summary.dist_moderate }}" title="moderate: {{ summary.dist_moderate }} functions">
+      <span class="dist-count">{{ summary.dist_moderate }}</span><span class="dist-label">moderate</span>
+    </span>
+    <span class="dist-seg" data-risk="4" style="flex:{{ summary.dist_high }}" title="high: {{ summary.dist_high }} functions">
+      <span class="dist-count">{{ summary.dist_high }}</span><span class="dist-label">high</span>
+    </span>
+  </div>
+  <div class="dist-legend">
+    <span><i class="legend-dot" style="background:var(--risk-1)"></i>low — CRAP ≤ 5</span>
+    <span><i class="legend-dot" style="background:var(--risk-2)"></i>acceptable — 5 &lt; CRAP ≤ 10</span>
+    <span><i class="legend-dot" style="background:var(--risk-3)"></i>moderate — 10 &lt; CRAP ≤ 30</span>
+    <span><i class="legend-dot" style="background:var(--risk-4)"></i>high — CRAP &gt; 30</span>
+  </div>
+</section>
+
+{% if !worst_offenders.is_empty() %}
+<!-- ── Worst offenders ─────────────────────────────────────────────── -->
+<section aria-label="Worst offenders">
+  <h2>Worst offenders</h2>
+  <ol class="offenders">
+    {% for o in worst_offenders %}
+    <li class="offender">
+      <span class="rank">{{ o.rank }}</span>
+      <span class="fn-name">{{ o.fn_name }}</span>
+      <span class="fn-path">{{ o.file }} <span class="line-range">L{{ o.start_line }}–{{ o.end_line }}</span></span>
+      <span class="metric">{{ o.crap }}</span>
+      <span class="risk-pill" data-risk="{{ o.risk_data }}">{{ o.risk_label }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+<!-- ── Files ───────────────────────────────────────────────────────── -->
+<section aria-label="Functions by file">
+  <div class="files-header">
+    <div>
+      <h2>Functions by file</h2>
+      <p class="files-sub">{{ summary.total_files }} {% if summary.total_files == 1 %}file{% else %}files{% endif %} · sorted by max CRAP</p>
+    </div>
+    <div class="controls">
+      <input id="filter" class="search-input" type="search" placeholder="Filter file or function… (/)" autocomplete="off">
+      <div class="chips">
+        <button class="chip is-active" data-filter="all" type="button">All <span class="chip-count">{{ file_count }}</span></button>
+        <button class="chip" data-filter="exceeding" type="button">Exceeding <span class="chip-count">{{ exceeding_file_count }}</span></button>
+        <button class="chip" data-filter="high" type="button">High <span class="chip-count">{{ high_file_count }}</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="file-list">
+    {% for f in files %}
+    <details class="severity-card file-card" data-risk="{{ f.risk_data }}" data-exceeds="{{ f.exceeds_count }}"{% if f.open %} open{% endif %}>
+      <summary>
+        <span class="stripe"></span>
+        <span class="caret">›</span>
+        <span class="sev-path">{{ f.path }}</span>
+        <span class="sev-meta">
+          <span><b>{{ f.fn_count }}</b> fn</span>
+          <span>max CRAP <b>{{ f.max_crap }}</b></span>
+          {% if f.exceeds_count > 0 %}
+          <span class="over"><b>{{ f.exceeds_count }} over</b></span>
+          {% else %}
+          <span>0 over</span>
+          {% endif %}
+        </span>
+      </summary>
+      <div class="severity-card-body">
+        <table class="file-fns">
+          <thead><tr>
+            <th>Function</th><th>Lines</th><th>Complexity</th><th>Coverage</th><th class="num">CRAP</th>
+          </tr></thead>
+          <tbody>
+            {% for row in f.rows %}
+            <tr{% if row.exceeds %} class="is-exceeds"{% endif %}>
+              <td><span class="fn-name">{{ row.fn_name }}</span><span class="fn-loc">{{ row.loc }} LOC</span></td>
+              <td>{{ row.start_line }}–{{ row.end_line }}</td>
+              <td><div class="metric-cell"><div class="num-line"><span>{{ row.cc }}</span><span class="note">{{ metric_label }}</span></div><div class="bar"><span class="is-{{ row.cc_risk }}" style="width:{{ row.cc_bar_pct }}%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>{{ row.cov }}%</span><span class="note">lines</span></div><div class="bar"><span class="is-{{ row.cov_risk }}" style="width:{{ row.cov }}%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">{{ row.crap }} <span class="risk-pill" data-risk="{{ row.risk_data }}">{{ row.risk_label }}</span>{% if row.exceeds %}<span class="over-by">+{{ row.over_by }}</span>{% endif %}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+
+  <div class="empty-state" id="empty-state" hidden>
+    No files or functions match. Try a different term or clear filters.
+  </div>
+</section>
+
+{% endif %}
+
+<footer class="report-footer">
+  <span>Generated by {{ tool_name }} v{{ tool_version }}</span>
+  <span class="footer-adapters">
+    <span class="label">Adapter</span>
+    <span class="adapter"><span class="ad-name">{{ adapter_display }}</span> <span class="ad-meta">· {{ metric_label }} complexity · line coverage · threshold <code>CRAP&nbsp;≤&nbsp;{{ summary.threshold }}</code></span></span>
+  </span>
+</footer>
+
+<script>
+  // ── Dark mode (persisted) ──────────────────────────────────────────
+  (function () {
+    var root = document.documentElement;
+    var KEY = "crap-rs.theme";
+    var stored = localStorage.getItem(KEY);
+    if (stored === "dark") root.setAttribute("data-theme", "dark");
+    var btn = document.getElementById("theme-toggle");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        var dark = root.getAttribute("data-theme") === "dark";
+        if (dark) { root.removeAttribute("data-theme"); localStorage.setItem(KEY, "light"); }
+        else      { root.setAttribute("data-theme", "dark"); localStorage.setItem(KEY, "dark"); }
+      });
+    }
+  })();
+
+  // ── Print button ───────────────────────────────────────────────────
+  (function () {
+    var btn = document.getElementById("print-button");
+    if (btn) btn.addEventListener("click", function () { window.print(); });
+  })();
+
+  // ── File filter + chips + search ──────────────────────────────────
+  (function () {
+    var input = document.getElementById("filter");
+    var chips = [].slice.call(document.querySelectorAll(".chip[data-filter]"));
+    var cards = [].slice.call(document.querySelectorAll(".file-card"));
+    var empty = document.getElementById("empty-state");
+    if (!input || !empty) return;
+    var activeChip = "all";
+
+    function apply() {
+      var q = (input.value || "").trim().toLowerCase();
+      var visible = 0;
+      cards.forEach(function (card) {
+        var text = card.textContent.toLowerCase();
+        var exceeds = +card.dataset.exceeds > 0;
+        var isHigh = card.dataset.risk === "4";
+        var matchesChip = activeChip === "all" ||
+          (activeChip === "exceeding" && exceeds) ||
+          (activeChip === "high" && isHigh);
+        var matchesQuery = !q || text.indexOf(q) !== -1;
+        var show = matchesChip && matchesQuery;
+        card.hidden = !show;
+        if (show) visible++;
+      });
+      empty.hidden = visible !== 0;
+    }
+
+    input.addEventListener("input", apply);
+    chips.forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        chips.forEach(function (c) { c.classList.remove("is-active"); });
+        chip.classList.add("is-active");
+        activeChip = chip.dataset.filter;
+        apply();
+      });
+    });
+  })();
+
+  // Keyboard shortcut "/" focuses filter
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && document.activeElement && document.activeElement.tagName !== "INPUT") {
+      e.preventDefault();
+      var f = document.getElementById("filter");
+      if (f) f.focus();
+    }
+  });
+</script>
+
+</body>
+</html>

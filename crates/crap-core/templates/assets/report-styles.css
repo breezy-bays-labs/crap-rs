@@ -1,0 +1,744 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Sakura Reports — structural styles
+   Drop-in CSS for the patterns documented in /README.md.
+   Layer order: this file extends colors_and_type.css.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Scope banner ────────────────────────────────────────────────────────
+   Plain text near the top of the report stating what's in scope and what
+   the comparison baseline is. Don't add chrome — the words are the UI. */
+.scope-banner {
+  padding: 0;
+  margin: 0 0 1rem;
+  color: var(--text);
+}
+.scope-banner code {
+  background: var(--bg-elevated);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+}
+
+/* ── Callout block ───────────────────────────────────────────────────────
+   The one consistently-styled box in the system. Use for the test
+   description, or any "here's what this thing is about" prose block.
+   Gray background + teal left rule. Don't reuse this treatment elsewhere
+   in the same report; its scarcity is what makes it readable. */
+.callout {
+  background: var(--bg-elevated);
+  border-left: 5px solid var(--accent);
+  padding: 0.875rem 1.125rem;
+  margin: 0 0 1.25rem;
+}
+
+/* ── Cascade selector ────────────────────────────────────────────────────
+   Two-step "Model → Item" picker. Each <select> shares the same type
+   scale, monospace, and min-width so the rhythm is consistent. */
+.selector-row {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.selector-field { display: flex; flex-direction: column; min-width: 16rem; }
+.selector-field label {
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 0.3rem;
+}
+.selector-arrow {
+  padding-bottom: 0.9rem;
+  color: var(--text-muted);
+  font-size: 1.125rem;
+}
+.selector-count {
+  padding-bottom: 1rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Diagram block (Mermaid DAG / flowchart) ───────────────────────────── */
+.diagram-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.125rem;
+  margin: 0 0 1rem;
+  background: var(--bg);
+}
+.diagram-header { display: block; margin-bottom: 0.5rem; }
+.diagram-header h2 { margin: 0 0 0.15rem; }
+.diagram-subtitle {
+  margin: 0 0 0.25rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.diagram-host {
+  display: flex; justify-content: center; overflow-x: auto;
+  padding: 0.5rem 0;
+}
+.diagram-host svg { max-width: 100%; height: auto; }
+.diagram-host g.node:hover .label { text-decoration: underline; }
+
+/* ── Diagram legend ──────────────────────────────────────────────────────
+   Two flex groups (role + edge type) with breathing room. Swatches
+   communicate shape *and* color so colorblind users get the same info. */
+.diagram-legend {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+  font-size: var(--fs-small);
+  display: flex; flex-wrap: wrap; gap: 0.75rem 2.5rem;
+}
+.legend-group {
+  display: flex; flex-wrap: wrap;
+  gap: 0.45rem 0.9rem; align-items: center;
+}
+.legend-title {
+  font-weight: 600;
+  color: var(--text);
+  margin-right: 0.25rem;
+}
+.legend-items {
+  display: inline-flex; flex-wrap: wrap;
+  gap: 0.5rem 1.25rem; align-items: center;
+}
+.legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+.legend-swatch {
+  display: inline-block; width: 22px; height: 14px;
+  border: 1.5px solid currentColor; background: var(--bg);
+}
+.legend-swatch.shape-stadium  { border-radius: 999px; }
+.legend-swatch.shape-hexagon  {
+  clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%);
+  border: 0;
+}
+.legend-edge {
+  display: inline-block; width: 28px; height: 3px; border-radius: 2px;
+}
+.legend-edge.is-dashed {
+  background: transparent;
+  border-top: 3px dashed;
+  height: 0;
+}
+
+/* ── Two-panel comparison region ─────────────────────────────────────────
+   `minmax(0, 1fr)` — without the 0 min, grid columns won't shrink below
+   content and the overflow-detection logic in your JS can't trip. */
+.panel-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  margin: 0 0 1.5rem;
+}
+.panel-row.is-stacked { grid-template-columns: 1fr; }
+.panel-row.is-stacked .reference-panel { position: static; }
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--panel-pad);
+  background: var(--bg);
+}
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; margin-bottom: 0.75rem;
+}
+
+/* The "reference" panel (Expected / Golden / Target). Outlined heavier
+   than the left so it reads as the source of truth. Sticky in side-by-
+   side, static when stacked. */
+.reference-panel {
+  border: 2px solid var(--text);
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+}
+
+/* ── Segmented toggle ────────────────────────────────────────────────────
+   For switching the left panel between two modes (e.g. detail / overview).
+   No third position — if you need three options, use a select. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--bg-elevated);
+}
+.segmented button {
+  appearance: none;
+  border: 0; background: transparent;
+  color: var(--text-muted);
+  font: inherit; font-size: var(--fs-small);
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.segmented button:hover { color: var(--text); }
+.segmented button.is-active {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* ── Code block with copy button ─────────────────────────────────────────
+   Wrapper is positioned so the button can float over the top-right of
+   the code. The pre inside the wrap reserves padding for the button
+   so the first line of code can't run under it. Button is muted by
+   default, opaque on hover/focus; click handler must stopPropagation
+   so it doesn't toggle a parent <details>. */
+.code-block-wrap { position: relative; }
+.code-block-wrap > pre {
+  padding-top: 1.875rem;
+  padding-right: 4rem;
+}
+.code-copy {
+  position: absolute; top: 8px; right: 8px;
+  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 0.78em;
+  padding: 0.1rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  cursor: pointer; opacity: 0.55;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+.code-block-wrap:hover .code-copy,
+.code-copy:focus-visible { opacity: 1; }
+.code-copy:hover { background: var(--bg-elevated); }
+.code-copy.copied {
+  background: var(--success-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
+}
+.code-copy.copy-failed {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+  opacity: 1;
+}
+
+/* SQL syntax highlight tokens. Plain-text fallback colors come from
+   colors_and_type.css. */
+.sql-keyword { color: var(--sql-keyword); font-weight: 700; }
+.sql-string  { color: var(--sql-string); }
+.sql-comment { color: var(--sql-comment); font-style: italic; }
+.sql-jinja   { color: var(--sql-jinja); }
+
+/* ── Tables ──────────────────────────────────────────────────────────────
+   Tables size to content but cover the column. Cells nowrap so numeric
+   tables stay readable; headers wrap at <wbr> boundaries (your JS
+   injects them after underscores in snake_case headers). */
+.table-fit { width: 100%; overflow-x: auto; }
+.table-fit table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-td);
+}
+.table-fit th {
+  text-align: left;
+  padding: var(--table-cell-pad);
+  font-family: var(--font-mono);
+  font-size: var(--fs-th);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-th);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+  white-space: normal;       /* allow <wbr> wrap */
+  max-width: 12rem;
+  vertical-align: bottom;
+  line-height: var(--line-height-tight);
+}
+.table-fit td {
+  padding: var(--table-cell-pad);
+  border-bottom: 1px solid var(--hairline);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.table-fit tr:last-child td { border-bottom: 0; }
+.cell-null { color: var(--text-muted); font-style: italic; }
+.cell-num  { text-align: right; }
+
+/* Table title row above each table */
+.table-header {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  margin: 0.4rem 0 0.2rem;
+}
+.table-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-h4);
+  color: var(--text);
+}
+.row-count-badge {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Empty / hint states ─────────────────────────────────────────────── */
+.empty-hint {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
+}
+
+.empty-callout {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-style: italic;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Dormant error card ──────────────────────────────────────────────────
+   Designed and shipped *hidden*. Reveal via URL #explain (a hashchange
+   listener in your JS toggles `.is-visible`) for design review without
+   polluting normal runs. */
+.error-card {
+  display: none;
+  border: 2px solid var(--danger);
+  background: var(--danger-bg);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin: 0 0 1.5rem;
+}
+.error-card.is-visible { display: block; }
+.error-card h2 { margin: 0 0 0.5rem; color: var(--danger); }
+.error-card .error-id {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--danger);
+  margin-bottom: 0.5rem;
+}
+.error-card .error-remediation { margin: 0; }
+
+/* ── Details prose (test / item metadata) ───────────────────────────────
+   Three short prose lines beats a key/value grid for scanability. */
+.details-body {
+  padding: 0.6rem 0 0;
+  margin-top: 0.35rem;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  gap: 0.3rem;
+  font-size: var(--fs-small);
+}
+.details-line { line-height: var(--line-height-body); }
+.details-label { color: var(--text-muted); }
+.details-tag,
+.details-meta-key,
+.details-meta-val {
+  font-family: var(--font-mono);
+}
+.details-meta-key { color: var(--text-muted); }
+.details-source {
+  font-family: var(--font-mono);
+  background: var(--bg-elevated);
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CI / static-analysis primitives
+   These were promoted from the crap-rs report mockup. They generalize to
+   any tool that scores items against a threshold and groups them by
+   severity (lint, audit, coverage, perf, security).
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Verdict pill ────────────────────────────────────────────────────────
+   The single "did this run pass" stamp. Three states only: PASS / WARN
+   / FAIL. Live in a hero region, near the headline. Don't use this for
+   per-row classification — that's what `.risk-pill` is for. */
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-md);
+  border: 2px solid currentColor;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.95em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.verdict.is-pass { color: var(--verdict-pass); background: var(--risk-1-tint); }
+.verdict.is-warn { color: var(--verdict-warn); background: var(--risk-3-tint); }
+.verdict.is-fail { color: var(--verdict-fail); background: var(--risk-4-tint); }
+.verdict .verdict-glyph {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 1.1em;
+  line-height: 1;
+  display: inline-block;
+}
+
+/* ── Risk pill (per-row classification) ──────────────────────────────────
+   Inline classifier that labels a single item: a function, a finding,
+   a row. Driven by `data-risk="1|2|3|4"` so the same markup styles
+   regardless of which vocabulary the tool uses (low/notice/warn/error,
+   etc). For convenience the legacy class names also work. */
+.risk-pill {
+  display: inline-flex; align-items: center;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  border: 1px solid transparent;
+  line-height: 1.5;
+  vertical-align: 0.05em;
+}
+.risk-pill[data-risk="1"], .risk-pill.is-1 { color: var(--risk-1-on); background: var(--risk-1-tint); border-color: var(--risk-1); }
+.risk-pill[data-risk="2"], .risk-pill.is-2 { color: var(--risk-2-on); background: var(--risk-2-tint); border-color: var(--risk-2); }
+.risk-pill[data-risk="3"], .risk-pill.is-3 { color: var(--risk-3-on); background: var(--risk-3-tint); border-color: var(--risk-3); }
+.risk-pill[data-risk="4"], .risk-pill.is-4 { color: var(--risk-4-on); background: var(--risk-4-tint); border-color: var(--risk-4); }
+
+/* ── KPI grid ────────────────────────────────────────────────────────────
+   A row of summary tiles. `auto-fit` keeps it balanced — 3 KPIs render as
+   3 columns, 6 wrap into 3×2 on mid widths, single-column on narrow.
+   Each tile is label / value / footnote-or-bar. */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+}
+.kpi {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  padding: 0.7rem 0.875rem 0.75rem;
+  display: flex; flex-direction: column; gap: 0.25rem;
+  min-width: 0;
+}
+.kpi-label {
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.kpi-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: var(--text);
+  line-height: 1.1;
+  display: inline-flex; align-items: baseline; gap: 0.25rem;
+}
+.kpi-value .kpi-unit {
+  font-size: 0.6em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.kpi-foot {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+.kpi-foot code { background: transparent; padding: 0; }
+
+/* ── Bar (inline progress / ratio) ──────────────────────────────────────
+   Tiny horizontal bar. Use inside a KPI or table cell. The fill class
+   carries the semantic — `.is-1` … `.is-4` to map onto the risk ladder. */
+.bar {
+  height: 4px;
+  background: var(--hairline);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bar > span { display: block; height: 100%; border-radius: inherit; background: var(--text-muted); }
+.bar > span.is-1 { background: var(--risk-1); }
+.bar > span.is-2 { background: var(--risk-2); }
+.bar > span.is-3 { background: var(--risk-3); }
+.bar > span.is-4 { background: var(--risk-4); }
+.bar.is-thick { height: 6px; }
+
+/* ── Distribution bar ────────────────────────────────────────────────────
+   One horizontal bar split into N segments, each weighted by count.
+   For showing how a population falls across the risk bands. Segments use
+   `flex-grow: <count>` to size by data, and `min-width` so a single-item
+   band stays visible. */
+.dist-bar {
+  display: flex; align-items: stretch;
+  width: 100%; height: 28px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin: 0.25rem 0 0.5rem;
+}
+.dist-seg {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0.4rem;
+  min-width: 2.5rem;
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: #fff;
+  padding: 0 0.6rem;
+  white-space: nowrap;
+}
+.dist-seg .dist-count { font-weight: 700; }
+.dist-seg .dist-label { opacity: 0.85; }
+.dist-seg[data-risk="1"], .dist-seg.is-1 { background: var(--risk-1); }
+.dist-seg[data-risk="2"], .dist-seg.is-2 { background: var(--risk-2); }
+.dist-seg[data-risk="3"], .dist-seg.is-3 { background: var(--risk-3); }
+.dist-seg[data-risk="4"], .dist-seg.is-4 { background: var(--risk-4); }
+.dist-legend {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+  font-size: var(--fs-small); color: var(--text-muted);
+}
+.dist-legend .legend-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  vertical-align: 0.05em;
+}
+
+/* ── Severity card (collapsible group with stripe) ──────────────────────
+   A `<details>` whose summary row carries a 4px-wide colored stripe on
+   the left edge, driven by `data-risk`. Use this for any "list of items
+   grouped by classification" surface: lint findings per file, slow
+   queries per table, etc.
+
+   Caret is a static glyph rotated 90deg when open. No spring easing —
+   matches Sakura's existing 120ms ease convention. */
+.severity-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  margin: 0 0 0.625rem;
+  overflow: hidden;
+}
+.severity-card > summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 4px 1rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.875rem 0.6rem 0;
+  user-select: none;
+}
+.severity-card > summary::-webkit-details-marker { display: none; }
+.severity-card > summary .stripe {
+  width: 4px; align-self: stretch;
+  background: var(--border);
+}
+.severity-card[data-risk="1"] > summary .stripe { background: var(--risk-1); }
+.severity-card[data-risk="2"] > summary .stripe { background: var(--risk-2); }
+.severity-card[data-risk="3"] > summary .stripe { background: var(--risk-3); }
+.severity-card[data-risk="4"] > summary .stripe { background: var(--risk-4); }
+.severity-card > summary .caret {
+  width: 1rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-align: center;
+  transition: transform 120ms ease;
+}
+.severity-card[open] > summary .caret { transform: rotate(90deg); }
+.severity-card > summary .sev-path {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.severity-card > summary .sev-meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  white-space: nowrap;
+}
+.severity-card > summary .sev-meta b { color: var(--text); font-weight: 600; }
+.severity-card > summary:hover { background: var(--bg-elevated); }
+
+/* Optional ratio sparkline inside the summary, showing the per-band
+   breakdown for THIS card. Widths are inline styles — `width: 16px` etc. */
+.sev-ratio { display: inline-flex; gap: 2px; }
+.sev-ratio span { height: 10px; border-radius: 2px; }
+.sev-ratio .is-1 { background: var(--risk-1); }
+.sev-ratio .is-2 { background: var(--risk-2); }
+.sev-ratio .is-3 { background: var(--risk-3); }
+.sev-ratio .is-4 { background: var(--risk-4); }
+
+.severity-card-body {
+  border-top: 1px solid var(--hairline);
+  padding: 0;
+}
+
+/* ── Filter chips ────────────────────────────────────────────────────────
+   Small flat buttons with an optional count badge. Use for filtering a
+   list ("All / Exceeding / High"). Distinct from `.segmented`: a
+   segmented control is a single value, chips can stack with other
+   filters (search, scope segmented) and intersect.
+
+   Keeps Sakura's small-radius rule — 4px, not 999px. */
+.chips {
+  display: inline-flex; gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.chip {
+  appearance: none;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.chip:hover { color: var(--text); border-color: var(--text-muted); }
+.chip.is-active {
+  color: var(--text);
+  border-color: var(--text);
+  background: var(--bg-elevated);
+}
+.chip-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+.chip.is-active .chip-count { color: var(--text); }
+
+/* ── Search input ────────────────────────────────────────────────────────
+   Plain text field with a magnifying-glass SVG baked into the
+   background-image. Pair with a keyboard shortcut (`/`) — see
+   PATTERNS.md for the handler. */
+.search-input {
+  height: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg);
+  padding: 0 0.625rem 0 1.85rem;
+  font: inherit;
+  font-size: var(--fs-small);
+  color: var(--text);
+  width: 16rem;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236a6a72' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 0.6rem center;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.search-input::placeholder { color: var(--text-muted); }
+.search-input:focus { border-color: var(--text); }
+
+/* ── Tabs (page-level navigation) ────────────────────────────────────────
+   Distinct from `.segmented` (single-value mode switch). Tabs are for
+   top-of-page navigation between views of the same report — e.g.
+   "Current run" vs "Delta vs baseline". Flat underline; no pill chrome. */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0 0 1rem;
+}
+.tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  padding: 0.4rem 0.75rem 0.5rem;
+  margin-bottom: -1px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tab .tab-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+.tab .tab-dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  display: inline-block;
+}
+
+/* ── Offenders list (ranked items) ──────────────────────────────────────
+   Numbered list of "worst N" items: each row carries a rank pill, a mono
+   identifier, a mono path, the primary metric (large, right-aligned),
+   and a classification pill. The pattern is the same whether you're
+   ranking by CRAP score, query duration, error count, or lint hits. */
+.offenders {
+  list-style: none;
+  margin: 0; padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.offender {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1.4fr) minmax(0, 1.2fr) auto auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.offender:last-child { border-bottom: 0; }
+.offender:hover { background: var(--bg-elevated); }
+.offender .rank {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  text-align: right;
+}
+.offender .fn-name {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.offender .fn-path {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.offender .fn-path .line-range { color: var(--text-muted); opacity: 0.7; }
+.offender .metric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+}

@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `crap-core` is the language-agnostic foundation shared by the
 `crap4rs` (Rust) and `crap4ts` (TypeScript) adapters.
 
+## [0.5.0]
+
+### Changed
+
+- HTML and Markdown reporters now render through askama compile-time
+  templates. Templates live at `crates/crap-core/templates/` and are
+  checked at compile time by `#[derive(Template)]`. Refactor under
+  the hood; no behavioral change to the markdown output (snapshots
+  byte-identical), HTML redesigned per the Sakura Reports design
+  system. (#260)
+- HTML reporter redesigned around the **Sakura Reports** design
+  system: a verdict-stamped header, 4 KPI tiles (down from 6), a
+  risk distribution bar, up to 4 worst offenders (down from 6), a
+  `<details>` card per file with a real `<table>` for function-level
+  data, light + optional dark mode, and a per-adapter footer that
+  carries metric / coverage / threshold provenance. Inline `<script>`
+  now permitted (theme toggle, file-list filter, `/` keyboard
+  shortcut); external assets still rejected. (#260)
+- `reporters::format_html` signature widened from
+  `(view, threshold, tool_name: &str, tool_version: &str)` to
+  `(view, threshold, meta: &AdapterMeta, effective_metric: ComplexityMetric)`.
+  The new arguments thread adapter identity + runtime-resolved
+  complexity metric into the per-adapter footer without leaking
+  domain state into the template. (#260)
+- `reporters::format_markdown` signature shifted its last two
+  `(&str, &str)` arguments to `(&AdapterMeta, ComplexityMetric)` for
+  signature symmetry with `format_html` — markdown does not yet
+  surface the metric label but the bundle is threaded uniformly.
+  (#260)
+- `AdapterMeta` gains a `display_name: &'static str` field carrying
+  the human-readable language label (`"Rust"` / `"TypeScript"`)
+  used by the HTML reporter's per-adapter footer row. Adapter
+  binaries must initialize this field. (#260)
+
 ## [0.4.0]
 
 This release covers two breaking changes to the public API, bundled

@@ -1,0 +1,76 @@
+{# Markdown reporter template (crap-rs#260).
+
+   Renders the analysis body produced by `format_markdown` — a header
+   line, an optional summary block, one of four mutually-exclusive
+   body sections (empty / grouped / full-table / spotlight), and an
+   optional appended delta scorecard.
+
+   Width-aligned numeric fields are pre-formatted in Rust (askama's
+   `{{ }}` does not honor Rust format specifiers); the template only
+   composes structure.
+
+   escape = "none" because markdown special chars (|, *, _, #) must
+   pass through verbatim. Cell escaping is the reporter's job. -#}
+# {{ tool_name }} v{{ tool_version }} — CRAP Score Analysis
+
+{% match body -%}
+{%- when MarkdownBody::Empty -%}
+No functions analyzed.
+{%- when MarkdownBody::Filled with { summary, section } -%}
+## Summary
+
+**Result:** {{ summary.pass_fail }} · **Functions:** {{ summary.total_functions }} · **Above threshold ({{ summary.threshold_display }}):** {{ summary.exceeding_threshold }}
+
+| Metric     | Worst | Average | Median |
+|------------|------:|--------:|-------:|
+| CRAP       | {{ summary.crap_max }} | {{ summary.crap_avg }} | {{ summary.crap_med }} |
+| Complexity | {{ summary.cx_max }} | {{ summary.cx_avg }} | {{ summary.cx_med }} |
+| Coverage   | {{ summary.cov_min }} | {{ summary.cov_avg }} | {{ summary.cov_med }} |
+
+**Risk distribution:** low {{ summary.dist_low }} · acceptable {{ summary.dist_acceptable }} · moderate {{ summary.dist_moderate }} · high {{ summary.dist_high }}
+{% match section -%}
+{%- when BodySection::Grouped with { rows } %}
+## Per-file aggregates
+
+| File | Functions | Failing | Avg CRAP | Worst CRAP | Worst Fn |
+|------|-----------|---------|----------|------------|----------|
+{% for row in rows -%}
+| {{ row.file_path }} | {{ row.function_count }} | {{ row.exceeding_count }} | {{ row.average_crap }} | {{ row.worst_crap }} | {{ row.worst_fn }} |
+{% endfor -%}
+{%- when BodySection::FullTable with { rows, legend } %}
+## All functions
+
+| File | Function | CC | Cov% | CRAP | Risk |
+|------|----------|----|------|------|------|
+{% for row in rows -%}
+| {{ row.file }} | {{ row.function }} | {{ row.cc }} | {{ row.cov }} | {{ row.crap }} | {{ row.risk }} |
+{% for bullet in row.breakdown_bullets -%}
+{{ bullet }}
+{% endfor -%}
+{% endfor -%}
+{%- if legend.is_some() %}
+{{ legend.as_ref().unwrap() }}
+{%- endif -%}
+{%- when BodySection::Spotlight with { header, rows, legend, footnote } %}
+{{ header }}
+
+| File | Function | CC | Cov% | CRAP | Risk |
+|------|----------|----|------|------|------|
+{% for row in rows -%}
+| {{ row.file }} | {{ row.function }} | {{ row.cc }} | {{ row.cov }} | {{ row.crap }} | {{ row.risk }} |
+{% for bullet in row.breakdown_bullets -%}
+{{ bullet }}
+{% endfor -%}
+{% endfor -%}
+{%- if legend.is_some() %}
+{{ legend.as_ref().unwrap() }}
+{%- endif -%}
+{%- if footnote.is_some() %}
+{{ footnote.as_ref().unwrap() }}
+{%- endif -%}
+{%- when BodySection::None -%}
+{% endmatch -%}
+{% endmatch -%}
+{%- if delta.is_some() %}
+{{ delta.as_ref().unwrap()|safe }}
+{%- endif %}

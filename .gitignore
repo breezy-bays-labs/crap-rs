@@ -22,3 +22,4 @@ lcov.info
 # Local agent + diagram tool state
 .gemini/
 excalidraw.log
+.playwright-mcp/
