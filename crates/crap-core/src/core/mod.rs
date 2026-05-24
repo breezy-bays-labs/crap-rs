@@ -286,15 +286,21 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
         // adapter surfaces an I/O failure (the path-doesn't-exist
         // case), letting per-adapter parse errors (malformed JSON,
         // etc.) flow through their own messages.
+        //
+        // Uses `anyhow::Error::new(e).context(...)` (not
+        // `anyhow!("{e}")`) so the underlying `CrapError` / `io::Error`
+        // chain is preserved for `err.source()` / `err.root_cause()`
+        // walks. `err.to_string()` still returns the top context
+        // message (`"failed to read coverage file: <path>"`), keeping
+        // the analyze-pipeline test contract green.
         self.coverage
             .parse(&self.options.coverage)
             .map_err(|e| match e {
-                crate::domain::types::CrapError::Io(io_err) => anyhow::anyhow!(
-                    "failed to read coverage file: {}: {}",
-                    self.options.coverage.display(),
-                    io_err
-                ),
-                other => anyhow::anyhow!("{other}"),
+                crate::domain::types::CrapError::Io(_) => anyhow::Error::new(e).context(format!(
+                    "failed to read coverage file: {}",
+                    self.options.coverage.display()
+                )),
+                other => anyhow::Error::new(other),
             })
     }
 

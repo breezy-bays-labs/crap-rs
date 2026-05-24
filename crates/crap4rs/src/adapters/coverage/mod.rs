@@ -80,16 +80,34 @@ impl CoveragePort for LcovParser {
 
     /// Slurp the LCOV file at `path` and parse it.
     ///
-    /// **Slurp choice**: LCOV emitted by `cargo-llvm-cov --lcov` for a
-    /// typical Rust workspace stays well under 100 MB even on
-    /// workspaces with thousands of files — the format is line-oriented
-    /// text without expansion. A full read keeps the parser linear in
-    /// input size with predictable allocations; streaming would
-    /// complicate the single-pass block accumulator (`flush_block` and
-    /// its surrounding state machine) for a memory ceiling no observed
-    /// workload approaches. [`Self::validate`] still streams via
-    /// `BufReader` since pre-flight returns on the first match —
-    /// short-circuit semantics dominate cost there, not peak RSS.
+    /// **Slurp choice (vs streaming via `BufReader`)**: deliberate
+    /// tradeoff. The slurp holds the file in memory once as a `String`,
+    /// then iterates `&str::lines()` which yields borrowed `&str`
+    /// slices with **zero per-line allocations**. A streaming
+    /// `BufReader::lines()` rewrite would bound peak memory at one line
+    /// — but each yielded `Result<String>` allocates a fresh `String`
+    /// per line. On the LCOV files this adapter sees (workspace
+    /// coverage from `cargo-llvm-cov --lcov`), files are line-oriented
+    /// text without expansion and stay well under any concerning
+    /// memory ceiling; a 1 M-line file would buy ~50 MB of avoided
+    /// peak RSS at the cost of 1 M small heap allocations, a trade
+    /// that's net-negative on every workload we measure. The
+    /// single-pass block accumulator (`flush_block` and its state
+    /// machine in this module) was also designed around `&str`
+    /// borrowing — refactoring to `impl BufRead` would force the
+    /// accumulator to own each line.
+    ///
+    /// [`Self::validate`] is a separate story and streams via
+    /// `BufReader` because it short-circuits on the first match —
+    /// for an early-exit gate, the per-line allocation cost is
+    /// dominated by the I/O-skipped tail, so streaming is the right
+    /// call there.
+    ///
+    /// If a future workload surfaces a multi-GB LCOV file, the
+    /// streaming refactor is tracked separately rather than blanket-
+    /// applied here — see follow-up issue for the abstraction (taking
+    /// `impl BufRead` so production streams and tests slice strings
+    /// via `.as_bytes()`).
     fn parse(&self, path: &Path) -> Result<ParseOutput<LcovParseDiagnostic>, CrapError> {
         let data = std::fs::read_to_string(path).map_err(CrapError::Io)?;
         Ok(self.parse_str(&data))

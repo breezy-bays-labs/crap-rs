@@ -606,11 +606,22 @@ impl CoveragePort for IstanbulCoverage {
     /// Slurp the Istanbul JSON file at `path` and parse it into per-file
     /// `LineCoverage` + `BranchCoverage` records.
     ///
-    /// **Slurp choice**: `serde_json` needs the whole document in
-    /// memory to deserialize, so streaming is not applicable here.
-    /// `coverage-final.json` files emitted by jest / vitest / nyc on
-    /// real-world TypeScript projects sit comfortably under 10 MB; a
-    /// single read is the correct tradeoff. Pre-flight
+    /// **Slurp choice (vs `serde_json::from_reader`)**: deliberate, and
+    /// matches `serde_json`'s own documented recommendation. The
+    /// `from_reader` family is explicitly slower for files — the
+    /// `serde_json::de::from_reader` docs note that "*it can be more
+    /// efficient to read the entire input into a String and then call
+    /// `from_str` on it*" because `from_reader` does not buffer
+    /// internally and incurs per-call syscall overhead. The classic
+    /// "raw string + parsed tree both in memory" objection holds only
+    /// if the string is much larger than the parsed `Value`; for
+    /// Istanbul payloads it's the opposite (the parsed `HashMap<String,
+    /// IstanbulCoverageFile>` is the dominant resident structure once
+    /// the source string is dropped, which happens at the close of
+    /// [`Self::parse_str`]). `coverage-final.json` files emitted by
+    /// jest / vitest / nyc on real-world TypeScript projects sit
+    /// comfortably under 10 MB; the duplicate transient memory is
+    /// negligible against the parsed tree's footprint. Pre-flight
     /// [`Self::validate`] also slurps for the same reason.
     ///
     /// **Top-level shape tolerance (W2.4)** — implemented by
