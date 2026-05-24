@@ -477,11 +477,15 @@ fn then_message_data_contents(world: &mut GhaWorld) {
 #[then("stdout is empty (no `::warning`, no `::notice`, no other workflow commands)")]
 fn then_stdout_no_commands(world: &mut GhaWorld) {
     let stdout = world.stdout();
+    // The scenario asserts both "no workflow commands of any kind"
+    // AND "stdout is empty" — the only honest check is `is_empty()`
+    // after trimming trailing whitespace. A `contains("::warning")`
+    // probe would miss `::error`, `::group`, `::set-output`, etc.,
+    // and would also pass with non-command stdout chatter the reporter
+    // contract forbids. Be strict.
     assert!(
-        !stdout.contains("::warning")
-            && !stdout.contains("::notice")
-            && !stdout.contains("::error"),
-        "expected no workflow commands, got:\n{stdout}"
+        stdout.trim().is_empty(),
+        "expected empty stdout (no workflow commands of any kind), got:\n{stdout:?}"
     );
 }
 
@@ -737,7 +741,7 @@ fn then_escape_chars_replaced(world: &mut GhaWorld) {
 
 // Scenario 16 / And
 #[then(
-    "the `file=`, `line=`, and `title=` property values are not modified (no dynamic data lands in property fields, so delimiter escaping is unnecessary)"
+    "the `file=`, `line=`, and `title=` property values carry no message-data escape sequences from this fixture (no `%25`, `%0D`, or `%0A` leaks across the `::` boundary; property-level escapes `%3A` for `:` and `%2C` for `,` apply separately when a dynamic path contains those delimiters)"
 )]
 fn then_property_values_unmodified(world: &mut GhaWorld) {
     let stdout = world.stdout();
@@ -745,23 +749,28 @@ fn then_property_values_unmodified(world: &mut GhaWorld) {
         .lines()
         .find(|l| l.starts_with("::warning "))
         .expect("at least one ::warning line");
-    // file= must be a clean path (no %0D / %0A / %25 escape sequences;
-    // the only legal escapes in property fields are , and : per the
-    // GH Actions spec, and those don't appear in deterministic data).
+    // The fixture's synthesized qualified name carries `%`, `\r`, `\n`
+    // in the MESSAGE data — none of those escape sequences should
+    // bleed back into property values across the `::` boundary.
+    // Property-level escapes (`%3A` for `:`, `%2C` for `,`) are
+    // verified by the unit test `file_property_escapes_delimiters_in_path`
+    // with a fixture whose path actually contains those delimiters;
+    // this fixture's `src/lib.rs` path has neither, so the property
+    // values pass through unmodified.
     let after_file = line.split_once("file=").expect("file= present").1;
     let file_value = after_file.split(',').next().unwrap();
     assert!(
         !file_value.contains("%0D") && !file_value.contains("%0A") && !file_value.contains("%25"),
-        "file= property value must not be escaped, got: {file_value}"
+        "file= property value carries unexpected message-data escape, got: {file_value}"
     );
-    // title=CRAP <score> — same invariant: no escape sequences.
+    // title=CRAP <score> — same invariant: no message-data escapes.
     let after_title = line.split_once("title=").expect("title= present").1;
     let title_value = after_title.split("::").next().unwrap();
     assert!(
         !title_value.contains("%0D")
             && !title_value.contains("%0A")
             && !title_value.contains("%25"),
-        "title= property value must not be escaped, got: {title_value}"
+        "title= property value carries unexpected message-data escape, got: {title_value}"
     );
 }
 

@@ -82,7 +82,8 @@ Run `crap4rs --help` for the canonical full reference. Grouped here as in `--hel
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--format <FORMAT[,…]>` | `table` | One or more output formats. Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file); a comma-separated list fans out a single analysis pass to multiple destinations (`json:env.json,markdown:report.md`). Supported formats: `table`, `json`, `markdown`, `csv`, `sarif`, `advice` (experimental), `scorecard-row`. Multi-format invocations require every entry to specify a file. |
+| `--format <FORMAT[,…]>` | `table` | One or more output formats. Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file); a comma-separated list fans out a single analysis pass to multiple destinations (`json:env.json,markdown:report.md` or `markdown:scorecard.md,github-annotations`). Supported formats: `table`, `json`, `markdown`, `csv`, `sarif`, `advice` (experimental), `scorecard-row`, `github-annotations`, `html`. Multi-format invocations may include at most one stdout entry; additional entries must specify a file. |
+| `--annotation-limit <N>` | `10` | Cap on `::warning` lines emitted by `--format github-annotations`. Range `1..=100`; also configurable via `[output] annotation_limit` in the TOML config. The CLI flag wins when both are set. |
 | `--threshold <N>` | metric-correct `default` preset (cognitive 15, cyclomatic 15 today) | CRAP score above which a function fails the check. The default is resolved against the effective metric, not a hard-coded scalar. |
 | `--strict` | — | Use the `strict` preset (cognitive 8, cyclomatic 8 today). Mutually exclusive with `--lenient`. |
 | `--lenient` | — | Use the `lenient` preset (cognitive 25, cyclomatic 25 today). |

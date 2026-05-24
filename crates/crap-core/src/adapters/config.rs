@@ -209,6 +209,19 @@ fn validate_raw_config(raw: &RawConfig) -> Result<()> {
             );
         }
     }
+    // Mirror the CLI's `clap::value_parser!(u32).range(1..=100)` on
+    // `--annotation-limit` so config and CLI agree on the legal range.
+    // Without this check a TOML `[output] annotation_limit = 0` would
+    // silently disable annotation emission (only the truncation notice
+    // fires); `= 999` would silently flood the per-step UI cap. Both
+    // are rejected by clap at the CLI boundary — config must match.
+    if let Some(limit) = raw.output.annotation_limit
+        && !(1..=100).contains(&limit)
+    {
+        anyhow::bail!(
+            "output.annotation_limit must be in 1..=100, got: {limit}\n  hint: matches the CLI `--annotation-limit` range; 0 disables emission, > 100 floods the GH Actions per-step cap"
+        );
+    }
     Ok(())
 }
 
@@ -750,6 +763,44 @@ annotation_limit = 7
         let config = parse_config(toml).unwrap();
         assert_eq!(config.threshold, Some(12.0));
         assert_eq!(config.output.annotation_limit, Some(7));
+    }
+
+    #[test]
+    fn parse_output_annotation_limit_zero_rejected() {
+        // 0 would silently disable annotation emission (the reporter
+        // takes 0 of the eligible set + only emits the truncation
+        // notice). Clap rejects 0 at the CLI boundary via
+        // `value_parser!(u32).range(1..=100)`; config must match.
+        let toml = "[output]\nannotation_limit = 0\n";
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("annotation_limit") && msg.contains("1..=100"),
+            "expected range error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_output_annotation_limit_above_max_rejected() {
+        // 101+ would silently flood the GH Actions per-step UI cap
+        // (10 warning per step; anything past 10 is dropped by the
+        // runner). Clap rejects at the CLI; config must match.
+        let toml = "[output]\nannotation_limit = 101\n";
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("annotation_limit") && msg.contains("1..=100"),
+            "expected range error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_output_annotation_limit_boundary_values_accepted() {
+        for v in [1u32, 10, 50, 100] {
+            let toml = format!("[output]\nannotation_limit = {v}\n");
+            let config = parse_config(&toml).expect("boundary value should parse");
+            assert_eq!(config.output.annotation_limit, Some(v));
+        }
     }
 
     #[test]

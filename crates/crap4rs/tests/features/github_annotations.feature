@@ -93,7 +93,7 @@ Feature: GitHub Actions inline annotations reporter (issue #276)
     Given an exceeding function whose qualified name contains `%`, `\r`, and `\n`
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations`
     Then the emitted message replaces `%` with `%25`, `\r` with `%0D`, `\n` with `%0A`
-    And the `file=`, `line=`, and `title=` property values are not modified (no dynamic data lands in property fields, so delimiter escaping is unnecessary)
+    And the `file=`, `line=`, and `title=` property values carry no message-data escape sequences from this fixture (no `%25`, `%0D`, or `%0A` leaks across the `::` boundary; property-level escapes `%3A` for `:` and `%2C` for `,` apply separately when a dynamic path contains those delimiters)
 
   @unwired
   Scenario: Rust qualified names containing :: are preserved verbatim in the message
