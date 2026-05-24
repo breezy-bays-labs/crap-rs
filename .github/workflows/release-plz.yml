@@ -51,7 +51,7 @@ jobs:
       # `persist-credentials: false` — release-plz authenticates with
       # the GH App / GITHUB_TOKEN directly; the checkout token is not
       # consumed by subsequent steps and must not linger in the runner.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -80,7 +80,7 @@ jobs:
       releases: ${{ steps.release-plz.outputs.releases }}
       releases_created: ${{ steps.release-plz.outputs.releases_created }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -133,7 +133,7 @@ jobs:
     steps:
       # `persist-credentials: false` — this job never pushes; not
       # persisting the checkout token keeps it out of the build env.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -229,7 +229,7 @@ jobs:
           node -e 'const m = require("crap4ts"); if (typeof m.analyze !== "function") { throw new Error("crap4ts installed from the packed tarball but the analyze export is missing"); } console.log("OK: npm install-gating passed and analyze export present");'
 
       - name: Upload cdylib artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cdylib-${{ matrix.platform }}
           path: packages/crap4ts/${{ matrix.node_name }}
@@ -246,7 +246,7 @@ jobs:
     steps:
       # `persist-credentials: false` — npm publish authenticates via the
       # OIDC `id-token`, not the git checkout token; don't persist it.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -346,7 +346,7 @@ jobs:
       # `persist-credentials: false` — this job never pushes; not persisting
       # the checkout token keeps it out of the runner env (closes the
       # `artipacked` zizmor audit). See AGENTS.md "Supply-chain hygiene".
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -388,7 +388,7 @@ jobs:
           fi
           echo "OK: asset filename matches binstall pkg-url shape (${tarballs[0]})"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: crap4rs-${{ matrix.target }}
           path: crap4rs-${{ matrix.target }}.tar.gz
@@ -400,7 +400,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
