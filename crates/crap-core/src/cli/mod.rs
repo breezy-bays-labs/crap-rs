@@ -1730,7 +1730,7 @@ fn majority_zero_coverage(files_analyzed: usize, files_zero_coverage: usize) -> 
 fn warn_if_issues<P: ParseDiagnostic>(diag: &AnalysisDiagnostics<P>) {
     if !diag.parse_diagnostics.is_empty() {
         eprintln!(
-            "warning: {} LCOV parse issue(s) encountered (use --verbose for details)",
+            "warning: {} coverage parse issue(s) encountered (use --verbose for details)",
             diag.parse_diagnostics.len()
         );
     }
@@ -1773,7 +1773,7 @@ fn print_diagnostics<P: ParseDiagnostic + std::fmt::Display>(diag: &AnalysisDiag
     );
     if !diag.parse_diagnostics.is_empty() {
         eprintln!(
-            "verbose: LCOV parse diagnostics ({}):",
+            "verbose: coverage parse diagnostics ({}):",
             diag.parse_diagnostics.len()
         );
         for d in &diag.parse_diagnostics {

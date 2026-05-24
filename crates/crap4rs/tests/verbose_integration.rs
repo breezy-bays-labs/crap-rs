@@ -109,8 +109,8 @@ fn warn_without_verbose_on_lcov_parse_issues() {
     let err = stderr_str(&output);
 
     assert!(
-        err.contains("warning:") && err.contains("LCOV parse issue"),
-        "expected warning about LCOV parse issues without --verbose, got:\n{err}"
+        err.contains("warning:") && err.contains("coverage parse issue"),
+        "expected warning about coverage parse issues without --verbose, got:\n{err}"
     );
     assert!(
         !err.contains("verbose:"),
@@ -133,8 +133,8 @@ fn verbose_adds_lcov_parse_detail() {
         "expected warning line with --verbose too, got:\n{err}"
     );
     assert!(
-        err.contains("verbose: LCOV parse diagnostics"),
-        "expected 'verbose: LCOV parse diagnostics' with --verbose, got:\n{err}"
+        err.contains("verbose: coverage parse diagnostics"),
+        "expected 'verbose: coverage parse diagnostics' with --verbose, got:\n{err}"
     );
 }
 
