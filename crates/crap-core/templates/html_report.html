@@ -282,7 +282,14 @@ footer.report-footer {
   color: var(--risk-4-on);
   border-color: var(--risk-4);
 }
-.delta-chip[data-direction="down"]:not([data-regression="1"]) {
+/* Anything rendered that isn't a regression is an improvement,
+   regardless of direction. The template suppresses "flat" chips
+   (|delta| < 0.005) by emitting an empty `chip_value`, so the only
+   chips that reach this selector are real movements. Direction
+   varies by metric — for CRAP/complexity an improvement points
+   `down`, for coverage it points `up`. Match on the absence of
+   `data-regression="1"` rather than gating on direction. */
+.delta-chip:not([data-regression="1"]) {
   background: var(--risk-1-tint);
   color: var(--risk-1-on);
   border-color: var(--risk-1);

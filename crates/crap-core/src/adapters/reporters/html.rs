@@ -666,7 +666,6 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
     let mut regressions: Vec<DeltaRow> = Vec::new();
     let mut improvements: Vec<DeltaRow> = Vec::new();
     let mut new_functions: Vec<DeltaRow> = Vec::new();
-    let mut unchanged_count: u32 = 0;
 
     // The shaped `view.shown` is sort-by-signed-impact descending by
     // default, so we get regressions first → improvements last under
@@ -691,12 +690,35 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
                     regressions.push(modified_row(baseline, current));
                 } else if delta <= -0.005 {
                     improvements.push(modified_row(baseline, current));
-                } else {
-                    unchanged_count += 1;
                 }
             }
         }
     }
+
+    // Count unchanged from the FULL delta (pre-truncate, pre-sort) so a
+    // `--top N` cap doesn't silently lop them off — under the default
+    // signed-impact sort, near-zero-delta entries land at the bottom of
+    // the list and are the first to drop on truncation. Respect the
+    // user's `change_kinds` filter so a deliberate exclusion of Modified
+    // entries doesn't get re-surfaced in the footer line.
+    let unchanged_count: u32 = view
+        .full
+        .changes
+        .iter()
+        .filter(|c| {
+            view.spec
+                .filters
+                .change_kinds
+                .as_ref()
+                .is_none_or(|kinds| kinds.contains(&c.kind()))
+        })
+        .filter(|c| match c {
+            FunctionChange::Modified { baseline, current } => {
+                (current.scored.crap.value - baseline.scored.crap.value).abs() < 0.005
+            }
+            _ => false,
+        })
+        .count() as u32;
 
     DeltaPanel {
         summary: panel_summary,
@@ -1358,6 +1380,36 @@ mod tests {
         assert!(
             !out.contains("delta-table unchanged"),
             "unchanged must NOT render as a full table — single-line note only"
+        );
+    }
+
+    #[test]
+    fn delta_panel_unchanged_count_survives_top_truncation() {
+        // Regression guard: the unchanged_count footer is computed from
+        // the FULL delta, not from `view.shown`. Under a `--top 1`
+        // truncation that lops the unchanged Modified row off the tail
+        // of the signed-impact sort, the count must still report 1
+        // (make_sample_delta has exactly one zero-delta Modified row:
+        // `simple_fn`). Truncating to `Some(1)` keeps only the
+        // top-ranked regression in `view.shown`, so the old loop-based
+        // counter would have read 0.
+        use crate::domain::delta::DeltaViewSpec;
+        let delta = make_sample_delta();
+        let truncated = crate::domain::delta::apply(
+            &delta,
+            DeltaViewSpec {
+                limit: Some(1),
+                ..Default::default()
+            },
+        );
+        let out = html_with_delta(&make_view_default(&delta.current), &truncated);
+        assert!(
+            out.contains("class=\"delta-unchanged\""),
+            "unchanged footer must render even when --top truncates the row off view.shown"
+        );
+        assert!(
+            out.contains("1 function"),
+            "unchanged_count should be 1 (from full delta) not 0 (from truncated shown subset)"
         );
     }
 
