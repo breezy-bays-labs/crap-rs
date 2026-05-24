@@ -11,9 +11,16 @@ keywords = ["crap", "complexity", "coverage", "testing", "quality"]
 categories = ["development-tools::testing", "command-line-utilities"]
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+# The `crap4rs-v{version}` tag prefix is the per-crate tag pattern created
+# by release-plz on every crap4rs publish (see release-plz.toml workspace
+# `git_tag_name`). The `release-plz.yml` workflow's build-crap4rs-binaries
+# matrix produces tarballs at exactly the `{name}-{target}.tar.gz` shape
+# this URL expects, and the matrix's filename-invariant assertion step
+# fails loudly if a future edit drifts that shape.
+pkg-url = "{ repo }/releases/download/crap4rs-v{ version }/{ name }-{ target }.tar.gz"
 pkg-fmt = "tgz"
-# Binary lives at the archive root (release.yml's `tar -C target/{target}/release crap4rs`).
+# Binary lives at the archive root (the build matrix's
+# `tar -C target/{target}/release crap4rs` places it there).
 # `"."` resolves to an empty source path under cargo-binstall ≥ 1.x and forces fallback to
 # `cargo install`. `{ bin }{ binary-ext }` resolves to `crap4rs` on Linux/macOS, `crap4rs.exe`
 # on Windows. Closes #101.
