@@ -17,10 +17,8 @@ shared-core development.
 
 ### Added
 
-- *(crap-core)* #260 — askama-templated HTML + markdown reporters + Sakura HTML redesign ([#307](https://github.com/breezy-bays-labs/crap-rs/pull/307))
-
-### Added
-
+- *(crap-core)* askama-templated HTML + markdown reporters + Sakura
+  HTML redesign. ([#307](https://github.com/breezy-bays-labs/crap-rs/pull/307))
 - `crap4ts init` subcommand generates a starter `crap4ts.toml`
   in the current directory. Auto-detects `src/`
   → `crates/` → falls back to `src` with a hint comment. Interactive
@@ -154,7 +152,8 @@ Initial extraction from the `crap4rs` workspace.
   [`breezy-bays-labs/crap4ts`](https://github.com/breezy-bays-labs/crap4ts)
   enters maintenance-only mode.
 
-[Unreleased]: https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.2...HEAD
+[Unreleased]: https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.3...HEAD
+[2.0.0-rc.3]: https://github.com/breezy-bays-labs/crap-rs/releases/tag/crap4ts-v2.0.0-rc.3
 [2.0.0-rc.2]: https://github.com/breezy-bays-labs/crap-rs/releases/tag/crap4ts-v2.0.0-rc.2
 [2.0.0-rc.1]: https://github.com/breezy-bays-labs/crap-rs/releases/tag/crap4ts-v2.0.0-rc.1
 [2.0.0-alpha.1]: https://github.com/breezy-bays-labs/crap-rs/releases/tag/crap4ts-v2.0.0-alpha.1

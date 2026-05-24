@@ -11,35 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- *(crap-core)* #260 — askama-templated HTML + markdown reporters + Sakura HTML redesign ([#307](https://github.com/breezy-bays-labs/crap-rs/pull/307))
-- *(ci)* #270 — adopt release-plz + crates.io OIDC trusted publishing ([#301](https://github.com/breezy-bays-labs/crap-rs/pull/301))
-- #276 — github-annotations reporter + composite action input ([#288](https://github.com/breezy-bays-labs/crap-rs/pull/288))
-- #139 #114 — composite scorecard action dispatches crap4ts + cross-adapter row parity ([#282](https://github.com/breezy-bays-labs/crap-rs/pull/282))
-- *(crap-core)* [**breaking**] align CRAP thresholds + risk tiers (8/15/25) ([#281](https://github.com/breezy-bays-labs/crap-rs/pull/281))
-- #180 #196 #202 — BDD tracked-comment lint + delta.feature spec + colored set_override poison fix ([#279](https://github.com/breezy-bays-labs/crap-rs/pull/279))
-- *(crap-core)* #188 — CrapError::MetricNotSupported + AdapterMeta::default_metric + crap4ts walker check + ADR (d) + crap-core 0.2.0 ([#203](https://github.com/breezy-bays-labs/crap-rs/pull/203))
-- #73 — `crap4rs init` subcommand (with crap4ts inheritance via AdapterMeta) ([#171](https://github.com/breezy-bays-labs/crap-rs/pull/171))
-- *(cli)* #131 — --summary one-line analysis verdict flag ([#167](https://github.com/breezy-bays-labs/crap-rs/pull/167))
-- *(crap-core)* [**breaking**] #147 — restore #[non_exhaustive] on 15 result structs (v1.0 prep) ([#166](https://github.com/breezy-bays-labs/crap-rs/pull/166))
-- *(crap-core)* #148+#152+#160 — AdapterMeta + decouple from Rust/crap4rs ([#162](https://github.com/breezy-bays-labs/crap-rs/pull/162))
-
-### Fixed
-
-- *(crap4ts)* #253 — skip `.d.ts` declaration files via AdapterMeta::forced_excludes ([#258](https://github.com/breezy-bays-labs/crap-rs/pull/258))
-- #163 — adapter-aware coverage preflight + walker reconciliation + config-path hint ([#164](https://github.com/breezy-bays-labs/crap-rs/pull/164))
-- *(crap-core)* #150 — late-bind coverage adapter via factory closure ([#158](https://github.com/breezy-bays-labs/crap-rs/pull/158))
-
-### Other
-
-- add per-crate READMEs for crates.io display ([#305](https://github.com/breezy-bays-labs/crap-rs/pull/305))
-- *(ci)* #261 — ast-purity layer-4 adapter-vocabulary string-literal ban ([#286](https://github.com/breezy-bays-labs/crap-rs/pull/286))
-- *(crap-core)* #178 #179 — port-surface cleanup (CrapError rename + CoveragePort::parse to &Path) ([#262](https://github.com/breezy-bays-labs/crap-rs/pull/262))
-- pre-flight scaffold for TS-adapter pipeline (gitignore + delta.feature relocation + #173 BDD scenarios) ([#195](https://github.com/breezy-bays-labs/crap-rs/pull/195))
-- *(bdd)* #168 — tag lexicon + retag scenarios + clean up Background ([#170](https://github.com/breezy-bays-labs/crap-rs/pull/170))
-- *(crap-core)* #161 — AdapterMeta polish + ci(ast-purity) adapter-name gate ([#165](https://github.com/breezy-bays-labs/crap-rs/pull/165))
-
-### Added
-
 - `--format github-annotations` emits GitHub Actions `::warning`
   workflow commands so threshold-exceeding functions render inline on
   the PR Files Changed tab — universal, free, no GHAS / Code Scanning
@@ -50,56 +21,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-step UI cap; over-cap eligible findings surface as a trailing
   `::notice::N more functions exceed threshold; see scorecard for the
   full list` line. Also configurable via `[output] annotation_limit`
-  in `crap4rs.toml`. The composite scorecard action
-  gained matching `annotations` (bool) and `annotation-limit` inputs
-  for opt-in inline rendering. (#276)
-- `crap4rs init` subcommand generates a starter `crap4rs.toml`
-  in the current directory. Auto-detects `src/`
-  → `crates/` → falls back to `src` with a hint comment. Interactive
-  by default (one prompt mapping `s|d|l` to strict/default/lenient
-  preset); `--non-interactive` for CI; `--force` to overwrite an
-  existing config. Emits Rust-ecosystem exclude defaults
-  (`tests/**`, `benches/**`, `examples/**`). (#73)
-- `--summary` flag emits a single-line analysis verdict to stdout (e.g.
-  `PASS: 1082 functions | 0 above threshold (25) | worst: 13.0 | avg: 1.6`),
-  matching crap4ts's `formatSummaryLine` byte-for-byte. Short-circuits
-  `--format`, composes with `--no-fail` (exit 0 always, summary
-  emitted) and `--quiet` (quiet wins — no output). Closes the
-  2026-05-08 crap4rs ↔ crap4ts parity audit's final gap. (#131)
+  in `crap4rs.toml`. The composite scorecard action gained matching
+  `annotations` (bool) and `annotation-limit` inputs for opt-in
+  inline rendering. ([#288](https://github.com/breezy-bays-labs/crap-rs/pull/288))
+- `crap4rs init` subcommand generates a starter `crap4rs.toml` in the
+  current directory. Auto-detects `src/` → `crates/` → falls back to
+  `src` with a hint comment. Interactive by default (one prompt
+  mapping `s|d|l` to strict/default/lenient preset);
+  `--non-interactive` for CI; `--force` to overwrite an existing
+  config. Emits Rust-ecosystem exclude defaults (`tests/**`,
+  `benches/**`, `examples/**`). Inherited by `crap4ts` via
+  `AdapterMeta`. ([#171](https://github.com/breezy-bays-labs/crap-rs/pull/171))
+- `--summary` flag emits a single-line analysis verdict to stdout
+  (e.g. `PASS: 1082 functions | 0 above threshold (25) | worst: 13.0
+  | avg: 1.6`), matching crap4ts's `formatSummaryLine` byte-for-byte.
+  Short-circuits `--format`, composes with `--no-fail` (exit 0
+  always, summary emitted) and `--quiet` (quiet wins — no output).
+  Closes the 2026-05-08 crap4rs ↔ crap4ts parity audit's final gap.
+  ([#167](https://github.com/breezy-bays-labs/crap-rs/pull/167))
+- *(crap-core)* askama-templated HTML + markdown reporters + Sakura
+  HTML redesign. ([#307](https://github.com/breezy-bays-labs/crap-rs/pull/307))
+- *(ci)* adopt release-plz + crates.io OIDC trusted publishing. ([#301](https://github.com/breezy-bays-labs/crap-rs/pull/301))
+- Composite scorecard action dispatches crap4ts + cross-adapter
+  scorecard-row parity. ([#282](https://github.com/breezy-bays-labs/crap-rs/pull/282))
+- *(crap-core)* [**breaking**] align CRAP thresholds + risk tiers
+  (8/15/25). ([#281](https://github.com/breezy-bays-labs/crap-rs/pull/281))
+- BDD tracked-comment lint + `delta.feature` spec + `colored
+  set_override` poison fix. ([#279](https://github.com/breezy-bays-labs/crap-rs/pull/279))
+- *(crap-core)* `CrapError::MetricNotSupported` +
+  `AdapterMeta::default_metric` + crap4ts walker check + supporting
+  ADR + crap-core 0.2.0. ([#203](https://github.com/breezy-bays-labs/crap-rs/pull/203))
+- *(crap-core)* [**breaking**] restore `#[non_exhaustive]` on 15
+  result structs (v1.0 prep). ([#166](https://github.com/breezy-bays-labs/crap-rs/pull/166))
+- *(crap-core)* `AdapterMeta` + decouple from Rust/crap4rs. ([#162](https://github.com/breezy-bays-labs/crap-rs/pull/162))
 
 ### Fixed
 
 - Threshold cutoffs are now calibrated per complexity metric instead
   of a single shared scalar. A cyclomatic count and a cognitive count
   have different magnitudes for the same function, so one cutoff
-  cannot fit both — applying the cognitive cutoff to cyclomatic scores
-  silently mis-gated. The strict/default/lenient presets now resolve
-  to cyclomatic `8/16/30` or cognitive `15/25/40` based on the
-  effective metric. User-visible behavior change: `crap4rs --metric
-  cyclomatic` with no flag now gates at `16` (was `25`) and `--strict`
-  at `8` (was `15`). `crap4rs`'s cognitive defaults (the common path)
-  are unchanged. The generated `crap4rs.toml` threshold comment now
-  states which metric the printed cutoffs apply to. (#218)
+  cannot fit both — applying the cognitive cutoff to cyclomatic
+  scores silently mis-gated. The strict/default/lenient presets now
+  resolve to cyclomatic `8/16/30` or cognitive `15/25/40` based on
+  the effective metric. User-visible behavior change: `crap4rs
+  --metric cyclomatic` with no flag now gates at `16` (was `25`) and
+  `--strict` at `8` (was `15`). `crap4rs`'s cognitive defaults (the
+  common path) are unchanged. The generated `crap4rs.toml` threshold
+  comment now states which metric the printed cutoffs apply to.
+  ([#281](https://github.com/breezy-bays-labs/crap-rs/pull/281))
+- *(crap4ts)* skip `.d.ts` declaration files via
+  `AdapterMeta::forced_excludes`. ([#258](https://github.com/breezy-bays-labs/crap-rs/pull/258))
+- Adapter-aware coverage preflight + walker reconciliation +
+  config-path hint. ([#164](https://github.com/breezy-bays-labs/crap-rs/pull/164))
+- *(crap-core)* late-bind coverage adapter via factory closure. ([#158](https://github.com/breezy-bays-labs/crap-rs/pull/158))
 
 ### Changed
 
-- Multi-format `--format` invocations now permit a single stdout entry
-  alongside file-targeted entries (previously every entry had to
-  specify a file). Two or more stdout entries are still rejected — the
-  underlying "cannot multiplex stdout" rule stands. Unblocks the
-  intended composite-CI shape
-  `--format markdown:scorecard.md,github-annotations`, where the
-  markdown is captured as a workflow artefact and the
-  `github-annotations` workflow commands flow through to the GH
-  Actions runner. (#276)
-- Config-file `threshold = N` now takes precedence over
-  `preset = "..."` when both are set in the same `crap4rs.toml`.
-  This makes config-file resolution consistent with
-  CLI semantics, where an explicit `--threshold N` already overrides
-  `--strict` / `--lenient`. Users who had both fields set will now get
-  the literal value; previously the preset silently won. The
-  `init`-generated config never writes both, so the blast radius is
-  limited to hand-edited configs. (#218)
+- Multi-format `--format` invocations now permit a single stdout
+  entry alongside file-targeted entries (previously every entry had
+  to specify a file). Two or more stdout entries are still rejected —
+  the underlying "cannot multiplex stdout" rule stands. Unblocks the
+  intended composite-CI shape `--format
+  markdown:scorecard.md,github-annotations`, where the markdown is
+  captured as a workflow artefact and the `github-annotations`
+  workflow commands flow through to the GH Actions runner. ([#288](https://github.com/breezy-bays-labs/crap-rs/pull/288))
+- Config-file `threshold = N` now takes precedence over `preset =
+  "..."` when both are set in the same `crap4rs.toml`. This makes
+  config-file resolution consistent with CLI semantics, where an
+  explicit `--threshold N` already overrides `--strict` /
+  `--lenient`. Users who had both fields set will now get the literal
+  value; previously the preset silently won. The `init`-generated
+  config never writes both, so the blast radius is limited to
+  hand-edited configs. ([#281](https://github.com/breezy-bays-labs/crap-rs/pull/281))
+
+### Other
+
+- Per-crate READMEs for crates.io display. ([#305](https://github.com/breezy-bays-labs/crap-rs/pull/305))
+- *(ci)* AST-purity layer-4 adapter-vocabulary string-literal ban. ([#286](https://github.com/breezy-bays-labs/crap-rs/pull/286))
+- *(crap-core)* port-surface cleanup (CrapError rename +
+  `CoveragePort::parse` to `&Path`). ([#262](https://github.com/breezy-bays-labs/crap-rs/pull/262))
+- Pre-flight scaffold for TS-adapter pipeline (gitignore +
+  `delta.feature` relocation + BDD scenarios). ([#195](https://github.com/breezy-bays-labs/crap-rs/pull/195))
+- *(bdd)* tag lexicon + retag scenarios + clean up Background. ([#170](https://github.com/breezy-bays-labs/crap-rs/pull/170))
+- *(crap-core)* `AdapterMeta` polish + ci(ast-purity) adapter-name
+  gate. ([#165](https://github.com/breezy-bays-labs/crap-rs/pull/165))
 
 ## [0.5.0] - 2026-05-10
 
