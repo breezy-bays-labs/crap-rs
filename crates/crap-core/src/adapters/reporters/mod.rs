@@ -2,6 +2,7 @@
 
 pub mod advice_summary;
 pub mod csv;
+pub mod github_annotations;
 pub mod html;
 pub mod json;
 pub mod markdown;
@@ -12,6 +13,7 @@ pub mod table;
 
 pub use advice_summary::render_summary as render_advice_summary;
 pub use csv::format_csv;
+pub use github_annotations::format_github_annotations;
 pub use html::format_html;
 pub use json::{JsonConfig, format_json};
 pub use markdown::format_markdown;
