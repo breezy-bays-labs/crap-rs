@@ -1041,31 +1041,35 @@ runs:
           fi
         fi
 
-        {
-          echo "row_json<<__CRAP_SCORECARD_ROW_EOF__"
-          printf '%s' "$legacy_row_json"
-          echo ""
-          echo "__CRAP_SCORECARD_ROW_EOF__"
-        } >> "$GITHUB_OUTPUT"
-
-        # Per-language split outputs. Each is the raw scorecard-row
-        # stdout for the corresponding adapter (or empty when the
-        # language did not run in this invocation). Both adapters
-        # emit the same Row JSON shape (locked by
+        # Emit each row output as a heredoc only when it carries
+        # content. An empty heredoc-style block emits `KEY="\n"`
+        # (the single trailing newline before the EOF marker), NOT
+        # the empty string that the README + action docs promise —
+        # downstream `[ -z "$row_json" ]` consumers would
+        # incorrectly treat the absent row as present. The plain
+        # `KEY=` form below guarantees a truly empty output value.
+        # Per-language split outputs follow the same pattern: each
+        # is the raw scorecard-row stdout for the corresponding
+        # adapter (or genuinely empty when the language did not run
+        # in this invocation). Both adapters emit the same Row JSON
+        # shape (locked by
         # crates/crap-core/tests/scorecard_row_parity.rs ::
         # envelope_multi_language_parity).
-        {
-          echo "row_json_rust<<__CRAP_SCORECARD_ROW_EOF__"
-          printf '%s' "$row_json_rust"
-          echo ""
-          echo "__CRAP_SCORECARD_ROW_EOF__"
-        } >> "$GITHUB_OUTPUT"
-        {
-          echo "row_json_typescript<<__CRAP_SCORECARD_ROW_EOF__"
-          printf '%s' "$row_json_typescript"
-          echo ""
-          echo "__CRAP_SCORECARD_ROW_EOF__"
-        } >> "$GITHUB_OUTPUT"
+        emit_row_output() {
+          local key="$1" value="$2"
+          if [ -z "$value" ]; then
+            printf '%s=\n' "$key" >> "$GITHUB_OUTPUT"
+          else
+            {
+              printf '%s<<__CRAP_SCORECARD_ROW_EOF__\n' "$key"
+              printf '%s\n' "$value"
+              printf '%s\n' "__CRAP_SCORECARD_ROW_EOF__"
+            } >> "$GITHUB_OUTPUT"
+          fi
+        }
+        emit_row_output "row_json" "$legacy_row_json"
+        emit_row_output "row_json_rust" "$row_json_rust"
+        emit_row_output "row_json_typescript" "$row_json_typescript"
 
         # Surface a compact summary in the job log so failures are
         # obvious without scrolling. Multi-language streams each
@@ -1108,14 +1112,34 @@ runs:
         # below owns hard gating.
         #
         # Per-language loop: single-language iterates once over the
-        # active language; multi-language iterates over both. Each
-        # language's findings render under the runner's own
-        # annotation cap (10 warnings per step); multi-language gets
-        # 2x effective annotation budget because two steps run.
+        # active language; multi-language iterates over both. The
+        # entire loop runs inside ONE composite-action `run:` block,
+        # which GitHub Actions treats as a single step — and the
+        # `::warning` workflow command cap is enforced per step, not
+        # per `run:` iteration. Without explicit per-language division,
+        # the first adapter to emit could exhaust the 10-warning cap
+        # and silently starve the second language's annotations.
         if [ -n "$LANGUAGE_SET" ]; then
           IFS=',' read -ra LANGS <<<"$LANGUAGE_SET"
         else
           LANGS=("$LANGUAGE")
+        fi
+        # Compute a per-language annotation budget only in
+        # multi-language mode. Single-language preserves existing
+        # precedence (explicit input → config file → adapter default of
+        # 10) so a `crap4rs.toml`-declared `[output] annotation_limit`
+        # is not silently overridden. Multi-language divides the
+        # explicit cap (or GitHub's default 10) by the number of
+        # languages, floored at 1 so each language still emits at
+        # least one annotation when there are violations.
+        per_lang_budget=""
+        if [ "$IS_MULTI" = "true" ]; then
+          n_langs="${#LANGS[@]}"
+          total_budget="${ANNOTATION_LIMIT:-10}"
+          per_lang_budget=$(( total_budget / n_langs ))
+          if [ "$per_lang_budget" -lt 1 ]; then
+            per_lang_budget=1
+          fi
         fi
         for lang in "${LANGS[@]}"; do
           case "$lang" in
@@ -1141,7 +1165,15 @@ runs:
           esac
           args=(--coverage "$LANG_COVERAGE" --src "$LANG_SRC" --threshold "$THRESHOLD" --no-fail --format github-annotations)
           [ -n "$CONFIG" ] && args+=(--config "$CONFIG")
-          [ -n "$ANNOTATION_LIMIT" ] && args+=(--annotation-limit "$ANNOTATION_LIMIT")
+          if [ -n "$per_lang_budget" ]; then
+            # Multi-language: the shared GH per-step cap is the hard
+            # constraint, so the per-language division overrides both
+            # the action input and any config-file value (otherwise
+            # we'd silently drop annotations beyond the cap).
+            args+=(--annotation-limit "$per_lang_budget")
+          elif [ -n "$ANNOTATION_LIMIT" ]; then
+            args+=(--annotation-limit "$ANNOTATION_LIMIT")
+          fi
           "$BIN" "${args[@]}"
         done
 
