@@ -24,7 +24,14 @@ if [ "$CARGO_VER" = "$PKG_VER" ]; then
   exit 0
 fi
 npm version --no-git-tag-version --prefix packages/crap4ts "$CARGO_VER"
-git add packages/crap4ts/package.json
-git commit -m "chore(crap4ts): sync package.json to v${CARGO_VER}"
+# Stage and commit only the files npm version touched, so a reviewer
+# with unrelated edits in the working tree doesn't accidentally ship
+# them. `npm version` updates package.json and (if present)
+# package-lock.json; the lockfile is optional for crap4ts but staging
+# both keeps them in sync whenever it exists.
+files=(packages/crap4ts/package.json)
+[ -f packages/crap4ts/package-lock.json ] && files+=(packages/crap4ts/package-lock.json)
+git add -- "${files[@]}"
+git commit -m "chore(crap4ts): sync package.json to v${CARGO_VER}" -- "${files[@]}"
 git push
 echo "package.json synced from $PKG_VER to $CARGO_VER and pushed."
