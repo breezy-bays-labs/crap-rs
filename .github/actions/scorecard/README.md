@@ -43,7 +43,7 @@ input always wins when set alongside a preset (the action emits a
 | `threshold-preset` | `strict` \| `default` \| `lenient` | `threshold` = 8 / 15 / 25 (cognitive scale) |
 | `run-mode` | `full` \| `delta` \| `both` | Baseline expectations (full: no baseline expected; delta/both: `baseline:` required) |
 | `gate-mode` | `report-only` \| `gate-on-analysis` \| `gate-on-delta` \| `gate-on-both` | Atomic `analysis-gate` + `delta-gate` pair |
-| `languages` | `rust` \| `typescript` \| `rust,typescript` \| `all` | Single-language supersedes `language:`; multi-language (PR β #293) lands separately |
+| `languages` | `rust` \| `typescript` \| `rust,typescript` \| `all` | Single-language supersedes `language:`; multi-language pairs Rust + TypeScript inputs and emits split outputs. See [Multi-language](#multi-language) |
 
 ```yaml
 - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
@@ -91,6 +91,97 @@ applied automatically when the action dispatches to crap4ts (per
 ADR (d) — see [crap-rs#218](https://github.com/breezy-bays-labs/crap-rs/issues/218)
 for the metric-keyed calibration mechanism). The dogfood smoke in
 PR δ (#295) asserts this invariant mechanically.
+
+## Multi-language
+
+For mixed Rust + TypeScript repos, set `languages: rust,typescript`
+(or `languages: all`) and pair the Rust + TS coverage / source / baseline
+inputs. Both adapters run in one action invocation; outputs split per
+language so aggregators can drop each row in independently.
+
+```yaml
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
+  id: crap
+  with:
+    languages: rust,typescript           # or `all`
+    coverage:    lcov.info               # Rust LCOV
+    coverage-ts: coverage-final.json     # TS Istanbul JSON
+    src:    crates/                      # Rust source root
+    src-ts: packages/                    # TS source root
+    threshold-preset: default
+    comment-mode: sticky
+```
+
+### Paired inputs
+
+When multi-language mode is active, the historical input set carries
+the Rust side and the new `*-ts` inputs carry the TypeScript side:
+
+| Rust input | TypeScript input | Purpose |
+|---|---|---|
+| `coverage:` | `coverage-ts:` | Coverage file path (LCOV / Istanbul JSON) |
+| `src:` | `src-ts:` | Source root passed to the analyzer |
+| `baseline:` | `baseline-ts:` | Previously-captured CRAP JSON envelope (optional, per language) |
+
+`coverage-ts:` and `src-ts:` are **required** when `languages:`
+resolves to a multi-language set; the action errors actionably at
+preset-resolution time when they're missing. `baseline-ts:` is
+optional independently per language — a multi-language run can have
+a Rust baseline + analysis-only TypeScript (or vice-versa, or no
+baseline on either side).
+
+### Split outputs
+
+Two new outputs join the existing `row-json` for multi-language
+aggregators:
+
+- `outputs.row-json-rust` — populated when Rust is in the resolved
+  language set (BOTH single-language `rust` and multi-language).
+- `outputs.row-json-typescript` — populated when TypeScript is in the
+  resolved language set.
+
+Both conform to the same locked `Row::CrapDelta` schema as
+`outputs.row-json` — see [Structured row output](#structured-row-output-outputsrow-json).
+
+The legacy `outputs.row-json` stays populated for **single-language**
+callers (back-compat: every consumer reading it today keeps working
+unchanged). In **multi-language mode**, `outputs.row-json` is the
+empty string and the action emits a `::warning::` directing
+consumers to the split outputs. The warning surfaces the migration
+path in the action's own log so a downstream `jq` parse doesn't
+silently fail on empty input.
+
+### Aggregation semantics
+
+Per-language passed flags / counts collapse to single output values
+via these rules:
+
+| Output | Rule | Notes |
+|---|---|---|
+| `analysis-passed` | AND across languages | `true` only when every language passed |
+| `delta-passed` | AND across languages (baseline-bearing ones only) | Empty string when no language ran with a baseline (back-compat) |
+| `new-violations` | SUM across languages | Per-language counts add |
+| `regressions` | SUM across languages | Per-language counts add |
+| `markdown` | Combined string under `## CRAP scorecard` wrapper + per-language `### Rust (crap4rs)` / `### TypeScript (crap4ts)` H3 sections | Single-language: raw adapter markdown, no wrapper (back-compat) |
+| `json-envelope-path` | Path to the FIRST language's envelope (canonical: Rust) | TS envelope at `$RUNNER_TEMP/crap4ts-envelope.json` |
+
+Existing single-language consumers reading `analysis-passed` /
+`delta-passed` see unchanged semantics. Multi-language consumers
+need to know the AND/SUM contract (not "whichever ran last").
+
+### Parsing edge cases
+
+- `languages: "rust, typescript"` (whitespace) → tolerated; splits identically to the no-whitespace form
+- `languages: "rust,rust"` → dedup collapses to single-language `rust` + `::warning::` so the input typo surfaces
+- `languages: rust,typescript` without `coverage-ts:` set → preset-resolution error directing the caller to add the paired input
+- `languages: garbage` → preset-resolution error naming the unsupported token
+
+### One sticky comment, not two
+
+`comment-mode: sticky` posts ONE comment under one `comment-header`,
+containing the combined `markdown` output (both per-language sections
+stacked). Aggregator workflows reading the split outputs and
+re-rendering elsewhere should still set `comment-mode: 'none'`.
 
 ## Minimal usage — analysis only, no delta
 
@@ -201,9 +292,12 @@ row; the aggregator owns the comment.
 | Name | Default | Notes |
 |---|---|---|
 | `language` | `auto` | `rust`, `typescript`, or `auto` (infer from coverage extension). Superseded by `languages` (preset) when both are set |
-| `coverage` | (required) | Path to LCOV (`.info`) for Rust, Istanbul JSON for TS |
-| `src` | `.` | Source root passed to the analyzer |
-| `baseline` | `''` | Path to a previously-captured CRAP JSON envelope. Empty = no delta |
+| `coverage` | (required) | Path to LCOV (`.info`) for Rust, Istanbul JSON for TS. In multi-language mode, carries the Rust LCOV (paired with `coverage-ts:`) |
+| `coverage-ts` | `''` | (paired) TypeScript Istanbul JSON path. Required in multi-language mode; ignored in single-language mode. See [Multi-language](#multi-language) |
+| `src` | `.` | Source root passed to the analyzer. In multi-language mode, carries the Rust source root |
+| `src-ts` | `''` | (paired) TypeScript source root. Required in multi-language mode; ignored in single-language mode. See [Multi-language](#multi-language) |
+| `baseline` | `''` | Path to a previously-captured CRAP JSON envelope. Empty = no delta. In multi-language mode, carries the Rust baseline |
+| `baseline-ts` | `''` | (paired) TypeScript baseline JSON envelope. Optional even in multi-language mode (per-language); a language without a baseline contributes neutrally to AND/SUM aggregation. See [Multi-language](#multi-language) |
 | `threshold` | `15` | Threshold for violations (user-visible default; the action.yml default is empty so the preset resolver can tell explicit from default — see [Presets — Raw wins on conflict](#raw-wins-on-conflict)) |
 | `config` | `''` | Path to `crap4rs.toml` |
 | `delta-gate` | `false` | Exit non-zero on new violations (only when baseline supplied). User-visible default; empty internally — see [Presets](#presets) |
@@ -216,19 +310,21 @@ row; the aggregator owns the comment.
 | `threshold-preset` | `''` | (preset) `strict` (8) \| `default` (15) \| `lenient` (25). Derives `threshold`; raw `threshold:` wins on conflict + warning. See [Presets](#presets) |
 | `run-mode` | `''` | (preset) `full` \| `delta` \| `both` — drives baseline expectations. `delta`/`both` require `baseline:` set. See [Presets](#presets) |
 | `gate-mode` | `''` | (preset) `report-only` \| `gate-on-analysis` \| `gate-on-delta` \| `gate-on-both`. Atomic `analysis-gate` + `delta-gate` pair; raw inputs win on conflict + warning. See [Presets](#presets) |
-| `languages` | `''` | (preset) `rust` \| `typescript` \| `rust,typescript` \| `all`. Single-language supersedes `language:`; multi-language lands in PR β #293. See [Presets](#presets) |
+| `languages` | `''` | (preset) `rust` \| `typescript` \| `rust,typescript` \| `all`. Single-language supersedes `language:`; multi-language pairs Rust + TypeScript inputs and emits split outputs. See [Multi-language](#multi-language) |
 
 ## Outputs
 
 | Name | Notes |
 |---|---|
-| `markdown` | The rendered scorecard — drop into aggregator comments verbatim |
-| `row-json` | `Row::CrapDelta` JSON object — for aggregators that re-render with full layout control. See [Structured row output](#structured-row-output-outputsrow-json) |
-| `json-envelope-path` | Path to the full JSON envelope on the runner |
-| `analysis-passed` | `true` / `false` |
-| `delta-passed` | `true` / `false`, or empty string when no baseline |
-| `new-violations` | Count of functions exceeding threshold but not in baseline |
-| `regressions` | Count of modified functions whose CRAP increased above rendering precision |
+| `markdown` | The rendered scorecard — drop into aggregator comments verbatim. Multi-language: combined under `## CRAP scorecard` wrapper with per-language `### Rust (crap4rs)` / `### TypeScript (crap4ts)` H3 sections. Single-language: raw adapter markdown (back-compat) |
+| `row-json` | `Row::CrapDelta` JSON object — for aggregators that re-render with full layout control. See [Structured row output](#structured-row-output-outputsrow-json). **Empty in multi-language mode** + `::warning::` directing consumers to `row-json-rust` / `row-json-typescript` |
+| `row-json-rust` | (multi-language split) `Row::CrapDelta` JSON for the Rust dispatch when Rust is in the resolved language set. Populated in both single-language `rust` and multi-language modes; empty otherwise. See [Multi-language — Split outputs](#split-outputs) |
+| `row-json-typescript` | (multi-language split) `Row::CrapDelta` JSON for the TypeScript dispatch when TypeScript is in the resolved language set. Populated in both single-language `typescript` and multi-language modes; empty otherwise. See [Multi-language — Split outputs](#split-outputs) |
+| `json-envelope-path` | Path to the full JSON envelope on the runner. Multi-language: first language's envelope (canonical: Rust); TS envelope at `$RUNNER_TEMP/crap4ts-envelope.json` |
+| `analysis-passed` | `true` / `false`. Multi-language: AND across languages. See [Multi-language — Aggregation semantics](#aggregation-semantics) |
+| `delta-passed` | `true` / `false`, or empty string when no baseline. Multi-language: AND across languages that ran with a baseline; empty when none did |
+| `new-violations` | Count of functions exceeding threshold but not in baseline. Multi-language: SUM across languages |
+| `regressions` | Count of modified functions whose CRAP increased above rendering precision. Multi-language: SUM across languages |
 | `threshold-resolved` | The threshold value the action's `Resolve presets` step resolved (preset-derived or raw passthrough). See [Presets — Threshold-sync invariant](#threshold-sync-invariant) |
 
 ## Structured row output (`outputs.row-json`)

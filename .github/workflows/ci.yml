@@ -609,6 +609,362 @@ jobs:
           # under a different header is review noise.
           comment-mode: 'none'
 
+  scorecard-smoke-multi-lang:
+    # Multi-language single-CI smoke for PR #293 — exercises the
+    # `languages: rust,typescript` / `languages: all` dispatch path
+    # added by the multi-language extension. Stages BOTH PR-built
+    # binaries onto PATH (so the action's pre-installed-detection
+    # picks them up), prepares both Rust LCOV + TS Istanbul fixtures,
+    # then runs the 8 parsing-edge-case spot checks the PR β
+    # acceptance gates call out. Single CI job (not a matrix) since
+    # each spot check is one composite-action invocation, and the
+    # invocations share the same staged binaries + fixture prep.
+    #
+    # SECURITY NOTE: every `run:` block reads only step outputs and
+    # workflow env vars via the `env:` indirection pattern (per the
+    # GH-workflow-injection guidance). No `github.event.*` /
+    # `github.head_ref` interpolation appears in any shell body.
+    name: Scorecard action smoke — multi-language
+    runs-on: ubuntu-latest
+    needs: [coverage]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lcov
+
+      # Build BOTH binaries from the PR's source so the multi-language
+      # smoke dogfoods this PR's adapters end-to-end. Mirrors the
+      # `scorecard-smoke-rust` (`cargo build --release --package crap4rs`)
+      # and `scorecard-smoke-ts` (`cargo build --release --bin crap4ts`)
+      # patterns combined. `--bin crap4ts` lives in the crap4ts package
+      # (not crap4rs), so the build invokes both packages explicitly.
+      - name: Build PR binaries (crap4rs + crap4ts)
+        run: cargo build --release --package crap4rs --package crap4ts
+
+      - name: Stage PR binaries as pre-installed adapters
+        run: |
+          set -euo pipefail
+          # Multi-language mode requires BOTH adapters discoverable on
+          # PATH. The public scorecard action's pre-installed-detection
+          # short-circuits its binstall steps when `crap4rs --version`
+          # and `crap4ts --version` resolve to executables under PATH,
+          # so staging both into `$HOME/.cargo/bin` (which the GitHub-
+          # hosted runner pre-pends to PATH) is the standard pattern.
+          # The `scorecard-smoke` internal composite uses the same shape.
+          mkdir -p "$HOME/.cargo/bin"
+          install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
+          install -m 0755 ./target/release/crap4ts "$HOME/.cargo/bin/crap4ts"
+          crap4rs --version
+          crap4ts --version
+
+      # Prepare a tiny Istanbul fixture under a stable workspace path
+      # so the action's `--src-ts` input resolves the coverage `path`
+      # entries cleanly. Same template substitution as `scorecard-smoke-ts`.
+      - name: Prepare Istanbul JSON fixture (TS side)
+        id: ts-fixture
+        env:
+          SRC_ROOT: ${{ runner.temp }}/ts-multi-smoke
+        run: |
+          set -euo pipefail
+          mkdir -p "$SRC_ROOT"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/simple.ts "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/arrow.ts "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/Button.tsx "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/map.ts "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/mixed.ts "$SRC_ROOT/"
+          sed "s|{SRC_ROOT}|$SRC_ROOT|g" \
+            crates/crap4ts/tests/fixtures/istanbul-jest/coverage-final.json \
+            > "$SRC_ROOT/coverage-final.json"
+          echo "coverage=$SRC_ROOT/coverage-final.json" >> "$GITHUB_OUTPUT"
+          echo "src=$SRC_ROOT" >> "$GITHUB_OUTPUT"
+
+      # ----------------------------------------------------------------
+      # Spot-check matrix (PR #293 acceptance gate #7).
+      #
+      # 8 single-step invocations covering the parsing edge cases the
+      # shape doc Open Q 2 enumerated. Each step pairs a `with:` block
+      # exercising one input shape with a matching assertion step
+      # reading the action's resolved outputs. The full list:
+      #   1. languages: rust              — single-language back-compat
+      #   2. languages: typescript        — single-language back-compat
+      #   3. languages: rust,typescript   — multi-language explicit
+      #   4. languages: all               — multi-language convenience
+      #   5. "languages: rust, typescript" (whitespace) — multi-language
+      #   6. languages: rust,rust         — dedup warning + single-lang
+      #   7. languages: rust,typescript w/o coverage-ts — actionable error
+      #   8. languages: garbage           — actionable error
+      #
+      # Cases 1-6 succeed and assert output shape; cases 7-8 are
+      # expected-failure invocations exercised via `continue-on-error:
+      # true` + a follow-up step that asserts the prior step's outcome
+      # was `failure` — that proves the error surfaced rather than
+      # silently passing.
+      # ----------------------------------------------------------------
+
+      - name: Spot-check 1 — languages=rust (single-language back-compat)
+        id: spot-rust
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          languages: rust
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 1 single-language outputs
+        env:
+          ROW_JSON: ${{ steps.spot-rust.outputs.row-json }}
+          ROW_JSON_RUST: ${{ steps.spot-rust.outputs.row-json-rust }}
+          ROW_JSON_TS: ${{ steps.spot-rust.outputs.row-json-typescript }}
+          MARKDOWN: ${{ steps.spot-rust.outputs.markdown }}
+        run: |
+          set -euo pipefail
+          # Single-language back-compat invariants:
+          #   * legacy `row-json` populated (every existing consumer)
+          #   * split `row-json-rust` ALSO populated (forward-compat)
+          #   * split `row-json-typescript` empty (TS didn't run)
+          #   * markdown carries NO `## CRAP scorecard` outer wrapper
+          if [ -z "$ROW_JSON" ]; then
+            echo "::error::spot-check 1: legacy row-json empty in single-language rust mode"
+            exit 1
+          fi
+          if [ -z "$ROW_JSON_RUST" ]; then
+            echo "::error::spot-check 1: row-json-rust empty in languages=rust"
+            exit 1
+          fi
+          if [ -n "$ROW_JSON_TS" ]; then
+            echo "::error::spot-check 1: row-json-typescript non-empty in languages=rust (got: $ROW_JSON_TS)"
+            exit 1
+          fi
+          if printf '%s' "$MARKDOWN" | grep -qE '^## CRAP scorecard$'; then
+            echo "::error::spot-check 1: single-language markdown should NOT carry the multi-language outer wrapper"
+            exit 1
+          fi
+          echo "spot-check 1 (languages=rust) ✓"
+
+      - name: Spot-check 2 — languages=typescript (single-language back-compat)
+        id: spot-ts
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: ${{ steps.ts-fixture.outputs.coverage }}
+          src: ${{ steps.ts-fixture.outputs.src }}
+          languages: typescript
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 2 single-language outputs
+        env:
+          ROW_JSON: ${{ steps.spot-ts.outputs.row-json }}
+          ROW_JSON_RUST: ${{ steps.spot-ts.outputs.row-json-rust }}
+          ROW_JSON_TS: ${{ steps.spot-ts.outputs.row-json-typescript }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ROW_JSON" ]; then
+            echo "::error::spot-check 2: legacy row-json empty in single-language typescript mode"
+            exit 1
+          fi
+          if [ -n "$ROW_JSON_RUST" ]; then
+            echo "::error::spot-check 2: row-json-rust non-empty in languages=typescript"
+            exit 1
+          fi
+          if [ -z "$ROW_JSON_TS" ]; then
+            echo "::error::spot-check 2: row-json-typescript empty in languages=typescript"
+            exit 1
+          fi
+          echo "spot-check 2 (languages=typescript) ✓"
+
+      - name: Spot-check 3 — languages=rust,typescript (multi-language explicit)
+        id: spot-multi
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          coverage-ts: ${{ steps.ts-fixture.outputs.coverage }}
+          src-ts: ${{ steps.ts-fixture.outputs.src }}
+          languages: rust,typescript
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 3 multi-language outputs
+        env:
+          ROW_JSON: ${{ steps.spot-multi.outputs.row-json }}
+          ROW_JSON_RUST: ${{ steps.spot-multi.outputs.row-json-rust }}
+          ROW_JSON_TS: ${{ steps.spot-multi.outputs.row-json-typescript }}
+          MARKDOWN: ${{ steps.spot-multi.outputs.markdown }}
+        run: |
+          set -euo pipefail
+          # Multi-language invariants:
+          #   * legacy `row-json` EMPTY (with `::warning::` in job log
+          #     directing consumers to the split outputs)
+          #   * both split outputs populated
+          #   * markdown carries `## CRAP scorecard` wrapper + per-
+          #     language `### Rust (crap4rs)` AND `### TypeScript
+          #     (crap4ts)` section headers
+          if [ -n "$ROW_JSON" ]; then
+            echo "::error::spot-check 3: legacy row-json should be EMPTY in multi-language mode (got: $ROW_JSON)"
+            exit 1
+          fi
+          if [ -z "$ROW_JSON_RUST" ]; then
+            echo "::error::spot-check 3: row-json-rust empty in multi-language mode"
+            exit 1
+          fi
+          if [ -z "$ROW_JSON_TS" ]; then
+            echo "::error::spot-check 3: row-json-typescript empty in multi-language mode"
+            exit 1
+          fi
+          if ! printf '%s' "$MARKDOWN" | grep -qE '^## CRAP scorecard$'; then
+            echo "::error::spot-check 3: multi-language markdown missing '## CRAP scorecard' outer wrapper"
+            exit 1
+          fi
+          if ! printf '%s' "$MARKDOWN" | grep -qE '^### Rust \(crap4rs\)$'; then
+            echo "::error::spot-check 3: multi-language markdown missing '### Rust (crap4rs)' section header"
+            exit 1
+          fi
+          if ! printf '%s' "$MARKDOWN" | grep -qE '^### TypeScript \(crap4ts\)$'; then
+            echo "::error::spot-check 3: multi-language markdown missing '### TypeScript (crap4ts)' section header"
+            exit 1
+          fi
+          echo "spot-check 3 (languages=rust,typescript) ✓"
+
+      - name: Spot-check 4 — languages=all (multi-language convenience expansion)
+        id: spot-all
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          coverage-ts: ${{ steps.ts-fixture.outputs.coverage }}
+          src-ts: ${{ steps.ts-fixture.outputs.src }}
+          languages: all
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 4 expansion matches explicit form
+        env:
+          ROW_JSON_RUST: ${{ steps.spot-all.outputs.row-json-rust }}
+          ROW_JSON_TS: ${{ steps.spot-all.outputs.row-json-typescript }}
+        run: |
+          set -euo pipefail
+          # `all` is the convenience expansion for the full multi-language
+          # set. Today that's rust,typescript; the dispatch should
+          # behave IDENTICALLY to the explicit form (spot-check 3).
+          if [ -z "$ROW_JSON_RUST" ] || [ -z "$ROW_JSON_TS" ]; then
+            echo "::error::spot-check 4: languages=all did not produce both split outputs"
+            exit 1
+          fi
+          echo "spot-check 4 (languages=all) ✓"
+
+      - name: Spot-check 5 — languages with whitespace (multi-language)
+        id: spot-ws
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          coverage-ts: ${{ steps.ts-fixture.outputs.coverage }}
+          src-ts: ${{ steps.ts-fixture.outputs.src }}
+          languages: 'rust, typescript'
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 5 whitespace tolerated
+        env:
+          ROW_JSON_RUST: ${{ steps.spot-ws.outputs.row-json-rust }}
+          ROW_JSON_TS: ${{ steps.spot-ws.outputs.row-json-typescript }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ROW_JSON_RUST" ] || [ -z "$ROW_JSON_TS" ]; then
+            echo "::error::spot-check 5: 'rust, typescript' (whitespace) did not produce both split outputs"
+            exit 1
+          fi
+          echo "spot-check 5 (languages='rust, typescript') ✓"
+
+      - name: Spot-check 6 — languages=rust,rust (dedup → single-language + warning)
+        id: spot-dedup
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          languages: 'rust,rust'
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 6 dedup collapses to single-language
+        env:
+          ROW_JSON_RUST: ${{ steps.spot-dedup.outputs.row-json-rust }}
+          ROW_JSON_TS: ${{ steps.spot-dedup.outputs.row-json-typescript }}
+          ROW_JSON: ${{ steps.spot-dedup.outputs.row-json }}
+        run: |
+          set -euo pipefail
+          # The dedupe warning itself goes to the workflow log (the
+          # action emits `::warning::scorecard action: 'languages:
+          # rust,rust' contains duplicate token 'rust' ...`); this
+          # assertion locks the dedupe BEHAVIOR (single-language dispatch
+          # after collapse), not the warning text. After collapse,
+          # `rust,rust` should behave identically to `languages: rust`
+          # (spot-check 1).
+          if [ -z "$ROW_JSON_RUST" ]; then
+            echo "::error::spot-check 6: dedup'd 'rust,rust' did not produce row-json-rust"
+            exit 1
+          fi
+          if [ -n "$ROW_JSON_TS" ]; then
+            echo "::error::spot-check 6: dedup'd 'rust,rust' produced TS output (should collapse to single-language rust)"
+            exit 1
+          fi
+          if [ -z "$ROW_JSON" ]; then
+            echo "::error::spot-check 6: dedup'd 'rust,rust' should populate legacy row-json (single-language back-compat)"
+            exit 1
+          fi
+          echo "spot-check 6 (languages=rust,rust → dedup ✓)"
+
+      - name: Spot-check 7 — multi-language without coverage-ts (actionable error)
+        id: spot-missing-pair
+        uses: ./.github/actions/scorecard
+        continue-on-error: true
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          # Intentionally OMIT coverage-ts + src-ts; the pre-execution
+          # validator in `Resolve presets` should error actionably.
+          languages: rust,typescript
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 7 surfaced the paired-input error
+        env:
+          OUTCOME: ${{ steps.spot-missing-pair.outcome }}
+        run: |
+          set -euo pipefail
+          # `continue-on-error: true` makes the action's failure
+          # non-fatal to the job; we then assert the OUTCOME was
+          # actually `failure` so the pre-execution validator didn't
+          # silently let multi-language mode run without the paired
+          # input set.
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::spot-check 7: action should have failed on missing coverage-ts but outcome=$OUTCOME"
+            exit 1
+          fi
+          echo "spot-check 7 (missing coverage-ts → actionable error ✓)"
+
+      - name: Spot-check 8 — languages=garbage (actionable error)
+        id: spot-garbage
+        uses: ./.github/actions/scorecard
+        continue-on-error: true
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          languages: garbage
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert spot-check 8 surfaced the unsupported-token error
+        env:
+          OUTCOME: ${{ steps.spot-garbage.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::spot-check 8: action should have failed on languages=garbage but outcome=$OUTCOME"
+            exit 1
+          fi
+          echo "spot-check 8 (languages=garbage → actionable error ✓)"
+
   msrv:
     # Pre-flight gate at the workspace's declared `rust-version`. The
     # original CEng audit (B3) ran lib-only `cargo +1.85 check` and

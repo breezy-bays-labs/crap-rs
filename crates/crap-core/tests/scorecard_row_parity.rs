@@ -47,12 +47,13 @@
 //!
 //! ## Mutants gate interaction
 //!
-//! Test fn is named `envelope` so the `--skip envelope` substring
-//! token in `.cargo/mutants.toml` covers it under `--package
-//! crap-core`. That scoped mutants run does not build the crap4rs
-//! or crap4ts bins; without the `--skip` the unmutated baseline
-//! would panic on `CARGO_BIN_EXE_*` unset and the gate would go
-//! silently dead. See AGENTS.md "Mutation testing" → "Why
+//! Test fns are named `envelope` and `envelope_multi_language_parity`
+//! so the `--skip envelope` substring token in `.cargo/mutants.toml`
+//! covers BOTH under `--package crap-core` (substring match — both
+//! names contain `envelope`). That scoped mutants run does not build
+//! the crap4rs or crap4ts bins; without the `--skip` the unmutated
+//! baseline would panic on `CARGO_BIN_EXE_*` unset and the gate would
+//! go silently dead. See AGENTS.md "Mutation testing" → "Why
 //! `additional_cargo_test_args` …" for the full rationale.
 
 use std::collections::BTreeSet;
@@ -200,6 +201,25 @@ fn key_set(value: &Value) -> BTreeSet<String> {
         .collect()
 }
 
+/// Combined key-set + value-shape conformance check, factored so the
+/// single-language `envelope()` test and the multi-language
+/// `envelope_multi_language_parity()` test share one assertion body.
+///
+/// `expected_keys` is `GREEN_KEYS` or `RED_KEYS` per the row's
+/// expected branch (caller passes the slice based on the threshold it
+/// invoked the adapter with). `adapter` is the human-readable label
+/// embedded in panic messages so a failure tells reviewers which side
+/// drifted (`crap4rs (green)`, `crap4ts (multi-red)`, etc.).
+fn assert_row_shape_conforms(row: &Value, expected_keys: &[&str], adapter: &str) {
+    let expected: BTreeSet<String> = expected_keys.iter().map(|s| (*s).to_string()).collect();
+    let actual = key_set(row);
+    assert_eq!(
+        actual, expected,
+        "{adapter}: Row key set drifted from contract: {row}"
+    );
+    assert_value_shape(row, adapter);
+}
+
 /// Stable-string-or-integer shape assertions both adapters' Rows
 /// must satisfy. Anything that varies by analyzed source (delta
 /// counts, failure detail text) is intentionally not asserted —
@@ -273,17 +293,8 @@ fn envelope() {
     let rs_green = run_crap4rs_row(green_threshold);
     let ts_green = run_crap4ts_row(green_threshold);
 
-    let expected_green: BTreeSet<String> = GREEN_KEYS.iter().map(|s| (*s).to_string()).collect();
-    assert_eq!(
-        key_set(&rs_green),
-        expected_green,
-        "crap4rs Green Row key set drifted from contract: {rs_green}"
-    );
-    assert_eq!(
-        key_set(&ts_green),
-        expected_green,
-        "crap4ts Green Row key set drifted from contract: {ts_green}"
-    );
+    assert_row_shape_conforms(&rs_green, GREEN_KEYS, "crap4rs (green)");
+    assert_row_shape_conforms(&ts_green, GREEN_KEYS, "crap4ts (green)");
     assert_eq!(
         key_set(&rs_green),
         key_set(&ts_green),
@@ -301,8 +312,6 @@ fn envelope() {
         Some("Green"),
         "crap4ts at threshold {green_threshold} must report Green status"
     );
-    assert_value_shape(&rs_green, "crap4rs (green)");
-    assert_value_shape(&ts_green, "crap4ts (green)");
 
     // Red branch: low threshold forces violations on both adapters.
     // Asserts the key set expands with `failure_detail_md` for both
@@ -313,17 +322,8 @@ fn envelope() {
     let rs_red = run_crap4rs_row(red_threshold);
     let ts_red = run_crap4ts_row(red_threshold);
 
-    let expected_red: BTreeSet<String> = RED_KEYS.iter().map(|s| (*s).to_string()).collect();
-    assert_eq!(
-        key_set(&rs_red),
-        expected_red,
-        "crap4rs Red Row key set drifted from contract: {rs_red}"
-    );
-    assert_eq!(
-        key_set(&ts_red),
-        expected_red,
-        "crap4ts Red Row key set drifted from contract: {ts_red}"
-    );
+    assert_row_shape_conforms(&rs_red, RED_KEYS, "crap4rs (red)");
+    assert_row_shape_conforms(&ts_red, RED_KEYS, "crap4ts (red)");
     assert_eq!(
         key_set(&rs_red),
         key_set(&ts_red),
@@ -345,6 +345,45 @@ fn envelope() {
             .is_some_and(|s| s.contains("over CRAP threshold")),
         "crap4ts Red failure_detail_md must reference threshold overrun: {ts_red}"
     );
-    assert_value_shape(&rs_red, "crap4rs (red)");
-    assert_value_shape(&ts_red, "crap4ts (red)");
+}
+
+/// Multi-language scorecard-row parity canary (PR β #293).
+///
+/// The composite scorecard action's multi-language mode runs BOTH
+/// adapters in a single invocation (`languages: rust,typescript`) and
+/// emits the per-language rows on split outputs (`row-json-rust` +
+/// `row-json-typescript`). This test simulates that path at the test
+/// layer — run both bins back-to-back at the same threshold, assert
+/// each row INDEPENDENTLY conforms to the locked `Row::CrapDelta`
+/// schema. Same parity contract as `fn envelope()` but exercises the
+/// dual-emission code path the action's per-language loop drives.
+///
+/// Why this is more than a `fn envelope()` rerun: the action ships
+/// each adapter's row out a DIFFERENT named output. A downstream
+/// aggregator parses `row-json-rust` and `row-json-typescript` with
+/// the SAME jq predicate. If a future refactor introduces a
+/// per-language post-processing step (e.g. injects a `language` field
+/// only on the Rust row), the existing `fn envelope()` catches the
+/// key-set divergence between adapters — but `fn envelope_multi_language_parity()`
+/// is the test whose name names the shape that breaks, making
+/// regressions self-documenting in the failure output.
+#[test]
+fn envelope_multi_language_parity() {
+    // Green: above-threshold for both. Each row independently
+    // conforms; no cross-adapter assertion here (that's `fn envelope()`'s
+    // job) — the contract this test locks is per-output independence.
+    let green_threshold = "1000";
+    let rs_green = run_crap4rs_row(green_threshold);
+    let ts_green = run_crap4ts_row(green_threshold);
+    assert_row_shape_conforms(&rs_green, GREEN_KEYS, "crap4rs (multi-green)");
+    assert_row_shape_conforms(&ts_green, GREEN_KEYS, "crap4ts (multi-green)");
+
+    // Red: both adapters cross the threshold; both rows carry
+    // `failure_detail_md`. Same dual-emission invariant — each row
+    // shaped independently.
+    let red_threshold = "1";
+    let rs_red = run_crap4rs_row(red_threshold);
+    let ts_red = run_crap4ts_row(red_threshold);
+    assert_row_shape_conforms(&rs_red, RED_KEYS, "crap4rs (multi-red)");
+    assert_row_shape_conforms(&ts_red, RED_KEYS, "crap4ts (multi-red)");
 }
