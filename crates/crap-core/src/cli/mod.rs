@@ -1376,7 +1376,9 @@ fn render_format<P: ParseDiagnostic>(
         FormatArg::ScorecardRow => {
             format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
         }
-        FormatArg::Html => reporters::format_html(view, inputs.threshold, meta, inputs.metric),
+        FormatArg::Html => {
+            reporters::format_html(view, delta_view, inputs.threshold, meta, inputs.metric)
+        }
         // GitHub Actions annotations is a gate translation like SARIF —
         // iterates `view.full.functions` regardless of View shaping so
         // PR annotations reflect the gate, not a presentation choice.

@@ -19,6 +19,7 @@
 //! at compile time by the `#[derive(Template)]` macro.
 
 use crate::cli::AdapterMeta;
+use crate::domain::delta::{DeltaView, FunctionChange};
 use crate::domain::types::{AnalysisSummary, ComplexityMetric, FunctionVerdict, RiskLevel};
 use crate::domain::view::AnalysisView;
 use askama::Template;
@@ -44,8 +45,22 @@ use std::collections::BTreeMap;
 /// (locked plan deviation #1) so the template can render the per-
 /// adapter footer without reading domain state — the dispatcher in
 /// `cli/mod.rs` already holds both in scope.
+///
+/// The signature widened again in crap-rs#306 to accept an optional
+/// `&DeltaView<'_>`. When `delta` is `None` the output is byte-
+/// identical to the v0.5.0 single-tab render (no tabs nav, no second
+/// panel — preserves the contract every existing consumer relies on).
+/// When `delta` is `Some(_)`, a `<nav class="tabs">` is emitted between
+/// the header and the body, and a second `<div class="tab-panel"
+/// data-tab="delta">` follows the Current panel with the delta KPI
+/// grid + per-category change tables. The Current tab opens by default
+/// so first-time users see the Sakura summary; the delta tab is one
+/// click away and reachable directly via the `#delta` URL hash (the
+/// inline `<script>` hook honors `location.hash` for CI sticky-comment
+/// deep links).
 pub fn format_html(
     view: &AnalysisView<'_>,
+    delta: Option<&DeltaView<'_>>,
     threshold: f64,
     meta: &AdapterMeta,
     effective_metric: ComplexityMetric,
@@ -84,6 +99,23 @@ pub fn format_html(
     let high_file_count = files.iter().filter(|f| f.risk_data == 4).count();
     let file_count = files.len();
 
+    // The delta panel is boxed because it carries several owned
+    // `Vec<DeltaRow>` fields. Boxing keeps the `Option::None` arm
+    // cheap (the no-baseline byte-identical contract is the dominant
+    // path) and mirrors #260's `MarkdownBody::Filled.summary` pattern
+    // for the same `large_enum_variant` reason.
+    let delta_panel = delta.map(|d| Box::new(build_delta_panel(d)));
+    let has_delta = delta_panel.is_some();
+    let current_tab_count = if is_empty { 0 } else { summary.total_functions };
+    let delta_tab_count = delta_panel
+        .as_ref()
+        .map(|p| p.summary.added + p.summary.removed + p.summary.modified)
+        .unwrap_or(0);
+    let delta_has_news = delta_panel
+        .as_ref()
+        .map(|p| p.summary.regressions > 0 || p.summary.new_violations > 0)
+        .unwrap_or(false);
+
     let tmpl = HtmlReport {
         title,
         tool_name: meta.tool_name,
@@ -100,6 +132,11 @@ pub fn format_html(
         file_count,
         exceeding_file_count,
         high_file_count,
+        has_delta,
+        current_tab_count,
+        delta_tab_count,
+        delta_has_news,
+        delta_panel,
     };
     tmpl.render()
         .expect("html template render is total — all fields owned")
@@ -123,6 +160,148 @@ struct HtmlReport<'a> {
     file_count: usize,
     exceeding_file_count: usize,
     high_file_count: usize,
+    /// True when a baseline was supplied and the delta tab should
+    /// render. The template gates the `<nav class="tabs">` block + the
+    /// second `<div class="tab-panel" data-tab="delta">` on this flag
+    /// so the no-baseline case stays byte-identical to v0.5.0.
+    has_delta: bool,
+    /// Tab-count badge on the "Current" tab. Equal to
+    /// `summary.total_functions` for the populated case, 0 for an
+    /// empty analysis.
+    current_tab_count: usize,
+    /// Tab-count badge on the "Delta" tab. Sum of all change kinds —
+    /// matches the markdown reporter's "+N added, M removed, K
+    /// modified" count.
+    delta_tab_count: u32,
+    /// True when the delta has at least one regression or new
+    /// violation. Drives the inline `<span class="tab-dot">` indicator
+    /// next to the Delta tab label — same affordance as the Sakura
+    /// mock's "news dot."
+    delta_has_news: bool,
+    /// Owned per-tab projection of the delta. `None` when no baseline
+    /// was supplied. Boxed because the populated case carries several
+    /// owned `Vec<DeltaRow>` fields and `large_enum_variant` would
+    /// otherwise penalize the dominant `None` arm — same boxing
+    /// pattern as the markdown reporter's `MarkdownBody::Filled.summary`.
+    delta_panel: Option<Box<DeltaPanel>>,
+}
+
+/// Per-tab projection of a `DeltaView` into render-ready row + KPI
+/// data. Pure presentation — no domain types leak into the template.
+///
+/// The four-KPI lock matches the Current-tab convention from the
+/// Sakura design (chat1.md trim). The five-tile "Functions" KPI from
+/// the mock is dropped: the change-counts already show added /
+/// removed / modified inline above the tables, and the per-section
+/// counts are visible in each table header.
+struct DeltaPanel {
+    /// Aggregate counts mirroring `DeltaSummary` (copied so the
+    /// template doesn't import a domain type). Drives the verdict
+    /// stamp + tile sub-text.
+    summary: DeltaPanelSummary,
+    /// Display label for the verdict pill (passed/regressed). The
+    /// delta verdict is "REGRESSED" when `summary.new_violations > 0`,
+    /// "PASSED" otherwise — mirroring `DeltaSummary::passed`.
+    verdict_class: &'static str,
+    verdict_label: &'static str,
+    verdict_glyph: &'static str,
+    /// The four KPI tiles, in fixed display order:
+    /// (1) Exceeding threshold (2) Max CRAP (3) Average CRAP
+    /// (4) Avg coverage. Each carries baseline + current values plus
+    /// a signed delta + direction.
+    kpis: [DeltaKpi; 4],
+    /// Modified-row regressions (positive score delta ≥ 0.005,
+    /// matching the markdown reporter's filter threshold to suppress
+    /// sub-cell-rendered-precision noise).
+    regressions: Vec<DeltaRow>,
+    /// Modified-row improvements (negative score delta ≤ −0.005).
+    improvements: Vec<DeltaRow>,
+    /// New functions — `Added` entries. Includes new violations
+    /// (`current.exceeds`); the table marks them with a high-risk
+    /// pill so the regression vs. benign distinction is visible per-
+    /// row without needing a separate "new violations" table.
+    new_functions: Vec<DeltaRow>,
+    /// `unchanged_count` is the count of baseline functions whose
+    /// identity persists in current and whose CRAP score moved less
+    /// than 0.005 (`Modified` with zero-ish delta). Rendered as a
+    /// single-line note per the chat1.md trim — no full table.
+    unchanged_count: u32,
+    /// Display label for the baseline reference. Today this is always
+    /// "baseline" because `DeltaView.baseline_ref` is `None` reserved
+    /// until F2; once a `--baseline-ref <label>` CLI flag lands, this
+    /// field carries the label verbatim (e.g. "main@a1f3c2b").
+    baseline_ref: &'static str,
+}
+
+#[derive(Clone, Copy)]
+struct DeltaPanelSummary {
+    added: u32,
+    removed: u32,
+    modified: u32,
+    regressions: u32,
+    improvements: u32,
+    new_violations: u32,
+}
+
+struct DeltaKpi {
+    label: &'static str,
+    before: String,
+    after: String,
+    /// Signed change as a chip glyph + value, e.g. "▲ +1" or
+    /// "▼ -2.30". Empty string when the delta is exactly zero (the
+    /// chip is suppressed; "no change" speaks for itself).
+    chip_glyph: &'static str,
+    chip_value: String,
+    /// One of "up" / "down" / "flat" — drives the chip color via
+    /// `data-direction`. Up = current is higher (bad for CRAP / max /
+    /// exceeding; good for coverage), Down = current is lower. The
+    /// `is_regression` flag below decides whether to paint the chip
+    /// red (regression) or green (improvement); direction alone is
+    /// not sufficient because higher coverage is an improvement.
+    direction: &'static str,
+    /// True when the chip should be painted red (worse than baseline
+    /// for the metric). For CRAP-style KPIs higher = worse; for
+    /// coverage lower = worse.
+    is_regression: bool,
+    /// Optional sub-text under the chip (e.g. "1 new function broke
+    /// the threshold"). Empty string when not applicable.
+    note: String,
+}
+
+struct DeltaRow {
+    file: String,
+    qualified_name: String,
+    start_line: usize,
+    end_line: usize,
+    /// Baseline CRAP value, formatted to 2 decimals. Empty string for
+    /// `Added` rows (no baseline).
+    baseline_crap: String,
+    /// Current CRAP value, formatted to 2 decimals. Empty string for
+    /// `Removed` rows (no current).
+    current_crap: String,
+    /// Baseline coverage %, "{:.1}%". Empty for Added.
+    baseline_cov: String,
+    /// Current coverage %, "{:.1}%". Empty for Removed.
+    current_cov: String,
+    /// Signed CRAP delta, formatted as a chip. e.g. "+5.20" /
+    /// "−8.70". Empty string for Added/Removed (the chip cell renders
+    /// a literal "—" instead).
+    delta_value: String,
+    /// "▲" / "▼" / "" (suppressed when delta_value is empty).
+    delta_glyph: &'static str,
+    /// "up" / "down" / "flat" — for chip color.
+    delta_direction: &'static str,
+    /// Baseline risk-pill data-risk value (1..=4). 0 for Added.
+    baseline_risk: u8,
+    /// Baseline risk-pill text label. Empty for Added.
+    baseline_risk_label: &'static str,
+    /// Current risk-pill data-risk value (1..=4). 0 for Removed.
+    current_risk: u8,
+    /// Current risk-pill text label. Empty for Removed.
+    current_risk_label: &'static str,
+    /// True when the current row exceeds threshold — rendered with a
+    /// `data-exceeds="1"` flag for tinting.
+    exceeds: bool,
 }
 
 struct SummaryView {
@@ -446,6 +625,324 @@ fn metric_label(metric: ComplexityMetric) -> &'static str {
     }
 }
 
+// ── Delta-panel projection ──────────────────────────────────────────
+//
+// Pulls baseline + current aggregates off the `AnalysisDelta` and
+// shapes the four KPI tiles + per-category row lists. The summary on
+// `DeltaPanel` mirrors `DeltaSummary` field-for-field (copied so the
+// template doesn't import a domain type — same boundary discipline as
+// the markdown reporter's `SummaryData`).
+//
+// The 0.005 cutoff on the regressions / improvements partition matches
+// the markdown reporter's filter: a delta below half a cent rounds to
+// "+0.00" in `{:.2}` cell output and looks like a false flag. The
+// "unchanged" bucket captures every Modified row that doesn't qualify
+// as a regression or improvement under that cutoff — including
+// genuinely-identical rows that show up as `Modified` with delta = 0.0
+// (e.g. when a function's surrounding LOC changed but its body
+// didn't).
+
+fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
+    let summary = view.full.summary;
+    let baseline_summary = &view.full.baseline.summary;
+    let current_summary = &view.full.current.summary;
+    let panel_summary = DeltaPanelSummary {
+        added: summary.added,
+        removed: summary.removed,
+        modified: summary.modified,
+        regressions: summary.regressions,
+        improvements: summary.improvements,
+        new_violations: summary.new_violations,
+    };
+
+    let (verdict_class, verdict_label, verdict_glyph) = if summary.passed {
+        ("pass", "PASS", "✓")
+    } else {
+        ("fail", "REGRESSED", "▲")
+    };
+
+    let kpis = build_delta_kpis(&summary, baseline_summary, current_summary);
+
+    let mut regressions: Vec<DeltaRow> = Vec::new();
+    let mut improvements: Vec<DeltaRow> = Vec::new();
+    let mut new_functions: Vec<DeltaRow> = Vec::new();
+
+    // The shaped `view.shown` is sort-by-signed-impact descending by
+    // default, so we get regressions first → improvements last under
+    // the default spec. Within each bucket we preserve that order
+    // (largest-impact-first) so the most consequential changes lead.
+    for change in view.shown.iter().copied() {
+        match change {
+            FunctionChange::Added { current } => {
+                new_functions.push(added_row(current));
+            }
+            FunctionChange::Removed { .. } => {
+                // v1 design intentionally drops the Removed-zero
+                // panel per chat1.md simplification, and the regular
+                // case (Removed > 0) isn't surfaced in this iteration
+                // either — the chat1.md trim treats removed functions
+                // as out of scope for a regression-focused scorecard.
+                // Counts still ride in the summary line.
+            }
+            FunctionChange::Modified { baseline, current } => {
+                let delta = current.scored.crap.value - baseline.scored.crap.value;
+                if delta >= 0.005 {
+                    regressions.push(modified_row(baseline, current));
+                } else if delta <= -0.005 {
+                    improvements.push(modified_row(baseline, current));
+                }
+            }
+        }
+    }
+
+    // Count unchanged from the FULL delta (pre-truncate, pre-sort) so a
+    // `--top N` cap doesn't silently lop them off — under the default
+    // signed-impact sort, near-zero-delta entries land at the bottom of
+    // the list and are the first to drop on truncation. Respect the
+    // user's `change_kinds` filter so a deliberate exclusion of Modified
+    // entries doesn't get re-surfaced in the footer line.
+    let unchanged_count: u32 = view
+        .full
+        .changes
+        .iter()
+        .filter(|c| {
+            view.spec
+                .filters
+                .change_kinds
+                .as_ref()
+                .is_none_or(|kinds| kinds.contains(&c.kind()))
+        })
+        .filter(|c| match c {
+            FunctionChange::Modified { baseline, current } => {
+                (current.scored.crap.value - baseline.scored.crap.value).abs() < 0.005
+            }
+            _ => false,
+        })
+        .count() as u32;
+
+    DeltaPanel {
+        summary: panel_summary,
+        verdict_class,
+        verdict_label,
+        verdict_glyph,
+        kpis,
+        regressions,
+        improvements,
+        new_functions,
+        unchanged_count,
+        // F2 follow-up: when `--baseline-ref <label>` lands, thread
+        // the label through `DeltaView.baseline_ref` and surface it
+        // here. Until then the honest label is the literal "baseline."
+        baseline_ref: "baseline",
+    }
+}
+
+fn build_delta_kpis(
+    summary: &crate::domain::delta::DeltaSummary,
+    baseline: &AnalysisSummary,
+    current: &AnalysisSummary,
+) -> [DeltaKpi; 4] {
+    // KPI 1 — exceeding threshold (count integer). Higher = worse.
+    let before_exc = baseline.exceeding_threshold;
+    let after_exc = current.exceeding_threshold;
+    let exc_delta = after_exc as i64 - before_exc as i64;
+    let exc_note = if summary.new_violations > 0 {
+        format!(
+            "{} new {} broke the threshold.",
+            summary.new_violations,
+            if summary.new_violations == 1 {
+                "function"
+            } else {
+                "functions"
+            }
+        )
+    } else if exc_delta < 0 {
+        format!(
+            "Threshold breaches dropped by {}.",
+            exc_delta.unsigned_abs()
+        )
+    } else {
+        "No new threshold breaches.".to_string()
+    };
+    let exceeding = DeltaKpi {
+        label: "Exceeding threshold",
+        before: format!("{}", before_exc),
+        after: format!("{}", after_exc),
+        chip_glyph: signed_glyph_int(exc_delta),
+        chip_value: signed_int_chip(exc_delta),
+        direction: direction_int(exc_delta),
+        // For exceeding-count, higher = worse (regression).
+        is_regression: exc_delta > 0,
+        note: exc_note,
+    };
+
+    // KPI 2 — Max CRAP. Higher = worse.
+    let before_max = baseline.max_crap.as_ref().map(|c| c.value).unwrap_or(0.0);
+    let after_max = current.max_crap.as_ref().map(|c| c.value).unwrap_or(0.0);
+    let max_delta = after_max - before_max;
+    let max_crap = DeltaKpi {
+        label: "Max CRAP",
+        before: format!("{:.2}", before_max),
+        after: format!("{:.2}", after_max),
+        chip_glyph: signed_glyph_f64(max_delta),
+        chip_value: signed_f64_chip(max_delta),
+        direction: direction_f64(max_delta),
+        is_regression: max_delta > 0.005,
+        note: String::new(),
+    };
+
+    // KPI 3 — Average CRAP. Higher = worse.
+    let before_avg = baseline.average_crap;
+    let after_avg = current.average_crap;
+    let avg_delta = after_avg - before_avg;
+    let avg_crap = DeltaKpi {
+        label: "Average CRAP",
+        before: format!("{:.2}", before_avg),
+        after: format!("{:.2}", after_avg),
+        chip_glyph: signed_glyph_f64(avg_delta),
+        chip_value: signed_f64_chip(avg_delta),
+        direction: direction_f64(avg_delta),
+        is_regression: avg_delta > 0.005,
+        note: format!(
+            "{} added · {} removed · {} modified",
+            summary.added, summary.removed, summary.modified
+        ),
+    };
+
+    // KPI 4 — Avg coverage. Higher = better (inverted regression
+    // polarity vs the CRAP-style KPIs).
+    let before_cov = baseline.average_coverage;
+    let after_cov = current.average_coverage;
+    let cov_delta = after_cov - before_cov;
+    let cov_chip_value = if cov_delta.abs() < 0.05 {
+        String::new()
+    } else {
+        format!("{:+.1} pp", cov_delta)
+    };
+    let avg_cov = DeltaKpi {
+        label: "Avg coverage",
+        before: format!("{:.1}%", before_cov),
+        after: format!("{:.1}%", after_cov),
+        chip_glyph: signed_glyph_f64(cov_delta),
+        chip_value: cov_chip_value,
+        direction: direction_f64(cov_delta),
+        // For coverage, lower = worse (regression).
+        is_regression: cov_delta < -0.05,
+        note: if cov_delta.abs() < 0.05 {
+            "Coverage unchanged.".to_string()
+        } else if cov_delta > 0.0 {
+            "Coverage moved in the right direction.".to_string()
+        } else {
+            "Coverage dropped.".to_string()
+        },
+    };
+
+    [exceeding, max_crap, avg_crap, avg_cov]
+}
+
+fn modified_row(baseline: &FunctionVerdict, current: &FunctionVerdict) -> DeltaRow {
+    let baseline_value = baseline.scored.crap.value;
+    let current_value = current.scored.crap.value;
+    let delta = current_value - baseline_value;
+    let span = &current.scored.identity.span;
+    DeltaRow {
+        file: current.scored.identity.file_path.clone(),
+        qualified_name: current.scored.identity.qualified_name.clone(),
+        start_line: span.start_line,
+        end_line: span.end_line,
+        baseline_crap: format!("{:.2}", baseline_value),
+        current_crap: format!("{:.2}", current_value),
+        baseline_cov: format!("{:.1}%", baseline.scored.coverage_percent),
+        current_cov: format!("{:.1}%", current.scored.coverage_percent),
+        delta_value: format!("{:+.2}", delta),
+        delta_glyph: signed_glyph_f64(delta),
+        delta_direction: direction_f64(delta),
+        baseline_risk: risk_data(baseline.scored.crap.risk_level),
+        baseline_risk_label: risk_label(baseline.scored.crap.risk_level),
+        current_risk: risk_data(current.scored.crap.risk_level),
+        current_risk_label: risk_label(current.scored.crap.risk_level),
+        exceeds: current.exceeds,
+    }
+}
+
+fn added_row(current: &FunctionVerdict) -> DeltaRow {
+    let span = &current.scored.identity.span;
+    DeltaRow {
+        file: current.scored.identity.file_path.clone(),
+        qualified_name: current.scored.identity.qualified_name.clone(),
+        start_line: span.start_line,
+        end_line: span.end_line,
+        baseline_crap: String::new(),
+        current_crap: format!("{:.2}", current.scored.crap.value),
+        baseline_cov: String::new(),
+        current_cov: format!("{:.1}%", current.scored.coverage_percent),
+        delta_value: String::new(),
+        delta_glyph: "",
+        delta_direction: "flat",
+        baseline_risk: 0,
+        baseline_risk_label: "",
+        current_risk: risk_data(current.scored.crap.risk_level),
+        current_risk_label: risk_label(current.scored.crap.risk_level),
+        exceeds: current.exceeds,
+    }
+}
+
+fn signed_glyph_f64(delta: f64) -> &'static str {
+    if delta > 0.005 {
+        "▲"
+    } else if delta < -0.005 {
+        "▼"
+    } else {
+        ""
+    }
+}
+
+fn signed_glyph_int(delta: i64) -> &'static str {
+    if delta > 0 {
+        "▲"
+    } else if delta < 0 {
+        "▼"
+    } else {
+        ""
+    }
+}
+
+fn signed_f64_chip(delta: f64) -> String {
+    if delta.abs() < 0.005 {
+        String::new()
+    } else {
+        format!("{:+.2}", delta)
+    }
+}
+
+fn signed_int_chip(delta: i64) -> String {
+    if delta == 0 {
+        String::new()
+    } else {
+        format!("{:+}", delta)
+    }
+}
+
+fn direction_f64(delta: f64) -> &'static str {
+    if delta > 0.005 {
+        "up"
+    } else if delta < -0.005 {
+        "down"
+    } else {
+        "flat"
+    }
+}
+
+fn direction_int(delta: i64) -> &'static str {
+    if delta > 0 {
+        "up"
+    } else if delta < 0 {
+        "down"
+    } else {
+        "flat"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -477,7 +974,17 @@ mod tests {
     }
 
     fn html(view: &AnalysisView<'_>) -> String {
-        format_html(view, 8.0, &test_meta(), ComplexityMetric::Cognitive)
+        format_html(view, None, 8.0, &test_meta(), ComplexityMetric::Cognitive)
+    }
+
+    fn html_with_delta(view: &AnalysisView<'_>, delta: &DeltaView<'_>) -> String {
+        format_html(
+            view,
+            Some(delta),
+            8.0,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+        )
     }
 
     #[test]
@@ -663,6 +1170,7 @@ mod tests {
         let result = make_multi_function_result();
         let out = format_html(
             &make_view_default(&result),
+            None,
             8.0,
             &test_meta(),
             ComplexityMetric::Cognitive,
@@ -684,6 +1192,7 @@ mod tests {
         let result = make_multi_function_result();
         let out = format_html(
             &make_view_default(&result),
+            None,
             10.0,
             &test_meta(),
             ComplexityMetric::Cyclomatic,
@@ -706,6 +1215,320 @@ mod tests {
     fn full_html_snapshot() {
         let result = make_multi_function_result();
         let out = html(&make_view_default(&result));
+        insta::assert_snapshot!(out);
+    }
+
+    // ── Delta tab (crap-rs#306) ───────────────────────────────────────
+
+    use crate::adapters::reporters::test_fixtures::{make_delta_view_default, make_sample_delta};
+
+    /// Without `--baseline`, the tabs nav and the second `<div
+    /// class="tab-panel">` MUST NOT render. This is the byte-identical
+    /// contract preservation: the v0.5.0 single-tab output is exactly
+    /// what consumers without a baseline still get.
+    #[test]
+    fn no_tabs_nav_when_delta_is_none() {
+        let result = make_multi_function_result();
+        let out = html(&make_view_default(&result));
+        assert!(
+            !out.contains("<nav class=\"tabs\""),
+            "no-baseline output must not emit the tabs nav"
+        );
+        assert!(
+            !out.contains("data-tab=\"delta\""),
+            "no-baseline output must not emit the delta tab panel"
+        );
+        assert!(
+            !out.contains("data-tab=\"current\""),
+            "no-baseline output must not wrap body in current tab panel"
+        );
+    }
+
+    #[test]
+    fn delta_tab_renders_when_delta_is_some() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        // Tabs nav present
+        assert!(
+            out.contains("<nav class=\"tabs\""),
+            "tabs nav should render when delta is supplied"
+        );
+        // Current tab opens by default (default-open lock from
+        // orchestrator pre-resolved Discovery #1)
+        assert!(
+            out.contains("data-tab=\"current\" data-active"),
+            "Current tab should open by default"
+        );
+        // Delta panel present (without data-active)
+        assert!(
+            out.contains("<div class=\"tab-panel\" data-tab=\"delta\""),
+            "delta tab panel should render"
+        );
+    }
+
+    #[test]
+    fn tabs_nav_has_two_tabs_when_delta_supplied() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        // Each tab carries a data-tab="X" attribute on a <button>
+        assert!(out.contains("data-tab=\"current\""));
+        assert!(out.contains("data-tab=\"delta\""));
+        // The Delta tab label is anchored on the literal baseline-ref
+        // string until F2 introduces `--baseline-ref <label>`.
+        assert!(
+            out.contains("Delta vs baseline"),
+            "delta tab label should anchor on the baseline-ref literal"
+        );
+    }
+
+    #[test]
+    fn delta_panel_has_exactly_4_kpi_tiles() {
+        // 4-tile lock from orchestrator pre-resolved Discovery #2 —
+        // matches the Current tab's 4-KPI convention. Mirrors the
+        // playwright assertion (`.delta-kpi-grid .kpi` count == 4).
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        let count = out.matches("class=\"delta-kpi\"").count();
+        assert_eq!(
+            count, 4,
+            "delta panel must render exactly 4 KPI tiles, got {count}"
+        );
+    }
+
+    #[test]
+    fn delta_kpi_tiles_include_expected_labels() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(out.contains("Exceeding threshold"));
+        assert!(out.contains("Max CRAP"));
+        assert!(out.contains("Average CRAP"));
+        assert!(out.contains("Avg coverage"));
+        // The dropped 5th tile ("Functions") MUST NOT appear in the
+        // delta panel as a tile (the word can show up elsewhere in
+        // the report — we anchor on the tile structure).
+        assert!(
+            !out.contains("<span class=\"delta-kpi-label\">Functions</span>"),
+            "the 5th 'Functions' tile from the mock is intentionally dropped per orchestrator-locked Discovery #2"
+        );
+    }
+
+    #[test]
+    fn delta_panel_renders_regressions_table() {
+        // make_sample_delta sets parse_record's CRAP 15.0 → 22.0
+        // (Modified with delta = +7.0), which qualifies as a
+        // regression under the 0.005 cutoff.
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(
+            out.contains("delta-table regressions"),
+            "regressions table should render when at least one positive delta is present"
+        );
+        assert!(out.contains("parse_record"));
+        // The +7.00 chip value should appear in some form (signed).
+        assert!(
+            out.contains("+7.00"),
+            "regression delta chip should render the signed value"
+        );
+    }
+
+    #[test]
+    fn delta_panel_renders_new_functions_table() {
+        // make_sample_delta adds new_fn (Added, exceeds=true, CRAP=30.0).
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(
+            out.contains("delta-table new-functions"),
+            "new-functions table should render when at least one Added change is present"
+        );
+        assert!(out.contains("new_fn"));
+        // The new violation gets a high-risk pill (data-risk=4).
+        assert!(out.contains("data-risk=\"4\""));
+    }
+
+    #[test]
+    fn delta_panel_improvements_table_absent_when_no_improvements() {
+        // make_sample_delta has no improvements (parse_record went
+        // up; simple_fn stayed flat at 3.0; complex_fn was removed
+        // not modified). So the improvements table should not render.
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(
+            !out.contains("delta-table improvements"),
+            "improvements table should be suppressed when there are no improvements"
+        );
+    }
+
+    #[test]
+    fn delta_panel_unchanged_rendered_as_single_line_not_table() {
+        // simple_fn is Modified with zero delta (3.0 → 3.0) — it
+        // hits the unchanged bucket. The render should be a single
+        // <p>...</p>-style note, not a full table.
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(
+            out.contains("delta-unchanged"),
+            "unchanged count should render as a single-line note (the chat1.md trim)"
+        );
+        assert!(
+            !out.contains("delta-table unchanged"),
+            "unchanged must NOT render as a full table — single-line note only"
+        );
+    }
+
+    #[test]
+    fn delta_panel_unchanged_count_survives_top_truncation() {
+        // Regression guard: the unchanged_count footer is computed from
+        // the FULL delta, not from `view.shown`. Under a `--top 1`
+        // truncation that lops the unchanged Modified row off the tail
+        // of the signed-impact sort, the count must still report 1
+        // (make_sample_delta has exactly one zero-delta Modified row:
+        // `simple_fn`). Truncating to `Some(1)` keeps only the
+        // top-ranked regression in `view.shown`, so the old loop-based
+        // counter would have read 0.
+        use crate::domain::delta::DeltaViewSpec;
+        let delta = make_sample_delta();
+        let truncated = crate::domain::delta::apply(
+            &delta,
+            DeltaViewSpec {
+                limit: Some(1),
+                ..Default::default()
+            },
+        );
+        let out = html_with_delta(&make_view_default(&delta.current), &truncated);
+        assert!(
+            out.contains("class=\"delta-unchanged\""),
+            "unchanged footer must render even when --top truncates the row off view.shown"
+        );
+        assert!(
+            out.contains("1 function"),
+            "unchanged_count should be 1 (from full delta) not 0 (from truncated shown subset)"
+        );
+    }
+
+    #[test]
+    fn delta_tab_news_dot_when_regressions_or_new_violations_present() {
+        // make_sample_delta has 1 regression + 1 new violation → dot.
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(
+            out.contains("class=\"tab-dot\""),
+            "delta tab should render a news dot when there are regressions or new violations"
+        );
+    }
+
+    #[test]
+    fn delta_tab_no_news_dot_when_clean() {
+        // A self-vs-self delta has 0 regressions and 0 new violations,
+        // so the dot suppression path is exercised.
+        let result = make_multi_function_result();
+        let delta = crate::domain::delta::compute(result.clone(), result.clone());
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&result), &dview);
+        assert!(!out.contains("class=\"tab-dot\""), "no news → no dot");
+    }
+
+    #[test]
+    fn delta_tab_script_present_when_delta_supplied() {
+        // The inline JS hook that switches tabs + restores from #hash
+        // MUST ship only when a second panel exists — otherwise it's
+        // dead code in the no-baseline output (which fails the
+        // byte-identical contract).
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(
+            out.contains("// ── Tab switcher"),
+            "tab-switcher IIFE should be present when delta is supplied"
+        );
+    }
+
+    #[test]
+    fn delta_tab_script_absent_when_no_delta() {
+        // Companion to the test above — confirms the no-baseline
+        // output doesn't carry a dead tab-switcher.
+        let result = make_multi_function_result();
+        let out = html(&make_view_default(&result));
+        assert!(
+            !out.contains("// ── Tab switcher"),
+            "tab-switcher must be absent when no delta — byte-identical no-baseline contract"
+        );
+    }
+
+    #[test]
+    fn delta_panel_escapes_function_names() {
+        use crate::domain::types::{AnalysisResult, AnalysisSummary, RiskDistribution};
+        // Build a hand-crafted Added change with a hostile name and
+        // file path.
+        let evil = crate::adapters::reporters::test_fixtures::make_verdict(
+            "<script>alert('x')</script>",
+            "src/<dangerous>.rs",
+            5,
+            50.0,
+            45.0,
+            RiskLevel::High,
+            8.0,
+        );
+        let baseline = AnalysisResult {
+            functions: vec![],
+            summary: AnalysisSummary {
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 0,
+                    moderate: 0,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: true,
+        };
+        let current_summary = AnalysisSummary {
+            total_functions: 1,
+            total_files: 1,
+            exceeding_threshold: 1,
+            average_crap: 45.0,
+            median_crap: 45.0,
+            distribution: RiskDistribution {
+                low: 0,
+                acceptable: 0,
+                moderate: 0,
+                high: 1,
+            },
+            ..Default::default()
+        };
+        let current = AnalysisResult {
+            functions: vec![evil],
+            summary: current_summary,
+            passed: false,
+        };
+        let delta = crate::domain::delta::compute(baseline, current);
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        assert!(
+            !out.contains("<script>alert"),
+            "hostile fn name must be HTML-escaped"
+        );
+        assert!(
+            !out.contains("src/<dangerous>"),
+            "hostile path must be HTML-escaped"
+        );
+    }
+
+    /// Byte-level snapshot lock for the HTML reporter's delta-tab
+    /// render (crap-rs#306).
+    #[test]
+    fn full_html_with_delta_snapshot() {
+        let delta = make_sample_delta();
+        let dview = make_delta_view_default(&delta);
+        let out = html_with_delta(&make_view_default(&delta.current), &dview);
         insta::assert_snapshot!(out);
     }
 }

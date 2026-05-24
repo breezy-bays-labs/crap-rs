@@ -8,6 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `crap-core` is the language-agnostic foundation shared by the
 `crap4rs` (Rust) and `crap4ts` (TypeScript) adapters.
 
+## [0.6.0]
+
+### Added
+
+- HTML reporter: optional delta tab (Current vs baseline view) when
+    `--baseline` is set. The tabs nav appears between the topbar and
+    the body, the Current panel opens by default, and a second
+    `<div class="tab-panel" data-tab="delta">` follows with a 4-tile
+    delta KPI grid (Exceeding threshold · Max CRAP · Average CRAP ·
+    Avg coverage) plus Regressions / Improvements / New-functions
+    tables. The Sakura mock's 5th "Functions" tile is dropped
+    (counts already surface in the verdict line), the empty
+    Removed-zero panel is dropped, and the Unchanged section trims
+    to a single-line note. URL hash `#delta` deep-links into the
+    delta tab via an inline `<script>` hook so CI sticky-comment
+    links land users in the right view. (crap-rs#306)
+
+### Changed
+
+- `reporters::format_html` signature widened from
+    `(view, threshold, &AdapterMeta, ComplexityMetric)` to
+    `(view, delta: Option<&DeltaView<'_>>, threshold, &AdapterMeta, ComplexityMetric)`.
+    Additive parameter (callers that wire `None` produce
+    **byte-identical** v0.5.0 output — the no-baseline contract is
+    preserved end-to-end), but the signature change is breaking for
+    any external caller and motivates the minor bump.
+- HTML template gains a `{% if has_delta %}` gate on the tabs nav,
+    a second `<div class="tab-panel" data-tab="delta">` block,
+    delta-tab CSS layered into the inline `<style>`, and a
+    `tab-switcher` IIFE in the inline `<script>`. All four
+    additions are gated on `has_delta`; the no-baseline render
+    emits zero new bytes.
+
 ## [0.5.0]
 
 ### Changed
