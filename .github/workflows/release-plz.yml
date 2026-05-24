@@ -68,6 +68,15 @@ jobs:
       - uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
         with:
           command: release-pr
+        env:
+          # The action's git-config substep reads GITHUB_TOKEN to query
+          # the GraphQL viewer endpoint and configure the commit author
+          # identity for the auto-opened release PR. The workflow-level
+          # default `permissions: contents: read` plus this job's
+          # contents:write + pull-requests:write grant are what the
+          # short-lived token carries; the env passthrough is the
+          # plumbing release-plz's sub-action expects.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-plz-release:
     name: Publish + tag
@@ -91,6 +100,8 @@ jobs:
 
       - id: release-plz
         uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           command: release
           # CARGO_REGISTRY_TOKEN is intentionally absent: with
