@@ -59,12 +59,20 @@ from pathlib import Path
 STATUS_TAG_RE = re.compile(r"(?:^|\s)@(unwired|wip)(?=\s|$)")
 TAG_LINE_RE = re.compile(r"^\s*@")
 SCENARIO_LINE_RE = re.compile(r"^\s*Scenario(?::|\s+Outline:)\s*(.*)$")
-TRACKED_RE = re.compile(r"#\s*tracked:\s*crap-rs#\d+")
+# Enforce the AGENTS.md "BDD hygiene" Rule 2 example shape exactly:
+#   # tracked: crap-rs#<digits> — <one-line non-empty reason>
+# `^\s*#` so the comment must be a true Gherkin comment line (not an
+# inline trailing comment in a step). The em-dash is U+2014 (the exact
+# glyph the AGENTS.md example uses); ASCII `--` is rejected. The
+# reason must contain at least one non-space character so an empty
+# trailer (`crap-rs#123 — `) cannot pass.
+TRACKED_RE = re.compile(r"^\s*#\s*tracked:\s*crap-rs#\d+\s+—\s+\S.*$")
 
-FEATURE_DIRS = (
-    Path("crates/crap4rs/tests/features"),
-    Path("crates/crap4ts/tests/features"),
-)
+# Dynamic discovery — every `crates/*/tests/features/` directory is in
+# scope. Hard-coding `crap4rs` + `crap4ts` worked today but silently
+# omits any future adapter crate (e.g. a `crap4py`); the glob keeps the
+# lint future-proof without per-crate maintenance.
+FEATURE_DIR_GLOB = "crates/*/tests/features"
 
 
 @dataclass
@@ -154,9 +162,8 @@ def lint(repo_root: Path) -> int:
     scanned = 0
     deferred = 0
 
-    for feat_dir in FEATURE_DIRS:
-        abs_dir = repo_root / feat_dir
-        if not abs_dir.exists():
+    for abs_dir in sorted(repo_root.glob(FEATURE_DIR_GLOB)):
+        if not abs_dir.is_dir():
             continue
         for feature_path in sorted(abs_dir.rglob("*.feature")):
             for block in parse_blocks(feature_path):
