@@ -13,6 +13,12 @@ shared-core development.
 
 ## [Unreleased]
 
+## [2.0.0-rc.3](https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.2...crap4ts-v2.0.0-rc.3) - 2026-05-24
+
+### Added
+
+- *(crap-core)* #260 — askama-templated HTML + markdown reporters + Sakura HTML redesign ([#307](https://github.com/breezy-bays-labs/crap-rs/pull/307))
+
 ### Added
 
 - `crap4ts init` subcommand generates a starter `crap4ts.toml`

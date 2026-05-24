@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.5.0...crap4rs-v0.6.0) - 2026-05-24
+
+### Added
+
+- *(crap-core)* #260 — askama-templated HTML + markdown reporters + Sakura HTML redesign ([#307](https://github.com/breezy-bays-labs/crap-rs/pull/307))
+- *(ci)* #270 — adopt release-plz + crates.io OIDC trusted publishing ([#301](https://github.com/breezy-bays-labs/crap-rs/pull/301))
+- #276 — github-annotations reporter + composite action input ([#288](https://github.com/breezy-bays-labs/crap-rs/pull/288))
+- #139 #114 — composite scorecard action dispatches crap4ts + cross-adapter row parity ([#282](https://github.com/breezy-bays-labs/crap-rs/pull/282))
+- *(crap-core)* [**breaking**] align CRAP thresholds + risk tiers (8/15/25) ([#281](https://github.com/breezy-bays-labs/crap-rs/pull/281))
+- #180 #196 #202 — BDD tracked-comment lint + delta.feature spec + colored set_override poison fix ([#279](https://github.com/breezy-bays-labs/crap-rs/pull/279))
+- *(crap-core)* #188 — CrapError::MetricNotSupported + AdapterMeta::default_metric + crap4ts walker check + ADR (d) + crap-core 0.2.0 ([#203](https://github.com/breezy-bays-labs/crap-rs/pull/203))
+- #73 — `crap4rs init` subcommand (with crap4ts inheritance via AdapterMeta) ([#171](https://github.com/breezy-bays-labs/crap-rs/pull/171))
+- *(cli)* #131 — --summary one-line analysis verdict flag ([#167](https://github.com/breezy-bays-labs/crap-rs/pull/167))
+- *(crap-core)* [**breaking**] #147 — restore #[non_exhaustive] on 15 result structs (v1.0 prep) ([#166](https://github.com/breezy-bays-labs/crap-rs/pull/166))
+- *(crap-core)* #148+#152+#160 — AdapterMeta + decouple from Rust/crap4rs ([#162](https://github.com/breezy-bays-labs/crap-rs/pull/162))
+
+### Fixed
+
+- *(crap4ts)* #253 — skip `.d.ts` declaration files via AdapterMeta::forced_excludes ([#258](https://github.com/breezy-bays-labs/crap-rs/pull/258))
+- #163 — adapter-aware coverage preflight + walker reconciliation + config-path hint ([#164](https://github.com/breezy-bays-labs/crap-rs/pull/164))
+- *(crap-core)* #150 — late-bind coverage adapter via factory closure ([#158](https://github.com/breezy-bays-labs/crap-rs/pull/158))
+
+### Other
+
+- add per-crate READMEs for crates.io display ([#305](https://github.com/breezy-bays-labs/crap-rs/pull/305))
+- *(ci)* #261 — ast-purity layer-4 adapter-vocabulary string-literal ban ([#286](https://github.com/breezy-bays-labs/crap-rs/pull/286))
+- *(crap-core)* #178 #179 — port-surface cleanup (CrapError rename + CoveragePort::parse to &Path) ([#262](https://github.com/breezy-bays-labs/crap-rs/pull/262))
+- pre-flight scaffold for TS-adapter pipeline (gitignore + delta.feature relocation + #173 BDD scenarios) ([#195](https://github.com/breezy-bays-labs/crap-rs/pull/195))
+- *(bdd)* #168 — tag lexicon + retag scenarios + clean up Background ([#170](https://github.com/breezy-bays-labs/crap-rs/pull/170))
+- *(crap-core)* #161 — AdapterMeta polish + ci(ast-purity) adapter-name gate ([#165](https://github.com/breezy-bays-labs/crap-rs/pull/165))
+
 ### Added
 
 - `--format github-annotations` emits GitHub Actions `::warning`
