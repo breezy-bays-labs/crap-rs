@@ -9,6 +9,7 @@ repository.workspace = true
 description = "CRAP score analyzer for Rust — find complex, under-tested functions"
 keywords = ["crap", "complexity", "coverage", "testing", "quality"]
 categories = ["development-tools::testing", "command-line-utilities"]
+readme = "README.md"
 
 [package.metadata.binstall]
 # The `crap4rs-v{version}` tag prefix is the per-crate tag pattern created

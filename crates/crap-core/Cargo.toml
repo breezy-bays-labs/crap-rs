@@ -9,6 +9,7 @@ repository.workspace = true
 description = "Language-agnostic foundation for the CRAP analyzer family — domain types, port traits, and shared invariants for crap4rs / future crap4ts."
 keywords = ["crap", "complexity", "coverage", "testing", "quality"]
 categories = ["development-tools::testing"]
+readme = "README.md"
 
 [lib]
 name = "crap_core"

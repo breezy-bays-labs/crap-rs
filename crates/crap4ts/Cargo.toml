@@ -9,6 +9,7 @@ repository.workspace = true
 description = "TypeScript adapter for crap-rs — Rust-powered CRAP score analyzer combining oxc AST complexity with Istanbul JSON coverage"
 keywords = ["crap", "complexity", "coverage", "typescript", "quality"]
 categories = ["development-tools::testing", "command-line-utilities"]
+readme = "README.md"
 
 # Single-crate cdylib + bin (CAO A3). The cdylib artifact powers the
 # napi-rs Node.js binding; the bin artifact is the standalone CLI that
