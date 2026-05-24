@@ -378,7 +378,7 @@ jobs:
           BIN: ./target/release/crap4rs
         run: |
           set -euo pipefail
-          envelope=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 25 --format json --no-fail)
+          envelope=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 15 --format json --no-fail)
           # Required fields the action's jq queries depend on.
           for field in '.schema_version' '.tool_version' '.result.passed' '.result.functions'; do
             value=$(printf '%s' "$envelope" | jq -e "$field" >/dev/null && echo ok || echo missing)
@@ -392,7 +392,7 @@ jobs:
           BIN: ./target/release/crap4rs
         run: |
           set -euo pipefail
-          md=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 25 --format markdown --no-fail)
+          md=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 15 --format markdown --no-fail)
           if [ -z "$md" ]; then
             echo "::error::markdown reporter produced empty output"
             exit 1
@@ -432,7 +432,7 @@ jobs:
         with:
           coverage: lcov.info
           src: crates/crap4rs/src
-          threshold: '25'
+          threshold: '15'
           comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
           comment-header: 'crap-scorecard-self'
       - name: Assert action outputs are populated
@@ -516,7 +516,7 @@ jobs:
           SRC: ${{ steps.fixture.outputs.src }}
         run: |
           set -euo pipefail
-          envelope=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 25 --format json --no-fail)
+          envelope=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 15 --format json --no-fail)
           for field in '.schema_version' '.tool_version' '.result.passed' '.result.functions'; do
             value=$(printf '%s' "$envelope" | jq -e "$field" >/dev/null && echo ok || echo missing)
             if [ "$value" = "missing" ]; then
@@ -531,7 +531,7 @@ jobs:
           SRC: ${{ steps.fixture.outputs.src }}
         run: |
           set -euo pipefail
-          md=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 25 --format markdown --no-fail)
+          md=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 15 --format markdown --no-fail)
           if [ -z "$md" ]; then
             echo "::error::markdown reporter produced empty output"
             exit 1
@@ -564,7 +564,7 @@ jobs:
         with:
           coverage: ${{ steps.fixture.outputs.coverage }}
           src: ${{ steps.fixture.outputs.src }}
-          threshold: '25'
+          threshold: '15'
           # No sticky comment on the ts smoke — the crap4rs sticky
           # comment owns the per-PR scorecard slot; a second sticky
           # under a different header is review noise.
