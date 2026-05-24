@@ -261,11 +261,11 @@ fn given_one_function(
     coverage: f64,
     crap: f64,
 ) {
-    let risk = if crap < 5.0 {
+    let risk = if crap <= 8.0 {
         "low"
-    } else if crap < 10.0 {
+    } else if crap <= 15.0 {
         "acceptable"
-    } else if crap < 30.0 {
+    } else if crap <= 25.0 {
         "moderate"
     } else {
         "high"

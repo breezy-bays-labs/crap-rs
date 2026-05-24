@@ -1,5 +1,5 @@
 ---
-source: src/adapters/reporters/json.rs
+source: crates/crap-core/src/adapters/reporters/json.rs
 expression: v
 ---
 {
@@ -114,7 +114,7 @@ expression: v
       "exceeding_threshold": 0,
       "max_complexity": 5,
       "max_crap": {
-        "risk_level": "acceptable",
+        "risk_level": "low",
         "value": 5.16
       },
       "median_complexity": 5.0,

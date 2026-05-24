@@ -1,7 +1,11 @@
 # Vendored mokumo scorecard schema
 
 `schema.json` is a verbatim copy of
-`breezy-bays-labs/mokumo:.config/scorecard/schema.json`.
+`breezy-bays-labs/mokumo:.config/scorecard/schema.json`, with one local
+deviation: the `definitions/CrateBreakout.properties.crate_name.description`
+example was changed from a project-specific crate name to the generic
+`"my-crate"`. A re-sync via `./regen.sh` must re-apply that sanitization
+(or land the same change upstream first).
 
 | Field | Value |
 |---|---|

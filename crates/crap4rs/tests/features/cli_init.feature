@@ -60,9 +60,9 @@ Feature: crap4rs init subcommand
     When the operator runs `crap4rs init --non-interactive`
     Then the config file contains "# crap4rs.toml"
     And the config file contains "Threshold preset"
-    And the config file contains "strict (15)"
-    And the config file contains "default (25)"
-    And the config file contains "lenient (40)"
+    And the config file contains "strict (8)"
+    And the config file contains "default (15)"
+    And the config file contains "lenient (25)"
 
   @wired
   Scenario: generated config round-trips through the loader

@@ -67,8 +67,9 @@ fn strip_volatile(value: &mut Value) {
 fn envelope() {
     // Fixture: crap4rs's own LCOV against its own source. `--no-fail`
     // ensures the snapshot covers the threshold-exceeded branch
-    // (passed=false) since crap4rs-self.lcov has functions above
-    // threshold=25 — that's the realistic envelope shape.
+    // (passed=false). `--threshold 8` matches the post-#272 strict
+    // cutoff and exposes the crap4rs-self.lcov over-threshold
+    // functions — that's the realistic envelope shape.
     let output = Command::cargo_bin("crap4rs")
         .expect("crap4rs binary discoverable in workspace")
         .args([
@@ -77,7 +78,7 @@ fn envelope() {
             "--src",
             "../crap4rs/src",
             "--threshold",
-            "25",
+            "8",
             "--format",
             "json",
             "--no-fail",

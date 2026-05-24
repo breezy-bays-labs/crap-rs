@@ -42,7 +42,7 @@ Feature: JSON reporter
     And the entry contains "complexity" equal to 5
     And the entry contains "coverage_percent" equal to 80.0
     And the entry contains "crap" with "value" equal to 5.16
-    And the entry contains "crap" with "risk_level" equal to "acceptable"
+    And the entry contains "crap" with "risk_level" equal to "low"
     And the entry contains "exceeds" equal to false
 
   @wired

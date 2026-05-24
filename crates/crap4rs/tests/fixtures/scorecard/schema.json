@@ -185,7 +185,7 @@
       ],
       "properties": {
         "crate_name": {
-          "description": "Crate name (e.g. `\"kikan\"`).",
+          "description": "Crate name (e.g. `\"my-crate\"`).",
           "type": "string"
         },
         "handlers": {

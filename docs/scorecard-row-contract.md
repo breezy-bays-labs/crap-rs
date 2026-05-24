@@ -49,7 +49,7 @@ for offline-clean testing — see [Schema vendoring strategy](#schema-vendoring-
 | `label` | `string` | Display label, e.g. `"CRAP Δ"` |
 | `anchor` | `string` | URL-fragment anchor for the rendered row, e.g. `"crap-delta"` |
 | `status` | `"Red"` \| `"Yellow"` \| `"Green"` | Producer-minted verdict — see [Status policy](#status-policy-model-p) |
-| `threshold` | `u32` | The CRAP threshold the count is over (default `25`; tunable via `crap4rs.toml` or `--threshold`) |
+| `threshold` | `u32` | The CRAP threshold the count is over (default `15`, the metric-correct `default` preset; tunable via `crap4rs.toml` or `--threshold`) |
 | `delta_count` | `i32` | Signed delta in over-threshold function count vs. baseline |
 | `delta_text` | `string` | Producer-rendered display string, e.g. `"5 → 7 (+2)"`. The aggregator never reparses. |
 | `failure_detail_md` | `string?` | Markdown describing the new violations. **Required when `status == "Red"`** (Layer 2 schema enforcement); omitted otherwise. |
@@ -70,7 +70,7 @@ variants, new optional fields) bump `schema_version` on the envelope.
   "label": "CRAP Δ",
   "anchor": "crap-delta",
   "status": "Green",
-  "threshold": 25,
+  "threshold": 15,
   "delta_count": -1,
   "delta_text": "5 → 4 (-1)"
 }
@@ -85,7 +85,7 @@ variants, new optional fields) bump `schema_version` on the envelope.
   "label": "CRAP Δ",
   "anchor": "crap-delta",
   "status": "Yellow",
-  "threshold": 25,
+  "threshold": 15,
   "delta_count": 0,
   "delta_text": "5 → 5 (regressions on existing functions)"
 }
@@ -100,10 +100,10 @@ variants, new optional fields) bump `schema_version` on the envelope.
   "label": "CRAP Δ",
   "anchor": "crap-delta",
   "status": "Red",
-  "threshold": 25,
+  "threshold": 15,
   "delta_count": 2,
   "delta_text": "5 → 7 (+2)",
-  "failure_detail_md": "**New CRAP threshold violations (>25):**\n- `kikan::control_plane::users::handle_create` — `crates/kikan/src/control_plane/users.rs:142` — CRAP 28.4\n- `kikan::backup::run_backup` — `crates/kikan/src/backup.rs:88` — CRAP 31.1"
+  "failure_detail_md": "**New CRAP threshold violations (>15):**\n- `auth::login::handle_post` — `src/auth/login.rs:142` — CRAP 18.4\n- `backup::run_backup` — `src/backup.rs:88` — CRAP 21.1"
 }
 ```
 

@@ -186,18 +186,24 @@ fn scenario_divergence_shows_contributor_breakdown() {
     );
 }
 
-/// Scenario: risk classification labels match across versions (D8
-/// invariance) — when nothing diverges, every risk label matches and
-/// no risk-class divergence is emitted.
+/// Scenario: score parity is the only parity contract. When score
+/// matches across versions (same CC, |Δcrap| ≤ tolerance, coverage
+/// stable), the pair classifies as `Match` regardless of whether the
+/// derived risk label moved. Risk labels live in `classify_risk` and
+/// are unit-tested there; pinning them across the v1.x boundary
+/// would force a new exemption bucket for every future tier
+/// recalibration (e.g. #272).
 #[test]
-fn scenario_risk_labels_match_when_no_divergence() {
+fn scenario_score_parity_is_match_even_when_risk_label_moved() {
+    // Same score, same CC, same coverage; v1's label is the pre-#272
+    // tier label, v2's is the post-#272 label — score-derived only.
     let oracle = vec![
         rec("a", 1, 2, 100.0, 2.0, "low", false, &[]),
         rec("b", 9, 9, 90.0, 9.01, "moderate", true, &[]),
     ];
     let v2 = vec![
         rec("a", 1, 2, 100.0, 2.0, "low", false, &[]),
-        rec("b", 9, 9, 90.0, 9.01, "moderate", true, &[]),
+        rec("b", 9, 9, 90.0, 9.01, "acceptable", true, &[]),
     ];
     let r = diff(&oracle, &v2);
     assert!(r.gate_passes());

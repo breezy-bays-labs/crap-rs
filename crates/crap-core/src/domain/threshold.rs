@@ -2,54 +2,54 @@ use super::types::ComplexityMetric;
 
 // ── Threshold calibration table ──────────────────────────────────────
 //
-// CRAP thresholds are NOT metric-invariant. For the *same* function,
-// its cyclomatic count (decision points) and its cognitive count
-// (nesting-weighted structural complexity) differ in magnitude — a
-// function that is "moderately risky" scores ~16 cyclomatic but ~25
-// cognitive. So one scalar cutoff cannot serve both metrics: a cutoff
-// tuned for cognitive scores, applied to cyclomatic scores, lets
-// genuinely-risky functions pass (and vice versa).
-//
-// Each calibration *tier* (strict / default / lenient) therefore has a
-// distinct cutoff per metric:
+// CRAP thresholds are aligned with the intrinsic risk classification
+// in `crap.rs::classify_risk`: every preset fires at the next
+// risk-tier boundary up.
 //
 //                strict  default  lenient
-//   cyclomatic      8       16       30
-//   cognitive      15       25       40
+//   cyclomatic      8       15       25
+//   cognitive       8       15       25
 //
-// The bare-named constants are the cognitive column; the
-// `_CYCLOMATIC` siblings are the cyclomatic column.
+// Both metric columns currently hold the same values. The dual-column
+// infrastructure is preserved because cognitive and cyclomatic scores
+// can diverge in magnitude for the same code (cognitive is
+// nesting-weighted; cyclomatic counts decision points), and a future
+// recalibration may want to widen one column without touching the
+// other. Today the columns are flat-equal — the simplest defensible
+// position until corpus evidence motivates a split.
+//
 // `ThresholdPreset::threshold(metric)` is the single lookup that keys
-// a tier to the right column — every preset / `--strict` / `--lenient`
-// / no-flag-default resolution routes through it so no path applies a
-// metric's cutoff to the other metric's scores.
+// a tier to a column. Every preset / `--strict` / `--lenient` /
+// no-flag-default resolution routes through it, so a future per-metric
+// divergence is a one-line constant change with no API churn.
 
-/// Strict CRAP cutoff for the **cognitive** metric — high-quality or
-/// safety-critical code. Matches SonarSource S3776's cognitive
-/// complexity limit and eliminates false positives on well-tested
-/// idiomatic Rust (SeaORM-style large match arms). Cyclomatic
-/// equivalent: [`STRICT_THRESHOLD_CYCLOMATIC`].
-pub const STRICT_THRESHOLD: f64 = 15.0;
+/// Strict CRAP cutoff for the **cognitive** metric — gates at the
+/// Low → Acceptable risk boundary; for high-quality or safety-critical
+/// code. Cyclomatic equivalent: [`STRICT_THRESHOLD_CYCLOMATIC`].
+pub const STRICT_THRESHOLD: f64 = 8.0;
 
-/// Default CRAP cutoff for the **cognitive** metric — balanced for
-/// typical codebases. Cyclomatic equivalent: [`DEFAULT_THRESHOLD_CYCLOMATIC`].
-pub const DEFAULT_THRESHOLD: f64 = 25.0;
+/// Default CRAP cutoff for the **cognitive** metric — gates at the
+/// Acceptable → Moderate risk boundary; the balanced tier for typical
+/// codebases. Cyclomatic equivalent: [`DEFAULT_THRESHOLD_CYCLOMATIC`].
+pub const DEFAULT_THRESHOLD: f64 = 15.0;
 
-/// Lenient CRAP cutoff for the **cognitive** metric — legacy or
-/// transitional code. Cyclomatic equivalent: [`LENIENT_THRESHOLD_CYCLOMATIC`].
-pub const LENIENT_THRESHOLD: f64 = 40.0;
+/// Lenient CRAP cutoff for the **cognitive** metric — gates at the
+/// Moderate → High risk boundary; for legacy or transitional code.
+/// Cyclomatic equivalent: [`LENIENT_THRESHOLD_CYCLOMATIC`].
+pub const LENIENT_THRESHOLD: f64 = 25.0;
 
-/// Strict CRAP cutoff for the **cyclomatic** metric. ~half the
-/// cognitive strict value because cyclomatic scores run lower in
-/// magnitude for the same code.
+/// Strict CRAP cutoff for the **cyclomatic** metric. Currently flat-
+/// equal to the cognitive strict value; the constant is retained so a
+/// future per-metric recalibration is a one-line change.
 pub const STRICT_THRESHOLD_CYCLOMATIC: f64 = 8.0;
 
-/// Default CRAP cutoff for the **cyclomatic** metric — the balanced
-/// tier for cyclomatic-scored code.
-pub const DEFAULT_THRESHOLD_CYCLOMATIC: f64 = 16.0;
+/// Default CRAP cutoff for the **cyclomatic** metric. Currently flat-
+/// equal to the cognitive default; see column note above.
+pub const DEFAULT_THRESHOLD_CYCLOMATIC: f64 = 15.0;
 
-/// Lenient CRAP cutoff for the **cyclomatic** metric.
-pub const LENIENT_THRESHOLD_CYCLOMATIC: f64 = 30.0;
+/// Lenient CRAP cutoff for the **cyclomatic** metric. Currently flat-
+/// equal to the cognitive lenient; see column note above.
+pub const LENIENT_THRESHOLD_CYCLOMATIC: f64 = 25.0;
 
 /// Named threshold preset — a calibration *tier*, independent of
 /// metric. The concrete f64 cutoff is resolved per metric via
@@ -57,13 +57,15 @@ pub const LENIENT_THRESHOLD_CYCLOMATIC: f64 = 30.0;
 /// number for cyclomatic vs cognitive scores).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThresholdPreset {
-    /// High-quality libraries, safety-critical code. Cognitive 15,
-    /// cyclomatic 8.
+    /// High-quality libraries, safety-critical code. Gates at the
+    /// Low → Acceptable risk boundary (cognitive 8, cyclomatic 8).
     Strict,
     /// Typical projects (balanced) — the tier used when no preset or
-    /// explicit threshold is given. Cognitive 25, cyclomatic 16.
+    /// explicit threshold is given. Gates at the Acceptable → Moderate
+    /// risk boundary (cognitive 15, cyclomatic 15).
     Default,
-    /// Legacy or transitional code. Cognitive 40, cyclomatic 30.
+    /// Legacy or transitional code. Gates at the Moderate → High risk
+    /// boundary (cognitive 25, cyclomatic 25).
     Lenient,
 }
 
@@ -158,28 +160,31 @@ mod tests {
 
     #[test]
     fn threshold_constants() {
-        // D5 calibration table (locked decision #5).
-        assert_eq!(STRICT_THRESHOLD, 15.0);
-        assert_eq!(DEFAULT_THRESHOLD, 25.0);
-        assert_eq!(LENIENT_THRESHOLD, 40.0);
+        // Aligned with classify_risk boundaries (Low ≤ 8, Acceptable ≤ 15,
+        // Moderate ≤ 25). Both metric columns flat-equal today; see the
+        // calibration-table comment at the top of this module for why
+        // the dual-column infrastructure is preserved.
+        assert_eq!(STRICT_THRESHOLD, 8.0);
+        assert_eq!(DEFAULT_THRESHOLD, 15.0);
+        assert_eq!(LENIENT_THRESHOLD, 25.0);
         assert_eq!(STRICT_THRESHOLD_CYCLOMATIC, 8.0);
-        assert_eq!(DEFAULT_THRESHOLD_CYCLOMATIC, 16.0);
-        assert_eq!(LENIENT_THRESHOLD_CYCLOMATIC, 30.0);
+        assert_eq!(DEFAULT_THRESHOLD_CYCLOMATIC, 15.0);
+        assert_eq!(LENIENT_THRESHOLD_CYCLOMATIC, 25.0);
     }
 
     #[test]
     fn preset_to_threshold_is_metric_keyed() {
         use ComplexityMetric::{Cognitive, Cyclomatic};
-        // Cognitive column (crap4rs).
-        assert_eq!(ThresholdPreset::Strict.threshold(Cognitive), 15.0);
-        assert_eq!(ThresholdPreset::Default.threshold(Cognitive), 25.0);
-        assert_eq!(ThresholdPreset::Lenient.threshold(Cognitive), 40.0);
-        // Cyclomatic column (crap4ts / crap4rs --metric cyclomatic) —
-        // the #218 fix: a tier resolves to the metric-correct cutoff,
-        // not the cognitive value applied blindly.
+        // Cognitive column (crap4rs default).
+        assert_eq!(ThresholdPreset::Strict.threshold(Cognitive), 8.0);
+        assert_eq!(ThresholdPreset::Default.threshold(Cognitive), 15.0);
+        assert_eq!(ThresholdPreset::Lenient.threshold(Cognitive), 25.0);
+        // Cyclomatic column (crap4ts / crap4rs --metric cyclomatic).
+        // Routing stays metric-keyed even with flat-equal values so a
+        // future per-metric recalibration is a one-line change.
         assert_eq!(ThresholdPreset::Strict.threshold(Cyclomatic), 8.0);
-        assert_eq!(ThresholdPreset::Default.threshold(Cyclomatic), 16.0);
-        assert_eq!(ThresholdPreset::Lenient.threshold(Cyclomatic), 30.0);
+        assert_eq!(ThresholdPreset::Default.threshold(Cyclomatic), 15.0);
+        assert_eq!(ThresholdPreset::Lenient.threshold(Cyclomatic), 25.0);
     }
 
     #[test]
