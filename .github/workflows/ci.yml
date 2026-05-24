@@ -20,6 +20,13 @@ permissions:
 env:
   CARGO_TARGET_DIR: target
   CARGO_TERM_COLOR: always
+  # Single source of truth for the smoke jobs' threshold input — both
+  # `scorecard-smoke-rust` and `scorecard-smoke-ts` (and the preset
+  # spot-check steps under `scorecard-smoke-rust`) consume this. The
+  # rust smoke uses a tighter strict cutoff for its main invocation
+  # (see the in-job rationale), so this env var owns the TS smoke's
+  # default-tier check + the preset spot-checks' baseline value.
+  CRAP_SMOKE_THRESHOLD: '15'
 
 jobs:
   fmt:
@@ -343,18 +350,18 @@ jobs:
         if: github.event_name == 'push'
         run: cargo mutants -j 4 --package crap4ts --file crates/crap4ts/src/adapters/walker/mod.rs --no-shuffle
 
-  scorecard-smoke:
-    # Two-layer smoke for the composite action:
-    #   (1) Run the PR's locally-built crap4rs directly against lcov.info
-    #       in JSON + markdown modes. Catches any regression in the
-    #       analyzer/renderer/envelope shape introduced by THIS PR before
-    #       it can mask itself by being installed-from-crates.io later.
-    #   (2) Exercise the composite action's wiring (input plumbing,
-    #       output emission). The action installs crap4rs via `cargo
-    #       binstall` — that path resolves to the latest published
-    #       version, so layer (1) is what guards against PR regressions
-    #       in the binary itself.
-    name: Scorecard action smoke (analysis-only)
+  scorecard-smoke-rust:
+    # Composite-action-driven smoke for the `crap4rs` dispatch path.
+    # The previous Layer 1 direct-binary probe (envelope-shape +
+    # markdown-header checks) was dropped in PR #292 — that surface is
+    # now owned by the wire-envelope canaries
+    # (`crates/crap-core/tests/wire_envelope_crap4rs.rs` + sibling TS
+    # files) which assert `tool_version` non-empty pre-strip + the
+    # full envelope shape on every `cargo nextest run`. The smoke
+    # below stays scoped to exercising the public composite action's
+    # plumbing (input parsing, output emission, sticky-comment shape,
+    # inline annotations) against the PR's locally-built binary.
+    name: Scorecard action smoke — Rust (analysis-only)
     runs-on: ubuntu-latest
     needs: [coverage]
     permissions:
@@ -370,66 +377,15 @@ jobs:
         with:
           name: lcov
 
-      # Layer (1): exercise the PR's binary directly.
       - name: Build PR binary
         run: cargo build --release --package crap4rs
-      - name: Direct smoke — JSON envelope shape
-        env:
-          BIN: ./target/release/crap4rs
-        run: |
-          set -euo pipefail
-          envelope=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 15 --format json --no-fail)
-          # Required fields the action's jq queries depend on.
-          for field in '.schema_version' '.tool_version' '.result.passed' '.result.functions'; do
-            value=$(printf '%s' "$envelope" | jq -e "$field" >/dev/null && echo ok || echo missing)
-            if [ "$value" = "missing" ]; then
-              echo "::error::JSON envelope missing $field — action's output parsing would break"
-              exit 1
-            fi
-          done
-      - name: Direct smoke — markdown render
-        env:
-          BIN: ./target/release/crap4rs
-        run: |
-          set -euo pipefail
-          md=$("$BIN" --coverage lcov.info --src crates/crap4rs/src --threshold 15 --format markdown --no-fail)
-          if [ -z "$md" ]; then
-            echo "::error::markdown reporter produced empty output"
-            exit 1
-          fi
-          # Sanity: the rendered scorecard always opens with an h1 carrying
-          # the tool version. The action consumes the whole string verbatim,
-          # so a regression here means consumers get garbage.
-          # Pure-bash prefix match (no `head -1` pipe, which would race
-          # SIGPIPE under `pipefail`).
-          case "$md" in
-            '# crap4rs'*) ;;
-            *)
-              echo "::error::markdown reporter output did not begin with '# crap4rs' header"
-              echo "First 80 chars: ${md:0:80}"
-              exit 1
-              ;;
-          esac
 
-      # Layer (2): exercise the composite action's plumbing.
-      # On pull_request runs we post a sticky comment so the rendered
-      # scorecard is reviewable on the PR itself; push runs to main fall
-      # back to `none` (no PR to comment on).
-      #
-      # Stage the PR binary as the pre-installed crap4rs so the action
-      # uses THIS PR's analyzer (not whatever crates.io publishes as
-      # latest). Without this, the smoke renders against the last
-      # released version and silently masks regressions in the binary.
-      - name: Stage PR binary as pre-installed crap4rs
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.cargo/bin"
-          install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
-          "$HOME/.cargo/bin/crap4rs" --version
-      - name: Dogfood the scorecard action
+      - name: Dogfood the scorecard action (rust dispatch)
         id: crap
-        uses: ./.github/actions/scorecard
+        uses: ./.github/actions/scorecard-smoke
         with:
+          bin-path: ./target/release/crap4rs
+          language: rust
           coverage: lcov.info
           src: crates/crap4rs/src
           # Strict cutoff (matches `--strict` for the cognitive metric,
@@ -453,37 +409,151 @@ jobs:
           # broken envelope shape or escape regression surfaces as a
           # missing/mangled annotation on the PR itself.
           annotations: 'true'
-      - name: Assert action outputs are populated
+
+      # ----------------------------------------------------------------
+      # Preset spot-checks (PR #292 acceptance gate #11).
+      #
+      # The plan calls out that we must verify the preset-to-raw
+      # threshold mapping mechanically — documentation rots; CI doesn't.
+      # Each step below invokes the scorecard action with a different
+      # preset shape and asserts the resolved threshold matches the
+      # locked calibration table (strict=8, default=15, lenient=25),
+      # plus one mixed step covering the actual-conflict warning case.
+      #
+      # All four steps reuse the workspace's own lcov.info + the
+      # PR-staged crap4rs binary; they do NOT post sticky comments
+      # (the main dogfood above owns that surface) and they do NOT
+      # exercise inline annotations (covered above) — they exist
+      # solely to lock the preset surface.
+      # ----------------------------------------------------------------
+      - name: Preset spot-check — strict
+        id: preset-strict
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold-preset: strict
+          comment-mode: 'none'
+      - name: Assert strict resolved to 8
         env:
-          MARKDOWN: ${{ steps.crap.outputs.markdown }}
-          ENVELOPE_PATH: ${{ steps.crap.outputs.json-envelope-path }}
-          ANALYSIS_PASSED: ${{ steps.crap.outputs.analysis-passed }}
-          REGRESSIONS: ${{ steps.crap.outputs.regressions }}
-          NEW_VIOLATIONS: ${{ steps.crap.outputs.new-violations }}
+          RESOLVED: ${{ steps.preset-strict.outputs.threshold-resolved }}
         run: |
           set -euo pipefail
-          if [ -z "$MARKDOWN" ]; then
-            echo "::error::scorecard action emitted empty markdown output"
+          if [ "$RESOLVED" != "8" ]; then
+            echo "::error::strict preset resolved to '$RESOLVED'; expected 8"
             exit 1
           fi
-          test -f "$ENVELOPE_PATH"
-          echo "analysis_passed=$ANALYSIS_PASSED"
-          echo "regressions=$REGRESSIONS"
-          echo "new_violations=$NEW_VIOLATIONS"
+          echo "strict → threshold=8 ✓"
+
+      - name: Preset spot-check — default
+        id: preset-default
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold-preset: default
+          comment-mode: 'none'
+      - name: Assert default resolved to env var
+        env:
+          RESOLVED: ${{ steps.preset-default.outputs.threshold-resolved }}
+          EXPECTED: ${{ env.CRAP_SMOKE_THRESHOLD }}
+        run: |
+          set -euo pipefail
+          if [ "$RESOLVED" != "$EXPECTED" ]; then
+            echo "::error::default preset resolved to '$RESOLVED'; expected $EXPECTED"
+            exit 1
+          fi
+          echo "default → threshold=$EXPECTED ✓"
+
+      - name: Preset spot-check — lenient
+        id: preset-lenient
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold-preset: lenient
+          comment-mode: 'none'
+      - name: Assert lenient resolved to 25
+        env:
+          RESOLVED: ${{ steps.preset-lenient.outputs.threshold-resolved }}
+        run: |
+          set -euo pipefail
+          if [ "$RESOLVED" != "25" ]; then
+            echo "::error::lenient preset resolved to '$RESOLVED'; expected 25"
+            exit 1
+          fi
+          echo "lenient → threshold=25 ✓"
+
+      - name: Preset spot-check — actual-conflict warning (strict + threshold:20)
+        id: preset-conflict
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold-preset: strict
+          threshold: '20'
+          comment-mode: 'none'
+      - name: Assert explicit threshold wins on conflict
+        env:
+          RESOLVED: ${{ steps.preset-conflict.outputs.threshold-resolved }}
+        run: |
+          set -euo pipefail
+          # Explicit `threshold: '20'` differs from strict-derived 8,
+          # so the action emits a `::warning::` and the explicit value
+          # wins (additive shim discipline per ADR public-api-shim).
+          # The warning itself surfaces in the workflow log; this step
+          # locks the wins-on-conflict half of the contract.
+          if [ "$RESOLVED" != "20" ]; then
+            echo "::error::explicit threshold:20 + strict preset resolved to '$RESOLVED'; expected 20 (explicit wins)"
+            exit 1
+          fi
+          echo "strict + threshold:20 → threshold=20 (explicit wins, warning emitted) ✓"
+
+      - name: Preset spot-check — no-conflict (default + threshold:15)
+        id: preset-no-conflict
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold-preset: default
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert no-conflict resolves cleanly
+        env:
+          RESOLVED: ${{ steps.preset-no-conflict.outputs.threshold-resolved }}
+          EXPECTED: ${{ env.CRAP_SMOKE_THRESHOLD }}
+        run: |
+          set -euo pipefail
+          # default preset derives the same value the explicit
+          # threshold passes, so no actual conflict, no warning, no
+          # surprise. This is the "you set both" case that the plan
+          # explicitly does NOT warn on (the false-default-
+          # indistinguishable-from-explicit gotcha — see the
+          # `Resolve presets` step's inline rationale).
+          if [ "$RESOLVED" != "$EXPECTED" ]; then
+            echo "::error::default preset + matching threshold resolved to '$RESOLVED'; expected $EXPECTED"
+            exit 1
+          fi
+          echo "default + threshold:$EXPECTED → threshold=$EXPECTED (no conflict, no warning) ✓"
 
   scorecard-smoke-ts:
-    # Sibling of `scorecard-smoke` for the TypeScript dispatch path.
-    # Build crap4ts from the PR, stage it on PATH (the only install
-    # strategy the action's typescript branch supports today — see
-    # AGENTS.md "crap4ts install constraint"), prepare a tiny Istanbul
-    # JSON fixture from the workspace's ts-fixtures corpus, then dogfood
-    # the composite action with `.json` coverage and assert the same
-    # outputs land as the rust dispatch.
+    # Sibling of `scorecard-smoke-rust` for the TypeScript dispatch
+    # path. Build crap4ts from the PR, stage it on PATH (the only
+    # install strategy the action's typescript branch supports today —
+    # see AGENTS.md "crap4ts install constraint"), prepare a tiny
+    # Istanbul JSON fixture from the workspace's ts-fixtures corpus,
+    # then dogfood the composite action with `.json` coverage and
+    # assert the same outputs land as the rust dispatch.
+    #
+    # Layer 1 direct-binary probe was dropped in PR #292 (canary
+    # takeover — see scorecard-smoke-rust rationale + the three wire
+    # envelope canaries in `crates/crap-core/tests/wire_envelope_*.rs`).
     name: Scorecard action smoke — TypeScript (analysis-only)
     runs-on: ubuntu-latest
     # comment-mode: 'none' below — this job never posts a PR comment,
-    # so `contents: read` is sufficient. The rust-side `scorecard-smoke`
-    # job owns the per-PR sticky-comment slot and elevates accordingly.
+    # so `contents: read` is sufficient. The rust-side
+    # `scorecard-smoke-rust` job owns the per-PR sticky-comment slot
+    # and elevates accordingly.
     permissions:
       contents: read
     steps:
@@ -495,7 +565,7 @@ jobs:
 
       # Build crap4ts from the PR's source so the smoke dogfoods this
       # PR's binary, not a downstream release. Mirrors the
-      # `scorecard-smoke` pattern for crap4rs.
+      # `scorecard-smoke-rust` pattern for crap4rs.
       - name: Build PR crap4ts binary
         run: cargo build --release --bin crap4ts
 
@@ -525,101 +595,19 @@ jobs:
           echo "coverage=$SRC_ROOT/coverage-final.json" >> "$GITHUB_OUTPUT"
           echo "src=$SRC_ROOT" >> "$GITHUB_OUTPUT"
 
-      # Layer (1): exercise the PR's binary directly so any regression
-      # in the analyzer / envelope shape surfaces before the action
-      # plumbing test runs. Mirrors the crap4rs smoke's direct-smoke
-      # layer.
-      - name: Direct smoke — JSON envelope shape
-        env:
-          BIN: ./target/release/crap4ts
-          COVERAGE: ${{ steps.fixture.outputs.coverage }}
-          SRC: ${{ steps.fixture.outputs.src }}
-        run: |
-          set -euo pipefail
-          envelope=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 15 --format json --no-fail)
-          for field in '.schema_version' '.tool_version' '.result.passed' '.result.functions'; do
-            value=$(printf '%s' "$envelope" | jq -e "$field" >/dev/null && echo ok || echo missing)
-            if [ "$value" = "missing" ]; then
-              echo "::error::JSON envelope missing $field — action's output parsing would break"
-              exit 1
-            fi
-          done
-      - name: Direct smoke — markdown render
-        env:
-          BIN: ./target/release/crap4ts
-          COVERAGE: ${{ steps.fixture.outputs.coverage }}
-          SRC: ${{ steps.fixture.outputs.src }}
-        run: |
-          set -euo pipefail
-          md=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 15 --format markdown --no-fail)
-          if [ -z "$md" ]; then
-            echo "::error::markdown reporter produced empty output"
-            exit 1
-          fi
-          # Pure-bash prefix match (no `head -1` pipe, which would race
-          # SIGPIPE under `pipefail`).
-          case "$md" in
-            '# crap4ts'*) ;;
-            *)
-              echo "::error::markdown reporter output did not begin with '# crap4ts' header"
-              echo "First 80 chars: ${md:0:80}"
-              exit 1
-              ;;
-          esac
-
-      # Layer (2): exercise the composite action's typescript-branch
-      # plumbing. The action's `Verify crap4ts (pre-installed-only)`
-      # step requires `crap4ts` on PATH — stage the PR binary at
-      # `$HOME/.cargo/bin/crap4ts` (which is on the runner's default
-      # PATH) before invoking the action.
-      - name: Stage PR binary as pre-installed crap4ts
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.cargo/bin"
-          install -m 0755 ./target/release/crap4ts "$HOME/.cargo/bin/crap4ts"
-          "$HOME/.cargo/bin/crap4ts" --version
       - name: Dogfood the scorecard action (typescript dispatch)
         id: crap
-        uses: ./.github/actions/scorecard
+        uses: ./.github/actions/scorecard-smoke
         with:
+          bin-path: ./target/release/crap4ts
+          language: typescript
           coverage: ${{ steps.fixture.outputs.coverage }}
           src: ${{ steps.fixture.outputs.src }}
-          threshold: '15'
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
           # No sticky comment on the ts smoke — the crap4rs sticky
           # comment owns the per-PR scorecard slot; a second sticky
           # under a different header is review noise.
           comment-mode: 'none'
-      - name: Assert action outputs are populated
-        env:
-          MARKDOWN: ${{ steps.crap.outputs.markdown }}
-          ROW_JSON: ${{ steps.crap.outputs.row-json }}
-          ENVELOPE_PATH: ${{ steps.crap.outputs.json-envelope-path }}
-          ANALYSIS_PASSED: ${{ steps.crap.outputs.analysis-passed }}
-          REGRESSIONS: ${{ steps.crap.outputs.regressions }}
-          NEW_VIOLATIONS: ${{ steps.crap.outputs.new-violations }}
-        run: |
-          set -euo pipefail
-          if [ -z "$MARKDOWN" ]; then
-            echo "::error::scorecard action emitted empty markdown output"
-            exit 1
-          fi
-          # crap4ts gets the same row-json contract as crap4rs (locked
-          # by crates/crap-core/tests/scorecard_row_parity.rs) — verify
-          # the dispatch wired through and the row JSON has the right
-          # top-level shape.
-          if [ -z "$ROW_JSON" ]; then
-            echo "::error::scorecard action emitted empty row-json output"
-            exit 1
-          fi
-          if ! printf '%s' "$ROW_JSON" | jq -e '.type == "CrapDelta"' >/dev/null; then
-            echo "::error::row-json missing type=CrapDelta — parity contract broken"
-            printf '%s' "$ROW_JSON" >&2
-            exit 1
-          fi
-          test -f "$ENVELOPE_PATH"
-          echo "analysis_passed=$ANALYSIS_PASSED"
-          echo "regressions=$REGRESSIONS"
-          echo "new_violations=$NEW_VIOLATIONS"
 
   msrv:
     # Pre-flight gate at the workspace's declared `rust-version`. The

@@ -29,6 +29,69 @@ honors an explicit `language:` override.
     coverage: lcov.info
 ```
 
+## Presets
+
+Four optional preset inputs cover the common-case configuration in one
+line each — no decisions about gate booleans, threshold drift, or
+per-language metric defaults required. Presets are **additive**: every
+existing raw input continues to work unchanged, and an explicit raw
+input always wins when set alongside a preset (the action emits a
+`::warning::` on actual conflict so consumers notice the double-config).
+
+| Input | Values | Derives |
+|---|---|---|
+| `threshold-preset` | `strict` \| `default` \| `lenient` | `threshold` = 8 / 15 / 25 (cognitive scale) |
+| `run-mode` | `full` \| `delta` \| `both` | Baseline expectations (full: no baseline expected; delta/both: `baseline:` required) |
+| `gate-mode` | `report-only` \| `gate-on-analysis` \| `gate-on-delta` \| `gate-on-both` | Atomic `analysis-gate` + `delta-gate` pair |
+| `languages` | `rust` \| `typescript` \| `rust,typescript` \| `all` | Single-language supersedes `language:`; multi-language (PR β #293) lands separately |
+
+```yaml
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
+  with:
+    coverage: lcov.info
+    threshold-preset: default
+    run-mode: full
+    gate-mode: report-only
+    languages: rust
+```
+
+### Raw wins on conflict
+
+When both a preset AND its corresponding raw input are set, the
+explicit raw input wins. The action only emits a `::warning::` on
+**actual conflict** — preset-derived value differs from the explicit
+caller-supplied value — because GitHub Actions composite inputs cannot
+distinguish "caller explicitly passed the default" from "caller did not
+pass it and the default filled in." This sacrifices the nudge for "you
+set both" while preserving the warning for "you set both and they
+disagree" (the case that actually matters).
+
+Example: `threshold-preset: strict` + `threshold: '20'` resolves to
+`20` and emits a warning naming both values. `threshold-preset: default`
++ `threshold: '15'` resolves to `15` silently (no actual conflict).
+Same pattern applies to `gate-mode` ↔ `analysis-gate` / `delta-gate`.
+
+### Threshold-sync invariant
+
+`threshold-preset` derives ONE threshold value internally; the gate
+step, the inline-annotations step, and the analysis step all consume
+that single derived value. Drift is structurally impossible (closes
+the 6-hardcoded-places drift surface PR #282 fixed in the workflow
+callers). The action exposes the resolved value via
+`outputs.threshold-resolved` so consumers can audit the derivation.
+
+### Per-language metric defaults
+
+The action **never passes `--metric` to the adapter binary**. Each
+adapter picks its language-appropriate default per the locked
+`AdapterMeta::default_metric` decision: crap4rs uses cognitive, crap4ts
+uses cyclomatic. The threshold values above (8 / 15 / 25) are the
+**cognitive** calibration; the cyclomatic calibration is different but
+applied automatically when the action dispatches to crap4ts (per
+ADR (d) — see [crap-rs#218](https://github.com/breezy-bays-labs/crap-rs/issues/218)
+for the metric-keyed calibration mechanism). The dogfood smoke in
+PR δ (#295) asserts this invariant mechanically.
+
 ## Minimal usage — analysis only, no delta
 
 ```yaml
@@ -137,19 +200,23 @@ row; the aggregator owns the comment.
 
 | Name | Default | Notes |
 |---|---|---|
-| `language` | `auto` | `rust`, `typescript`, or `auto` (infer from coverage extension) |
+| `language` | `auto` | `rust`, `typescript`, or `auto` (infer from coverage extension). Superseded by `languages` (preset) when both are set |
 | `coverage` | (required) | Path to LCOV (`.info`) for Rust, Istanbul JSON for TS |
 | `src` | `.` | Source root passed to the analyzer |
 | `baseline` | `''` | Path to a previously-captured CRAP JSON envelope. Empty = no delta |
-| `threshold` | `15` | Threshold for violations |
+| `threshold` | `15` | Threshold for violations (user-visible default; the action.yml default is empty so the preset resolver can tell explicit from default — see [Presets — Raw wins on conflict](#raw-wins-on-conflict)) |
 | `config` | `''` | Path to `crap4rs.toml` |
-| `delta-gate` | `false` | Exit non-zero on new violations (only when baseline supplied) |
-| `analysis-gate` | `false` | Exit non-zero if the analysis itself fails |
+| `delta-gate` | `false` | Exit non-zero on new violations (only when baseline supplied). User-visible default; empty internally — see [Presets](#presets) |
+| `analysis-gate` | `false` | Exit non-zero if the analysis itself fails. User-visible default; empty internally — see [Presets](#presets) |
 | `comment-mode` | `none` | `none` (outputs only) or `sticky` (post/update sticky comment) |
 | `comment-header` | `crap-scorecard` | Sticky-comment identifier |
 | `version` | `latest` | crap4rs version to install (`latest` or pinned tag) |
 | `annotations` | `false` | When `true`, emit `::warning` workflow commands so findings render inline on the PR Files Changed tab (see [Inline annotations](#inline-annotations)) |
 | `annotation-limit` | `''` | Cap on emitted annotations when `annotations: true`. Empty defers to the adapter's default (10) or `[output] annotation_limit` from `config`. Range 1..=100 |
+| `threshold-preset` | `''` | (preset) `strict` (8) \| `default` (15) \| `lenient` (25). Derives `threshold`; raw `threshold:` wins on conflict + warning. See [Presets](#presets) |
+| `run-mode` | `''` | (preset) `full` \| `delta` \| `both` — drives baseline expectations. `delta`/`both` require `baseline:` set. See [Presets](#presets) |
+| `gate-mode` | `''` | (preset) `report-only` \| `gate-on-analysis` \| `gate-on-delta` \| `gate-on-both`. Atomic `analysis-gate` + `delta-gate` pair; raw inputs win on conflict + warning. See [Presets](#presets) |
+| `languages` | `''` | (preset) `rust` \| `typescript` \| `rust,typescript` \| `all`. Single-language supersedes `language:`; multi-language lands in PR β #293. See [Presets](#presets) |
 
 ## Outputs
 
@@ -162,6 +229,7 @@ row; the aggregator owns the comment.
 | `delta-passed` | `true` / `false`, or empty string when no baseline |
 | `new-violations` | Count of functions exceeding threshold but not in baseline |
 | `regressions` | Count of modified functions whose CRAP increased above rendering precision |
+| `threshold-resolved` | The threshold value the action's `Resolve presets` step resolved (preset-derived or raw passthrough). See [Presets — Threshold-sync invariant](#threshold-sync-invariant) |
 
 ## Structured row output (`outputs.row-json`)
 

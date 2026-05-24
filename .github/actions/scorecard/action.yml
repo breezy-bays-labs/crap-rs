@@ -6,6 +6,50 @@ branding:
   color: 'orange'
 
 inputs:
+  threshold-preset:
+    description: |
+      One of `strict` | `default` | `lenient` — derives `threshold`
+      internally per the locked metric-keyed calibration. `strict` = 8,
+      `default` = 15, `lenient` = 25 (cognitive scale). When set
+      alongside an explicit `threshold:`, the explicit input wins and
+      the action emits a `::warning::` so the caller notices the
+      double-config. Empty (default) leaves `threshold` untouched.
+    required: false
+    default: ''
+  run-mode:
+    description: |
+      One of `full` | `delta` | `both` — drives baseline expectations.
+      `full`: analysis-only (warns if `baseline:` is set).
+      `delta`: requires `baseline:` set (errors if missing); skips the
+      analysis-only render.
+      `both`: requires `baseline:` set (errors if missing); runs both
+      analyses. Empty (default) leaves baseline expectations untouched
+      — the action behaves exactly as today (analysis-only when no
+      baseline, both when baseline is supplied).
+    required: false
+    default: ''
+  gate-mode:
+    description: |
+      One of `report-only` | `gate-on-analysis` | `gate-on-delta`
+      | `gate-on-both`. Atomically sets `analysis-gate` + `delta-gate`
+      together so the two cannot drift. Explicit `analysis-gate:` /
+      `delta-gate:` inputs override; the action emits a `::warning::`
+      on actual conflict (derived value differs from explicit value).
+      Empty (default) leaves the raw inputs in charge.
+    required: false
+    default: ''
+  languages:
+    description: |
+      Comma-separated language set. `rust`, `typescript`,
+      `rust,typescript`, or `all` (convenience expansion equivalent
+      to the current full set). Single-language preserves the
+      existing dispatch (`auto` / `rust` / `typescript`) behavior and
+      takes precedence over the `language:` input when both are set.
+      Multi-value triggers multi-language mode, which lands in PR β
+      (#293) — until then this PR rejects multi-value with an
+      actionable error so consumers see the deferred surface.
+    required: false
+    default: ''
   language:
     description: |
       Language to analyze. `rust` runs crap4rs over an LCOV file.
@@ -14,6 +58,11 @@ inputs:
       "crap4ts install" note for the reason). `auto` (default) infers
       from the `coverage` file extension: `.info`/`.lcov` -> rust,
       `.json` (Istanbul) -> typescript.
+
+      When `languages:` is set to a single value, it takes precedence
+      over `language:` (the preset surface supersedes the raw surface
+      for the language dimension; the additive shim discipline keeps
+      `language:` working for callers who never adopted presets).
     required: false
     default: 'auto'
   coverage:
@@ -32,9 +81,18 @@ inputs:
     required: false
     default: ''
   threshold:
-    description: 'CRAP threshold — functions above this are violations.'
+    description: |
+      CRAP threshold — functions above this are violations. The
+      historical default is `15` (applied internally when both this
+      input AND `threshold-preset` are empty). The action.yml default
+      is intentionally empty (not `'15'`) so the preset-resolution
+      step can tell "caller passed it explicitly" apart from "caller
+      omitted it and the default filled in" — that distinction is
+      what makes `threshold-preset: strict` alone able to apply the
+      preset cleanly without false-conflict warnings. User-visible
+      default remains `15`.
     required: false
-    default: '15'
+    default: ''
   config:
     description: 'Optional path to a crap4rs.toml config file.'
     required: false
@@ -43,16 +101,25 @@ inputs:
     description: |
       When `true` and a baseline is provided, the action exits non-zero if any
       new threshold violations land. The markdown scorecard is still emitted as
-      an output. Independent of `analysis-gate`.
+      an output. Independent of `analysis-gate`. The action.yml default is
+      empty (not `'false'`) so the preset-resolution step can tell
+      "caller passed it explicitly" apart from "caller omitted it" —
+      that distinction is what makes `gate-mode: gate-on-delta` alone
+      able to flip the gate cleanly. User-visible default remains `false`.
     required: false
-    default: 'false'
+    default: ''
   analysis-gate:
     description: |
       When `true`, the action exits non-zero if the analysis itself fails the
-      threshold. Default `false` keeps the action measurement-only — callers
-      who want hard gates run a separate `crap4rs` step or set this true.
+      threshold. The action.yml default is empty (not `'false'`) so the
+      preset-resolution step can tell "caller passed it explicitly"
+      apart from "caller omitted it" — that distinction is what makes
+      `gate-mode: gate-on-analysis` alone able to flip the gate cleanly.
+      User-visible default remains `false` — measurement-only by
+      default; callers who want hard gates set this true (or use
+      `gate-mode:`).
     required: false
-    default: 'false'
+    default: ''
   comment-mode:
     description: |
       `none` (default): outputs only — composable into PR-metrics
@@ -128,24 +195,258 @@ outputs:
   regressions:
     description: 'Count of modified functions whose CRAP score increased above the rendering precision threshold. `0` when no baseline.'
     value: ${{ steps.run.outputs.regressions }}
+  threshold-resolved:
+    description: |
+      The threshold value the action's `Resolve presets` step resolved
+      for this invocation (preset-derived or raw passthrough). Surfaces
+      the single source-of-truth threshold so consumers can verify the
+      preset-to-raw mapping (e.g. `threshold-preset: strict` resolved
+      to 8 on the cognitive scale).
+    value: ${{ steps.presets.outputs.threshold }}
 
 runs:
   using: 'composite'
   steps:
+    - name: Resolve presets
+      id: presets
+      shell: bash
+      env:
+        THRESHOLD_PRESET: ${{ inputs.threshold-preset }}
+        THRESHOLD: ${{ inputs.threshold }}
+        RUN_MODE: ${{ inputs.run-mode }}
+        BASELINE: ${{ inputs.baseline }}
+        GATE_MODE: ${{ inputs.gate-mode }}
+        ANALYSIS_GATE: ${{ inputs.analysis-gate }}
+        DELTA_GATE: ${{ inputs.delta-gate }}
+        LANGUAGES: ${{ inputs.languages }}
+      run: |
+        set -euo pipefail
+        # ----------------------------------------------------------------
+        # 1. threshold-preset → threshold (single source of truth)
+        # ----------------------------------------------------------------
+        # Single source of truth for the threshold value consumed by
+        # `Run analysis`, `Emit inline annotations`, and the gate-mode
+        # derivation downstream. Closes the 6-hardcoded-places drift
+        # surface PR #282 (`d3438c7`) plugged in the workflow callers
+        # by collapsing the action's own internal drift too.
+        #
+        # Empty-string semantics: the action.yml defaults for
+        # `threshold`, `analysis-gate`, `delta-gate` are intentionally
+        # empty (not their historical `15` / `false` / `false`). That
+        # empty-vs-historical-default distinction is what lets the
+        # resolver tell "caller explicitly passed it" apart from
+        # "caller omitted it and the default filled in" — without
+        # that, `threshold-preset: strict` alone would always trip
+        # the "explicit raw conflicts with preset" warning against
+        # the input-default `15` and revert to 15 (the verbatim plan
+        # bash had this bug). User-visible defaults remain the
+        # historical values: when both preset AND raw are empty, the
+        # resolver substitutes the historical default below.
+        derived_threshold=""
+        case "$THRESHOLD_PRESET" in
+          "")
+            ;;
+          strict)
+            derived_threshold=8
+            ;;
+          default)
+            derived_threshold=15
+            ;;
+          lenient)
+            derived_threshold=25
+            ;;
+          *)
+            echo "::error::unsupported threshold-preset '$THRESHOLD_PRESET'; expected one of: strict, default, lenient (or empty)"
+            exit 1
+            ;;
+        esac
+
+        if [ -n "$THRESHOLD_PRESET" ]; then
+          if [ -n "$THRESHOLD" ] && [ "$THRESHOLD" != "$derived_threshold" ]; then
+            # Explicit raw conflicts with preset-derived → raw wins,
+            # warn. Additive shim discipline per ADR public-api-shim.
+            echo "::warning::scorecard action: input 'threshold' ($THRESHOLD) conflicts with 'threshold-preset: $THRESHOLD_PRESET' (derives $derived_threshold). The explicit 'threshold' input wins; remove 'threshold-preset' or align the two values to silence this warning."
+            resolved_threshold="$THRESHOLD"
+          else
+            # Either no explicit raw (apply preset) or explicit raw
+            # equals derived (no conflict, no warning).
+            resolved_threshold="$derived_threshold"
+          fi
+        elif [ -n "$THRESHOLD" ]; then
+          resolved_threshold="$THRESHOLD"
+        else
+          # Historical default — preserved verbatim from the pre-PR
+          # action.yml default. User-visible behavior unchanged for
+          # callers who never set either input.
+          resolved_threshold="15"
+        fi
+        echo "threshold=$resolved_threshold" >> "$GITHUB_OUTPUT"
+
+        # ----------------------------------------------------------------
+        # 2. run-mode → baseline expectations
+        # ----------------------------------------------------------------
+        # run-mode is a descriptor for the caller's intent; the action
+        # validates that `baseline:` is shaped consistently with that
+        # intent. No outputs other than the validation result.
+        case "$RUN_MODE" in
+          "")
+            ;;
+          full)
+            if [ -n "$BASELINE" ]; then
+              echo "::warning::scorecard action: 'run-mode: full' implies analysis-only, but 'baseline:' is set ($BASELINE). The baseline will be honored (additive shim discipline); remove 'baseline:' to silence this warning or set 'run-mode: both'."
+            fi
+            ;;
+          delta|both)
+            if [ -z "$BASELINE" ]; then
+              echo "::error::'run-mode: $RUN_MODE' requires 'baseline:' to be set"
+              exit 1
+            fi
+            ;;
+          *)
+            echo "::error::unsupported run-mode '$RUN_MODE'; expected one of: full, delta, both (or empty)"
+            exit 1
+            ;;
+        esac
+        echo "run_mode=$RUN_MODE" >> "$GITHUB_OUTPUT"
+
+        # ----------------------------------------------------------------
+        # 3. gate-mode → atomic (analysis-gate, delta-gate)
+        # ----------------------------------------------------------------
+        # Same empty-vs-historical-default pattern as threshold above:
+        # `analysis-gate` / `delta-gate` action.yml defaults are empty
+        # so the resolver can tell explicit-`false` apart from
+        # default-`false`. Without that distinction every non-
+        # `report-only` gate-mode would warn against the input-default
+        # `false` and revert to no-gate.
+        derived_analysis_gate=""
+        derived_delta_gate=""
+        case "$GATE_MODE" in
+          "")
+            ;;
+          report-only)
+            derived_analysis_gate=false
+            derived_delta_gate=false
+            ;;
+          gate-on-analysis)
+            derived_analysis_gate=true
+            derived_delta_gate=false
+            ;;
+          gate-on-delta)
+            derived_analysis_gate=false
+            derived_delta_gate=true
+            ;;
+          gate-on-both)
+            derived_analysis_gate=true
+            derived_delta_gate=true
+            ;;
+          *)
+            echo "::error::unsupported gate-mode '$GATE_MODE'; expected one of: report-only, gate-on-analysis, gate-on-delta, gate-on-both (or empty)"
+            exit 1
+            ;;
+        esac
+
+        # Validate raw gate booleans up-front. GH Actions composite inputs
+        # pass through as free-form strings, so values like `TRUE`, `yes`,
+        # or typos would otherwise silently disable hard-gating downstream
+        # (the `Enforce gates` step at the bottom compares against the
+        # literal string `"true"`). Accept only `""|true|false`; error on
+        # anything else with an actionable message. CodeRabbit #296 catch.
+        case "$ANALYSIS_GATE" in
+          ""|true|false) ;;
+          *) echo "::error::unsupported analysis-gate '$ANALYSIS_GATE'; expected 'true' or 'false' (or empty to inherit gate-mode / historical default)"; exit 1 ;;
+        esac
+        case "$DELTA_GATE" in
+          ""|true|false) ;;
+          *) echo "::error::unsupported delta-gate '$DELTA_GATE'; expected 'true' or 'false' (or empty to inherit gate-mode / historical default)"; exit 1 ;;
+        esac
+
+        if [ -n "$GATE_MODE" ]; then
+          if [ -n "$ANALYSIS_GATE" ] && [ "$ANALYSIS_GATE" != "$derived_analysis_gate" ]; then
+            echo "::warning::scorecard action: input 'analysis-gate' ($ANALYSIS_GATE) conflicts with 'gate-mode: $GATE_MODE' (derives analysis-gate=$derived_analysis_gate). The explicit 'analysis-gate' input wins."
+            resolved_analysis_gate="$ANALYSIS_GATE"
+          else
+            resolved_analysis_gate="$derived_analysis_gate"
+          fi
+          if [ -n "$DELTA_GATE" ] && [ "$DELTA_GATE" != "$derived_delta_gate" ]; then
+            echo "::warning::scorecard action: input 'delta-gate' ($DELTA_GATE) conflicts with 'gate-mode: $GATE_MODE' (derives delta-gate=$derived_delta_gate). The explicit 'delta-gate' input wins."
+            resolved_delta_gate="$DELTA_GATE"
+          else
+            resolved_delta_gate="$derived_delta_gate"
+          fi
+        else
+          # No gate-mode set — historical default `false` for any
+          # input that wasn't explicitly passed.
+          resolved_analysis_gate="${ANALYSIS_GATE:-false}"
+          resolved_delta_gate="${DELTA_GATE:-false}"
+        fi
+        echo "analysis_gate=$resolved_analysis_gate" >> "$GITHUB_OUTPUT"
+        echo "delta_gate=$resolved_delta_gate" >> "$GITHUB_OUTPUT"
+
+        # ----------------------------------------------------------------
+        # 4. languages parsing
+        # ----------------------------------------------------------------
+        # Single-language values feed `Resolve language` downstream and
+        # supersede `inputs.language` (additive shim: presets surface
+        # wins for the language dimension). Multi-value triggers the
+        # deferred-to-PR-β placeholder error so consumers see exactly
+        # where the work lands.
+        single_language=""
+        if [ -n "$LANGUAGES" ]; then
+          # Strip surrounding whitespace + tolerate ", " separator;
+          # PR β tightens the parser when multi-language EXECUTION
+          # wires up.
+          # printf — not echo — to avoid the echo-builtin flag-injection
+          # trap (a `LANGUAGES` value starting with `-e`/`-n`/`-E` would
+          # otherwise be interpreted as a flag rather than data).
+          # gemini-code-assist #296 catch.
+          normalized="$(printf '%s' "$LANGUAGES" | tr -d '[:space:]')"
+          case "$normalized" in
+            rust|typescript)
+              single_language="$normalized"
+              ;;
+            all|*,*)
+              # `all` is the convenience expansion; multi-value with
+              # comma is the explicit form. Both route to the
+              # deferred-to-PR-β error today.
+              echo "::error::languages: multi-language mode lands in PR β (#293); '$LANGUAGES' resolves to a multi-language set. For now, set 'languages: rust' or 'languages: typescript' (or omit the input)."
+              exit 1
+              ;;
+            *)
+              echo "::error::unsupported languages value '$LANGUAGES'; expected one of: rust, typescript, rust,typescript, all (or empty)"
+              exit 1
+              ;;
+          esac
+        fi
+        echo "single_language=$single_language" >> "$GITHUB_OUTPUT"
+
+        # Surface a compact summary in the job log so the resolved
+        # values are obvious to reviewers without scrolling.
+        echo "Resolved presets: threshold=$resolved_threshold analysis-gate=$resolved_analysis_gate delta-gate=$resolved_delta_gate single-language=${single_language:-<unset>} run-mode=${RUN_MODE:-<unset>}"
+
     - name: Resolve language
       id: lang
       shell: bash
       env:
         LANGUAGE: ${{ inputs.language }}
         COVERAGE: ${{ inputs.coverage }}
+        PRESET_LANGUAGE: ${{ steps.presets.outputs.single_language }}
       run: |
         set -euo pipefail
-        resolved="$LANGUAGE"
+        # `languages:` (preset surface) supersedes `language:` (raw
+        # surface) when both resolve to a single value — the preset
+        # input is the canonical language-dimension surface going
+        # forward; `language:` stays additive-shim for callers who
+        # never adopted presets.
+        if [ -n "$PRESET_LANGUAGE" ]; then
+          resolved="$PRESET_LANGUAGE"
+        else
+          resolved="$LANGUAGE"
+        fi
         if [ "$resolved" = "auto" ]; then
           case "$COVERAGE" in
             *.info|*.lcov) resolved="rust" ;;
             *.json)        resolved="typescript" ;;
-            *) echo "::error::cannot infer language from coverage path '$COVERAGE'; set inputs.language explicitly"; exit 1 ;;
+            *) echo "::error::cannot infer language from coverage path '$COVERAGE'; set inputs.language (or inputs.languages) explicitly"; exit 1 ;;
           esac
         fi
         # Whitelist the resolved value so an explicit unsupported
@@ -221,10 +522,15 @@ runs:
         COVERAGE: ${{ inputs.coverage }}
         SRC: ${{ inputs.src }}
         BASELINE: ${{ inputs.baseline }}
-        THRESHOLD: ${{ inputs.threshold }}
+        # threshold/gate values come from `steps.presets.outputs.*`
+        # (single source of truth for both raw and preset paths) so
+        # the threshold-sync invariant holds across every step that
+        # reads them: Run analysis, Emit inline annotations, Enforce
+        # gates.
+        THRESHOLD: ${{ steps.presets.outputs.threshold }}
         CONFIG: ${{ inputs.config }}
-        DELTA_GATE: ${{ inputs.delta-gate }}
-        ANALYSIS_GATE: ${{ inputs.analysis-gate }}
+        DELTA_GATE: ${{ steps.presets.outputs.delta_gate }}
+        ANALYSIS_GATE: ${{ steps.presets.outputs.analysis_gate }}
       run: |
         set -euo pipefail
         # `BIN` is the adapter binary the language resolution step picked.
@@ -347,7 +653,12 @@ runs:
         LANGUAGE: ${{ steps.lang.outputs.language }}
         COVERAGE: ${{ inputs.coverage }}
         SRC: ${{ inputs.src }}
-        THRESHOLD: ${{ inputs.threshold }}
+        # Threshold-sync invariant: consume the derived single
+        # source-of-truth so `threshold-preset: strict` produces
+        # annotations at the same cutoff as the main analysis (a
+        # partial wiring here would silently surface `default`-level
+        # annotations under a `strict` preset).
+        THRESHOLD: ${{ steps.presets.outputs.threshold }}
         CONFIG: ${{ inputs.config }}
         ANNOTATION_LIMIT: ${{ inputs.annotation-limit }}
       run: |
@@ -380,8 +691,12 @@ runs:
       if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript'
       shell: bash
       env:
-        ANALYSIS_GATE: ${{ inputs.analysis-gate }}
-        DELTA_GATE: ${{ inputs.delta-gate }}
+        # Gate values come from the preset-resolution step (single
+        # source of truth) so `gate-mode: gate-on-both` actually
+        # enforces both gates without the raw `analysis-gate` /
+        # `delta-gate` defaults silently overriding.
+        ANALYSIS_GATE: ${{ steps.presets.outputs.analysis_gate }}
+        DELTA_GATE: ${{ steps.presets.outputs.delta_gate }}
         ANALYSIS_PASSED: ${{ steps.run.outputs.analysis_passed }}
         DELTA_PASSED: ${{ steps.run.outputs.delta_passed }}
       run: |
