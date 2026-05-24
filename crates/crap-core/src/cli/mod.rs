@@ -2238,48 +2238,45 @@ mod tests {
 
     #[test]
     fn merge_threshold_explicit_default_overrides_config() {
-        // User explicitly passes --threshold 8.0 (same as DEFAULT_THRESHOLD).
+        // User explicitly passes --threshold 15.0 (same as DEFAULT_THRESHOLD).
         // This MUST override the config file's threshold of 12.0.
-        let cli = parse(&["--coverage", "lcov.info", "--threshold", "8.0"]).unwrap();
+        let cli = parse(&["--coverage", "lcov.info", "--threshold", "15.0"]).unwrap();
         let file_config = Some(FileConfig {
             threshold: Some(12.0),
             ..FileConfig::default()
         });
         let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
         assert_eq!(
-            config.global, 8.0,
+            config.global, 15.0,
             "explicit CLI default must override config"
         );
-        assert_eq!(display, 8.0);
+        assert_eq!(display, 15.0);
     }
 
     #[test]
     fn merge_threshold_no_flag_default_is_metric_keyed() {
-        // Replaces the pre-fix `merge_threshold_no_cli_no_config_uses_hardcoded_default`.
-        // The no-flag/no-config fallthrough is the `Default` tier
-        // resolved against the effective metric — NOT a single shared
-        // scalar. Cognitive runs get 25; cyclomatic runs get 16. A
-        // cognitive-tuned 25 applied to cyclomatic scores would
-        // under-gate (the bug this keys against).
+        // No-flag/no-config fallthrough is the `Default` tier resolved
+        // against the effective metric. Both columns currently hold 15
+        // (post-#272 alignment); the metric-keyed routing path is
+        // exercised so a future per-metric divergence surfaces here.
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         let (cog, cog_disp) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
-        assert_eq!(cog.global, 25.0);
-        assert_eq!(cog_disp, 25.0);
+        assert_eq!(cog.global, 15.0);
+        assert_eq!(cog_disp, 15.0);
         let (cyc, cyc_disp) = merge_threshold(&cli, &None, ComplexityMetric::Cyclomatic);
-        assert_eq!(cyc.global, 16.0);
-        assert_eq!(cyc_disp, 16.0);
+        assert_eq!(cyc.global, 15.0);
+        assert_eq!(cyc_disp, 15.0);
     }
 
     #[test]
     fn merge_threshold_strict_lenient_are_metric_keyed() {
-        // `--strict` / `--lenient` were previously metric-blind (always
-        // the cognitive 15 / 40). They now resolve per metric too, so
-        // no preset path silently applies a cognitive cutoff to
-        // cyclomatic scores.
+        // `--strict` / `--lenient` resolve per metric. Columns are
+        // flat-equal post-#272; the metric-keyed routing path is still
+        // exercised so a future per-metric divergence surfaces here.
         let strict = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
         assert_eq!(
             merge_threshold(&strict, &None, ComplexityMetric::Cognitive).1,
-            15.0
+            8.0
         );
         assert_eq!(
             merge_threshold(&strict, &None, ComplexityMetric::Cyclomatic).1,
@@ -2288,11 +2285,11 @@ mod tests {
         let lenient = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
         assert_eq!(
             merge_threshold(&lenient, &None, ComplexityMetric::Cognitive).1,
-            40.0
+            25.0
         );
         assert_eq!(
             merge_threshold(&lenient, &None, ComplexityMetric::Cyclomatic).1,
-            30.0
+            25.0
         );
     }
 
@@ -2740,7 +2737,7 @@ mod tests {
     fn merge_effective_inputs_default_threshold_follows_adapter_metric_cognitive() {
         // End-to-end wiring: an adapter whose default metric is
         // cognitive, with no `--threshold`/`--metric`/config, resolves
-        // the no-flag gate to the cognitive `Default` cutoff (25).
+        // the no-flag gate to the cognitive `Default` cutoff (15).
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         let meta = AdapterMeta {
             default_metric: ComplexityMetric::Cognitive,
@@ -2748,15 +2745,15 @@ mod tests {
         };
         let inputs = merge_effective_inputs(&cli, &None, &meta);
         assert!(matches!(inputs.metric, ComplexityMetric::Cognitive));
-        assert_eq!(inputs.threshold, 25.0);
+        assert_eq!(inputs.threshold, 15.0);
     }
 
     #[test]
     fn merge_effective_inputs_default_threshold_follows_adapter_metric_cyclomatic() {
         // Mirror for a cyclomatic-default adapter (crap4ts): the no-flag
-        // gate must be the cyclomatic `Default` cutoff (16), not the
-        // cognitive 25 — a single shared default applied the wrong
-        // metric's cutoff before this fix.
+        // gate routes through the cyclomatic column. Columns are flat-
+        // equal post-#272 (both 15); the metric-keyed routing is what
+        // this test locks, not the numeric value.
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         let meta = AdapterMeta {
             default_metric: ComplexityMetric::Cyclomatic,
@@ -2764,7 +2761,7 @@ mod tests {
         };
         let inputs = merge_effective_inputs(&cli, &None, &meta);
         assert!(matches!(inputs.metric, ComplexityMetric::Cyclomatic));
-        assert_eq!(inputs.threshold, 16.0);
+        assert_eq!(inputs.threshold, 15.0);
     }
 
     #[test]

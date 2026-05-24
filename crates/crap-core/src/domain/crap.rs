@@ -30,11 +30,11 @@ fn round_to_2(value: f64) -> f64 {
 }
 
 pub fn classify_risk(score: f64) -> RiskLevel {
-    if score <= 5.0 {
+    if score <= 8.0 {
         RiskLevel::Low
-    } else if score <= 8.0 {
+    } else if score <= 15.0 {
         RiskLevel::Acceptable
-    } else if score <= 30.0 {
+    } else if score <= 25.0 {
         RiskLevel::Moderate
     } else {
         RiskLevel::High
@@ -63,7 +63,7 @@ mod tests {
     fn complex_function_fully_covered() {
         let score = compute_crap(10, 100.0).unwrap();
         assert_eq!(score.value, 10.0);
-        assert_eq!(score.risk_level, RiskLevel::Moderate);
+        assert_eq!(score.risk_level, RiskLevel::Acceptable);
     }
 
     #[test]
@@ -78,26 +78,25 @@ mod tests {
         // CC=6, 80% coverage => 6² × 0.2³ + 6 = 36 × 0.008 + 6 = 6.288 → 6.29
         let score = compute_crap(6, 80.0).unwrap();
         assert_eq!(score.value, 6.29);
-        assert_eq!(score.risk_level, RiskLevel::Acceptable);
+        assert_eq!(score.risk_level, RiskLevel::Low);
     }
 
     #[test]
     fn threshold_boundary_low_acceptable() {
-        // Score exactly 5.0 should be Low
-        assert_eq!(classify_risk(5.0), RiskLevel::Low);
-        assert_eq!(classify_risk(5.01), RiskLevel::Acceptable);
+        assert_eq!(classify_risk(8.0), RiskLevel::Low);
+        assert_eq!(classify_risk(8.01), RiskLevel::Acceptable);
     }
 
     #[test]
     fn threshold_boundary_acceptable_moderate() {
-        assert_eq!(classify_risk(8.0), RiskLevel::Acceptable);
-        assert_eq!(classify_risk(8.01), RiskLevel::Moderate);
+        assert_eq!(classify_risk(15.0), RiskLevel::Acceptable);
+        assert_eq!(classify_risk(15.01), RiskLevel::Moderate);
     }
 
     #[test]
     fn threshold_boundary_moderate_high() {
-        assert_eq!(classify_risk(30.0), RiskLevel::Moderate);
-        assert_eq!(classify_risk(30.01), RiskLevel::High);
+        assert_eq!(classify_risk(25.0), RiskLevel::Moderate);
+        assert_eq!(classify_risk(25.01), RiskLevel::High);
     }
 
     #[test]
@@ -139,7 +138,7 @@ mod tests {
     fn crap4ts_oracle_moderate_half_covered() {
         let score = compute_crap(5, 50.0).unwrap();
         assert_eq!(score.value, 8.13);
-        assert_eq!(score.risk_level, RiskLevel::Moderate);
+        assert_eq!(score.risk_level, RiskLevel::Acceptable);
     }
 
     #[test]

@@ -15,7 +15,7 @@
 //!   3. Neither → fall back to `"src"` with a hint comment so users
 //!      see the toggle point.
 //!
-//! Threshold preset: defaults to `default` (25) non-interactively;
+//! Threshold preset: defaults to `default` (15) non-interactively;
 //! interactively reads one line from stdin and maps the first char
 //! (`s|S` → strict, `l|L` → lenient, anything else → default). No TTY
 //! detection — CI users pass `--non-interactive` to skip the prompt;
@@ -387,9 +387,9 @@ mod tests {
             "header line missing; got:\n{out}",
         );
         assert!(out.contains("Threshold preset"));
-        assert!(out.contains("strict (15)"));
-        assert!(out.contains("default (25)"));
-        assert!(out.contains("lenient (40)"));
+        assert!(out.contains("strict (8)"));
+        assert!(out.contains("default (15)"));
+        assert!(out.contains("lenient (25)"));
     }
 
     #[test]
@@ -412,19 +412,19 @@ mod tests {
 
     #[test]
     fn prompt_numbers_track_the_metric() {
-        // The interactive prompt must show the cutoffs calibrated for
-        // the adapter's metric — a cyclomatic adapter shows 8/16/30,
-        // never the cognitive 15/25/40. This is the same defect class
-        // as the generated-config comment: metric-blind numbers shown
-        // to the user.
+        // The interactive prompt must show the cutoffs that route via
+        // the adapter's metric. Both columns are flat-equal post-#272
+        // (8/15/25); the prompt still emits the cyclomatic-column
+        // values, proving the metric-keyed routing path is exercised
+        // even when columns agree.
         let mut stdin = Cursor::new(b"\n");
         let mut stderr: Vec<u8> = Vec::new();
         prompt_threshold_preset(ComplexityMetric::Cyclomatic, &mut stdin, &mut stderr).unwrap();
         let shown = String::from_utf8(stderr).unwrap();
         assert!(shown.contains("cyclomatic metric"), "prompt: {shown}");
         assert!(shown.contains("(s)trict  = 8"), "prompt: {shown}");
-        assert!(shown.contains("(d)efault = 16"), "prompt: {shown}");
-        assert!(shown.contains("(l)enient = 30"), "prompt: {shown}");
+        assert!(shown.contains("(d)efault = 15"), "prompt: {shown}");
+        assert!(shown.contains("(l)enient = 25"), "prompt: {shown}");
     }
 
     #[test]

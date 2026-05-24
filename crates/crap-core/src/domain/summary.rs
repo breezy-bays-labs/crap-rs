@@ -652,10 +652,10 @@ mod tests {
     #[test]
     fn distribution_counting() {
         let verdicts = vec![
-            make_verdict("a.rs", "low", 2.0, 30.0),        // Low (<=5)
-            make_verdict("a.rs", "acceptable", 6.0, 30.0), // Acceptable (<=8)
-            make_verdict("a.rs", "moderate", 15.0, 30.0),  // Moderate (<=30)
-            make_verdict("a.rs", "high", 50.0, 30.0),      // High (>30)
+            make_verdict("a.rs", "low", 2.0, 30.0),         // Low (<=8)
+            make_verdict("a.rs", "acceptable", 10.0, 30.0), // Acceptable (<=15)
+            make_verdict("a.rs", "moderate", 20.0, 30.0),   // Moderate (<=25)
+            make_verdict("a.rs", "high", 50.0, 30.0),       // High (>25)
         ];
         let summary = compute_summary(&verdicts);
         assert_eq!(summary.distribution.low, 1);
@@ -899,10 +899,10 @@ mod file_summary_tests {
     #[test]
     fn distribution_per_file() {
         let verdicts = vec![
-            vrd("a.rs", "low", 2.0, 25.0),        // Low (<=5)
-            vrd("a.rs", "acceptable", 6.0, 25.0), // Acceptable (<=8)
-            vrd("a.rs", "moderate", 15.0, 25.0),  // Moderate (<=30)
-            vrd("a.rs", "high", 50.0, 25.0),      // High (>30)
+            vrd("a.rs", "low", 2.0, 25.0),         // Low (<=8)
+            vrd("a.rs", "acceptable", 10.0, 25.0), // Acceptable (<=15)
+            vrd("a.rs", "moderate", 20.0, 25.0),   // Moderate (<=25)
+            vrd("a.rs", "high", 50.0, 25.0),       // High (>25)
         ];
         let summaries = compute_file_summaries(&verdicts);
         assert_eq!(summaries.len(), 1);

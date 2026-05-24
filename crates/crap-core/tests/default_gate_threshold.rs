@@ -24,24 +24,25 @@
 //!
 //! ## What it locks (the calibration table, observed end-to-end)
 //!
-//! Threshold cutoffs are metric-keyed: for the same code, cyclomatic
-//! and cognitive scores differ in magnitude, so each tier maps to a
-//! different number per metric (strict/default/lenient = cyclomatic
-//! 8/16/30, cognitive 15/25/40):
+//! Threshold cutoffs are routed metric-by-metric through
+//! `ThresholdPreset::threshold`. Cognitive and cyclomatic columns
+//! currently hold the same values (strict/default/lenient = 8/15/25
+//! for both); the dual-column infrastructure is preserved so a future
+//! per-metric divergence is a one-line constant change.
 //!
 //! | invocation                              | metric    | tier    | expect |
 //! |-----------------------------------------|-----------|---------|--------|
-//! | `crap4ts` (no flags)                    | cyclomatic| default | 16     |
+//! | `crap4ts` (no flags)                    | cyclomatic| default | 15     |
 //! | `crap4ts --strict`                      | cyclomatic| strict  | 8      |
-//! | `crap4ts --lenient`                     | cyclomatic| lenient | 30     |
-//! | `crap4rs` (no flags)                    | cognitive | default | 25     |
-//! | `crap4rs --strict`                      | cognitive | strict  | 15     |
-//! | `crap4rs --metric cyclomatic`           | cyclomatic| default | 16     |
+//! | `crap4ts --lenient`                     | cyclomatic| lenient | 25     |
+//! | `crap4rs` (no flags)                    | cognitive | default | 15     |
+//! | `crap4rs --strict`                      | cognitive | strict  | 8      |
+//! | `crap4rs --metric cyclomatic`           | cyclomatic| default | 15     |
 //! | `crap4rs --metric cyclomatic --strict`  | cyclomatic| strict  | 8      |
 //!
-//! The crap4rs cognitive rows are regression guards: the
-//! `merge_threshold` signature change must not move the Rust adapter's
-//! long-standing cognitive defaults.
+//! Tests assert the metric-keyed routing path even when the columns
+//! agree, so if a future change splits the columns the regression
+//! surfaces here first.
 
 use std::path::PathBuf;
 
@@ -159,77 +160,73 @@ fn crap4rs_threshold(extra_args: &[&str]) -> f64 {
 // ── crap4ts: cyclomatic-metric adapter ───────────────────────────────
 
 #[test]
-fn default_gate_crap4ts_no_flag_is_cyclomatic_16() {
+fn default_gate_crap4ts_no_flag_is_cyclomatic_default() {
     assert_eq!(
         crap4ts_threshold(&[]),
-        16.0,
-        "crap4ts no-flag default must be the cyclomatic `default` cutoff \
-         (16), not the cognitive 25 — a single shared default applied a \
-         cognitive cutoff to cyclomatic scores"
+        15.0,
+        "crap4ts no-flag default must resolve to the cyclomatic \
+         `default` cutoff via metric-keyed routing"
     );
 }
 
 #[test]
-fn default_gate_crap4ts_strict_is_cyclomatic_8() {
+fn default_gate_crap4ts_strict_is_cyclomatic_strict() {
     assert_eq!(
         crap4ts_threshold(&["--strict"]),
         8.0,
-        "crap4ts --strict must be the cyclomatic `strict` cutoff (8), \
-         not the cognitive 15"
+        "crap4ts --strict must resolve to the cyclomatic `strict` cutoff"
     );
 }
 
 #[test]
-fn default_gate_crap4ts_lenient_is_cyclomatic_30() {
+fn default_gate_crap4ts_lenient_is_cyclomatic_lenient() {
     assert_eq!(
         crap4ts_threshold(&["--lenient"]),
-        30.0,
-        "crap4ts --lenient must be the cyclomatic `lenient` cutoff (30), \
-         not the cognitive 40"
+        25.0,
+        "crap4ts --lenient must resolve to the cyclomatic `lenient` cutoff"
     );
 }
 
 // ── crap4rs: cognitive-metric adapter (regression guards) ────────────
 
 #[test]
-fn default_gate_crap4rs_no_flag_stays_cognitive_25() {
+fn default_gate_crap4rs_no_flag_is_cognitive_default() {
     assert_eq!(
         crap4rs_threshold(&[]),
-        25.0,
-        "crap4rs no-flag default must stay the cognitive `default` \
-         cutoff (25) — the resolution refactor must not regress the \
-         Rust adapter"
+        15.0,
+        "crap4rs no-flag default must resolve to the cognitive \
+         `default` cutoff via metric-keyed routing"
     );
 }
 
 #[test]
-fn default_gate_crap4rs_strict_stays_cognitive_15() {
+fn default_gate_crap4rs_strict_is_cognitive_strict() {
     assert_eq!(
         crap4rs_threshold(&["--strict"]),
-        15.0,
-        "crap4rs --strict (cognitive metric) must stay 15"
+        8.0,
+        "crap4rs --strict (cognitive metric) must resolve to the \
+         cognitive `strict` cutoff"
     );
 }
 
 #[test]
-fn default_gate_crap4rs_metric_cyclomatic_no_flag_is_16() {
-    // The deeper instance of the same defect class: crap4rs *supports*
-    // cyclomatic too, and `--metric cyclomatic` with no threshold must
-    // resolve to the cyclomatic `default` (16), not the cognitive 25.
+fn default_gate_crap4rs_metric_cyclomatic_no_flag_is_default() {
+    // crap4rs *supports* cyclomatic too; --metric cyclomatic with no
+    // threshold must route through the cyclomatic column.
     assert_eq!(
         crap4rs_threshold(&["--metric", "cyclomatic"]),
-        16.0,
-        "crap4rs --metric cyclomatic no-flag default must be the \
-         cyclomatic cutoff (16), not the cognitive 25"
+        15.0,
+        "crap4rs --metric cyclomatic no-flag default must resolve to \
+         the cyclomatic `default` cutoff"
     );
 }
 
 #[test]
-fn default_gate_crap4rs_metric_cyclomatic_strict_is_8() {
+fn default_gate_crap4rs_metric_cyclomatic_strict_is_strict() {
     assert_eq!(
         crap4rs_threshold(&["--metric", "cyclomatic", "--strict"]),
         8.0,
-        "crap4rs --metric cyclomatic --strict must be the cyclomatic \
-         strict cutoff (8), not the cognitive 15"
+        "crap4rs --metric cyclomatic --strict must resolve to the \
+         cyclomatic `strict` cutoff"
     );
 }

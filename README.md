@@ -22,23 +22,23 @@ Both adapters link the same `crap-core`, so Rust and TypeScript / JavaScript pro
 The CRAP metric combines **complexity** and **code coverage** into a single risk score:
 
 ```
-CRAP(complexity, coverage) = complexity^2 * (1 - coverage)^3 + complexity
+CRAP(complexity, coverage) = complexity² × (1 − coverage)³ + complexity
 ```
 
-High complexity + low coverage = high CRAP score = high risk of bugs when changed.
+where `coverage` is the fraction in `[0, 1]` (50% → `0.5`). High complexity + low coverage = high CRAP score = high risk of bugs when changed.
 
-### Risk classification (intrinsic)
+### Risk classification
 
-Every score lands in one of four risk levels. The classification is intrinsic to the score and drives the SARIF severity mapping — it is **not** the build gate.
+Every score lands in one of four risk levels:
 
 | CRAP Score | Risk Level |
 |------------|------------|
-| ≤ 5 | Low |
-| ≤ 8 | Acceptable |
-| ≤ 30 | Moderate |
-| > 30 | High |
+| ≤ 8        | Low        |
+| ≤ 15       | Acceptable |
+| ≤ 25       | Moderate   |
+| > 25       | High       |
 
-The build gate is a separate axis — see [Threshold (the gate)](#threshold-the-gate) below.
+These boundaries also anchor the threshold presets: `--strict` fires at the Low → Acceptable boundary, the default fires at Acceptable → Moderate, and `--lenient` fires at Moderate → High — so every preset corresponds to "gate at the next risk tier up." See [Threshold (the gate)](#threshold-the-gate) for how the gate works and how the two views relate.
 
 ## crap4rs — the Rust analyzer
 
@@ -54,42 +54,103 @@ cargo llvm-cov --lcov --output-path lcov.info
 crap4rs --src src/ --coverage lcov.info
 ```
 
+### Commands
+
+| Command | Purpose |
+|---------|---------|
+| `crap4rs` (no subcommand) | Run the analyzer. Requires `--coverage <FILE>`. |
+| `crap4rs init` | Generate a starter `crap4rs.toml` in the current directory. Interactive (pick a preset); pair with `--force` to overwrite. |
+| `crap4rs completions <SHELL>` | Print a shell completion script to stdout. See [Shell completions](#shell-completions). |
+| `crap4rs help [SUBCOMMAND]` | Long-form help for the binary or a subcommand. |
+
 ### Options
+
+Run `crap4rs --help` for the canonical full reference. Grouped here as in `--help` output:
+
+**Input**
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--src <path>` | `src` | Path to Rust source files |
-| `--coverage <path>` | required | Path to LCOV coverage file |
-| `--threshold <n>` | 25 | CRAP score threshold (exit 1 if exceeded) |
-| `--metric <type>` | cognitive | Complexity metric: `cognitive` or `cyclomatic` |
-| `--format <type>` | table | Output format: `table`, `json`, `markdown`, or `csv` |
-| `--exclude <glob>` | — | Exclude paths matching glob (repeatable) |
-| `--verbose` | — | Print analysis diagnostics to stderr |
-| `--breakdown` | — | Show per-contributor complexity breakdown for failing functions in table output |
-| `--explain` | — | With `--breakdown`, explain nested cognitive increments in table output |
-| `--only-failing` | — | Display only functions exceeding the threshold (full analysis still drives the gate) |
-| `--top <n>` | — | Truncate the report to the top `n` highest-CRAP rows (`--top 0` means no limit) |
-| `--min-coverage <pct>` | — | Drop functions whose `coverage_percent` falls below the bound |
-| `--max-coverage <pct>` | — | Drop functions whose `coverage_percent` exceeds the bound |
-| `--sort-by <key>` | `crap` | Reorder rows by `crap`, `coverage`, `complexity`, or `path` |
-| `--group-by <key>` | — | Aggregate the displayed view by a key. Today: `file` (per-file summaries). Under grouping, `--top` and `--sort-by` key at the file level. |
-| `--no-fail` | — | Always exit `0`; `result.passed` in JSON still reflects the truthful state |
+| `--coverage <FILE>` | required for analysis | Path to the LCOV coverage file. Not required for `completions`/`init`. |
+| `--src <DIR>` | `src` | Root directory of source files to analyze. |
+| `--metric <METRIC>` | `cognitive` | `cognitive` (default) or `cyclomatic`. |
+| `--config <FILE>` | auto-discovered | Explicit config file path; bypasses `crap4rs.toml` auto-discovery. |
+| `--view <NAME>` | — | Resolve a saved view preset from the config (see [Saved view presets](#saved-view-presets---view-name)). |
+| `--baseline <FILE>` | — | Compare against a previously-emitted JSON envelope (see [Comparing two analyses](#comparing-two-analyses---baseline-file)). |
+
+**Output**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format <FORMAT[,…]>` | `table` | One or more output formats. Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file); a comma-separated list fans out a single analysis pass to multiple destinations (`json:env.json,markdown:report.md`). Supported formats: `table`, `json`, `markdown`, `csv`, `sarif`, `advice` (experimental), `scorecard-row`. Multi-format invocations require every entry to specify a file. |
+| `--threshold <N>` | metric-correct `default` preset (cognitive 15, cyclomatic 15 today) | CRAP score above which a function fails the check. The default is resolved against the effective metric, not a hard-coded scalar. |
+| `--strict` | — | Use the `strict` preset (cognitive 8, cyclomatic 8 today). Mutually exclusive with `--lenient`. |
+| `--lenient` | — | Use the `lenient` preset (cognitive 25, cyclomatic 25 today). |
+| `--no-fail` | — | Always exit `0`; `result.passed` in JSON still reflects truth. Composes with `--delta-gate` (overrides BOTH gates). |
+| `--delta-gate` | off | Fail the build (exit `1`) when `--baseline` introduces new threshold violations. |
+| `--minimal-view` | — | Omit `view.shown[]` from JSON output (payload-size escape hatch for large codebases). |
+| `--summary` | — | Emit a single-line analysis verdict instead of the full report; short-circuits `--format`. |
+
+**Filtering**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--exclude <GLOB>` | — | Exclude paths matching glob (repeatable). |
+| `--no-gitignore` | respect | Do NOT skip paths in `.gitignore`. |
+| `--diff <REF>` | — | Only analyze functions in files changed since `REF` (CI PR-gating). |
+| `--only-failing` | — | Display only functions exceeding the threshold (gate still ranges over everything). |
+| `--top <N>` | — | Truncate the displayed report to the top `N` highest-CRAP rows. |
+| `--min-coverage <PCT>` | — | Drop displayed rows whose coverage falls below `PCT`. |
+| `--max-coverage <PCT>` | — | Drop displayed rows whose coverage exceeds `PCT`. |
+| `--sort-by <KEY>` | `crap` | `crap` (default), `coverage`, `complexity`, or `path`. |
+| `--group-by <KEY>` | — | Today: `file` (per-file summaries). Under grouping, `--top` and `--sort-by` key at the file level. |
+| `--delta-top <N>` | — | Truncate the delta block to top `N` changes. |
+| `--delta-sort <KEY>` | `score-delta` | `score-delta`, `current-crap`, `baseline-crap`, or `path`. |
+| `--delta-only <KINDS>` | all | Comma-separated subset of `added`, `removed`, `modified`. |
+
+**Display**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--color <COLOR>` | `auto` | `auto`, `always`, or `never`. |
+| `-v`, `--verbose` | — | Show parse diagnostics and matching statistics. |
+| `-q`, `--quiet` | — | Suppress report output, only set exit code. |
+| `--breakdown` | — | Show per-contributor complexity breakdown for failing functions in table output. |
+| `--explain` | — | With `--breakdown`, explain nested cognitive increments in table output. |
+| `--md-full-table` | — | Append the full per-function table to markdown output (default markdown is a compact top-N summary). |
+| `--md-top <N>` | `10` | Number of rows in the markdown top-N table. |
 
 ### Threshold (the gate)
 
-`--threshold` is the line above which a function trips the build gate (exit `1` unless `--no-fail`). It is a separate axis from the risk classification — the gate is deliberately more aggressive than waiting for the `High` tier so functions surface before they cliff.
+`--threshold` is the line above which a function trips the build gate (exit `1` unless `--no-fail`). Tier presets are aligned with the [risk classification](#risk-classification) — each preset fires at the next risk-tier boundary:
 
-| Preset | Threshold | Where the gate sits relative to risk levels |
-|--------|-----------|---------------------------------------------|
-| `--strict` | `15` | Fires inside `Moderate` — flags borderline functions early |
-| default | `25` | Fires near the top of `Moderate` (just before `High` at 30) |
-| `--lenient` | `40` | Fires inside `High` — only catches genuinely-dangerous functions |
+| Preset      | Cognitive | Cyclomatic | Risk boundary it gates at |
+|-------------|-----------|------------|---------------------------|
+| `--strict`  | `8`       | `8`        | Low → Acceptable          |
+| default     | `15`      | `15`       | Acceptable → Moderate     |
+| `--lenient` | `25`      | `25`       | Moderate → High           |
 
-A function with CRAP `7` is `Acceptable` and never trips any preset. A function with CRAP `40` is `High` and trips every preset. A function with CRAP `20` is `Moderate` (the risk classification) but trips `--strict` (the gate); the two answers are independent.
+Cognitive and cyclomatic columns currently hold the same values. The dual-column infrastructure inside `crap-core` is preserved because the two metrics can diverge in magnitude for the same code (cognitive is nesting-weighted; cyclomatic counts decision points); a future per-metric recalibration is a one-line change without an API churn.
+
+A function with CRAP `5` is `Low` and never trips any preset. A function with CRAP `40` is `High` and trips every preset. A function with CRAP `12` is `Acceptable` (the risk classification) but trips `--strict` (the gate); the two views agree at boundaries but the gate moves earlier than risk reclassification.
 
 Risk classification feeds SARIF severity (`high → error`, `moderate → warning`, `acceptable/low → note`); threshold feeds the exit code. Scorecard-row status (`Red`/`Yellow`/`Green`) — see [docs/scorecard-row-contract.md](docs/scorecard-row-contract.md) — is minted from the threshold gate, not from risk classification.
 
-`crap4rs` and `crap4ts` share the CRAP formula and analysis concepts through `crap-core`, but threshold policy is language-specific — the two analyzers deliberately do not use identical thresholds.
+`crap4rs` and `crap4ts` share the CRAP formula and analysis concepts through `crap-core`; threshold policy is exposed per analyzer and may diverge in the future.
+
+#### Per-path threshold overrides
+
+`crap4rs.toml` accepts a `[thresholds]` block with per-glob overrides — useful when a directory has stricter or looser requirements than the project default. The most-specific (latest-matching) override wins:
+
+```toml
+# crap4rs.toml — domain/ must stay under the strict cutoff, even when
+# the project default is more permissive.
+preset = "default"   # global cutoff = cognitive 15
+
+[[thresholds.overrides]]
+pattern = "src/domain/**"
+threshold = 8        # gate at the strict tier inside domain/
+```
 
 ### Why cognitive by default?
 
@@ -186,19 +247,6 @@ The shaping flags `--delta-top`, `--delta-sort` (`score-delta` (default) | `curr
 
 `--format markdown` produces GitHub-flavored Markdown (pipe-syntax table plus a Summary block) — paste it into a PR comment, an issue body, or a doc page. `--format csv` produces RFC 4180 CSV with a fixed header row, suitable for piping into spreadsheets, BI tools, or `awk`/`jq` pipelines that prefer tabular input. Both honor every shaping flag (`--top`, `--sort-by`, `--only-failing`, `--min-coverage` / `--max-coverage`).
 
-### Scorecard row (`--format scorecard-row`)
-
-Emits a single `Row::CrapDelta` JSON object on stdout, conformant to the locked schema in [breezy-bays-labs/mokumo](https://github.com/breezy-bays-labs/mokumo) at `.config/scorecard/schema.json`. Designed for cross-tool aggregation: a fan-in workflow can run crap4rs alongside other per-gate emitters (mutation testing, BDD, dep-cruiser, coverage) and post one composed scorecard comment per PR.
-
-```bash
-# Producer mode — one Row per run, no envelope, no markdown noise
-crap4rs --coverage lcov.info --baseline baseline.json --format scorecard-row
-```
-
-Status (`Red`/`Yellow`/`Green`) is minted by crap4rs from the [threshold gate](#threshold-the-gate) and modified-function regressions, *not* from the intrinsic risk classification. See **[docs/scorecard-row-contract.md](docs/scorecard-row-contract.md)** for the full contract reference: wire shape, status policy, schema vendoring, producer-pattern overview, and the planned crap-core extraction path.
-
-The composite action at `.github/actions/scorecard` exposes the same JSON via `outputs.row-json` for downstream aggregator workflows.
-
 ### Agent advice (`--format advice`) — experimental
 
 `--format advice` emits the same JSON envelope as `--format json`, but with a populated `Diagnostic` on every over-threshold `view.shown[]` entry. The diagnostic is AST-derived — coverage gaps, complexity drivers, suggested actions, and a flat `root_cause` scalar — so coding agents can read findings and propose remediations without re-walking the source.
@@ -249,7 +297,7 @@ A grep-friendly stderr summary streams alongside stdout — one line per over-th
 | `acceptable`   | `note`        |
 | `low`          | `note`        |
 
-Severity is the [intrinsic risk classification](#risk-classification-intrinsic), not the threshold gate — a `Moderate` function is a SARIF `warning` regardless of which preset is in effect.
+Severity is the [risk classification](#risk-classification), not the threshold gate — a `Moderate` function is a SARIF `warning` regardless of which preset is in effect.
 
 Unlike the table / JSON / Markdown / CSV reporters, SARIF is a **gate translation**, not a display: it iterates the unshapeable analysis. `--top`, `--sort-by`, `--only-failing`, and `--baseline` do **not** alter SARIF output — PR annotations must reflect truth, not a presentation choice. `--no-fail` overrides the exit code only; the `results[]` array still lists every finding.
 

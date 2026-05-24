@@ -145,8 +145,8 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
     And the contributors include exactly one `logical-operator` entry
 
   @wired
-  Scenario: Risk classification is metric-invariant per ADR D8
+  Scenario: Risk classification is metric-invariant
     Given a TypeScript function with cyclomatic complexity 4 and coverage 50%
     When the operator runs `crap4ts --coverage cov.json --src .`
     Then the function's CRAP score is 6.0
-    And the function's risk classification is `acceptable`
+    And the function's risk classification is `low`

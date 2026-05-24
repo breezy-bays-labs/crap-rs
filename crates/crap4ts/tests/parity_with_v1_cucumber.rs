@@ -207,8 +207,8 @@ fn when_run_real_corpus(world: &mut ParityWorld) {
     world.report = Some(real_parity().clone());
 }
 
-#[when("the parity harness compares risk labels function-by-function")]
-fn when_compare_risk_labels(world: &mut ParityWorld) {
+#[when("the parity harness compares scores function-by-function")]
+fn when_compare_scores(world: &mut ParityWorld) {
     world.report = Some(real_parity().clone());
 }
 
@@ -240,15 +240,16 @@ fn then_exact_cc_rate(world: &mut ParityWorld) {
     );
 }
 
-#[then("100% of functions match risk-classification labels (Low/Acceptable/Moderate/High)")]
-fn then_risk_labels_match(world: &mut ParityWorld) {
-    // Risk hard-match is enforced through the classifier: a risk move
-    // not absorbed by an improvement or a threshold change classifies
-    // as ScoreRegression. Zero regressions ⇒ every risk label matched.
+#[then("every matched function's CRAP score is within tolerance (no unexplained regressions)")]
+fn then_scores_within_tolerance(world: &mut ParityWorld) {
+    // Score parity is the parity contract. Risk labels are derived
+    // from the score by `classify_risk` and verified by that
+    // function's own unit tests; they are not pinned across the v1.x
+    // boundary so a tier recalibration does not surface here.
     let report = world.report();
     assert!(
         report.regressions().is_empty(),
-        "{} risk/score regression(s):\n{}",
+        "{} score regression(s):\n{}",
         report.regressions().len(),
         report.render(),
     );
@@ -263,21 +264,17 @@ fn then_divergence_reported_per_function(world: &mut ParityWorld) {
     );
 }
 
-#[then("every function's risk classification matches v1.x to v2 exactly")]
-fn then_every_risk_matches(world: &mut ParityWorld) {
-    then_risk_labels_match(world);
-}
-
-#[then("the cutoff boundaries (5/8/30) are NOT version-sensitive")]
-fn then_cutoffs_not_version_sensitive(world: &mut ParityWorld) {
-    // The 5/8/30 risk cutoffs live in crap_core::domain and are shared
-    // by both versions. A version-sensitive cutoff would surface as a
-    // same-score risk-class move — a ScoreRegression. None ⇒ the
-    // cutoffs held across the version boundary.
+#[then("risk-tier boundaries may be recalibrated across versions without tripping the gate")]
+fn then_risk_tier_recalibration_does_not_trip_gate(world: &mut ParityWorld) {
+    // Risk-tier boundaries live in `classify_risk`. They are allowed
+    // to move across versions (e.g. #272 aligned them with the
+    // threshold presets). Because the parity gate ranges over scores
+    // (not derived labels), a tier-only change does not flip
+    // `gate_passes`.
     let report = world.report();
     assert!(
         report.gate_passes(),
-        "a version-sensitive risk cutoff would fail the gate:\n{}",
+        "score parity should hold across a risk-tier recalibration:\n{}",
         report.render(),
     );
 }

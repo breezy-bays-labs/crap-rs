@@ -9,7 +9,7 @@ Feature: crap4ts@2 parity with crap4ts@1.x reference outputs
     And the captured v1.x reference outputs at `tests/fixtures/crap4ts-v1-reference.json`
     When the parity harness runs `crap4ts --src tests/fixtures/crap4ts-v1/src --coverage <v1-coverage>` and compares
     Then 95%+ of functions match cyclomatic complexity within ±0 (exact match)
-    And 100% of functions match risk-classification labels (Low/Acceptable/Moderate/High)
+    And every matched function's CRAP score is within tolerance (no unexplained regressions)
     And any divergence is reported per-function in the harness output
 
   @wired
@@ -25,11 +25,11 @@ Feature: crap4ts@2 parity with crap4ts@1.x reference outputs
     And the report shows v2 contributors: `2× if-branch`
 
   @wired
-  Scenario: Risk classification labels match across versions (D8 invariance check)
+  Scenario: Risk-tier recalibration is allowed; score parity is the contract
     Given the v1.x corpus + reference outputs
-    When the parity harness compares risk labels function-by-function
-    Then every function's risk classification matches v1.x to v2 exactly
-    And the cutoff boundaries (5/8/30) are NOT version-sensitive
+    When the parity harness compares scores function-by-function
+    Then every matched function's score is within tolerance (no unexplained regressions)
+    And risk-tier boundaries may be recalibrated across versions without tripping the gate
 
   @wired
   Scenario: Threshold-default difference is documented, not a parity failure
