@@ -53,39 +53,34 @@ Feature: GitHub Actions inline annotations reporter (issue #276)
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations`
     Then the emitted lines appear in CRAP-score-descending order (the worst function's annotation first, the least-bad last)
 
-  @unwired
+  @wired
   Scenario: --annotation-limit caps the emitted set
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given fifteen exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations --annotation-limit 10`
     Then exactly ten `::warning` lines are emitted (the ten with the highest CRAP)
     And exactly one trailing `::notice::` line is emitted whose message names the remaining count: `5 more functions exceed threshold; see scorecard for the full list`
 
-  @unwired
+  @wired
   Scenario: No truncation notice when the cap is not exceeded
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given three exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations --annotation-limit 10`
     Then three `::warning` lines are emitted and no `::notice` line follows
 
-  @unwired
+  @wired
   Scenario: Default annotation limit is 10
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given twelve exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations` (without an explicit `--annotation-limit`)
     Then ten `::warning` lines and one trailing `::notice::` line are emitted
 
-  @unwired
+  @wired
   Scenario: --annotation-limit can be configured via crap4rs.toml
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given a `crap4rs.toml` with `[output] annotation_limit = 25`
     And eleven exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations`
     Then all eleven `::warning` lines are emitted and no `::notice` line follows
 
-  @unwired
+  @wired
   Scenario: CLI --annotation-limit overrides crap4rs.toml
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given a `crap4rs.toml` with `[output] annotation_limit = 25`
     And fifteen exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations --annotation-limit 5`
@@ -93,9 +88,8 @@ Feature: GitHub Actions inline annotations reporter (issue #276)
 
   # ── Escaping per the GH Actions workflow-command spec ──────────────
 
-  @unwired
+  @wired
   Scenario: Percent, carriage-return, and newline characters in the message are escaped
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given an exceeding function whose qualified name contains `%`, `\r`, and `\n`
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations`
     Then the emitted message replaces `%` with `%25`, `\r` with `%0D`, `\n` with `%0A`
@@ -125,9 +119,8 @@ Feature: GitHub Actions inline annotations reporter (issue #276)
 
   # ── Gate keystone: reporter iterates the FULL analysis ─────────────
 
-  @unwired
+  @wired
   Scenario: --top does NOT shrink the annotation set
-    # tracked: crap-rs#276 — depends on --annotation-limit landing in Session 2; clap rejects the flag until then
     Given six exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations --top 2 --annotation-limit 10`
     Then six `::warning` lines are emitted (the `--top` view shaping is independent of the annotation cap; the cap is the GitHub UI limit, not a display knob)
@@ -146,9 +139,8 @@ Feature: GitHub Actions inline annotations reporter (issue #276)
 
   # ── Multi-format composition ───────────────────────────────────────
 
-  @unwired
+  @wired
   Scenario: github-annotations can be combined with another format in one invocation
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given several exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format markdown:scorecard.md,github-annotations`
     Then `scorecard.md` is created with the markdown reporter's output
@@ -157,15 +149,13 @@ Feature: GitHub Actions inline annotations reporter (issue #276)
 
   # ── Empty / boundary cases ─────────────────────────────────────────
 
-  @unwired
+  @wired
   Scenario: Empty analysis produces empty output
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     Given no functions are discovered
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations`
     Then stdout is empty
 
-  @unwired
+  @wired
   Scenario: --annotation-limit 0 is rejected at the CLI boundary
-    # tracked: crap-rs#276 — github-annotations reporter not yet wired
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations --annotation-limit 0`
     Then the CLI exits non-zero with a clap error explaining the value must be ≥ 1 (the per-step display cap is meaningless at zero; the user almost certainly meant to use the default)

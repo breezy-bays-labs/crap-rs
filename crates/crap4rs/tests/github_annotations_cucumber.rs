@@ -42,6 +42,14 @@ struct GhaWorld {
     /// (path-fallback scenario only).
     abs_src_path: Option<PathBuf>,
     output: Option<Output>,
+    /// Captured reporter output when the scenario invokes
+    /// `format_github_annotations` directly via the library instead of
+    /// shelling the binary. Used by the escape scenario whose
+    /// qualified name contains `%`, `\r`, `\n` — characters that are
+    /// not valid Rust identifiers, so unreachable through the walker.
+    /// When set, the shared `#[when]` step is a no-op and `stdout()`
+    /// returns this string.
+    synthesized_stdout: Option<String>,
 }
 
 impl GhaWorld {
@@ -58,6 +66,9 @@ impl GhaWorld {
     }
 
     fn stdout(&self) -> String {
+        if let Some(synth) = self.synthesized_stdout.as_ref() {
+            return synth.clone();
+        }
         String::from_utf8_lossy(&self.require_output().stdout).into_owned()
     }
 }
@@ -132,12 +143,23 @@ fn letter(i: usize) -> String {
     }
 }
 
+/// Set up (or extend) the scenario's synthetic project. If a Given
+/// step before this one already created `world.project_dir` (e.g. by
+/// dropping a `crap4rs.toml` into it), `setup_with` writes the
+/// source plus LCOV into that same dir; otherwise it creates a fresh
+/// tempdir. Idempotent on the project dir but always overwrites
+/// `src/lib.rs` and `lcov.info` so callers in sequence stack cleanly.
 fn setup_with(world: &mut GhaWorld, n_exceeding: usize, n_within: usize) {
-    let dir = tempfile::tempdir().expect("create tempdir");
-    let path = dir.path().to_path_buf();
+    let path = if let Some(existing) = world.project_dir.as_ref() {
+        existing.clone()
+    } else {
+        let dir = tempfile::tempdir().expect("create tempdir");
+        let path = dir.path().to_path_buf();
+        world._tempdir = Some(dir);
+        path
+    };
     write_project(&path, n_exceeding, n_within);
     world.project_dir = Some(path);
-    world._tempdir = Some(dir);
 }
 
 /// Parse a backtick-wrapped `crap4rs ...` command into args (drops the
@@ -249,10 +271,91 @@ fn given_mixed_pass_fail(world: &mut GhaWorld) {
     setup_with(world, 3, 3);
 }
 
+#[given("fifteen exceeding functions")]
+fn given_fifteen_exceeders(world: &mut GhaWorld) {
+    setup_with(world, 15, 0);
+}
+
+#[given("twelve exceeding functions")]
+fn given_twelve_exceeders(world: &mut GhaWorld) {
+    setup_with(world, 12, 0);
+}
+
+#[given("eleven exceeding functions")]
+fn given_eleven_exceeders(world: &mut GhaWorld) {
+    setup_with(world, 11, 0);
+}
+
+#[given("three exceeding functions")]
+fn given_three_exceeders(world: &mut GhaWorld) {
+    setup_with(world, 3, 0);
+}
+
+#[given("a `crap4rs.toml` with `[output] annotation_limit = 25`")]
+fn given_toml_annotation_limit_25(world: &mut GhaWorld) {
+    // The project_dir doubles as the binary's CWD, so a config file
+    // here is discovered by `discover_config("crap4rs.toml")`. Created
+    // before any source-writing Given step in the same scenario so
+    // `setup_with` later reuses this dir (idempotent contract).
+    let dir = tempfile::tempdir().expect("create tempdir");
+    let path = dir.path().to_path_buf();
+    std::fs::write(
+        path.join("crap4rs.toml"),
+        "[output]\nannotation_limit = 25\n",
+    )
+    .expect("write crap4rs.toml");
+    world._tempdir = Some(dir);
+    world.project_dir = Some(path);
+}
+
+#[given("an exceeding function whose qualified name contains `%`, `\\r`, and `\\n`")]
+fn given_qualified_name_with_escape_chars(world: &mut GhaWorld) {
+    // %, CR, LF are not legal in Rust identifiers, so the walker
+    // can never produce such a qualified name from source. The library
+    // synthesizes an `AnalysisView` whose verdict carries the special
+    // chars in its `qualified_name`, then calls
+    // `format_github_annotations` directly. The `#[when]` step is a
+    // no-op when `synthesized_stdout` is set.
+    use crap_core::adapters::reporters::format_github_annotations;
+    use crap_core::adapters::reporters::test_fixtures::{
+        make_single_function_result, make_view_default,
+    };
+    use crap_core::domain::types::RiskLevel;
+
+    let result = make_single_function_result(
+        "weird%name\rwith\nbreaks",
+        "src/lib.rs",
+        10,
+        0.0,
+        50.0,
+        RiskLevel::High,
+        8.0,
+    );
+    let view_for_render = make_view_default(&result);
+    let rendered = format_github_annotations(&view_for_render, "crap4rs", "0.0.0", 10);
+    world.synthesized_stdout = Some(rendered);
+}
+
+#[given("no functions are discovered")]
+fn given_no_functions(world: &mut GhaWorld) {
+    // Empty src/lib.rs + an LCOV with no DA records → the walker
+    // discovers zero functions and the reporter has nothing to emit.
+    setup_with(world, 0, 0);
+}
+
 // ── When step ────────────────────────────────────────────────────────
 
-#[when(regex = r#"^the operator runs `([^`]+)`$"#)]
+#[when(
+    regex = r#"^the operator runs `([^`]+)`(?:\s+\(without an explicit `--annotation-limit`\))?$"#
+)]
 fn when_run(world: &mut GhaWorld, cmd: String) {
+    if world.synthesized_stdout.is_some() {
+        // Library-synthesized output already in place — see
+        // `given_qualified_name_with_escape_chars`. The .feature step
+        // text stays scenario-agnostic; the harness routes by world
+        // state.
+        return;
+    }
     let mut args = parse_command(&cmd);
     // Path-fallback scenario uses --src <abs-path>; inject it here so
     // the When step text in the .feature stays scenario-agnostic.
@@ -260,9 +363,22 @@ fn when_run(world: &mut GhaWorld, cmd: String) {
         args.push("--src".into());
         args.push(abs.to_string_lossy().into_owned());
     }
-    let dir = world.require_dir();
+    // Scenarios that test CLI-validation-level rejection (e.g.
+    // `--annotation-limit 0`) have no Given step setting up a project,
+    // because clap rejects the flag before any file I/O happens. Spin
+    // up a scratch tempdir so `current_dir` resolves to something.
+    let dir = match world.project_dir.clone() {
+        Some(d) => d,
+        None => {
+            let dir = tempfile::tempdir().expect("create scratch tempdir for cli-only scenario");
+            let path = dir.path().to_path_buf();
+            world._tempdir = Some(dir);
+            world.project_dir = Some(path.clone());
+            path
+        }
+    };
     let mut command = std::process::Command::new(BINARY);
-    command.current_dir(dir);
+    command.current_dir(&dir);
     command.args(&args);
 
     let output = command
@@ -506,6 +622,224 @@ fn then_sort_by_no_op(world: &mut GhaWorld) {
             "scores not CRAP-DESC despite --sort-by coverage: {scores:?}"
         );
     }
+}
+
+fn notice_count(stdout: &str) -> usize {
+    stdout.lines().filter(|l| l.starts_with("::notice")).count()
+}
+
+// Scenario 11
+#[then("exactly ten `::warning` lines are emitted (the ten with the highest CRAP)")]
+fn then_exactly_ten_warnings(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    let warnings = warning_count(&stdout);
+    assert_eq!(
+        warnings, 10,
+        "expected ten ::warnings, got {warnings}\nstdout:\n{stdout}"
+    );
+}
+
+// Scenario 11 / And
+#[then(
+    "exactly one trailing `::notice::` line is emitted whose message names the remaining count: `5 more functions exceed threshold; see scorecard for the full list`"
+)]
+fn then_truncation_notice_5(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    let notices: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.starts_with("::notice"))
+        .collect();
+    assert_eq!(
+        notices.len(),
+        1,
+        "expected one ::notice, got {notices:?}\nstdout:\n{stdout}"
+    );
+    assert_eq!(
+        notices[0], "::notice::5 more functions exceed threshold; see scorecard for the full list",
+        "unexpected notice text"
+    );
+}
+
+// Scenario 12
+#[then("three `::warning` lines are emitted and no `::notice` line follows")]
+fn then_three_warnings_no_notice(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    assert_eq!(warning_count(&stdout), 3, "stdout:\n{stdout}");
+    assert_eq!(notice_count(&stdout), 0, "stdout:\n{stdout}");
+}
+
+// Scenario 13
+#[then("ten `::warning` lines and one trailing `::notice::` line are emitted")]
+fn then_ten_warnings_one_notice(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    assert_eq!(
+        warning_count(&stdout),
+        10,
+        "expected 10 ::warnings (default cap), got\n{stdout}"
+    );
+    assert_eq!(
+        notice_count(&stdout),
+        1,
+        "expected one trailing notice, got\n{stdout}"
+    );
+}
+
+// Scenario 14
+#[then("all eleven `::warning` lines are emitted and no `::notice` line follows")]
+fn then_eleven_warnings_no_notice(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    assert_eq!(
+        warning_count(&stdout),
+        11,
+        "expected 11 ::warnings (config cap=25 allows all), got\n{stdout}"
+    );
+    assert_eq!(notice_count(&stdout), 0, "stdout:\n{stdout}");
+}
+
+// Scenario 15
+#[then("exactly five `::warning` lines are emitted (the CLI flag wins)")]
+fn then_exactly_five_warnings(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    assert_eq!(
+        warning_count(&stdout),
+        5,
+        "expected 5 ::warnings (CLI cap=5 overrides config cap=25), got\n{stdout}"
+    );
+}
+
+// Scenario 16
+#[then("the emitted message replaces `%` with `%25`, `\\r` with `%0D`, `\\n` with `%0A`")]
+fn then_escape_chars_replaced(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    // Synthesized qualified_name is "weird%name\rwith\nbreaks"; after
+    // gha_escape it must become "weird%25name%0Dwith%0Abreaks" in the
+    // emitted message data.
+    assert!(
+        stdout.contains("weird%25name%0Dwith%0Abreaks"),
+        "expected escaped qualified name in stdout, got:\n{stdout}"
+    );
+    // The raw control chars must NOT survive into the output.
+    assert!(
+        !stdout.contains("weird%name"),
+        "raw `%` must be escaped, got:\n{stdout}"
+    );
+    let (_, message) = stdout
+        .lines()
+        .find(|l| l.starts_with("::warning "))
+        .expect("at least one ::warning line")
+        .rsplit_once("::")
+        .expect(":: separator present");
+    assert!(
+        !message.contains('\r') && !message.contains('\n'),
+        "raw CR/LF leaked into message data: {message:?}"
+    );
+}
+
+// Scenario 16 / And
+#[then(
+    "the `file=`, `line=`, and `title=` property values are not modified (no dynamic data lands in property fields, so delimiter escaping is unnecessary)"
+)]
+fn then_property_values_unmodified(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    let line = stdout
+        .lines()
+        .find(|l| l.starts_with("::warning "))
+        .expect("at least one ::warning line");
+    // file= must be a clean path (no %0D / %0A / %25 escape sequences;
+    // the only legal escapes in property fields are , and : per the
+    // GH Actions spec, and those don't appear in deterministic data).
+    let after_file = line.split_once("file=").expect("file= present").1;
+    let file_value = after_file.split(',').next().unwrap();
+    assert!(
+        !file_value.contains("%0D") && !file_value.contains("%0A") && !file_value.contains("%25"),
+        "file= property value must not be escaped, got: {file_value}"
+    );
+    // title=CRAP <score> — same invariant: no escape sequences.
+    let after_title = line.split_once("title=").expect("title= present").1;
+    let title_value = after_title.split("::").next().unwrap();
+    assert!(
+        !title_value.contains("%0D")
+            && !title_value.contains("%0A")
+            && !title_value.contains("%25"),
+        "title= property value must not be escaped, got: {title_value}"
+    );
+}
+
+// Scenario 17
+#[then("`scorecard.md` is created with the markdown reporter's output")]
+fn then_scorecard_md_created(world: &mut GhaWorld) {
+    let dir = world.require_dir();
+    let path = dir.join("scorecard.md");
+    assert!(path.exists(), "scorecard.md missing at {}", path.display());
+    let content = std::fs::read_to_string(&path).expect("read scorecard.md");
+    // Markdown reporter emits a table — at minimum some pipe-delimited
+    // structure must appear. A more strict check would couple us to a
+    // specific markdown layout the reporter may rework.
+    assert!(
+        content.contains('|'),
+        "scorecard.md doesn't look like markdown table output:\n{content}"
+    );
+}
+
+// Scenario 17 / And
+#[then("stdout contains the `::warning` lines from the annotation reporter")]
+fn then_stdout_has_annotation_warnings(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    assert!(
+        warning_count(&stdout) > 0,
+        "expected at least one ::warning in stdout, got:\n{stdout}"
+    );
+}
+
+// Scenario 17 / And
+#[then(
+    "the two reporters produce consistent function counts (the annotation cap may truncate but the markdown is full-fidelity)"
+)]
+fn then_consistent_counts(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    let warnings = warning_count(&stdout);
+    // Fixture: 3 branchy_X fns, default cap = 10 → cap doesn't fire,
+    // both reporters cover the full set.
+    assert_eq!(warnings, 3, "expected 3 ::warnings, got\n{stdout}");
+    let dir = world.require_dir();
+    let md = std::fs::read_to_string(dir.join("scorecard.md")).expect("read scorecard.md");
+    for letter in ["a", "b", "c"] {
+        let fname = format!("branchy_{letter}");
+        assert!(md.contains(&fname), "markdown missing {fname}:\n{md}");
+    }
+}
+
+// Scenario 18
+#[then("stdout is empty")]
+fn then_stdout_empty(world: &mut GhaWorld) {
+    let stdout = world.stdout();
+    assert!(stdout.is_empty(), "expected empty stdout, got:\n{stdout:?}");
+}
+
+// Scenario 19
+#[then(
+    "the CLI exits non-zero with a clap error explaining the value must be ≥ 1 (the per-step display cap is meaningless at zero; the user almost certainly meant to use the default)"
+)]
+fn then_zero_rejected(world: &mut GhaWorld) {
+    let output = world.require_output();
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit, got status: {:?}",
+        output.status
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // clap's value_parser!(u32).range(1..=100) error contains "1" and
+    // some "not in" / "out of range" framing; assert on the flag name
+    // + the lower bound rather than the exact phrasing so the assertion
+    // survives a clap version bump.
+    assert!(
+        stderr.contains("--annotation-limit") || stderr.contains("annotation-limit"),
+        "stderr must mention --annotation-limit, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains('1'),
+        "stderr must reference the lower bound (1), got:\n{stderr}"
+    );
 }
 
 // ── Runner ──────────────────────────────────────────────────────────
