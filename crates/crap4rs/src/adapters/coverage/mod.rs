@@ -54,10 +54,16 @@ impl LcovParser {
     }
 }
 
-impl CoveragePort for LcovParser {
-    type Diagnostic = LcovParseDiagnostic;
-
-    fn parse(&self, data: &str) -> Result<ParseOutput<LcovParseDiagnostic>, CrapError> {
+impl LcovParser {
+    /// Parse already-loaded LCOV text. Pure, no I/O — the public
+    /// [`CoveragePort::parse`] impl slurps the file and delegates here
+    /// so the parsing logic stays testable without writing every
+    /// fixture to a tempfile.
+    ///
+    /// Kept `pub(crate)` so the in-tree test module can exercise the
+    /// parser against string literals; external callers always go
+    /// through the port.
+    pub(crate) fn parse_str(&self, data: &str) -> ParseOutput<LcovParseDiagnostic> {
         let mut state = ParseState::default();
 
         for (line, line_number) in data.lines().zip(1usize..) {
@@ -65,7 +71,46 @@ impl CoveragePort for LcovParser {
         }
 
         flush_block(&mut state);
-        Ok(build_parse_output(state))
+        build_parse_output(state)
+    }
+}
+
+impl CoveragePort for LcovParser {
+    type Diagnostic = LcovParseDiagnostic;
+
+    /// Slurp the LCOV file at `path` and parse it.
+    ///
+    /// **Slurp choice (vs streaming via `BufReader`)**: deliberate
+    /// tradeoff. The slurp holds the file in memory once as a `String`,
+    /// then iterates `&str::lines()` which yields borrowed `&str`
+    /// slices with **zero per-line allocations**. A streaming
+    /// `BufReader::lines()` rewrite would bound peak memory at one line
+    /// — but each yielded `Result<String>` allocates a fresh `String`
+    /// per line. On the LCOV files this adapter sees (workspace
+    /// coverage from `cargo-llvm-cov --lcov`), files are line-oriented
+    /// text without expansion and stay well under any concerning
+    /// memory ceiling; a 1 M-line file would buy ~50 MB of avoided
+    /// peak RSS at the cost of 1 M small heap allocations, a trade
+    /// that's net-negative on every workload we measure. The
+    /// single-pass block accumulator (`flush_block` and its state
+    /// machine in this module) was also designed around `&str`
+    /// borrowing — refactoring to `impl BufRead` would force the
+    /// accumulator to own each line.
+    ///
+    /// [`Self::validate`] is a separate story and streams via
+    /// `BufReader` because it short-circuits on the first match —
+    /// for an early-exit gate, the per-line allocation cost is
+    /// dominated by the I/O-skipped tail, so streaming is the right
+    /// call there.
+    ///
+    /// If a future workload surfaces a multi-GB LCOV file, the
+    /// streaming refactor is tracked separately rather than blanket-
+    /// applied here — see follow-up issue for the abstraction (taking
+    /// `impl BufRead` so production streams and tests slice strings
+    /// via `.as_bytes()`).
+    fn parse(&self, path: &Path) -> Result<ParseOutput<LcovParseDiagnostic>, CrapError> {
+        let data = std::fs::read_to_string(path).map_err(CrapError::Io)?;
+        Ok(self.parse_str(&data))
     }
 
     /// LCOV-flavoured pre-flight: stream the file line-by-line via
@@ -322,7 +367,7 @@ mod tests {
     }
 
     fn parse(input: &str) -> ParseOutput<LcovParseDiagnostic> {
-        parser().parse(input).unwrap()
+        parser().parse_str(input)
     }
 
     #[test]
@@ -445,7 +490,7 @@ mod tests {
     #[test]
     fn backslash_normalized_to_forward_slash() {
         let p = LcovParser::new(PathBuf::from("C:\\project"));
-        let output = p.parse("SF:C:\\project\\src\\main.rs\nDA:1,1\n").unwrap();
+        let output = p.parse_str("SF:C:\\project\\src\\main.rs\nDA:1,1\n");
         assert!(output.coverage.contains_key("src/main.rs"));
     }
 
@@ -769,19 +814,19 @@ mod proptests {
         #[test]
         fn no_panic_on_structured_input(input in arb_lcov_input()) {
             let parser = LcovParser::new(PathBuf::from("/project"));
-            let _ = parser.parse(&input);
+            let _ = parser.parse_str(&input);
         }
 
         #[test]
         fn no_panic_on_arbitrary_input(input in ".*") {
             let parser = LcovParser::new(PathBuf::from("/project"));
-            let _ = parser.parse(&input);
+            let _ = parser.parse_str(&input);
         }
 
         #[test]
         fn all_line_numbers_are_positive(input in arb_lcov_input()) {
             let parser = LcovParser::new(PathBuf::from("/project"));
-            let output = parser.parse(&input).unwrap();
+            let output = parser.parse_str(&input);
             for lines in output.coverage.values() {
                 for lc in lines {
                     prop_assert!(lc.line > 0);
@@ -793,7 +838,7 @@ mod proptests {
         fn no_panic_on_arbitrary_brda(input in "BRDA:.*") {
             let lcov = format!("SF:/project/src/test.rs\n{input}\nend_of_record\n");
             let parser = LcovParser::new(PathBuf::from("/project"));
-            let _ = parser.parse(&lcov);
+            let _ = parser.parse_str(&lcov);
         }
 
         #[test]
@@ -812,7 +857,7 @@ mod proptests {
             input.push_str("end_of_record\n");
 
             let parser = LcovParser::new(PathBuf::from("/project"));
-            let output = parser.parse(&input).unwrap();
+            let output = parser.parse_str(&input);
 
             if let Some(a_coverage) = output.coverage.get("src/a.rs") {
                 for lc in a_coverage {

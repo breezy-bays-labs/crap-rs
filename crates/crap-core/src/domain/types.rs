@@ -641,8 +641,20 @@ pub enum CrapError {
     #[error("Invalid coverage percentage: {0}. Must be finite.")]
     InvalidCoverage(f64),
 
-    #[error("Failed to parse LCOV data: {0}")]
-    LcovParse(String),
+    /// Coverage payload parse failure.
+    ///
+    /// Adapter-agnostic by design — the source format (LCOV, Istanbul
+    /// JSON, future formats) renders at the construction site via a
+    /// tool-prefixed message (`"lcov: …"` / `"istanbul: …"`) rather
+    /// than being baked into the variant name. Today no adapter
+    /// returns this variant — both the LCOV and Istanbul parsers
+    /// either succeed (emitting per-record issues as non-fatal
+    /// `ParseOutput.diagnostics`) or fail via
+    /// [`CrapError::SourceParse`] for malformed top-level structure.
+    /// The variant remains as the stable error surface for future
+    /// adapter-format-parse failures that don't fit either bucket.
+    #[error("Failed to parse coverage data: {0}")]
+    CoverageParse(String),
 
     /// The walker was asked to compute a metric the adapter does not
     /// (yet) support. The variant is metric-named, not adapter-named —
