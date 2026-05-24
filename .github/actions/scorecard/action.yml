@@ -8,10 +8,12 @@ branding:
 inputs:
   language:
     description: |
-      Language to analyze. `rust` runs crap4rs over an LCOV file. `typescript`
-      is reserved for crap4ts integration (coming in a future release of this
-      action). `auto` (default) infers from the `coverage` file extension:
-      `.info` -> rust, `.json` (Istanbul) -> typescript.
+      Language to analyze. `rust` runs crap4rs over an LCOV file.
+      `typescript` runs crap4ts over an Istanbul JSON file (the crap4ts
+      binary must be pre-installed on `PATH` — see the action README's
+      "crap4ts install" note for the reason). `auto` (default) infers
+      from the `coverage` file extension: `.info`/`.lcov` -> rust,
+      `.json` (Istanbul) -> typescript.
     required: false
     default: 'auto'
   coverage:
@@ -124,15 +126,6 @@ runs:
         echo "language=$resolved" >> "$GITHUB_OUTPUT"
         echo "Resolved language: $resolved"
 
-    - name: Reject TypeScript (not yet wired)
-      if: steps.lang.outputs.language == 'typescript'
-      shell: bash
-      run: |
-        echo "::error::TypeScript scoring is not yet wired in this action."
-        echo "::error::Track progress at https://github.com/breezy-bays-labs/ops/issues/231"
-        echo "::error::For now, run crap4ts directly and post the markdown yourself."
-        exit 1
-
     - name: Install cargo-binstall
       if: steps.lang.outputs.language == 'rust'
       uses: cargo-bins/cargo-binstall@dc19f1e48450eefe5a29b8da6c6b00a87d730b37 # v1.18.1
@@ -159,11 +152,37 @@ runs:
         fi
         crap4rs --version
 
+    - name: Verify crap4ts (pre-installed-only)
+      if: steps.lang.outputs.language == 'typescript'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # crap4ts ships on npm via napi-rs and is not yet published to
+        # crates.io at a working version (the `2.0.0-alpha.1` on crates.io
+        # is a pre-walker stub; the working `2.0.0-rc.x` lives only on
+        # npm until release-plz adoption lands the crates.io publish
+        # path). The action therefore does NOT attempt `cargo binstall
+        # crap4ts` — callers must pre-install the binary on PATH (e.g.
+        # by cargo-building from a fork OR by shipping a binary artifact
+        # to the runner). When binstall becomes safe, this step folds
+        # back into the same shape as the crap4rs install above.
+        if ! command -v crap4ts >/dev/null 2>&1; then
+          echo "::error::crap4ts binary not found on PATH."
+          echo "::error::The composite action requires crap4ts to be pre-installed on PATH."
+          echo "::error::Until crap4ts publishes a working binary to crates.io, install it"
+          echo "::error::yourself (e.g. cargo-install from a fork or download a release"
+          echo "::error::artifact) and prepend its directory to PATH in a step that runs"
+          echo "::error::before this action."
+          exit 1
+        fi
+        echo "Pre-installed crap4ts detected ($(crap4ts --version))."
+
     - name: Run analysis + render scorecard
       id: run
-      if: steps.lang.outputs.language == 'rust'
+      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript'
       shell: bash
       env:
+        LANGUAGE: ${{ steps.lang.outputs.language }}
         COVERAGE: ${{ inputs.coverage }}
         SRC: ${{ inputs.src }}
         BASELINE: ${{ inputs.baseline }}
@@ -173,9 +192,17 @@ runs:
         ANALYSIS_GATE: ${{ inputs.analysis-gate }}
       run: |
         set -euo pipefail
-        envelope="$RUNNER_TEMP/crap4rs-envelope.json"
-        markdown_file="$RUNNER_TEMP/crap4rs-scorecard.md"
-        row_json_file="$RUNNER_TEMP/crap4rs-row.json"
+        # `BIN` is the adapter binary the language resolution step picked.
+        # Both bins share the CLI surface (via crap-core's shared `cli::run`
+        # orchestration), so a single shell body drives either dispatch.
+        if [ "$LANGUAGE" = "rust" ]; then
+          BIN=crap4rs
+        else
+          BIN=crap4ts
+        fi
+        envelope="$RUNNER_TEMP/${BIN}-envelope.json"
+        markdown_file="$RUNNER_TEMP/${BIN}-scorecard.md"
+        row_json_file="$RUNNER_TEMP/${BIN}-row.json"
         common=(--coverage "$COVERAGE" --src "$SRC" --threshold "$THRESHOLD")
         [ -n "$CONFIG" ] && common+=(--config "$CONFIG")
         if [ -n "$BASELINE" ]; then
@@ -187,48 +214,58 @@ runs:
         # gates would have tripped. The hard gating happens in the dedicated
         # gate step below, gated by the analysis-gate / delta-gate inputs.
         #
-        # Three-pass note: we run crap4rs three times — once each for JSON,
-        # markdown, and scorecard-row — because the analyzer doesn't yet
-        # support multi-format output in a single invocation. The cost is two
-        # extra LCOV parses + CRAP recomputes (cheap relative to runner
-        # setup); the user-visible latency is dominated by
-        # `cargo binstall crap4rs` upstream. Tracked in
-        # https://github.com/breezy-bays-labs/crap4rs/issues/100.
-        crap4rs "${common[@]}" --format json --no-fail > "$envelope"
-        crap4rs "${common[@]}" --format markdown --no-fail > "$markdown_file"
+        # Three-pass note: we run the adapter three times — once each for
+        # JSON, markdown, and scorecard-row — because the analyzer doesn't
+        # yet support multi-format output in a single invocation. The cost
+        # is two extra coverage parses + CRAP recomputes (cheap relative to
+        # runner setup); the user-visible latency is dominated by adapter
+        # install upstream. Tracked in
+        # https://github.com/breezy-bays-labs/crap-rs/issues/100.
+        "$BIN" "${common[@]}" --format json --no-fail > "$envelope"
+        "$BIN" "${common[@]}" --format markdown --no-fail > "$markdown_file"
 
-        # Graceful probe: --format scorecard-row landed in crap4rs 0.4.0
-        # (https://github.com/breezy-bays-labs/crap4rs/pull/119). Older
-        # releases don't recognize the value and clap exits non-zero, so
-        # we probe before invoking and degrade to an empty row-json with
-        # a workflow warning when unsupported.
-        #
-        # Probe by version, not `--help` text. crap4rs 0.4.0 replaced
-        # clap's `--format` ValueEnum with a custom FormatSpec parser so
-        # `--format` could accept `<format>:<file>` syntax (#100), and
-        # clap can't introspect a custom parser — `--help` no longer
-        # enumerates format names. Grepping `--help` for `scorecard-row`
-        # therefore false-negatives against the very versions that
-        # support it. `sort -V` works on both GitHub-hosted Ubuntu and
-        # macOS runners.
-        installed_version_raw="$(crap4rs --version 2>/dev/null | awk '{print $2}')"
-        installed_version="${installed_version_raw#v}"
-        required_version="0.4.0"
-        # Validate against a strict semver shape before `sort -V`. `sort -V`
-        # treats non-numeric tokens (e.g. "unknown", "garbage") and `v`-prefixed
-        # tags as sorting after pure semver strings, so without this gate they
-        # would false-positive into the supported branch and skip the warning.
-        supports_scorecard_row=false
-        if [[ "$installed_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
-          && [ "$(printf '%s\n%s\n' "$required_version" "$installed_version" | sort -V | head -n1)" = "$required_version" ]; then
-          supports_scorecard_row=true
-        fi
+        if [ "$LANGUAGE" = "rust" ]; then
+          # Graceful probe for crap4rs: --format scorecard-row landed in
+          # crap4rs 0.4.0 (https://github.com/breezy-bays-labs/crap4rs/pull/119).
+          # Older releases don't recognize the value and clap exits non-zero,
+          # so we probe before invoking and degrade to an empty row-json with
+          # a workflow warning when unsupported.
+          #
+          # Probe by version, not `--help` text. crap4rs 0.4.0 replaced
+          # clap's `--format` ValueEnum with a custom FormatSpec parser so
+          # `--format` could accept `<format>:<file>` syntax (#100), and
+          # clap can't introspect a custom parser — `--help` no longer
+          # enumerates format names. Grepping `--help` for `scorecard-row`
+          # therefore false-negatives against the very versions that
+          # support it. `sort -V` works on both GitHub-hosted Ubuntu and
+          # macOS runners.
+          installed_version_raw="$(crap4rs --version 2>/dev/null | awk '{print $2}')"
+          installed_version="${installed_version_raw#v}"
+          required_version="0.4.0"
+          # Validate against a strict semver shape before `sort -V`. `sort -V`
+          # treats non-numeric tokens (e.g. "unknown", "garbage") and `v`-prefixed
+          # tags as sorting after pure semver strings, so without this gate they
+          # would false-positive into the supported branch and skip the warning.
+          supports_scorecard_row=false
+          if [[ "$installed_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+            && [ "$(printf '%s\n%s\n' "$required_version" "$installed_version" | sort -V | head -n1)" = "$required_version" ]; then
+            supports_scorecard_row=true
+          fi
 
-        if [ "$supports_scorecard_row" = true ]; then
-          crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
+          if [ "$supports_scorecard_row" = true ]; then
+            crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
+          else
+            echo "::warning::Installed crap4rs (${installed_version:-unknown}) is older than $required_version or reports a non-semver version; outputs.row-json will be empty. Pin the action's 'version' input to '$required_version' or later for structured Row::CrapDelta output."
+            : > "$row_json_file"
+          fi
         else
-          echo "::warning::Installed crap4rs (${installed_version:-unknown}) is older than $required_version or reports a non-semver version; outputs.row-json will be empty. Pin the action's 'version' input to '$required_version' or later for structured Row::CrapDelta output."
-          : > "$row_json_file"
+          # crap4ts: monorepo-shipped, structurally guarantees
+          # `--format scorecard-row` support (both adapters route through
+          # crap-core's shared `cli::format_as_scorecard_row` pipeline,
+          # locked by `crates/crap-core/tests/scorecard_row_parity.rs`).
+          # No probe needed — pre-installed-only means the caller is on a
+          # current build.
+          crap4ts "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
         fi
 
         # Parse the envelope. jq is preinstalled on GitHub-hosted runners.
@@ -251,10 +288,11 @@ runs:
         } >> "$GITHUB_OUTPUT"
 
         # Multi-line output: file the row-json via a distinct heredoc sentinel.
-        # The file is the raw stdout of `crap4rs --format scorecard-row` —
+        # The file is the raw stdout of `<bin> --format scorecard-row` —
         # one mokumo Row::CrapDelta JSON object, no envelope wrapping. The
         # sentinel must not appear in the JSON; pretty-printed CrapDelta
-        # never contains it.
+        # never contains it. Both adapters emit the same Row JSON shape
+        # (locked by crates/crap-core/tests/scorecard_row_parity.rs).
         {
           echo "row_json<<__CRAP_SCORECARD_ROW_EOF__"
           cat "$row_json_file"
@@ -268,14 +306,14 @@ runs:
         echo "::endgroup::"
 
     - name: Post sticky PR comment
-      if: steps.lang.outputs.language == 'rust' && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
+      if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript') && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
       uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
       with:
         header: ${{ inputs.comment-header }}
         message: ${{ steps.run.outputs.markdown }}
 
     - name: Enforce gates
-      if: steps.lang.outputs.language == 'rust'
+      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript'
       shell: bash
       env:
         ANALYSIS_GATE: ${{ inputs.analysis-gate }}

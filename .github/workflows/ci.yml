@@ -453,6 +453,154 @@ jobs:
           echo "regressions=$REGRESSIONS"
           echo "new_violations=$NEW_VIOLATIONS"
 
+  scorecard-smoke-ts:
+    # Sibling of `scorecard-smoke` for the TypeScript dispatch path.
+    # Build crap4ts from the PR, stage it on PATH (the only install
+    # strategy the action's typescript branch supports today — see
+    # AGENTS.md "crap4ts install constraint"), prepare a tiny Istanbul
+    # JSON fixture from the workspace's ts-fixtures corpus, then dogfood
+    # the composite action with `.json` coverage and assert the same
+    # outputs land as the rust dispatch.
+    name: Scorecard action smoke — TypeScript (analysis-only)
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      # Build crap4ts from the PR's source so the smoke dogfoods this
+      # PR's binary, not a downstream release. Mirrors the
+      # `scorecard-smoke` pattern for crap4rs.
+      - name: Build PR crap4ts binary
+        run: cargo build --release --bin crap4ts
+
+      # Prepare a tiny Istanbul fixture under a stable workspace path
+      # (RUNNER_TEMP/ts-smoke) so the action's `--src` input resolves
+      # the coverage `path` entries cleanly. The jest fixture template
+      # uses `{SRC_ROOT}` substitution (matches
+      # `crates/crap-core/tests/wire_envelope_crap4ts.rs::build_fixture`).
+      - name: Prepare Istanbul JSON fixture
+        id: fixture
+        env:
+          SRC_ROOT: ${{ runner.temp }}/ts-smoke
+        run: |
+          set -euo pipefail
+          mkdir -p "$SRC_ROOT"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/simple.ts "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/arrow.ts "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/Button.tsx "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/map.ts "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/mixed.ts "$SRC_ROOT/"
+          # `{SRC_ROOT}` is the literal placeholder used by every
+          # fixture under `crates/crap4ts/tests/fixtures/istanbul-jest/`;
+          # the wire_envelope_crap4ts test substitutes the same way.
+          sed "s|{SRC_ROOT}|$SRC_ROOT|g" \
+            crates/crap4ts/tests/fixtures/istanbul-jest/coverage-final.json \
+            > "$SRC_ROOT/coverage-final.json"
+          echo "coverage=$SRC_ROOT/coverage-final.json" >> "$GITHUB_OUTPUT"
+          echo "src=$SRC_ROOT" >> "$GITHUB_OUTPUT"
+
+      # Layer (1): exercise the PR's binary directly so any regression
+      # in the analyzer / envelope shape surfaces before the action
+      # plumbing test runs. Mirrors the crap4rs smoke's direct-smoke
+      # layer.
+      - name: Direct smoke — JSON envelope shape
+        env:
+          BIN: ./target/release/crap4ts
+          COVERAGE: ${{ steps.fixture.outputs.coverage }}
+          SRC: ${{ steps.fixture.outputs.src }}
+        run: |
+          set -euo pipefail
+          envelope=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 25 --format json --no-fail)
+          for field in '.schema_version' '.tool_version' '.result.passed' '.result.functions'; do
+            value=$(printf '%s' "$envelope" | jq -e "$field" >/dev/null && echo ok || echo missing)
+            if [ "$value" = "missing" ]; then
+              echo "::error::JSON envelope missing $field — action's output parsing would break"
+              exit 1
+            fi
+          done
+      - name: Direct smoke — markdown render
+        env:
+          BIN: ./target/release/crap4ts
+          COVERAGE: ${{ steps.fixture.outputs.coverage }}
+          SRC: ${{ steps.fixture.outputs.src }}
+        run: |
+          set -euo pipefail
+          md=$("$BIN" --coverage "$COVERAGE" --src "$SRC" --threshold 25 --format markdown --no-fail)
+          if [ -z "$md" ]; then
+            echo "::error::markdown reporter produced empty output"
+            exit 1
+          fi
+          # Pure-bash prefix match (no `head -1` pipe, which would race
+          # SIGPIPE under `pipefail`).
+          case "$md" in
+            '# crap4ts'*) ;;
+            *)
+              echo "::error::markdown reporter output did not begin with '# crap4ts' header"
+              echo "First 80 chars: ${md:0:80}"
+              exit 1
+              ;;
+          esac
+
+      # Layer (2): exercise the composite action's typescript-branch
+      # plumbing. The action's `Verify crap4ts (pre-installed-only)`
+      # step requires `crap4ts` on PATH — stage the PR binary at
+      # `$HOME/.cargo/bin/crap4ts` (which is on the runner's default
+      # PATH) before invoking the action.
+      - name: Stage PR binary as pre-installed crap4ts
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cargo/bin"
+          install -m 0755 ./target/release/crap4ts "$HOME/.cargo/bin/crap4ts"
+          "$HOME/.cargo/bin/crap4ts" --version
+      - name: Dogfood the scorecard action (typescript dispatch)
+        id: crap
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: ${{ steps.fixture.outputs.coverage }}
+          src: ${{ steps.fixture.outputs.src }}
+          threshold: '25'
+          # No sticky comment on the ts smoke — the crap4rs sticky
+          # comment owns the per-PR scorecard slot; a second sticky
+          # under a different header is review noise.
+          comment-mode: 'none'
+      - name: Assert action outputs are populated
+        env:
+          MARKDOWN: ${{ steps.crap.outputs.markdown }}
+          ROW_JSON: ${{ steps.crap.outputs.row-json }}
+          ENVELOPE_PATH: ${{ steps.crap.outputs.json-envelope-path }}
+          ANALYSIS_PASSED: ${{ steps.crap.outputs.analysis-passed }}
+          REGRESSIONS: ${{ steps.crap.outputs.regressions }}
+          NEW_VIOLATIONS: ${{ steps.crap.outputs.new-violations }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MARKDOWN" ]; then
+            echo "::error::scorecard action emitted empty markdown output"
+            exit 1
+          fi
+          # crap4ts gets the same row-json contract as crap4rs (locked
+          # by crates/crap-core/tests/scorecard_row_parity.rs) — verify
+          # the dispatch wired through and the row JSON has the right
+          # top-level shape.
+          if [ -z "$ROW_JSON" ]; then
+            echo "::error::scorecard action emitted empty row-json output"
+            exit 1
+          fi
+          if ! printf '%s' "$ROW_JSON" | jq -e '.type == "CrapDelta"' >/dev/null; then
+            echo "::error::row-json missing type=CrapDelta — parity contract broken"
+            printf '%s' "$ROW_JSON" >&2
+            exit 1
+          fi
+          test -f "$ENVELOPE_PATH"
+          echo "analysis_passed=$ANALYSIS_PASSED"
+          echo "regressions=$REGRESSIONS"
+          echo "new_violations=$NEW_VIOLATIONS"
+
   msrv:
     # Pre-flight gate at the workspace's declared `rust-version`. The
     # original CEng audit (B3) ran lib-only `cargo +1.85 check` and
