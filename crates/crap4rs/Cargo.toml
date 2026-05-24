@@ -73,9 +73,9 @@ proptest = { workspace = true }
 pretty_assertions = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
-# Schema round-trip validation for `--format scorecard-row` (issue #111).
-# Validates emitted Row::CrapDelta JSON against the vendored mokumo
-# schema fragment at tests/fixtures/scorecard/schema.json.
+# Schema round-trip validation for `--format scorecard-row`.
+# Validates emitted Row::CrapDelta JSON against the locked schema
+# fragment at tests/fixtures/scorecard/schema.json.
 jsonschema = { workspace = true }
 # BDD execution of `tests/features/*.feature` files (issue #115).
 # Adopted incrementally: `json_reporter.feature` is the POC; future

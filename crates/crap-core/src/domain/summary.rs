@@ -338,8 +338,9 @@ fn median_of(scores: &mut [f64]) -> f64 {
 
 // ── CrapDeltaRowData (scorecard-row producer) ────────────
 
-/// Status mirrors mokumo's `Row::CrapDelta::status` (Green/Yellow/Red).
-/// Producer-mints-status under Model P.
+/// Per-row verdict for the scorecard-row contract (Green/Yellow/Red).
+/// Producer-mints-status — the adapter sets this from its own
+/// analysis; aggregators consume it as-is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum CrapDeltaStatus {
@@ -364,10 +365,11 @@ impl CrapDeltaStatus {
 }
 
 /// Language-agnostic record carrying the structured signal a producer
-/// projects into a mokumo `Row::CrapDelta` JSON object. Lives in
+/// projects into a `Row::CrapDelta` JSON object. Lives in
 /// `domain/summary.rs` (pure-domain — no `syn`, no LCOV). The
 /// reporter at `adapters/reporters/scorecard_row.rs` wires this
-/// record into the locked V3-symmetric wire shape.
+/// record into the locked wire shape (see
+/// `crates/crap4rs/tests/fixtures/scorecard/schema.json`).
 #[derive(Debug, Clone, Serialize)]
 pub struct CrapDeltaRowData {
     pub status: CrapDeltaStatus,

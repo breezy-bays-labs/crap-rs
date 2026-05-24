@@ -242,11 +242,10 @@ the Rust adapter.
 
 ### For hardcoded `breezy-bays-labs/crap4rs` URL references
 
-Many downstreams reference the repo by its URL — `mokumo` references
-`breezy-bays-labs/crap4rs/.github/actions/scorecard@v0.5.0` as a
-composite GitHub Action, READMEs link to issues, badges point at the
-Actions tab. GitHub's repo-rename auto-redirect carries all of these
-for at least one year:
+Many downstreams reference the repo by its URL — composite-action
+consumers reference `breezy-bays-labs/crap4rs/.github/actions/scorecard@v0.5.0`,
+READMEs link to issues, badges point at the Actions tab. GitHub's
+repo-rename auto-redirect carries all of these for at least one year:
 
 - `git clone https://github.com/breezy-bays-labs/crap4rs.git` redirects
   to the new repo.
@@ -256,8 +255,8 @@ for at least one year:
   redirect to the new URL.
 
 **No immediate action is required**, but it is good hygiene to update
-hardcoded URLs to `breezy-bays-labs/crap-rs` within the next year. An
-example downstream update (mokumo-style):
+hardcoded URLs to `breezy-bays-labs/crap-rs` within the next year.
+Example downstream update:
 
 ```diff
 # .github/workflows/quality.yml

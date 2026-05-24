@@ -1,14 +1,13 @@
-//! Integration tests for `--format scorecard-row` (issue #111).
+//! Integration tests for `--format scorecard-row`.
 //!
 //! Validates that the projector + reporter produce a JSON object that
-//! conforms to mokumo's locked `Row::CrapDelta` schema fragment
-//! (vendored at `tests/fixtures/scorecard/schema.json`,
-//! `schema_version = 2`).
+//! conforms to the locked `Row::CrapDelta` schema fragment owned by
+//! this repository (`tests/fixtures/scorecard/schema.json`,
+//! `schema_version = 1`).
 //!
-//! These tests are the contract pin between crap4rs and mokumo. If
-//! mokumo bumps `schema_version`, run
-//! `tests/fixtures/scorecard/regen.sh` to refresh the fixture, then
-//! adjust this file or the reporter as needed.
+//! The schema fragment is the producer-side contract any downstream
+//! aggregator or PR-comment renderer validates emitted rows against;
+//! see `tests/fixtures/scorecard/SOURCE.md` for the bump ceremony.
 
 use std::sync::OnceLock;
 
@@ -16,20 +15,20 @@ use crap4rs::adapters::reporters::format_scorecard_row;
 use crap4rs::domain::summary::{CrapDeltaRowData, CrapDeltaStatus};
 use serde_json::Value;
 
-/// Vendored mokumo schema. Embedded so the test is hermetic — no
-/// filesystem reads at runtime, no network.
-const VENDORED_SCHEMA: &str = include_str!("fixtures/scorecard/schema.json");
+/// Locally-owned scorecard-row schema. Embedded so the test is
+/// hermetic — no filesystem reads at runtime, no network.
+const SCORECARD_ROW_SCHEMA: &str = include_str!("fixtures/scorecard/schema.json");
 
 /// Build a wrapper schema rooted at `#/definitions/Row` so the JSON
-/// Schema validator resolves `$ref`s against the vendored `definitions`
-/// block. Cached because `serde_json::from_str` over a 50KB schema
-/// plus compilation isn't free, and the test module runs each case
+/// Schema validator resolves `$ref`s against the locked `definitions`
+/// block. Cached because `serde_json::from_str` over the schema plus
+/// compilation isn't free, and the test module runs each case
 /// independently.
 fn row_schema_validator() -> &'static jsonschema::Validator {
     static VALIDATOR: OnceLock<jsonschema::Validator> = OnceLock::new();
     VALIDATOR.get_or_init(|| {
-        let full: Value =
-            serde_json::from_str(VENDORED_SCHEMA).expect("vendored schema must be valid JSON");
+        let full: Value = serde_json::from_str(SCORECARD_ROW_SCHEMA)
+            .expect("scorecard-row schema must be valid JSON");
         let definitions = full
             .get("definitions")
             .expect("schema must carry definitions")
@@ -40,7 +39,7 @@ fn row_schema_validator() -> &'static jsonschema::Validator {
             "$ref": "#/definitions/Row",
         });
         jsonschema::validator_for(&row_schema)
-            .expect("wrapper schema must compile against vendored definitions")
+            .expect("wrapper schema must compile against locked definitions")
     })
 }
 
@@ -62,7 +61,7 @@ fn validate_row(row_json: &str) {
 // ── Green / Yellow / Red ─────────────────────────────────────────────
 
 #[test]
-fn green_row_validates_against_mokumo_schema() {
+fn green_row_validates_against_scorecard_schema() {
     let data = CrapDeltaRowData {
         status: CrapDeltaStatus::Green,
         threshold: 15,
@@ -74,7 +73,7 @@ fn green_row_validates_against_mokumo_schema() {
 }
 
 #[test]
-fn yellow_row_validates_against_mokumo_schema() {
+fn yellow_row_validates_against_scorecard_schema() {
     let data = CrapDeltaRowData {
         status: CrapDeltaStatus::Yellow,
         threshold: 15,
@@ -86,7 +85,7 @@ fn yellow_row_validates_against_mokumo_schema() {
 }
 
 #[test]
-fn red_row_validates_against_mokumo_schema() {
+fn red_row_validates_against_scorecard_schema() {
     let data = CrapDeltaRowData {
         status: CrapDeltaStatus::Red,
         threshold: 15,
@@ -105,8 +104,8 @@ fn red_row_validates_against_mokumo_schema() {
 #[test]
 fn red_row_without_failure_detail_is_rejected_by_layer_2_if_then() {
     // Hand-craft a malformed payload — bypassing the projector — to
-    // confirm the vendored schema enforces the Layer 2 invariant
-    // (Red ⇒ failure_detail_md required) end-to-end.
+    // confirm the schema enforces the Layer 2 invariant (Red ⇒
+    // failure_detail_md required) end-to-end.
     let malformed = serde_json::json!({
         "type": "CrapDelta",
         "id": "crap_delta",
@@ -164,15 +163,10 @@ fn cli_dispatch_emits_scorecard_row_validating_against_schema() {
 // ── Schema version pin ───────────────────────────────────────────────
 
 #[test]
-fn vendored_schema_pins_schema_version_2() {
-    // If mokumo bumps schema_version, this test fails loud.
-    // Run tests/fixtures/scorecard/regen.sh to refresh, then update
-    // crap4rs reporter / tests as needed before bumping the pin here.
-    let full: Value = serde_json::from_str(VENDORED_SCHEMA).unwrap();
-    // schema_version lives on the top-level Scorecard envelope;
-    // the value `2` is asserted by inspecting the description.
-    // We pin the structural property: the schema MUST require
-    // schema_version on Scorecard.
+fn schema_pins_version_1() {
+    // Update this pin when bumping the producer-side `schema_version`
+    // per the ceremony in `tests/fixtures/scorecard/SOURCE.md`.
+    let full: Value = serde_json::from_str(SCORECARD_ROW_SCHEMA).unwrap();
     let required = full["required"]
         .as_array()
         .expect("Scorecard.required must be an array");

@@ -16,8 +16,8 @@
 Gherkin specs live in `crates/crap4rs/tests/features/*.feature` and are
 exercised by cucumber-rs harnesses under `crates/crap4rs/tests/*_cucumber.rs`.
 The conventions below keep the spec corpus honest about what is and
-isn't actually verified, so a future BDD-quality monitor (mokumo epic
-breezy-bays-labs/mokumo#370) can dogfood on us without false positives.
+isn't actually verified, so a future BDD-quality monitor can dogfood
+on us without false positives.
 
 **Lexicon source of truth**: `crates/crap4rs/tests/features/TAGS.toml`.
 
@@ -249,6 +249,52 @@ commit SHA isn't).
   notes for the bumped action; merge if benign. Multi-action group
   PRs may need staging if one bump is more contentious than the
   others.
+
+## Composite scorecard action
+
+`.github/actions/scorecard/action.yml` is the public dogfood surface
+for both adapters. It auto-detects the language from the `coverage`
+input's file extension (`.info` / `.lcov` → crap4rs, `.json`
+(Istanbul) → crap4ts) and dispatches the matching adapter binary.
+Callers may override detection by setting `inputs.language` to
+`rust` or `typescript` explicitly.
+
+### Cross-adapter `--format scorecard-row` parity
+
+`crap4rs` and `crap4ts` both route `--format scorecard-row` through
+crap-core's shared
+`cli::format_as_scorecard_row` → `domain::summary::project_crap_delta_row`
+→ `reporters::format_scorecard_row` pipeline. The Row JSON shape —
+top-level keys, `type`/`id`/`label`/`anchor` literals, `status`
+enum, numeric types — is therefore structurally guaranteed to be
+identical across both adapters, and consumers of the composite
+action's `outputs.row-json` can rely on a single schema regardless
+of which adapter the action dispatched.
+
+**Mechanical enforcement**:
+`crates/crap-core/tests/scorecard_row_parity.rs` runs both bins
+against representative fixtures and asserts byte-identical key
+sets on both the Green (no violations) and Red (above-threshold)
+branches plus value-shape invariants for fields the locked
+schema fragment
+(`crates/crap4rs/tests/fixtures/scorecard/schema.json`) relies on.
+"Documentation rots; CI doesn't" — same pattern as
+`scripts/bdd-tracked-lint.py` and `scripts/mutants-skip-lint.py`.
+
+### crap4ts install constraint
+
+Until crap4ts publishes a working binary release to crates.io
+(currently `2.0.0-alpha.1` on crates.io is the pre-walker stub;
+the working `2.0.0-rc.x` ships only to npm via napi-rs and the
+crates.io publish path is tracked under release-plz adoption),
+the composite action's typescript branch does **not** attempt a
+`cargo binstall`. External TS consumers must pre-install `crap4ts`
+on `PATH` themselves (e.g. by cargo-building from a fork or
+shipping a binary artifact); the action fails with an actionable
+error message naming the same constraint when the binary is
+missing. The CI smoke in this repo dogfoods the typescript branch
+using the workspace-built `target/release/crap4ts` prepended to
+`PATH`.
 
 ## Mutation testing
 

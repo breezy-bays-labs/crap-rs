@@ -327,11 +327,13 @@ jobs:
 
 ### Scorecard row (`--format scorecard-row`)
 
-`--format scorecard-row` emits exactly one JSON object — a mokumo
-[`Row::CrapDelta`](https://github.com/breezy-bays-labs/mokumo/blob/main/.config/scorecard/schema.json)
-— for consumption by scorecard aggregators (mokumo's sticky PR scorecard
-comment is the first downstream consumer). The object conforms to the
-locked `definitions/Row` schema fragment at `schema_version: 2`.
+`--format scorecard-row` emits exactly one JSON object — a
+[`Row::CrapDelta`](crates/crap4rs/tests/fixtures/scorecard/schema.json)
+— for consumption by scorecard aggregators (any CI workflow, PR-comment
+bot, or dashboard that composes per-gate verdicts into a unified
+scorecard). The object conforms to the locked `definitions/Row` schema
+fragment owned by this repo (`schema_version: 1`; see
+[`docs/scorecard-row-contract.md`](docs/scorecard-row-contract.md)).
 
 Status is producer-side (crap4rs mints it from `--baseline` + `--threshold`):
 
@@ -372,11 +374,12 @@ over-threshold functions (`"N over threshold (no baseline)"` in
 `delta_text`); status is Green when the count is zero, Red otherwise.
 
 > **Tradeoff:** the threshold lives in `crap4rs.toml` / `--threshold`,
-> not in mokumo's `quality.toml`. CRAP-metric parameters belong to the
-> producer (Model P). If a future repo wants `quality.toml`-tuned CRAP
-> thresholds, that's a Model-A migration — non-breaking at the data
-> level (the wire shape stays identical; status-minting moves from
-> producer to aggregator).
+> not in an aggregator's config. CRAP-metric parameters belong to the
+> producer. If a future repo wants aggregator-side CRAP threshold
+> tuning, that's a non-breaking evolution at the wire level — the row
+> shape stays identical; status-minting moves from producer to
+> aggregator. See [`docs/scorecard-row-contract.md`](docs/scorecard-row-contract.md)
+> for the full operator-tunability boundary.
 
 ## Shell completions
 

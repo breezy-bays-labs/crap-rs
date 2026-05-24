@@ -10,9 +10,9 @@
 # `# tracked: crap-rs#<n> — <reason>` comment within the scenario
 # block, mirroring `~/.claude/rules/exclusions.md`.
 #
-# This file is the source of truth for the lexicon. A future bdd-rs
-# monitor (separate crate, mokumo epic #370) will parse this file
-# to validate tag usage; for now it is documentation.
+# This file is the source of truth for the lexicon. A future
+# BDD-quality monitor (separate crate, planned) will parse this
+# file to validate tag usage; for now it is documentation.
 
 [status]
 # Mutually exclusive. Every scenario MUST carry exactly one.
