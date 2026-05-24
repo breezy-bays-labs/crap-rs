@@ -33,12 +33,12 @@ updates:
     open-pull-requests-limit: 5
     # Cooldown delays a Dependabot bump for N days after the upstream
     # release lands, giving the community time to surface a bad
-    # release before our automation pulls it. Semver-major bumps get
-    # the longer window since they're the highest-risk class. Default
-    # covers minor + patch.
+    # release before our automation pulls it. The `github-actions`
+    # ecosystem only supports the flat `default-days` knob
+    # (semver-major/minor/patch granularity is reserved for
+    # ecosystems with semver semantics like npm/cargo/pip).
     cooldown:
       default-days: 7
-      semver-major-days: 30
     commit-message:
       prefix: "ci"
       include: "scope"
