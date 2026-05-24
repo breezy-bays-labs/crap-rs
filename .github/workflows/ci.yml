@@ -440,7 +440,7 @@ jobs:
       # supply-chain check. The repo-wide SHA-pinning sweep (#233)
       # brought every other action up to the same standard — see
       # AGENTS.md "Supply-chain hygiene".
-      - uses: EmbarkStudios/cargo-deny-action@91bf2b620e09e18d6eb78b92e7861937469acedb # v2
+      - uses: EmbarkStudios/cargo-deny-action@6c8f9facfa5047ec02d8485b6bf52b587b7777d1 # v2
         with:
           command: check
 
