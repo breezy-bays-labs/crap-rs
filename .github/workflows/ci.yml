@@ -775,6 +775,59 @@ jobs:
             exit 1
           fi
           echo "crap-core adapter-name literals: clean (comment-only references allowed)"
+      - name: Reject adapter-vocabulary string literals in crap-core
+        # Layer 4 of crap-core's purity gate. Layers 1-3 (above) ban
+        # `syn`/`oxc`/`tree_sitter`/etc. at the import + direct-dep
+        # level. This layer bans the vocabulary of adapter-specific
+        # coverage source formats from appearing inside user-facing
+        # string literals (`format!`, `#[error("…")]`, bare `"…"`).
+        #
+        # Banlist (case-sensitive, proper-noun forms): `LCOV`,
+        # `Istanbul`, `TypeScript`, `LCOV-flavou?red`. These are
+        # source-format tokens, not AST-library tokens — a leak via
+        # `format!("Failed to parse LCOV: {err}")` is not caught by
+        # L1/L2/L3 because no import or dep change is required. The
+        # case-sensitive proper-noun match is the noise filter that
+        # distinguishes user-prose ("LCOV parse issue") from
+        # filename literals like `"lcov.info"` and fixture paths
+        # like `"src/adapters/lcov.rs"` — those use lowercase by
+        # convention and aren't English-prose leaks.
+        #
+        # `rg` flag note: ripgrep treats patterns as regex by
+        # default; the `-E` flag in ripgrep means `--encoding`,
+        # NOT `--extended-regex` (which is grep's `-E`). Bare
+        # invocation `rg PATTERN PATH` is the right shape.
+        #
+        # Doc/inline/block comments are allowed to mention these
+        # tokens (the awk filter skips lines whose content starts
+        # with //, /*, *). Same comment-filter shape as the #161
+        # adapter-name literal check above; only the token list and
+        # the `"[^"]*X[^"]*"` candidate scan
+        # (substring-within-string-literal) differ.
+        #
+        # No untrusted input interpolated; `rg`/`awk` patterns are
+        # literal static strings.
+        run: |
+          set -euo pipefail
+          hits=$(rg -n '"[^"]*(LCOV|Istanbul|TypeScript|LCOV-flavou?red)[^"]*"' crates/crap-core/src 2>/dev/null || true)
+          if [ -z "$hits" ]; then
+            echo "crap-core adapter-vocabulary literals: clean"
+            exit 0
+          fi
+          non_comment_hits=$(echo "$hits" | awk -F: '
+            {
+              content = ""
+              for (i = 3; i <= NF; i++) content = content (i > 3 ? ":" : "") $i
+              gsub(/^[ \t]+/, "", content)
+              if (content !~ /^(\/\/|\/\*|\*)/) print
+            }
+          ')
+          if [ -n "$non_comment_hits" ]; then
+            echo "::error::crap-core must not contain LCOV/Istanbul/TypeScript string literals — coverage source format names belong to adapters, not the domain library (see #261)"
+            echo "$non_comment_hits"
+            exit 1
+          fi
+          echo "crap-core adapter-vocabulary literals: clean (comment-only references allowed)"
 
   mutants-skip-lint:
     # Mechanical enforcement of the carry-forward rule documented at the top
