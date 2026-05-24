@@ -1,0 +1,62 @@
+# release-plz configuration for the crap-rs workspace.
+#
+# release-plz drives crates.io publishing via OIDC trusted publishing
+# (no `CARGO_REGISTRY_TOKEN` in CI), opens a per-bump release PR with
+# conventional-commit-driven version bumps, and creates per-crate git
+# tags on merge. The three crates publish independently; per-crate
+# CHANGELOG paths are wired below so each release section lands in
+# the right file.
+#
+# Companion files:
+#   .github/workflows/release-plz.yml — the workflow that invokes
+#     release-plz with `command: release-pr` and `command: release`
+#   crates/<name>/CHANGELOG.md / packages/crap4ts/CHANGELOG.md — the
+#     per-crate changelog destinations referenced below
+
+[workspace]
+# Track upstream changes to transitive workspace deps so release-plz
+# can suggest cargo-update bumps alongside the version bumps it computes.
+dependencies_update = true
+
+# Per-crate tag pattern. The `{{ package }}-v{{ version }}` template
+# produces tags like `crap-core-v0.4.0`, `crap4rs-v0.6.0`, and
+# `crap4ts-v2.0.0` — each tag scoped to a single published crate so
+# downstream tooling can map a release back to one package
+# unambiguously. The binstall `pkg-url` metadata in
+# crates/crap4rs/Cargo.toml references the same `crap4rs-v*` shape.
+git_tag_name = "{{ package }}-v{{ version }}"
+
+# A release PR opens only when there is a publishable bump pending.
+# `release_always = false` keeps the PR queue quiet on commits that
+# don't trip the conventional-commit filter below.
+release_always = false
+
+# Run cargo-semver-checks on every release PR — version bumps below
+# the detected breaking-change level fail the PR before merge.
+semver_check = true
+
+# Only commits matching this regex contribute to release sections.
+# Conventional-commit types `feat` / `fix` / `perf` / `refactor`
+# (with optional `(scope)` and optional `!` for breaking) drive
+# bumps; `chore` / `docs` / `test` / `ci` / `style` commits land in
+# the repo history without forcing a release PR.
+release_commits = "^(feat|fix|perf|refactor)(\\(.+\\))?!?:"
+
+# pr_branch_prefix is intentionally omitted so release-plz uses its
+# upstream default (`release-plz-`). The default is referenced by the
+# follow-up automation that fires on those branches.
+
+[[package]]
+name = "crap-core"
+changelog_path = "crates/crap-core/CHANGELOG.md"
+changelog_update = true
+
+[[package]]
+name = "crap4rs"
+changelog_path = "crates/crap4rs/CHANGELOG.md"
+changelog_update = true
+
+[[package]]
+name = "crap4ts"
+changelog_path = "packages/crap4ts/CHANGELOG.md"
+changelog_update = true
