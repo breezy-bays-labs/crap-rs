@@ -345,6 +345,21 @@ runs:
             ;;
         esac
 
+        # Validate raw gate booleans up-front. GH Actions composite inputs
+        # pass through as free-form strings, so values like `TRUE`, `yes`,
+        # or typos would otherwise silently disable hard-gating downstream
+        # (the `Enforce gates` step at the bottom compares against the
+        # literal string `"true"`). Accept only `""|true|false`; error on
+        # anything else with an actionable message. CodeRabbit #296 catch.
+        case "$ANALYSIS_GATE" in
+          ""|true|false) ;;
+          *) echo "::error::unsupported analysis-gate '$ANALYSIS_GATE'; expected 'true' or 'false' (or empty to inherit gate-mode / historical default)"; exit 1 ;;
+        esac
+        case "$DELTA_GATE" in
+          ""|true|false) ;;
+          *) echo "::error::unsupported delta-gate '$DELTA_GATE'; expected 'true' or 'false' (or empty to inherit gate-mode / historical default)"; exit 1 ;;
+        esac
+
         if [ -n "$GATE_MODE" ]; then
           if [ -n "$ANALYSIS_GATE" ] && [ "$ANALYSIS_GATE" != "$derived_analysis_gate" ]; then
             echo "::warning::scorecard action: input 'analysis-gate' ($ANALYSIS_GATE) conflicts with 'gate-mode: $GATE_MODE' (derives analysis-gate=$derived_analysis_gate). The explicit 'analysis-gate' input wins."
@@ -380,7 +395,11 @@ runs:
           # Strip surrounding whitespace + tolerate ", " separator;
           # PR β tightens the parser when multi-language EXECUTION
           # wires up.
-          normalized="$(echo "$LANGUAGES" | tr -d '[:space:]')"
+          # printf — not echo — to avoid the echo-builtin flag-injection
+          # trap (a `LANGUAGES` value starting with `-e`/`-n`/`-E` would
+          # otherwise be interpreted as a flag rather than data).
+          # gemini-code-assist #296 catch.
+          normalized="$(printf '%s' "$LANGUAGES" | tr -d '[:space:]')"
           case "$normalized" in
             rust|typescript)
               single_language="$normalized"
