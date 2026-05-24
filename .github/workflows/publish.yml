@@ -54,18 +54,31 @@ jobs:
         with:
           persist-credentials: false
 
+      # `enable-cache: false` — tag-triggered workflows must neither
+      # restore nor save caches under tag triggers. A poisoned cache from a
+      # malicious tag push would otherwise become part of the published
+      # cdylib. Closes the `cache-poisoning` zizmor audit. See
+      # https://docs.zizmor.sh/audits/#cache-poisoning.
+      # `shared-key` becomes inert when caching is disabled but is kept for
+      # symmetry with the (former) cached path.
       - name: Set up Rust
         uses: ./.github/actions/setup-rust
         with:
           shared-key: publish-${{ matrix.platform }}
           targets: ${{ matrix.target }}
+          enable-cache: "false"
 
       # Node 24 (npm 11.x) is pinned so the install-gating check below
       # exercises an npm new enough to enforce the `libc` field, and so
       # the path-require smoke test runs on a deterministic Node rather
       # than whatever the runner image happens to ship.
+      #
+      # `cache:` input is intentionally omitted — `actions/setup-node` only
+      # caches when the input is set. zizmor's `cache-poisoning` audit
+      # flags this on tag-triggered workflows by default; inline-suppress
+      # since no cache is actually populated here.
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 # zizmor: ignore[cache-poisoning]
         with:
           node-version: '24'
 
@@ -158,8 +171,13 @@ jobs:
       # Node 24 + npm >= 11.5.1 are the floor for npm OIDC trusted
       # publishing (https://docs.npmjs.com/trusted-publishers). Node 20
       # ships npm 10.x, which cannot mint the OIDC token and 401s.
+      #
+      # `cache:` input is intentionally omitted — `actions/setup-node` only
+      # caches when the input is set. zizmor's `cache-poisoning` audit
+      # flags this on tag-triggered workflows by default; inline-suppress
+      # since no cache is actually populated here.
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 # zizmor: ignore[cache-poisoning]
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'

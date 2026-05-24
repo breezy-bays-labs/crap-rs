@@ -178,25 +178,68 @@ commit SHA isn't).
    major bumps land as separate PRs (breaking-change review).
 
 6. **Per-audit `zizmor` ignores get a `tracked:` comment.** New
-   audits surfaced by zizmor that we scope-defer (e.g. workflow-wide
-   `persist-credentials: false`, scoped per-job `permissions:`
-   blocks) land in `.github/zizmor.yml` with a `# tracked: crap-rs#N`
-   comment naming the follow-up issue. When the follow-up lands, the
-   ignore is removed and the audit fires unconditionally — same
-   accountability pattern as the rest of the repo's exclusions
-   (mirrors `~/.claude/rules/exclusions.md`). Inline ignores in
-   composite actions use `# zizmor: ignore[<audit>]` on the
-   identified span and carry the same `tracked:` comment nearby.
+   audits surfaced by zizmor that we scope-defer (e.g. a workflow-wide
+   convention change too large for the current PR) land in
+   `.github/zizmor.yml` with a `# tracked: crap-rs#N` comment naming
+   the follow-up issue. When the follow-up lands, the ignore is
+   removed and the audit fires unconditionally — same accountability
+   pattern as the rest of the repo's exclusions (mirrors
+   `~/.claude/rules/exclusions.md`). The file is intentionally absent
+   in steady state: it appears only when an audit is in flight to a
+   tracked issue. Inline ignores in composite actions or in workflow
+   spans use `# zizmor: ignore[<audit>]` on the identified line; if
+   the suppression is permanent (intentional + bounded), no
+   `tracked:` comment is needed.
+
+7. **`persist-credentials: false` on every `actions/checkout`.**
+   Workflows that never push (every job in this repo's `ci.yml` +
+   `publish.yml/build` + `release.yml/build`) keep the GH App
+   checkout token out of the runner's `.git/config`. Already wired
+   on every checkout repo-wide; the `artipacked` audit fails any
+   new checkout that omits it.
+
+8. **Scoped per-job `permissions:` blocks (least privilege).** Each
+   workflow declares a top-level `permissions: contents: read`
+   default; jobs that need more elevate explicitly (e.g.
+   `release.yml/release` needs `contents: write` for
+   `gh release create`; `ci.yml/scorecard-smoke` needs
+   `pull-requests: write` for the sticky-comment dogfood). Never let
+   a job inherit the runner's default workflow permissions silently;
+   the `excessive-permissions` audit fails any job missing a
+   `permissions:` block.
+
+9. **Cache-poisoning fix shape for tag-triggered workflows.**
+   Workflows that trigger only on `push: tags` (`release.yml`,
+   `publish.yml`) must neither restore nor save caches: a poisoned
+   cache from a malicious tag push would otherwise become part of
+   the published artifact. The pattern: the `setup-rust` composite
+   action accepts `enable-cache: "false"` which skips its embedded
+   `Swatinem/rust-cache` step via `if:`. Tag-triggered callers pass
+   that input. `actions/setup-node` is opted-out by simply omitting
+   the `cache:` input (which would otherwise enable caching), and
+   carries an inline `# zizmor: ignore[cache-poisoning]` because
+   zizmor's heuristic flags setup-node defensively. See
+   https://docs.zizmor.sh/audits/#cache-poisoning.
+
+10. **Prefer the `gh` CLI to a third-party release action.** GitHub
+    releases are created via `gh release create "$TAG" --generate-notes
+    artifacts/*.tar.gz` under `permissions: contents: write` and
+    `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. One less external action
+    to SHA-pin and bump, and the `superfluous-actions` audit closes
+    cleanly. The same principle applies whenever the gh CLI covers
+    the third-party action's feature set.
 
 ### When the rules bite
 
 - Adding a new workflow / composite action → SHA-pin every external
-  `uses:` reference from day one. The `zizmor` CI gate fails the PR
-  otherwise.
+  `uses:` reference from day one, add `persist-credentials: false`
+  to every checkout, declare a scoped `permissions:` block per job,
+  and pass `enable-cache: "false"` to `setup-rust` if the workflow
+  is tag-triggered. The `zizmor` CI gate fails the PR otherwise.
 - Adding a new step that triggers a new zizmor audit → fix the
-  finding OR file a follow-up issue and add a tracked entry to
-  `.github/zizmor.yml`. Never silently expand the ignore list
-  without a tracking issue.
+  finding directly OR file a follow-up issue and add a tracked
+  entry to `.github/zizmor.yml`. Never silently expand the ignore
+  list without a tracking issue.
 - Reviewing a Dependabot bump PR → eyeball the upstream release
   notes for the bumped action; merge if benign. Multi-action group
   PRs may need staging if one bump is more contentious than the
