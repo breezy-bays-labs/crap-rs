@@ -76,6 +76,10 @@ pub enum FormatArg {
     /// distribution, and per-file collapsible function tables. Inline
     /// CSS, no external assets, mobile-responsive.
     Html,
+    /// GitHub Actions inline annotations — emits `::warning` workflow
+    /// commands so threshold-exceeding findings render inline on the
+    /// PR "Files Changed" tab. Universal, free, no GHAS dependency.
+    GithubAnnotations,
 }
 
 /// One requested output: a format and an optional file destination.
@@ -336,8 +340,12 @@ pub struct OutputArgs {
     /// separated list to fan out a single analysis pass to multiple
     /// destinations (`--format json:envelope.json,markdown:report.md`).
     /// Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file).
-    /// Multi-format invocations require every entry to specify a file —
-    /// stdout cannot multiplex.
+    /// Multi-format invocations may include at most one stdout entry
+    /// (the rest must specify a file) — two stdout sinks would
+    /// interleave indistinguishably, but a single stdout sink
+    /// alongside file sinks is the shape composite CI workflows need
+    /// (e.g. `markdown:scorecard.md,github-annotations` where the
+    /// workflow commands are intercepted from stdout by the runner).
     #[arg(
         short,
         long,
@@ -413,6 +421,27 @@ pub struct OutputArgs {
     /// subset so a CI line-template can match either tool.
     #[arg(long)]
     pub summary: bool,
+
+    /// Cap on the number of `::warning` annotations the
+    /// `github-annotations` reporter emits per invocation.
+    ///
+    /// GitHub Actions silently drops annotations past a per-step UI
+    /// cap (10 warning / 10 error / 10 notice per step, 50 per job).
+    /// When the eligible (`exceeds == true`) set exceeds this cap, the
+    /// reporter takes the top-N by CRAP and appends a single trailing
+    /// `::notice::N more functions exceed threshold; see scorecard for
+    /// the full list` line so reviewers know findings were dropped.
+    ///
+    /// Range `1..=100` (clap-enforced — `0` is rejected at the CLI
+    /// boundary because a zero cap is meaningless and almost always
+    /// indicates the user meant to omit the flag). Default `10` —
+    /// matches the GH Actions per-step display cap; raising the limit
+    /// past 10 produces annotations that the runner will drop. Only
+    /// meaningful with `--format github-annotations`; ignored by every
+    /// other reporter. Configurable per project via
+    /// `[output] annotation_limit` in the adapter's TOML.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=100))]
+    pub annotation_limit: Option<u32>,
 }
 
 #[derive(Debug, Args)]
@@ -1020,14 +1049,21 @@ where
 // ── Run-inner orchestration helpers ────────────────────────────────
 
 /// Effective inputs after CLI / config-file / preset / default merging.
-/// Everything `core::analyze` needs except the coverage path (which is
-/// validated separately and may be borrowed from `cli`).
+/// Carries everything downstream (`core::analyze` + reporter dispatch)
+/// needs except the coverage path (which is validated separately and
+/// may be borrowed from `cli`).
 struct EffectiveInputs {
     src: PathBuf,
     metric: ComplexityMetric,
     threshold_config: ThresholdConfig,
     threshold: f64,
     exclude: Vec<String>,
+    /// Merged cap for the `github-annotations` reporter. Defaults to
+    /// `10` when neither the CLI flag nor the TOML `[output]
+    /// annotation_limit` is set; CLI flag wins over config. Honored
+    /// only by `format_github_annotations` — every other reporter
+    /// ignores it.
+    annotation_limit: usize,
 }
 
 /// In-flight pipeline state assembled by `prepare_pipeline`. Owns the
@@ -1065,12 +1101,18 @@ fn merge_effective_inputs(
         .unwrap_or(meta.default_metric);
     let (threshold_config, threshold) = merge_threshold(cli, file_config, metric);
     let exclude = merge_exclude(cli, file_config, meta);
+    let annotation_limit = cli
+        .output
+        .annotation_limit
+        .or_else(|| file_config.as_ref().and_then(|c| c.output.annotation_limit))
+        .unwrap_or(10) as usize;
     EffectiveInputs {
         src,
         metric,
         threshold_config,
         threshold,
         exclude,
+        annotation_limit,
     }
 }
 
@@ -1325,6 +1367,17 @@ fn render_format<P: ParseDiagnostic>(
         FormatArg::Html => {
             reporters::format_html(view, inputs.threshold, meta.tool_name, meta.tool_version)
         }
+        // GitHub Actions annotations is a gate translation like SARIF —
+        // iterates `view.full.functions` regardless of View shaping so
+        // PR annotations reflect the gate, not a presentation choice.
+        // `annotation_limit` is the per-step UI cap; the reporter
+        // appends a `::notice` summary when truncation kicks in.
+        FormatArg::GithubAnnotations => reporters::format_github_annotations(
+            view,
+            meta.tool_name,
+            meta.tool_version,
+            inputs.annotation_limit,
+        ),
     })
 }
 
@@ -1433,8 +1486,14 @@ fn validate_display_flags(cli: &Cli) -> Result<()> {
     Ok(())
 }
 
-/// Multi-format invocations require every entry to specify a file —
-/// stdout cannot multiplex.
+/// Multi-format invocations may contain at most one stdout-targeted
+/// spec (the rest must specify a file). Two stdout sinks would
+/// interleave indistinguishably, but a single stdout sink alongside
+/// any number of file sinks is unambiguous and is the shape composite
+/// CI workflows need (e.g. `markdown:scorecard.md,github-annotations`
+/// where the markdown becomes the scorecard artefact and
+/// `github-annotations` workflow commands are intercepted from
+/// stdout by the GitHub Actions runner).
 fn validate_format_destinations(specs: &[FormatSpec]) -> Result<()> {
     if specs.len() > 1 {
         let stdout_specs: Vec<_> = specs
@@ -1442,9 +1501,9 @@ fn validate_format_destinations(specs: &[FormatSpec]) -> Result<()> {
             .filter(|s| s.output.is_none())
             .map(|s| format_arg_kebab(s.format).to_string())
             .collect();
-        if !stdout_specs.is_empty() {
+        if stdout_specs.len() > 1 {
             bail!(
-                "multi-format `--format` requires every entry to specify a file (e.g. `json:envelope.json`); stdout-only entries: {}",
+                "multi-format `--format` allows at most one stdout entry (the rest must specify a file, e.g. `json:envelope.json`); stdout entries: {}",
                 stdout_specs.join(", ")
             );
         }
@@ -1945,12 +2004,47 @@ mod tests {
     }
 
     #[test]
-    fn format_multi_without_files_rejected() {
+    fn format_multi_with_two_stdout_specs_rejected() {
         let cli = parse(&["--coverage", "lcov.info", "--format", "json,markdown"]).unwrap();
         let err = validate_display_flags(&cli).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("multi-format"));
-        assert!(msg.contains("file"));
+        assert!(msg.contains("multi-format"), "got: {msg}");
+        assert!(msg.contains("stdout"), "got: {msg}");
+        assert!(
+            msg.contains("json"),
+            "msg should name the stdout specs: {msg}"
+        );
+        assert!(
+            msg.contains("markdown"),
+            "msg should name the stdout specs: {msg}"
+        );
+    }
+
+    #[test]
+    fn format_multi_with_single_stdout_plus_file_accepted() {
+        // Locked shape D1 for github-annotations: composite workflows
+        // emit `markdown:scorecard.md,github-annotations` in one
+        // invocation. The validator permits exactly one stdout sink
+        // alongside any number of file sinks.
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--format",
+            "markdown:scorecard.md,github-annotations",
+        ])
+        .unwrap();
+        assert!(validate_display_flags(&cli).is_ok());
+    }
+
+    #[test]
+    fn format_multi_with_three_stdout_specs_rejected() {
+        let cli = parse(&["--coverage", "lcov.info", "--format", "json,markdown,csv"]).unwrap();
+        let err = validate_display_flags(&cli).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("at most one stdout"),
+            "rejection must name the rule, got: {msg}"
+        );
     }
 
     #[test]

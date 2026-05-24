@@ -82,7 +82,8 @@ Run `crap4rs --help` for the canonical full reference. Grouped here as in `--hel
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--format <FORMAT[,…]>` | `table` | One or more output formats. Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file); a comma-separated list fans out a single analysis pass to multiple destinations (`json:env.json,markdown:report.md`). Supported formats: `table`, `json`, `markdown`, `csv`, `sarif`, `advice` (experimental), `scorecard-row`. Multi-format invocations require every entry to specify a file. |
+| `--format <FORMAT[,…]>` | `table` | One or more output formats. Each entry is `FORMAT` (stdout) or `FORMAT:FILE` (write to file); a comma-separated list fans out a single analysis pass to multiple destinations (`json:env.json,markdown:report.md` or `markdown:scorecard.md,github-annotations`). Supported formats: `table`, `json`, `markdown`, `csv`, `sarif`, `advice` (experimental), `scorecard-row`, `github-annotations`, `html`. Multi-format invocations may include at most one stdout entry; additional entries must specify a file. |
+| `--annotation-limit <N>` | `10` | Cap on `::warning` lines emitted by `--format github-annotations`. Range `1..=100`; also configurable via `[output] annotation_limit` in the TOML config. The CLI flag wins when both are set. |
 | `--threshold <N>` | metric-correct `default` preset (cognitive 15, cyclomatic 15 today) | CRAP score above which a function fails the check. The default is resolved against the effective metric, not a hard-coded scalar. |
 | `--strict` | — | Use the `strict` preset (cognitive 8, cyclomatic 8 today). Mutually exclusive with `--lenient`. |
 | `--lenient` | — | Use the `lenient` preset (cognitive 25, cyclomatic 25 today). |
@@ -323,6 +324,47 @@ jobs:
       - uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: crap.sarif
+```
+
+### GitHub Actions inline annotations (`--format github-annotations`)
+
+`--format github-annotations` emits one
+[GitHub Actions `::warning` workflow command](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions)
+per function above threshold. The runner intercepts the commands from
+stdout and renders them as inline annotations on the PR "Files
+Changed" tab — same UX as SARIF, but with no GitHub Advanced Security
+or Code Scanning subscription required and no per-line annotation
+cap (other than the per-step UI cap below).
+
+```bash
+crap4rs --coverage lcov.info --format github-annotations
+# ::warning file=src/lib.rs,line=42,title=CRAP 32.5::Function `tangled` has CRAP 32.50 (complexity=14, coverage=20.0%) which exceeds threshold 15.0
+```
+
+Like SARIF, this is a **gate translation**, not a display: the
+reporter iterates the unshapeable analysis. `--top`, `--sort-by`,
+`--only-failing`, and `--baseline` do **not** alter what's emitted —
+PR annotations must reflect truth, not a presentation choice.
+
+GitHub silently drops annotations past a per-step UI cap (10 warning
+/ 10 error / 10 notice per step; 50 per job; 50 per workflow). Use
+`--annotation-limit N` (default `10`, range `1..=100`) to cap
+emission; over-cap eligible findings surface as a trailing
+`::notice::N more functions exceed threshold; see scorecard for the
+full list` line so reviewers know findings were dropped. Configurable
+per project via `[output] annotation_limit` in `crap4rs.toml`; the
+CLI flag wins when both are set.
+
+The composite scorecard action exposes this via `annotations: true`
+(see [`.github/actions/scorecard/README.md`](.github/actions/scorecard/README.md#inline-annotations)).
+For a workflow that ships annotations alongside the markdown
+scorecard in a single analyzer invocation, combine the formats:
+
+```yaml
+- run: crap4rs --coverage lcov.info --format markdown:scorecard.md,github-annotations --no-fail
+  # `markdown:scorecard.md` writes the rendered scorecard to a file;
+  # `github-annotations` flows through to stdout where the runner
+  # intercepts the workflow commands.
 ```
 
 ### Scorecard row (`--format scorecard-row`)

@@ -73,6 +73,19 @@ differ for the three compounding reasons documented there.
 
 ### Added
 
+- `--format github-annotations` emits GitHub Actions `::warning`
+  workflow commands so threshold-exceeding functions render inline on
+  the PR Files Changed tab — universal, free, no GHAS / Code Scanning
+  dependency. Like SARIF, this is a gate translation: the reporter
+  iterates the unshaped `view.full.functions` regardless of `--top` /
+  `--sort-by` / `--only-failing`. New `--annotation-limit N` (u32,
+  range 1..=100, default 10) caps emission to match the GH Actions
+  per-step UI cap; over-cap eligible findings surface as a trailing
+  `::notice::N more functions exceed threshold; see scorecard for the
+  full list` line. Also configurable via `[output] annotation_limit`
+  in `crap4rs.toml` / `crap4ts.toml`. The composite scorecard action
+  gained matching `annotations` (bool) and `annotation-limit` inputs
+  for opt-in inline rendering. (#276)
 - `<adapter> init` subcommand generates a starter `crap4rs.toml`
   (or `crap4ts.toml`) in the current directory. Auto-detects `src/`
   → `crates/` → falls back to `src` with a hint comment. Interactive
@@ -107,6 +120,15 @@ differ for the three compounding reasons documented there.
 
 ### Changed
 
+- Multi-format `--format` invocations now permit a single stdout entry
+  alongside file-targeted entries (previously every entry had to
+  specify a file). Two or more stdout entries are still rejected — the
+  underlying "cannot multiplex stdout" rule stands. Unblocks the
+  intended composite-CI shape
+  `--format markdown:scorecard.md,github-annotations`, where the
+  markdown is captured as a workflow artefact and the
+  `github-annotations` workflow commands flow through to the GH
+  Actions runner. (#276)
 - Config-file `threshold = N` now takes precedence over
   `preset = "..."` when both are set in the same `crap4rs.toml` /
   `crap4ts.toml`. This makes config-file resolution consistent with

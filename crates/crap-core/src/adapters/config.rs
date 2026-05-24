@@ -36,6 +36,25 @@ pub struct FileConfig {
     /// this map and folds preset values into `Cli` before
     /// `build_view_spec`.
     pub views: HashMap<String, ViewPreset>,
+    /// Output-shaping settings under `[output]`.
+    ///
+    /// Reporter-specific knobs (today: `annotation_limit`) live here
+    /// so they share a single TOML namespace rather than polluting the
+    /// top-level table. Missing `[output]` blocks deserialize to
+    /// `OutputConfig::default()`.
+    pub output: OutputConfig,
+}
+
+/// Reporter-level output settings (TOML `[output]` table).
+///
+/// All fields are optional — missing fields mean "use CLI default."
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct OutputConfig {
+    /// Cap on the number of `::warning` annotations emitted by the
+    /// `github-annotations` reporter per invocation. `None` defers to
+    /// the CLI default (10); a CLI `--annotation-limit` flag always
+    /// wins over this value when both are set.
+    pub annotation_limit: Option<u32>,
 }
 
 /// Saved view preset.
@@ -71,6 +90,14 @@ struct RawConfig {
     overrides: Vec<RawOverride>,
     #[serde(default)]
     views: HashMap<String, RawViewPreset>,
+    #[serde(default)]
+    output: RawOutputConfig,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOutputConfig {
+    annotation_limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -158,6 +185,9 @@ fn parse_config(content: &str) -> Result<FileConfig> {
         exclude: raw.exclude,
         overrides,
         views,
+        output: OutputConfig {
+            annotation_limit: raw.output.annotation_limit,
+        },
     })
 }
 
@@ -178,6 +208,19 @@ fn validate_raw_config(raw: &RawConfig) -> Result<()> {
                 o.pattern
             );
         }
+    }
+    // Mirror the CLI's `clap::value_parser!(u32).range(1..=100)` on
+    // `--annotation-limit` so config and CLI agree on the legal range.
+    // Without this check a TOML `[output] annotation_limit = 0` would
+    // silently disable annotation emission (only the truncation notice
+    // fires); `= 999` would silently flood the per-step UI cap. Both
+    // are rejected by clap at the CLI boundary — config must match.
+    if let Some(limit) = raw.output.annotation_limit
+        && !(1..=100).contains(&limit)
+    {
+        anyhow::bail!(
+            "output.annotation_limit must be in 1..=100, got: {limit}\n  hint: matches the CLI `--annotation-limit` range; 0 disables emission, > 100 floods the GH Actions per-step cap"
+        );
     }
     Ok(())
 }
@@ -689,6 +732,94 @@ sort = "path"
             Some(SortKey::Complexity)
         );
         assert_eq!(config.views["path_sort"].sort, Some(SortKey::Path));
+    }
+
+    // ── OutputConfig tests ───────────────────────────────────────
+
+    #[test]
+    fn parse_no_output_table_yields_default_output_config() {
+        // Back-compat: every existing crap4rs.toml lacks `[output]` and
+        // must continue to parse with the new field defaulted.
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert_eq!(config.output, OutputConfig::default());
+        assert_eq!(config.output.annotation_limit, None);
+    }
+
+    #[test]
+    fn parse_output_annotation_limit() {
+        let toml = "[output]\nannotation_limit = 25\n";
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.output.annotation_limit, Some(25));
+    }
+
+    #[test]
+    fn parse_output_alongside_threshold() {
+        let toml = r#"
+threshold = 12.0
+
+[output]
+annotation_limit = 7
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.threshold, Some(12.0));
+        assert_eq!(config.output.annotation_limit, Some(7));
+    }
+
+    #[test]
+    fn parse_output_annotation_limit_zero_rejected() {
+        // 0 would silently disable annotation emission (the reporter
+        // takes 0 of the eligible set + only emits the truncation
+        // notice). Clap rejects 0 at the CLI boundary via
+        // `value_parser!(u32).range(1..=100)`; config must match.
+        let toml = "[output]\nannotation_limit = 0\n";
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("annotation_limit") && msg.contains("1..=100"),
+            "expected range error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_output_annotation_limit_above_max_rejected() {
+        // 101+ would silently flood the GH Actions per-step UI cap
+        // (10 warning per step; anything past 10 is dropped by the
+        // runner). Clap rejects at the CLI; config must match.
+        let toml = "[output]\nannotation_limit = 101\n";
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("annotation_limit") && msg.contains("1..=100"),
+            "expected range error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_output_annotation_limit_boundary_values_accepted() {
+        for v in [1u32, 10, 50, 100] {
+            let toml = format!("[output]\nannotation_limit = {v}\n");
+            let config = parse_config(&toml).expect("boundary value should parse");
+            assert_eq!(config.output.annotation_limit, Some(v));
+        }
+    }
+
+    #[test]
+    fn parse_unknown_output_field_rejected() {
+        // deny_unknown_fields guards forward-compat: a TOML pinned at
+        // an old crap4rs version must still surface unrecognised output
+        // settings as load-time errors rather than silently dropping
+        // them.
+        let toml = r#"
+[output]
+annotation_limit = 5
+nonsense_field = "x"
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("unknown") || msg.contains("nonsense_field"),
+            "expected deny_unknown_fields error, got: {msg}"
+        );
     }
 
     // ── discover_config parameterization (#161) ───────────────────
