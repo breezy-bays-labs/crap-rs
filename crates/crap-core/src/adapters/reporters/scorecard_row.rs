@@ -1,21 +1,22 @@
-//! Scorecard-row reporter — emits a single mokumo `Row::CrapDelta` JSON
+//! Scorecard-row reporter — emits a single `Row::CrapDelta` JSON
 //! object to stdout.
 //!
-//! The wire shape mirrors mokumo's locked schema fragment at
-//! `breezy-bays-labs/mokumo/.config/scorecard/schema.json#/definitions/Row`
-//! (CrapDelta member of the `oneOf`, schema_version=2). We replicate
-//! the shape locally via private serde structs rather than depending
-//! on mokumo's `scorecard` crate so the analyzer stays mokumo-
-//! decoupled — the scorecard schema is the contract, not mokumo's
-//! Rust crate. Model P (producer-mints-status) is the locked
-//! convention; integration tests in adapter crates validate output
-//! against a vendored copy of mokumo's schema.
+//! The wire shape conforms to the locked scorecard-row schema fragment
+//! owned by this repository at
+//! `crates/crap4rs/tests/fixtures/scorecard/schema.json`
+//! (CrapDelta member of `definitions/Row.oneOf`, schema_version=1).
+//! The reporter replicates the shape via private serde structs so the
+//! analyzer carries no foreign-crate dependency for the row format —
+//! the schema fragment is the contract. Producer-mints-status is the
+//! locked convention; integration tests in adapter crates validate
+//! emitted output against the locked schema. See
+//! `docs/scorecard-row-contract.md` for the full producer contract.
 
 use serde::Serialize;
 
 use crate::domain::summary::{CrapDeltaRowData, CrapDeltaStatus};
 
-/// Format a `CrapDeltaRowData` as a mokumo `Row::CrapDelta` JSON object.
+/// Format a `CrapDeltaRowData` as a `Row::CrapDelta` JSON object.
 ///
 /// Output is pretty-printed (multi-line) for CI-log readability — the
 /// aggregator parses either form. A trailing newline is appended so the
@@ -28,7 +29,8 @@ pub fn format_scorecard_row(data: &CrapDeltaRowData) -> String {
     out
 }
 
-/// On-the-wire shape. Serializes to mokumo's `Row::CrapDelta`.
+/// On-the-wire shape. Serializes to the locked `Row::CrapDelta`
+/// fragment.
 ///
 /// Field order is illustrative only — JSON Schema validation is order-
 /// agnostic, and downstream consumers parse by key, not position.
@@ -63,8 +65,8 @@ impl<'a> ScorecardRowWire<'a> {
     }
 }
 
-/// PascalCase serialization mirrors mokumo's `Status` enum
-/// (`#[serde(rename_all = "PascalCase")]` in `crates/scorecard/src/lib.rs`).
+/// PascalCase serialization matches the schema's `Status` enum
+/// (`#[serde(rename_all = "PascalCase")]`).
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "PascalCase")]
 enum WireStatus {
@@ -176,7 +178,7 @@ mod tests {
     // ── Byte-level snapshot locks ───────────────────────────────
     //
     // Complement the existing `scorecard_row_integration.rs` schema
-    // validation (which gates the shape against mokumo's
+    // validation (which gates the shape against the locked
     // `Row::CrapDelta` JSON Schema) with insta snapshots that pin the
     // exact serialization — pretty-printer settings, field ordering,
     // failure-detail rendering. Schema + insta together = belt +

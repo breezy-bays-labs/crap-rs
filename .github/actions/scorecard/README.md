@@ -5,21 +5,22 @@ into aggregator PR-comment bots; can also post its own sticky comment.
 
 ## Why composite, not standalone
 
-The scorecard is one row in a richer "PR metrics" comment (mokumo's
-[#650](https://github.com/breezy-bays-labs/mokumo/issues/650) for example
-combines coverage, CRAP, mutation, module size, architecture violations).
-This action exposes the rendered markdown as an **output** so an aggregator
-job can drop it into a larger sticky comment without two bots fighting over
-the same comment.
+The scorecard is typically one row in a richer "PR metrics" comment
+that aggregates multiple quality signals (coverage, CRAP, mutation,
+module size, architecture violations, etc.). This action exposes the
+rendered markdown as an **output** so an aggregator job can drop it
+into a larger sticky comment without two bots fighting over the same
+comment.
 
 For repos that only care about CRAP, set `comment-mode: sticky` and the
 action manages its own sticky comment.
 
 ## Languages
 
-Polyglot interface, Rust wired today. TypeScript (via `crap4ts`) is reserved
-for a future release of this action — see ops
-[#231](https://github.com/breezy-bays-labs/ops/issues/231).
+Polyglot interface. Rust (via `crap4rs`) and TypeScript (via `crap4ts`)
+are both wired — the action auto-detects from the `coverage` file
+extension (`.info`/`.lcov` → Rust, `.json` (Istanbul) → TypeScript) or
+honors an explicit `language:` override.
 
 ```yaml
 - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
@@ -103,9 +104,9 @@ need — same-repo coverage is sufficient for internal review.
 
 ## Aggregator pattern — one row of a richer metrics comment
 
-Mokumo's metrics-delta bot wants coverage + CRAP + mutation + module size in
-one sticky comment. This action contributes the CRAP rows; the aggregator
-owns the comment.
+When a PR-metrics aggregator composes coverage + CRAP + mutation +
+module size into one sticky comment, this action contributes the CRAP
+row; the aggregator owns the comment.
 
 ```yaml
 - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
@@ -153,7 +154,7 @@ owns the comment.
 | Name | Notes |
 |---|---|
 | `markdown` | The rendered scorecard — drop into aggregator comments verbatim |
-| `row-json` | Mokumo `Row::CrapDelta` JSON object — for aggregators that re-render with full layout control. See [Structured row output](#structured-row-output-outputsrow-json) |
+| `row-json` | `Row::CrapDelta` JSON object — for aggregators that re-render with full layout control. See [Structured row output](#structured-row-output-outputsrow-json) |
 | `json-envelope-path` | Path to the full JSON envelope on the runner |
 | `analysis-passed` | `true` / `false` |
 | `delta-passed` | `true` / `false`, or empty string when no baseline |
@@ -162,9 +163,10 @@ owns the comment.
 
 ## Structured row output (`outputs.row-json`)
 
-`outputs.row-json` is the raw stdout of `crap4rs --format scorecard-row` —
-one mokumo `Row::CrapDelta` JSON object, conforming to the locked
-[scorecard schema](https://github.com/breezy-bays-labs/mokumo/blob/main/.config/scorecard/schema.json)
+`outputs.row-json` is the raw stdout of `<adapter> --format scorecard-row` —
+one `Row::CrapDelta` JSON object, conforming to the locked scorecard
+schema fragment at
+[`crates/crap4rs/tests/fixtures/scorecard/schema.json`](../../../crates/crap4rs/tests/fixtures/scorecard/schema.json)
 (the `CrapDelta` member of `definitions/Row` `oneOf`). No envelope, no
 metadata wrapper — the JSON object is the contract.
 
@@ -172,9 +174,7 @@ Use `outputs.row-json` when an aggregator workflow re-renders the
 scorecard with full layout control. Use `outputs.markdown` when posting
 the scorecard verbatim into a sticky comment.
 
-Producer-side status policy (Red/Yellow/Green) lives in `crap4rs`
-([crap4rs#111](https://github.com/breezy-bays-labs/crap4rs/issues/111),
-PR [#119](https://github.com/breezy-bays-labs/crap4rs/pull/119)):
+Producer-side status policy (Red/Yellow/Green):
 
 - **Red** — at least one new threshold violation landed.
 - **Yellow** — no new violations, but at least one modified function's
@@ -210,8 +210,7 @@ PR [#119](https://github.com/breezy-bays-labs/crap4rs/pull/119)):
 ```
 
 `outputs.markdown` remains available unchanged — existing consumers
-(e.g. mokumo's `crap-scorecard` job in `quality.yml`) continue to read
-it without modification.
+continue to read it without modification.
 
 ### Version requirement
 

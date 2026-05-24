@@ -67,8 +67,10 @@ pub enum FormatArg {
     Sarif,
     /// Agent-oriented JSON with Diagnostic remediation hints (experimental)
     Advice,
-    /// Single mokumo-scorecard `Row::CrapDelta` JSON object — for scorecard
-    /// aggregator consumption (mokumo schema_version=2).
+    /// Single `Row::CrapDelta` JSON object — for scorecard
+    /// aggregator consumption (locked schema fragment at
+    /// `crates/crap4rs/tests/fixtures/scorecard/schema.json`,
+    /// schema_version=1; see `docs/scorecard-row-contract.md`).
     ScorecardRow,
     /// Self-contained HTML dashboard with summary stats, risk
     /// distribution, and per-file collapsible function tables. Inline
@@ -1243,7 +1245,7 @@ fn format_as_json<P: ParseDiagnostic>(
     reporters::json::format_json(view, &config).map_err(Into::into)
 }
 
-/// ScorecardRow projects the unshaped analysis + delta into a mokumo
+/// ScorecardRow projects the unshaped analysis + delta into a
 /// `Row::CrapDelta` JSON object. View shaping does NOT
 /// alter scorecard-row — the aggregator consumes truth, not a filtered
 /// subset.

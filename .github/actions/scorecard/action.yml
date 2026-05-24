@@ -55,8 +55,8 @@ inputs:
     default: 'false'
   comment-mode:
     description: |
-      `none` (default): outputs only — composable into aggregator bots like
-      mokumo's metrics-delta comment.
+      `none` (default): outputs only — composable into PR-metrics
+      aggregator workflows.
       `sticky`: post/update a sticky PR comment using
       marocchino/sticky-pull-request-comment. Requires `pull-requests: write`
       on the calling job.
@@ -81,12 +81,16 @@ outputs:
     value: ${{ steps.run.outputs.markdown }}
   row-json:
     description: |
-      The mokumo `Row::CrapDelta` JSON object emitted by `crap4rs --format scorecard-row`.
-      Conforms to the locked scorecard schema published at
-      https://github.com/breezy-bays-labs/mokumo/blob/main/.config/scorecard/schema.json
-      (the `CrapDelta` member of `definitions/Row` `oneOf`). Consume in aggregator workflows
-      that re-render the scorecard with full layout control instead of parsing `outputs.markdown`.
-      Producer-side status policy lives in crap4rs (see PR #119).
+      The `Row::CrapDelta` JSON object emitted by the dispatched
+      adapter's `--format scorecard-row`. Conforms to the locked
+      scorecard schema fragment at
+      `crates/crap4rs/tests/fixtures/scorecard/schema.json` in this
+      repo (the `CrapDelta` member of `definitions/Row` `oneOf`).
+      Consume in aggregator workflows that re-render the scorecard
+      with full layout control instead of parsing `outputs.markdown`.
+      Producer-side status policy lives in crap-core's shared
+      `format_as_scorecard_row` routing — see
+      `docs/scorecard-row-contract.md`.
     value: ${{ steps.run.outputs.row_json }}
   json-envelope-path:
     description: 'Path to the full JSON envelope on the runner — pass to downstream tooling.'
@@ -289,7 +293,7 @@ runs:
 
         # Multi-line output: file the row-json via a distinct heredoc sentinel.
         # The file is the raw stdout of `<bin> --format scorecard-row` —
-        # one mokumo Row::CrapDelta JSON object, no envelope wrapping. The
+        # one Row::CrapDelta JSON object, no envelope wrapping. The
         # sentinel must not appear in the JSON; pretty-printed CrapDelta
         # never contains it. Both adapters emit the same Row JSON shape
         # (locked by crates/crap-core/tests/scorecard_row_parity.rs).

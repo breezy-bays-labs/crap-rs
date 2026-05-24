@@ -16,8 +16,8 @@
 Gherkin specs live in `crates/crap4rs/tests/features/*.feature` and are
 exercised by cucumber-rs harnesses under `crates/crap4rs/tests/*_cucumber.rs`.
 The conventions below keep the spec corpus honest about what is and
-isn't actually verified, so a future BDD-quality monitor (mokumo epic
-breezy-bays-labs/mokumo#370) can dogfood on us without false positives.
+isn't actually verified, so a future BDD-quality monitor can dogfood
+on us without false positives.
 
 **Lexicon source of truth**: `crates/crap4rs/tests/features/TAGS.toml`.
 
@@ -275,9 +275,10 @@ of which adapter the action dispatched.
 `crates/crap-core/tests/scorecard_row_parity.rs` runs both bins
 against representative fixtures and asserts byte-identical key
 sets on both the Green (no violations) and Red (above-threshold)
-branches plus value-shape invariants for fields the
-mokumo-side schema (`crates/crap4rs/tests/fixtures/scorecard/schema.json`)
-relies on. "Documentation rots; CI doesn't" — same pattern as
+branches plus value-shape invariants for fields the locked
+schema fragment
+(`crates/crap4rs/tests/fixtures/scorecard/schema.json`) relies on.
+"Documentation rots; CI doesn't" — same pattern as
 `scripts/bdd-tracked-lint.py` and `scripts/mutants-skip-lint.py`.
 
 ### crap4ts install constraint

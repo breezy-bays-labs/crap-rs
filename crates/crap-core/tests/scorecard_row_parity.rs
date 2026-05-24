@@ -24,9 +24,9 @@
 //! * **Value-shape parity** — `type`/`id`/`label`/`anchor` are
 //!   stable string literals, `status` is one of the documented
 //!   enum members, `threshold` is an integer, `delta_count` is an
-//!   integer. The aggregator-side schema in mokumo expects these
-//!   shapes; a quiet shift (e.g. `"status": "yellow"` lowercase)
-//!   would slip past key-set parity alone.
+//!   integer. The locked scorecard-row schema expects these shapes;
+//!   a quiet shift (e.g. `"status": "yellow"` lowercase) would slip
+//!   past key-set parity alone.
 //!
 //! Out of scope:
 //!

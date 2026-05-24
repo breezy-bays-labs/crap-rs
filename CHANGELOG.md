@@ -372,15 +372,14 @@ consumers, including the planned `crap-core` library extraction
   every scored function. Inline CSS (no CDN, no external fonts), grid-
   based mobile-responsive layout, and color-coded risk levels matching
   the SARIF severity mapping. Closes #71.
-- **`--format scorecard-row`** emits a single mokumo `Row::CrapDelta`
-  JSON object (mokumo `schema_version=2`) for scorecard-aggregator
-  consumption. Producer-mints-status (Model P): Red on new threshold
-  violations, Yellow on modified-function CRAP regression, Green
-  otherwise. `--baseline <path>` integration carries the signed
-  `delta_count`, the `delta_text` display string (e.g. `"5 → 7 (+2)"`),
-  and a Red-only `failure_detail_md` listing violators sorted by CRAP
-  descending. Schema round-trip pinned via vendored fixture at
-  `tests/fixtures/scorecard/schema.json`. Closes #111.
+- **`--format scorecard-row`** emits a single `Row::CrapDelta`
+  JSON object for scorecard-aggregator consumption. Producer-mints
+  status: Red on new threshold violations, Yellow on modified-function
+  CRAP regression, Green otherwise. `--baseline <path>` integration
+  carries the signed `delta_count`, the `delta_text` display string
+  (e.g. `"5 → 7 (+2)"`), and a Red-only `failure_detail_md` listing
+  violators sorted by CRAP descending. Schema round-trip pinned via
+  fixture at `tests/fixtures/scorecard/schema.json`. Closes #111.
 - **`--format advice`** (experimental, schema_version=1) emits AST-derived
   remediation hints alongside the standard JSON envelope: a per-function
   `Diagnostic` with `coverage_gaps`, `complexity_drivers`,

@@ -33,8 +33,8 @@ use std::fmt;
 /// Resolved Q10 in shaping, parsers NEVER silent-drop and NEVER abort
 /// first-record. The diagnostic surfaces in the JSON envelope under
 /// `analysis_output.diagnostics.parse_diagnostics[]` so downstream
-/// consumers (Scorecard action, mokumo) can decide whether to surface
-/// or ignore.
+/// consumers (Scorecard action, aggregator workflows) can decide
+/// whether to surface or ignore.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IstanbulParseDiagnostic {
     /// The raw `path` field from the Istanbul entry (pre-normalization).
