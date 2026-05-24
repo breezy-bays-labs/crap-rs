@@ -49,6 +49,11 @@ breezy-bays-labs/mokumo#370) can dogfood on us without false positives.
    File the tracking issue **before** the tag lands. Same rule for
    `@wip` (issue must name the in-flight PR).
 
+   Mechanical enforcement: `scripts/bdd-tracked-lint.py` (run from
+   `lefthook.yml` pre-push and the `bdd-tracked-lint` CI job)
+   rejects any `@unwired`/`@wip` scenario whose body lacks a
+   `# tracked: crap-rs#<n>` comment. Documentation rots; CI doesn't.
+
 3. **No no-op step definitions.** If a `Given`/`When`/`Then` in a
    scenario has no executable implementation, the scenario is
    `@unwired` — not "wired with empty step defs". Forced empty step
