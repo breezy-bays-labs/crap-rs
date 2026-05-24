@@ -198,7 +198,7 @@ commit SHA isn't).
 
 7. **`persist-credentials: false` on every `actions/checkout`.**
    Workflows that never push (every job in this repo's `ci.yml` +
-   `publish.yml/build` + `release.yml/build`) keep the GH App
+   the build/publish jobs in `release-plz.yml`) keep the GH App
    checkout token out of the runner's `.git/config`. Already wired
    on every checkout repo-wide; the `artipacked` audit fails any
    new checkout that omits it.
@@ -206,24 +206,25 @@ commit SHA isn't).
 8. **Scoped per-job `permissions:` blocks (least privilege).** Each
    workflow declares a top-level `permissions: contents: read`
    default; jobs that need more elevate explicitly (e.g.
-   `release.yml/release` needs `contents: write` for
-   `gh release create`; `ci.yml/scorecard-smoke` needs
-   `pull-requests: write` for the sticky-comment dogfood). Never let
-   a job inherit the runner's default workflow permissions silently;
+   `release-plz.yml/release-plz-release` needs `contents: write` +
+   `id-token: write` for the OIDC publish path; `ci.yml/scorecard-smoke`
+   needs `pull-requests: write` for the sticky-comment dogfood). Never
+   let a job inherit the runner's default workflow permissions silently;
    the `excessive-permissions` audit fails any job missing a
    `permissions:` block.
 
-9. **Cache-poisoning fix shape for tag-triggered workflows.**
-   Workflows that trigger only on `push: tags` (`release.yml`,
-   `publish.yml`) must neither restore nor save caches: a poisoned
-   cache from a malicious tag push would otherwise become part of
-   the published artifact. The pattern: the `setup-rust` composite
-   action accepts `enable-cache: "false"` which skips its embedded
-   `Swatinem/rust-cache` step via `if:`. Tag-triggered callers pass
-   that input. `actions/setup-node` is opted-out by simply omitting
-   the `cache:` input (which would otherwise enable caching), and
-   carries an inline `# zizmor: ignore[cache-poisoning]` because
-   zizmor's heuristic flags setup-node defensively. See
+9. **Cache-poisoning fix shape for release-relevant workflows.**
+   Workflows whose downstream jobs publish to crates.io / npm or
+   upload signed binaries (every job in `release-plz.yml`) must
+   neither restore nor save caches: a poisoned cache from a malicious
+   push would otherwise become part of the published artifact.
+   The pattern: the `setup-rust` composite action accepts
+   `enable-cache: "false"` which skips its embedded `Swatinem/rust-cache`
+   step via `if:`. Release-relevant callers pass that input.
+   `actions/setup-node` is opted-out by simply omitting the `cache:`
+   input (which would otherwise enable caching), and carries an inline
+   `# zizmor: ignore[cache-poisoning]` because zizmor's heuristic
+   flags setup-node defensively. See
    https://docs.zizmor.sh/audits/#cache-poisoning.
 
 10. **Prefer the `gh` CLI to a third-party release action.** GitHub
