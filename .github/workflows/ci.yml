@@ -674,6 +674,19 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
+      - name: Install ripgrep
+        # `ubuntu-latest` runner images do not ship ripgrep on every
+        # generation (empirically observed via #261's `command -v rg`
+        # guard tripping on this PR's run). Three steps in this job
+        # shell `rg` — the L2 grouped-import check, the L3.5 adapter-
+        # name literal check (#161), and the L4 adapter-vocabulary
+        # check (#261). The L2 and L3.5 steps use the
+        # `if rg ...; then`/`|| true` patterns that silently treat a
+        # missing `rg` as "no matches found" and exit 0; the L4 step
+        # added in #261 surfaces this loudly via `command -v rg`.
+        # Explicit install closes the gap so all three layers
+        # actually execute. ~10-15s wall-clock overhead per CI run.
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Reject AST-library imports in crap-core (leading-token form)
         # Scope: crap-core ONLY. oxc/swc imports are legitimate in
         # crates/crap4ts/ once that lands; crap4rs uses syn. Do NOT
