@@ -36,6 +36,25 @@ pub struct FileConfig {
     /// this map and folds preset values into `Cli` before
     /// `build_view_spec`.
     pub views: HashMap<String, ViewPreset>,
+    /// Output-shaping settings under `[output]`.
+    ///
+    /// Reporter-specific knobs (today: `annotation_limit`) live here
+    /// so they share a single TOML namespace rather than polluting the
+    /// top-level table. Missing `[output]` blocks deserialize to
+    /// `OutputConfig::default()`.
+    pub output: OutputConfig,
+}
+
+/// Reporter-level output settings (TOML `[output]` table).
+///
+/// All fields are optional — missing fields mean "use CLI default."
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct OutputConfig {
+    /// Cap on the number of `::warning` annotations emitted by the
+    /// `github-annotations` reporter per invocation. `None` defers to
+    /// the CLI default (10); a CLI `--annotation-limit` flag always
+    /// wins over this value when both are set.
+    pub annotation_limit: Option<u32>,
 }
 
 /// Saved view preset.
@@ -71,6 +90,14 @@ struct RawConfig {
     overrides: Vec<RawOverride>,
     #[serde(default)]
     views: HashMap<String, RawViewPreset>,
+    #[serde(default)]
+    output: RawOutputConfig,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOutputConfig {
+    annotation_limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -158,6 +185,9 @@ fn parse_config(content: &str) -> Result<FileConfig> {
         exclude: raw.exclude,
         overrides,
         views,
+        output: OutputConfig {
+            annotation_limit: raw.output.annotation_limit,
+        },
     })
 }
 
@@ -689,6 +719,56 @@ sort = "path"
             Some(SortKey::Complexity)
         );
         assert_eq!(config.views["path_sort"].sort, Some(SortKey::Path));
+    }
+
+    // ── OutputConfig tests ───────────────────────────────────────
+
+    #[test]
+    fn parse_no_output_table_yields_default_output_config() {
+        // Back-compat: every existing crap4rs.toml lacks `[output]` and
+        // must continue to parse with the new field defaulted.
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert_eq!(config.output, OutputConfig::default());
+        assert_eq!(config.output.annotation_limit, None);
+    }
+
+    #[test]
+    fn parse_output_annotation_limit() {
+        let toml = "[output]\nannotation_limit = 25\n";
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.output.annotation_limit, Some(25));
+    }
+
+    #[test]
+    fn parse_output_alongside_threshold() {
+        let toml = r#"
+threshold = 12.0
+
+[output]
+annotation_limit = 7
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.threshold, Some(12.0));
+        assert_eq!(config.output.annotation_limit, Some(7));
+    }
+
+    #[test]
+    fn parse_unknown_output_field_rejected() {
+        // deny_unknown_fields guards forward-compat: a TOML pinned at
+        // an old crap4rs version must still surface unrecognised output
+        // settings as load-time errors rather than silently dropping
+        // them.
+        let toml = r#"
+[output]
+annotation_limit = 5
+nonsense_field = "x"
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("unknown") || msg.contains("nonsense_field"),
+            "expected deny_unknown_fields error, got: {msg}"
+        );
     }
 
     // ── discover_config parameterization (#161) ───────────────────
