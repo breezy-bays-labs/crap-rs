@@ -45,9 +45,22 @@ inputs:
       to the current full set). Single-language preserves the
       existing dispatch (`auto` / `rust` / `typescript`) behavior and
       takes precedence over the `language:` input when both are set.
-      Multi-value triggers multi-language mode, which lands in PR β
-      (#293) — until then this PR rejects multi-value with an
-      actionable error so consumers see the deferred surface.
+
+      Multi-value (`rust,typescript` or `all`) triggers
+      **multi-language mode** (PR β #293): both adapters run in one
+      action invocation, paired against `coverage`/`coverage-ts` +
+      `src`/`src-ts` + `baseline`/`baseline-ts`. The action emits
+      split per-language outputs (`row-json-rust` +
+      `row-json-typescript`); `analysis-passed` / `delta-passed` are
+      AND across languages; `new-violations` / `regressions` are SUM
+      across languages; `markdown` is a single combined string with
+      `### Rust (crap4rs)` + `### TypeScript (crap4ts)` section
+      headers under one `## CRAP scorecard` wrapper. The legacy
+      `row-json` output is empty in multi-language mode + the action
+      emits a `::warning::` directing consumers to the split outputs.
+      Whitespace is tolerated (`rust, typescript` works); duplicate
+      tokens collapse with a `::warning::` (`rust,rust` → `rust`);
+      unsupported tokens error with an actionable message.
     required: false
     default: ''
   language:
@@ -66,18 +79,63 @@ inputs:
     required: false
     default: 'auto'
   coverage:
-    description: 'Path to the coverage file. LCOV (.info) for Rust, Istanbul JSON for TypeScript.'
+    description: |
+      Path to the coverage file. LCOV (.info) for Rust, Istanbul JSON
+      for TypeScript. In multi-language mode (`languages:
+      rust,typescript` or `all`), this is the **Rust** LCOV path; the
+      TypeScript Istanbul JSON path lives on `coverage-ts:` so both
+      languages can be paired in one action invocation.
     required: true
+  coverage-ts:
+    description: |
+      Path to the TypeScript Istanbul JSON coverage file. Used ONLY
+      in multi-language mode (`languages: rust,typescript` or `all`)
+      alongside `coverage:` (which then carries the Rust LCOV). The
+      action.yml default is empty (not `'coverage-final.json'`) so
+      the multi-language pairing validator can tell "caller omitted
+      the TS coverage" apart from "caller explicitly passed a path",
+      and error actionably when multi-language mode is requested
+      without the paired input. Ignored in single-language mode.
+    required: false
+    default: ''
   src:
-    description: 'Source root directory passed to the analyzer.'
+    description: |
+      Source root directory passed to the analyzer. In multi-language
+      mode, this is the **Rust** source root; the TypeScript source
+      root lives on `src-ts:`.
     required: false
     default: '.'
+  src-ts:
+    description: |
+      TypeScript source root, paired with `coverage-ts:`. Used ONLY
+      in multi-language mode. Empty default mirrors `coverage-ts:`:
+      multi-language mode requires this paired input alongside
+      `src:` (Rust). Ignored in single-language mode.
+    required: false
+    default: ''
   baseline:
     description: |
       Path to a previously-captured CRAP JSON envelope to compare against.
       Leave empty to skip delta and emit an analysis-only scorecard. Producing
       the baseline (typically a coverage run on the PR base) is the caller's
       responsibility — this action does not auto-checkout, by design.
+
+      In multi-language mode, this is the **Rust** baseline; the
+      TypeScript baseline lives on `baseline-ts:` so each language
+      can have its own previously-captured envelope.
+    required: false
+    default: ''
+  baseline-ts:
+    description: |
+      Path to the TypeScript baseline JSON envelope. Used ONLY in
+      multi-language mode, paired with `baseline:` (Rust). Either
+      side may be empty independently — a multi-language run can
+      have a Rust baseline + analysis-only TypeScript run, or
+      vice-versa, or no baseline on either side. The action emits
+      `delta-passed`/`new-violations`/`regressions` for the
+      language(s) that supplied a baseline; languages without one
+      contribute neutrally to the AND/SUM aggregation (passed=true,
+      counts=0).
     required: false
     default: ''
   threshold:
@@ -179,7 +237,36 @@ outputs:
       Producer-side status policy lives in crap-core's shared
       `format_as_scorecard_row` routing — see
       `docs/scorecard-row-contract.md`.
+
+      Populated in **single-language mode** (back-compat for every
+      consumer already reading this output). In **multi-language
+      mode** (`languages: rust,typescript` or `all`), this output is
+      the empty string and the action emits a `::warning::` directing
+      consumers to the split outputs `row-json-rust` and
+      `row-json-typescript`. The warning surfaces the migration path
+      in the action's own log so a downstream `jq` parse doesn't
+      silently fail on empty input.
     value: ${{ steps.run.outputs.row_json }}
+  row-json-rust:
+    description: |
+      The `Row::CrapDelta` JSON object emitted by `crap4rs --format
+      scorecard-row` when Rust is in the resolved language set.
+      Populated in BOTH single-language mode (`languages: rust`) and
+      multi-language mode (`languages: rust,typescript` or `all`);
+      empty when Rust is not in the resolved set. Pair with
+      `row-json-typescript` in multi-language aggregator workflows.
+      Same schema as `row-json` (the legacy single-output above).
+    value: ${{ steps.run.outputs.row_json_rust }}
+  row-json-typescript:
+    description: |
+      The `Row::CrapDelta` JSON object emitted by `crap4ts --format
+      scorecard-row` when TypeScript is in the resolved language set.
+      Populated in BOTH single-language mode (`languages: typescript`)
+      and multi-language mode (`languages: rust,typescript` or
+      `all`); empty when TypeScript is not in the resolved set. Pair
+      with `row-json-rust` in multi-language aggregator workflows.
+      Same schema as `row-json` (the legacy single-output above).
+    value: ${{ steps.run.outputs.row_json_typescript }}
   json-envelope-path:
     description: 'Path to the full JSON envelope on the runner — pass to downstream tooling.'
     value: ${{ steps.run.outputs.envelope_path }}
@@ -219,6 +306,12 @@ runs:
         ANALYSIS_GATE: ${{ inputs.analysis-gate }}
         DELTA_GATE: ${{ inputs.delta-gate }}
         LANGUAGES: ${{ inputs.languages }}
+        # Multi-language paired inputs — consumed only by the
+        # paired-input validation block below (single-language flows
+        # ignore these). Empty defaults preserve back-compat: the
+        # validation skips when `is_multi=false`.
+        COVERAGE_TS: ${{ inputs.coverage-ts }}
+        SRC_TS: ${{ inputs.src-ts }}
       run: |
         set -euo pipefail
         # ----------------------------------------------------------------
@@ -385,43 +478,152 @@ runs:
         # ----------------------------------------------------------------
         # 4. languages parsing
         # ----------------------------------------------------------------
-        # Single-language values feed `Resolve language` downstream and
-        # supersede `inputs.language` (additive shim: presets surface
-        # wins for the language dimension). Multi-value triggers the
-        # deferred-to-PR-β placeholder error so consumers see exactly
-        # where the work lands.
+        # `languages:` resolves to one of three shapes:
+        #   * empty            → no preset language; raw `language:` rules
+        #   * single value     → `single_language` set, supersedes
+        #                        `inputs.language` (additive shim:
+        #                        presets surface wins for the language
+        #                        dimension)
+        #   * multi-value set  → `language_set` (canonical-ordered CSV)
+        #                        + `is_multi=true`; downstream `Run
+        #                        analysis` loop dispatches BOTH adapters
+        # `all` is the convenience expansion for the full multi-language
+        # set (`rust,typescript` today; alphabetical-ordered as the set
+        # grows beyond two languages).
+        #
+        # printf — not echo — when re-emitting `LANGUAGES` to avoid the
+        # echo-builtin flag-injection trap (a value starting with `-e` /
+        # `-n` / `-E` would otherwise be interpreted as a flag rather
+        # than data). gemini-code-assist #296 catch.
         single_language=""
+        language_set=""
+        is_multi="false"
         if [ -n "$LANGUAGES" ]; then
-          # Strip surrounding whitespace + tolerate ", " separator;
-          # PR β tightens the parser when multi-language EXECUTION
-          # wires up.
-          # printf — not echo — to avoid the echo-builtin flag-injection
-          # trap (a `LANGUAGES` value starting with `-e`/`-n`/`-E` would
-          # otherwise be interpreted as a flag rather than data).
-          # gemini-code-assist #296 catch.
+          # Strip ALL whitespace then split on comma; `rust, typescript`
+          # and `rust,typescript` resolve identically. The strip-then-
+          # split is one pass per token via parameter expansion so the
+          # loop body stays POSIX-portable across runner shells.
           normalized="$(printf '%s' "$LANGUAGES" | tr -d '[:space:]')"
-          case "$normalized" in
+          if [ "$normalized" = "all" ]; then
+            # Convenience expansion. Canonical-ordered (rust,typescript)
+            # so output ordering and downstream loop ordering are
+            # deterministic regardless of how the caller spelled it.
+            normalized="rust,typescript"
+          fi
+          # Split on comma into a Bash array. `IFS=','` is scoped to
+          # the `read` invocation so the surrounding script's IFS is
+          # not mutated.
+          IFS=',' read -ra raw_langs <<<"$normalized"
+          # Validate each token AND dedupe (preserving first-seen
+          # order, so canonical `rust,typescript` stays in that order
+          # if both come through `all` or an `all`-equivalent set).
+          # Dedupe emits a `::warning::` so the caller sees the
+          # collapse — silent dedupe would mask `rust,rust` typos.
+          declare -a seen=()
+          for tok in "${raw_langs[@]}"; do
+            case "$tok" in
+              rust|typescript) ;;
+              "")
+                echo "::error::languages: empty token in '$LANGUAGES' — check for leading/trailing/duplicate commas"
+                exit 1
+                ;;
+              *)
+                echo "::error::languages: unsupported token '$tok' in '$LANGUAGES'; expected one of: rust, typescript, all"
+                exit 1
+                ;;
+            esac
+            # Dedupe.
+            already_seen="false"
+            for s in "${seen[@]:-}"; do
+              [ "$s" = "$tok" ] && already_seen="true" && break
+            done
+            if [ "$already_seen" = "true" ]; then
+              echo "::warning::scorecard action: 'languages: $LANGUAGES' contains duplicate token '$tok'; deduplicating to a single entry."
+            else
+              seen+=("$tok")
+            fi
+          done
+
+          # Reorder seen[] to the canonical (rust,typescript) order so
+          # the downstream loop, the markdown section headers, and the
+          # split-output ordering are deterministic across input
+          # spellings (`typescript,rust` and `rust,typescript` produce
+          # identical artifacts).
+          canonical_set=""
+          for canonical_lang in rust typescript; do
+            for s in "${seen[@]:-}"; do
+              if [ "$s" = "$canonical_lang" ]; then
+                if [ -z "$canonical_set" ]; then
+                  canonical_set="$canonical_lang"
+                else
+                  canonical_set="$canonical_set,$canonical_lang"
+                fi
+                break
+              fi
+            done
+          done
+
+          # Decide single vs multi based on the deduped set size, not
+          # on the raw input shape — `rust,rust` collapses to single
+          # `rust`, which is the only sane interpretation given the
+          # warning above.
+          case "$canonical_set" in
             rust|typescript)
-              single_language="$normalized"
+              single_language="$canonical_set"
+              language_set="$canonical_set"
               ;;
-            all|*,*)
-              # `all` is the convenience expansion; multi-value with
-              # comma is the explicit form. Both route to the
-              # deferred-to-PR-β error today.
-              echo "::error::languages: multi-language mode lands in PR β (#293); '$LANGUAGES' resolves to a multi-language set. For now, set 'languages: rust' or 'languages: typescript' (or omit the input)."
-              exit 1
+            rust,typescript)
+              language_set="$canonical_set"
+              is_multi="true"
               ;;
             *)
-              echo "::error::unsupported languages value '$LANGUAGES'; expected one of: rust, typescript, rust,typescript, all (or empty)"
+              # Defensive — the validation + dedupe + canonicalization
+              # above should make this branch unreachable. Surface it
+              # loudly if hit so any future parser regression fails
+              # the action rather than silently falling through.
+              echo "::error::languages: internal canonicalization produced unexpected set '$canonical_set' from input '$LANGUAGES'"
               exit 1
               ;;
           esac
         fi
         echo "single_language=$single_language" >> "$GITHUB_OUTPUT"
+        echo "language_set=$language_set"       >> "$GITHUB_OUTPUT"
+        echo "is_multi=$is_multi"               >> "$GITHUB_OUTPUT"
+
+        # ----------------------------------------------------------------
+        # 5. Multi-language paired-input validation
+        # ----------------------------------------------------------------
+        # When multi-language mode is active, the action runs BOTH
+        # adapters in one invocation. Each adapter needs its own
+        # coverage + src input; the paired-input convention puts the
+        # Rust inputs on `coverage:` / `src:` / `baseline:` (the
+        # historical single-language input set) and the TS inputs on
+        # `coverage-ts:` / `src-ts:` / `baseline-ts:` (the new paired
+        # inputs added in this PR). Missing-pair = actionable error
+        # surfaced in the job log; baseline is optional on either
+        # side (the per-language analysis runs without it). The
+        # validation fires here (during Resolve presets, before any
+        # adapter dispatch) so the error appears in the same step
+        # that resolved the language set — easier for callers to
+        # connect cause and effect than a downstream `Run analysis`
+        # failure.
+        if [ "$is_multi" = "true" ]; then
+          missing=""
+          if [ -z "${COVERAGE_TS:-}" ]; then
+            missing="${missing}coverage-ts "
+          fi
+          if [ -z "${SRC_TS:-}" ]; then
+            missing="${missing}src-ts "
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::languages: '$LANGUAGES' resolves to a multi-language set; missing paired input(s): $missing. Multi-language mode requires 'coverage:' (Rust LCOV) AND 'coverage-ts:' (TS Istanbul JSON), plus 'src:' (Rust source root) AND 'src-ts:' (TS source root). 'baseline:' / 'baseline-ts:' are optional on either side. Set the missing input(s) or drop a language from 'languages:' for single-language dispatch."
+            exit 1
+          fi
+        fi
 
         # Surface a compact summary in the job log so the resolved
         # values are obvious to reviewers without scrolling.
-        echo "Resolved presets: threshold=$resolved_threshold analysis-gate=$resolved_analysis_gate delta-gate=$resolved_delta_gate single-language=${single_language:-<unset>} run-mode=${RUN_MODE:-<unset>}"
+        echo "Resolved presets: threshold=$resolved_threshold analysis-gate=$resolved_analysis_gate delta-gate=$resolved_delta_gate single-language=${single_language:-<unset>} language-set=${language_set:-<unset>} is-multi=$is_multi run-mode=${RUN_MODE:-<unset>}"
 
     - name: Resolve language
       id: lang
@@ -430,8 +632,24 @@ runs:
         LANGUAGE: ${{ inputs.language }}
         COVERAGE: ${{ inputs.coverage }}
         PRESET_LANGUAGE: ${{ steps.presets.outputs.single_language }}
+        IS_MULTI: ${{ steps.presets.outputs.is_multi }}
       run: |
         set -euo pipefail
+        # Multi-language short-circuit: when `languages:` resolved
+        # to a multi-value set, the per-language Run analysis loop
+        # downstream handles dispatch. This step emits a sentinel
+        # `language=multi` so the downstream `if:` conditionals on
+        # Run analysis / Emit inline annotations / Post sticky PR
+        # comment / Enforce gates can match `rust || typescript ||
+        # multi` and proceed. The single-language conditional
+        # branches below are skipped — no auto-detect, no
+        # `inputs.language` fallback, since the language set is
+        # already canonical.
+        if [ "$IS_MULTI" = "true" ]; then
+          echo "language=multi" >> "$GITHUB_OUTPUT"
+          echo "Resolved language: multi (per-language loop dispatches both adapters)"
+          exit 0
+        fi
         # `languages:` (preset surface) supersedes `language:` (raw
         # surface) when both resolve to a single value — the preset
         # input is the canonical language-dimension surface going
@@ -463,11 +681,14 @@ runs:
         echo "Resolved language: $resolved"
 
     - name: Install cargo-binstall
-      if: steps.lang.outputs.language == 'rust'
+      # Needed for the crap4rs install (binstall path). Fires in both
+      # single-language `rust` mode AND multi-language `multi` mode
+      # since the latter dispatches BOTH adapters.
+      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'multi'
       uses: cargo-bins/cargo-binstall@dc19f1e48450eefe5a29b8da6c6b00a87d730b37 # v1.18.1
 
     - name: Install crap4rs
-      if: steps.lang.outputs.language == 'rust'
+      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'multi'
       shell: bash
       env:
         VERSION: ${{ inputs.version }}
@@ -489,7 +710,7 @@ runs:
         crap4rs --version
 
     - name: Verify crap4ts (pre-installed-only)
-      if: steps.lang.outputs.language == 'typescript'
+      if: steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi'
       shell: bash
       run: |
         set -euo pipefail
@@ -515,13 +736,25 @@ runs:
 
     - name: Run analysis + render scorecard
       id: run
-      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript'
+      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi'
       shell: bash
       env:
         LANGUAGE: ${{ steps.lang.outputs.language }}
+        LANGUAGE_SET: ${{ steps.presets.outputs.language_set }}
+        IS_MULTI: ${{ steps.presets.outputs.is_multi }}
+        # Single-language inputs (back-compat — the historical input
+        # set drove the pre-PR action). In multi-language mode, these
+        # carry the Rust side of each pair; the TS side lives on the
+        # `*_TS` env vars below.
         COVERAGE: ${{ inputs.coverage }}
         SRC: ${{ inputs.src }}
         BASELINE: ${{ inputs.baseline }}
+        # Multi-language paired inputs. Empty in single-language mode
+        # (the loop below ignores them); validated as non-empty in
+        # `Resolve presets` when `is_multi=true`.
+        COVERAGE_TS: ${{ inputs.coverage-ts }}
+        SRC_TS: ${{ inputs.src-ts }}
+        BASELINE_TS: ${{ inputs.baseline-ts }}
         # threshold/gate values come from `steps.presets.outputs.*`
         # (single source of truth for both raw and preset paths) so
         # the threshold-sync invariant holds across every step that
@@ -533,126 +766,333 @@ runs:
         ANALYSIS_GATE: ${{ steps.presets.outputs.analysis_gate }}
       run: |
         set -euo pipefail
-        # `BIN` is the adapter binary the language resolution step picked.
-        # Both bins share the CLI surface (via crap-core's shared `cli::run`
-        # orchestration), so a single shell body drives either dispatch.
-        if [ "$LANGUAGE" = "rust" ]; then
-          BIN=crap4rs
+        # Per-language loop. Single-language mode iterates once over
+        # the resolved single language; multi-language mode iterates
+        # in canonical order (rust,typescript). Each iteration runs
+        # the adapter's three formats (json + markdown + scorecard-row)
+        # against the language-appropriate coverage/src/baseline triple
+        # and accumulates per-language passed/delta/violations counts
+        # for the post-loop aggregation. The aggregation policy
+        # (AND for passed, SUM for counts) is documented in the
+        # README's "Multi-language" section.
+
+        # Resolve the iteration set from LANGUAGE_SET (multi-mode) or
+        # the resolved single language (single-mode). In single-mode
+        # LANGUAGE_SET is also populated by `Resolve presets` when
+        # `languages:` was set; we fall back to the legacy
+        # `Resolve language` output for callers using `language:`
+        # without `languages:`.
+        if [ -n "$LANGUAGE_SET" ]; then
+          IFS=',' read -ra LANGS <<<"$LANGUAGE_SET"
         else
-          BIN=crap4ts
-        fi
-        envelope="$RUNNER_TEMP/${BIN}-envelope.json"
-        markdown_file="$RUNNER_TEMP/${BIN}-scorecard.md"
-        row_json_file="$RUNNER_TEMP/${BIN}-row.json"
-        common=(--coverage "$COVERAGE" --src "$SRC" --threshold "$THRESHOLD")
-        [ -n "$CONFIG" ] && common+=(--config "$CONFIG")
-        if [ -n "$BASELINE" ]; then
-          common+=(--baseline "$BASELINE")
+          LANGS=("$LANGUAGE")
         fi
 
-        # Always capture truth into the envelope; --no-fail keeps the step
-        # green so we can surface counts/passed status via outputs even when
-        # gates would have tripped. The hard gating happens in the dedicated
-        # gate step below, gated by the analysis-gate / delta-gate inputs.
-        #
-        # Three-pass note: we run the adapter three times — once each for
-        # JSON, markdown, and scorecard-row — because the analyzer doesn't
-        # yet support multi-format output in a single invocation. The cost
-        # is two extra coverage parses + CRAP recomputes (cheap relative to
-        # runner setup); the user-visible latency is dominated by adapter
-        # install upstream. Tracked in
-        # https://github.com/breezy-bays-labs/crap-rs/issues/100.
-        "$BIN" "${common[@]}" --format json --no-fail > "$envelope"
-        "$BIN" "${common[@]}" --format markdown --no-fail > "$markdown_file"
+        # Per-language accumulator arrays. `passed_all` / `delta_all`
+        # walk to "false"/"" on the first failing leg (AND); count
+        # totals walk by `+=` (SUM). `markdown_combined` collects each
+        # iteration's adapter markdown; the post-loop assembly wraps
+        # multi-language under a single `## CRAP scorecard` H2 with
+        # per-language `### Rust (crap4rs)` / `### TypeScript
+        # (crap4ts)` H3s. Single-language assembly emits the raw
+        # adapter markdown unchanged (back-compat — same bytes as
+        # pre-PR).
+        analysis_passed_combined="true"
+        delta_passed_combined=""        # empty when no language ran with a baseline
+        delta_any_seen="false"
+        new_violations_total=0
+        regressions_total=0
+        row_json_rust=""
+        row_json_typescript=""
+        envelope_path_first=""
 
-        if [ "$LANGUAGE" = "rust" ]; then
-          # Graceful probe for crap4rs: --format scorecard-row landed in
-          # crap4rs 0.4.0 (https://github.com/breezy-bays-labs/crap4rs/pull/119).
-          # Older releases don't recognize the value and clap exits non-zero,
-          # so we probe before invoking and degrade to an empty row-json with
-          # a workflow warning when unsupported.
+        # Per-language markdown bodies live in temp files keyed by
+        # adapter name so the post-loop assembly stays simple.
+        for lang in "${LANGS[@]}"; do
+          case "$lang" in
+            rust)
+              BIN="crap4rs"
+              LANG_COVERAGE="$COVERAGE"
+              LANG_SRC="$SRC"
+              LANG_BASELINE="$BASELINE"
+              ;;
+            typescript)
+              BIN="crap4ts"
+              # In multi-language mode, TS triple comes from the
+              # paired `*_TS` inputs. In single-language `typescript`
+              # mode, the historical single-input set carries TS — so
+              # fall back to those when `*_TS` are empty.
+              if [ "$IS_MULTI" = "true" ]; then
+                LANG_COVERAGE="$COVERAGE_TS"
+                LANG_SRC="$SRC_TS"
+                LANG_BASELINE="$BASELINE_TS"
+              else
+                LANG_COVERAGE="$COVERAGE"
+                LANG_SRC="$SRC"
+                LANG_BASELINE="$BASELINE"
+              fi
+              ;;
+            *)
+              echo "::error::Run analysis: internal iteration over unexpected language '$lang' (LANGS='${LANGS[*]}'); expected rust or typescript"
+              exit 1
+              ;;
+          esac
+          envelope="$RUNNER_TEMP/${BIN}-envelope.json"
+          markdown_file="$RUNNER_TEMP/${BIN}-scorecard.md"
+          row_json_file="$RUNNER_TEMP/${BIN}-row.json"
+          common=(--coverage "$LANG_COVERAGE" --src "$LANG_SRC" --threshold "$THRESHOLD")
+          [ -n "$CONFIG" ] && common+=(--config "$CONFIG")
+          if [ -n "$LANG_BASELINE" ]; then
+            common+=(--baseline "$LANG_BASELINE")
+          fi
+
+          # Always capture truth into the envelope; --no-fail keeps the step
+          # green so we can surface counts/passed status via outputs even when
+          # gates would have tripped. The hard gating happens in the dedicated
+          # gate step below, gated by the analysis-gate / delta-gate inputs.
           #
-          # Probe by version, not `--help` text. crap4rs 0.4.0 replaced
-          # clap's `--format` ValueEnum with a custom FormatSpec parser so
-          # `--format` could accept `<format>:<file>` syntax (#100), and
-          # clap can't introspect a custom parser — `--help` no longer
-          # enumerates format names. Grepping `--help` for `scorecard-row`
-          # therefore false-negatives against the very versions that
-          # support it. `sort -V` works on both GitHub-hosted Ubuntu and
-          # macOS runners.
-          installed_version_raw="$(crap4rs --version 2>/dev/null | awk '{print $2}')"
-          installed_version="${installed_version_raw#v}"
-          required_version="0.4.0"
-          # Validate against a strict semver shape before `sort -V`. `sort -V`
-          # treats non-numeric tokens (e.g. "unknown", "garbage") and `v`-prefixed
-          # tags as sorting after pure semver strings, so without this gate they
-          # would false-positive into the supported branch and skip the warning.
-          supports_scorecard_row=false
-          if [[ "$installed_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
-            && [ "$(printf '%s\n%s\n' "$required_version" "$installed_version" | sort -V | head -n1)" = "$required_version" ]; then
-            supports_scorecard_row=true
+          # Three-pass note: we run the adapter three times — once each for
+          # JSON, markdown, and scorecard-row — because the analyzer doesn't
+          # yet support multi-format output in a single invocation. The cost
+          # is two extra coverage parses + CRAP recomputes per language
+          # (cheap relative to runner setup); the user-visible latency is
+          # dominated by adapter install upstream. Tracked in
+          # https://github.com/breezy-bays-labs/crap-rs/issues/100.
+          "$BIN" "${common[@]}" --format json --no-fail > "$envelope"
+          "$BIN" "${common[@]}" --format markdown --no-fail > "$markdown_file"
+
+          if [ "$lang" = "rust" ]; then
+            # Graceful probe for crap4rs: --format scorecard-row landed in
+            # crap4rs 0.4.0 (https://github.com/breezy-bays-labs/crap4rs/pull/119).
+            # Older releases don't recognize the value and clap exits non-zero,
+            # so we probe before invoking and degrade to an empty row-json with
+            # a workflow warning when unsupported.
+            #
+            # Probe by version, not `--help` text. crap4rs 0.4.0 replaced
+            # clap's `--format` ValueEnum with a custom FormatSpec parser so
+            # `--format` could accept `<format>:<file>` syntax (#100), and
+            # clap can't introspect a custom parser — `--help` no longer
+            # enumerates format names. Grepping `--help` for `scorecard-row`
+            # therefore false-negatives against the very versions that
+            # support it. `sort -V` works on both GitHub-hosted Ubuntu and
+            # macOS runners.
+            installed_version_raw="$(crap4rs --version 2>/dev/null | awk '{print $2}')"
+            installed_version="${installed_version_raw#v}"
+            required_version="0.4.0"
+            # Validate against a strict semver shape before `sort -V`. `sort -V`
+            # treats non-numeric tokens (e.g. "unknown", "garbage") and `v`-prefixed
+            # tags as sorting after pure semver strings, so without this gate they
+            # would false-positive into the supported branch and skip the warning.
+            supports_scorecard_row=false
+            if [[ "$installed_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+              && [ "$(printf '%s\n%s\n' "$required_version" "$installed_version" | sort -V | head -n1)" = "$required_version" ]; then
+              supports_scorecard_row=true
+            fi
+
+            if [ "$supports_scorecard_row" = true ]; then
+              crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
+            else
+              echo "::warning::Installed crap4rs (${installed_version:-unknown}) is older than $required_version or reports a non-semver version; outputs.row-json (and outputs.row-json-rust) will be empty. Pin the action's 'version' input to '$required_version' or later for structured Row::CrapDelta output."
+              : > "$row_json_file"
+            fi
+          else
+            # crap4ts: monorepo-shipped, structurally guarantees
+            # `--format scorecard-row` support (both adapters route through
+            # crap-core's shared `cli::format_as_scorecard_row` pipeline,
+            # locked by `crates/crap-core/tests/scorecard_row_parity.rs`).
+            # No probe needed — pre-installed-only means the caller is on a
+            # current build.
+            crap4ts "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
           fi
 
-          if [ "$supports_scorecard_row" = true ]; then
-            crap4rs "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
-          else
-            echo "::warning::Installed crap4rs (${installed_version:-unknown}) is older than $required_version or reports a non-semver version; outputs.row-json will be empty. Pin the action's 'version' input to '$required_version' or later for structured Row::CrapDelta output."
-            : > "$row_json_file"
+          # Parse the envelope. jq is preinstalled on GitHub-hosted runners.
+          lang_analysis_passed=$(jq -r '.result.passed' "$envelope")
+          lang_delta_passed=$(jq -r '.delta.summary.passed // ""' "$envelope")
+          lang_new_violations=$(jq -r '.delta.summary.new_violations // 0' "$envelope")
+          lang_regressions=$(jq -r '.delta.summary.regressions // 0' "$envelope")
+
+          # AND-reduce passed flags. The `--no-fail` invariant means
+          # exit code cannot be used (the bin always returns 0); jq
+          # extraction of `.result.passed` IS the contract.
+          if [ "$lang_analysis_passed" != "true" ]; then
+            analysis_passed_combined="false"
           fi
-        else
-          # crap4ts: monorepo-shipped, structurally guarantees
-          # `--format scorecard-row` support (both adapters route through
-          # crap-core's shared `cli::format_as_scorecard_row` pipeline,
-          # locked by `crates/crap-core/tests/scorecard_row_parity.rs`).
-          # No probe needed — pre-installed-only means the caller is on a
-          # current build.
-          crap4ts "${common[@]}" --format scorecard-row --no-fail > "$row_json_file"
+          # `delta_passed_combined` stays empty when NO language ran
+          # with a baseline (back-compat: single-language with no
+          # baseline emits ""). When at least one language has a
+          # baseline, the combined value is AND across the ones that
+          # did. A baseline-less language contributes neutrally
+          # (its `lang_delta_passed` is "" → skipped in the AND).
+          if [ -n "$lang_delta_passed" ]; then
+            delta_any_seen="true"
+            if [ "$lang_delta_passed" != "true" ]; then
+              delta_passed_combined="false"
+            elif [ -z "$delta_passed_combined" ] || [ "$delta_passed_combined" = "true" ]; then
+              delta_passed_combined="true"
+            fi
+          fi
+          new_violations_total=$((new_violations_total + lang_new_violations))
+          regressions_total=$((regressions_total + lang_regressions))
+
+          # Track envelope path for the legacy `json-envelope-path`
+          # output. Single-language: this is the only language's
+          # envelope. Multi-language: this is the FIRST language's
+          # envelope (rust, by canonical ordering) — downstream
+          # tooling that wants the TS envelope reads
+          # `$RUNNER_TEMP/crap4ts-envelope.json` directly (documented
+          # in the README "Multi-language" section).
+          if [ -z "$envelope_path_first" ]; then
+            envelope_path_first="$envelope"
+          fi
+
+          # Capture per-language row JSON for the split outputs.
+          # `row_json_file` is the raw stdout of `--format
+          # scorecard-row`, the JSON object that conforms to the
+          # locked Row::CrapDelta schema.
+          if [ "$lang" = "rust" ]; then
+            row_json_rust="$(cat "$row_json_file")"
+          else
+            row_json_typescript="$(cat "$row_json_file")"
+          fi
+        done
+
+        # If the loop never executed a baseline-bearing language but
+        # the historical contract emits "" for `delta-passed`, keep
+        # it empty. The defensive elif above already covers the case
+        # where every language had a baseline AND all passed.
+        if [ "$delta_any_seen" = "false" ]; then
+          delta_passed_combined=""
         fi
 
-        # Parse the envelope. jq is preinstalled on GitHub-hosted runners.
-        analysis_passed=$(jq -r '.result.passed' "$envelope")
-        delta_passed=$(jq -r '.delta.summary.passed // ""' "$envelope")
-        new_violations=$(jq -r '.delta.summary.new_violations // 0' "$envelope")
-        regressions=$(jq -r '.delta.summary.regressions // 0' "$envelope")
+        echo "analysis_passed=$analysis_passed_combined" >> "$GITHUB_OUTPUT"
+        echo "delta_passed=$delta_passed_combined"       >> "$GITHUB_OUTPUT"
+        echo "new_violations=$new_violations_total"      >> "$GITHUB_OUTPUT"
+        echo "regressions=$regressions_total"            >> "$GITHUB_OUTPUT"
+        echo "envelope_path=$envelope_path_first"        >> "$GITHUB_OUTPUT"
 
-        echo "analysis_passed=$analysis_passed" >> "$GITHUB_OUTPUT"
-        echo "delta_passed=$delta_passed"       >> "$GITHUB_OUTPUT"
-        echo "new_violations=$new_violations"   >> "$GITHUB_OUTPUT"
-        echo "regressions=$regressions"         >> "$GITHUB_OUTPUT"
-        echo "envelope_path=$envelope"          >> "$GITHUB_OUTPUT"
+        # Markdown assembly — single-language vs multi-language.
+        if [ "$IS_MULTI" = "true" ]; then
+          combined_md="$RUNNER_TEMP/scorecard-combined.md"
+          : > "$combined_md"
+          {
+            echo "## CRAP scorecard"
+            echo ""
+            for lang in "${LANGS[@]}"; do
+              case "$lang" in
+                rust)       header="### Rust (crap4rs)"       ; BIN="crap4rs" ;;
+                typescript) header="### TypeScript (crap4ts)" ; BIN="crap4ts" ;;
+              esac
+              echo "$header"
+              echo ""
+              # Demote the adapter's own header hierarchy by 3 levels
+              # so the markdown stays consistent under the outer
+              # `## CRAP scorecard` (H2) + `### Rust (crap4rs)` /
+              # `### TypeScript (crap4ts)` (H3) wrappers:
+              #   `# <bin> v<v> — CRAP Score Analysis`  (H1) → `####` (H4)
+              #   `## Summary` / `## All functions` / `## CRAP Scorecard` (H2) → `#####` (H5)
+              #   `### Regressions` / `### New violations` (H3) → `######` (H6)
+              # The adapter's markdown body is otherwise concatenated
+              # verbatim. `sed` runs on a copy; the original
+              # `$RUNNER_TEMP/${BIN}-scorecard.md` stays unchanged
+              # for any consumer reading it directly.
+              sed -E 's/^### /###### /; s/^## /##### /; s/^# /#### /' "$RUNNER_TEMP/${BIN}-scorecard.md"
+              echo ""
+            done
+          } > "$combined_md"
 
-        # Multi-line output: file the markdown via the heredoc-delimited form.
-        {
-          echo "markdown<<__CRAP_SCORECARD_EOF__"
-          cat "$markdown_file"
-          echo "__CRAP_SCORECARD_EOF__"
-        } >> "$GITHUB_OUTPUT"
+          {
+            echo "markdown<<__CRAP_SCORECARD_EOF__"
+            cat "$combined_md"
+            echo "__CRAP_SCORECARD_EOF__"
+          } >> "$GITHUB_OUTPUT"
+        else
+          # Single-language: emit the raw adapter markdown unchanged
+          # (back-compat — every byte matches the pre-PR shape). `BIN`
+          # carries the loop's only iteration's bin name (`crap4rs` or
+          # `crap4ts`), so the markdown file path is well-defined.
+          {
+            echo "markdown<<__CRAP_SCORECARD_EOF__"
+            cat "$RUNNER_TEMP/${BIN}-scorecard.md"
+            echo "__CRAP_SCORECARD_EOF__"
+          } >> "$GITHUB_OUTPUT"
+        fi
 
-        # Multi-line output: file the row-json via a distinct heredoc sentinel.
-        # The file is the raw stdout of `<bin> --format scorecard-row` —
-        # one Row::CrapDelta JSON object, no envelope wrapping. The
-        # sentinel must not appear in the JSON; pretty-printed CrapDelta
-        # never contains it. Both adapters emit the same Row JSON shape
-        # (locked by crates/crap-core/tests/scorecard_row_parity.rs).
-        {
-          echo "row_json<<__CRAP_SCORECARD_ROW_EOF__"
-          cat "$row_json_file"
-          echo "__CRAP_SCORECARD_ROW_EOF__"
-        } >> "$GITHUB_OUTPUT"
+        # Legacy `row-json` output:
+        # * single-language: populated with the active language's row
+        #   (back-compat — every consumer reading `row-json` keeps
+        #   working unchanged)
+        # * multi-language: empty + `::warning::` directing consumers
+        #   to the split outputs. Without the warning, a consumer
+        #   flipping `languages:` to multi-value would see their
+        #   downstream `jq` parse silently fail on empty input — the
+        #   warning surfaces the migration path in the action's own
+        #   log.
+        if [ "$IS_MULTI" = "true" ]; then
+          echo "::warning::scorecard action: outputs.row-json is EMPTY in multi-language mode (languages='${LANGUAGE_SET}'). Use outputs.row-json-rust and outputs.row-json-typescript instead. See the action README's 'Multi-language' section for the split-output contract."
+          legacy_row_json=""
+        else
+          # Single-language: the active language's row populates the
+          # legacy output. The split per-language output is ALSO
+          # populated, so consumers can migrate at their own cadence.
+          if [ "${LANGS[0]}" = "rust" ]; then
+            legacy_row_json="$row_json_rust"
+          else
+            legacy_row_json="$row_json_typescript"
+          fi
+        fi
 
-        # Surface a compact summary in the job log so failures are obvious
-        # without scrolling.
+        # Emit each row output as a heredoc only when it carries
+        # content. An empty heredoc-style block emits `KEY="\n"`
+        # (the single trailing newline before the EOF marker), NOT
+        # the empty string that the README + action docs promise —
+        # downstream `[ -z "$row_json" ]` consumers would
+        # incorrectly treat the absent row as present. The plain
+        # `KEY=` form below guarantees a truly empty output value.
+        # Per-language split outputs follow the same pattern: each
+        # is the raw scorecard-row stdout for the corresponding
+        # adapter (or genuinely empty when the language did not run
+        # in this invocation). Both adapters emit the same Row JSON
+        # shape (locked by
+        # crates/crap-core/tests/scorecard_row_parity.rs ::
+        # envelope_multi_language_parity).
+        emit_row_output() {
+          local key="$1" value="$2"
+          if [ -z "$value" ]; then
+            printf '%s=\n' "$key" >> "$GITHUB_OUTPUT"
+          else
+            {
+              printf '%s<<__CRAP_SCORECARD_ROW_EOF__\n' "$key"
+              printf '%s\n' "$value"
+              printf '%s\n' "__CRAP_SCORECARD_ROW_EOF__"
+            } >> "$GITHUB_OUTPUT"
+          fi
+        }
+        emit_row_output "row_json" "$legacy_row_json"
+        emit_row_output "row_json_rust" "$row_json_rust"
+        emit_row_output "row_json_typescript" "$row_json_typescript"
+
+        # Surface a compact summary in the job log so failures are
+        # obvious without scrolling. Multi-language streams each
+        # adapter's markdown in turn.
         echo "::group::CRAP scorecard"
-        cat "$markdown_file"
+        if [ "$IS_MULTI" = "true" ]; then
+          cat "$combined_md"
+        else
+          cat "$RUNNER_TEMP/${BIN}-scorecard.md"
+        fi
         echo "::endgroup::"
 
     - name: Emit inline annotations
-      if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript') && inputs.annotations == 'true'
+      if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi') && inputs.annotations == 'true'
       shell: bash
       env:
         LANGUAGE: ${{ steps.lang.outputs.language }}
+        LANGUAGE_SET: ${{ steps.presets.outputs.language_set }}
+        IS_MULTI: ${{ steps.presets.outputs.is_multi }}
         COVERAGE: ${{ inputs.coverage }}
         SRC: ${{ inputs.src }}
+        COVERAGE_TS: ${{ inputs.coverage-ts }}
+        SRC_TS: ${{ inputs.src-ts }}
         # Threshold-sync invariant: consume the derived single
         # source-of-truth so `threshold-preset: strict` produces
         # annotations at the same cutoff as the main analysis (a
@@ -670,25 +1110,82 @@ runs:
         # `--no-fail` keeps the step green so a failing analysis still
         # surfaces findings inline; the dedicated "Enforce gates" step
         # below owns hard gating.
-        if [ "$LANGUAGE" = "rust" ]; then
-          BIN=crap4rs
+        #
+        # Per-language loop: single-language iterates once over the
+        # active language; multi-language iterates over both. The
+        # entire loop runs inside ONE composite-action `run:` block,
+        # which GitHub Actions treats as a single step — and the
+        # `::warning` workflow command cap is enforced per step, not
+        # per `run:` iteration. Without explicit per-language division,
+        # the first adapter to emit could exhaust the 10-warning cap
+        # and silently starve the second language's annotations.
+        if [ -n "$LANGUAGE_SET" ]; then
+          IFS=',' read -ra LANGS <<<"$LANGUAGE_SET"
         else
-          BIN=crap4ts
+          LANGS=("$LANGUAGE")
         fi
-        args=(--coverage "$COVERAGE" --src "$SRC" --threshold "$THRESHOLD" --no-fail --format github-annotations)
-        [ -n "$CONFIG" ] && args+=(--config "$CONFIG")
-        [ -n "$ANNOTATION_LIMIT" ] && args+=(--annotation-limit "$ANNOTATION_LIMIT")
-        "$BIN" "${args[@]}"
+        # Compute a per-language annotation budget only in
+        # multi-language mode. Single-language preserves existing
+        # precedence (explicit input → config file → adapter default of
+        # 10) so a `crap4rs.toml`-declared `[output] annotation_limit`
+        # is not silently overridden. Multi-language divides the
+        # explicit cap (or GitHub's default 10) by the number of
+        # languages, floored at 1 so each language still emits at
+        # least one annotation when there are violations.
+        per_lang_budget=""
+        if [ "$IS_MULTI" = "true" ]; then
+          n_langs="${#LANGS[@]}"
+          total_budget="${ANNOTATION_LIMIT:-10}"
+          per_lang_budget=$(( total_budget / n_langs ))
+          if [ "$per_lang_budget" -lt 1 ]; then
+            per_lang_budget=1
+          fi
+        fi
+        for lang in "${LANGS[@]}"; do
+          case "$lang" in
+            rust)
+              BIN="crap4rs"
+              LANG_COVERAGE="$COVERAGE"
+              LANG_SRC="$SRC"
+              ;;
+            typescript)
+              BIN="crap4ts"
+              if [ "$IS_MULTI" = "true" ]; then
+                LANG_COVERAGE="$COVERAGE_TS"
+                LANG_SRC="$SRC_TS"
+              else
+                LANG_COVERAGE="$COVERAGE"
+                LANG_SRC="$SRC"
+              fi
+              ;;
+            *)
+              echo "::error::Emit inline annotations: internal iteration over unexpected language '$lang'; expected rust or typescript"
+              exit 1
+              ;;
+          esac
+          args=(--coverage "$LANG_COVERAGE" --src "$LANG_SRC" --threshold "$THRESHOLD" --no-fail --format github-annotations)
+          [ -n "$CONFIG" ] && args+=(--config "$CONFIG")
+          if [ -n "$per_lang_budget" ]; then
+            # Multi-language: the shared GH per-step cap is the hard
+            # constraint, so the per-language division overrides both
+            # the action input and any config-file value (otherwise
+            # we'd silently drop annotations beyond the cap).
+            args+=(--annotation-limit "$per_lang_budget")
+          elif [ -n "$ANNOTATION_LIMIT" ]; then
+            args+=(--annotation-limit "$ANNOTATION_LIMIT")
+          fi
+          "$BIN" "${args[@]}"
+        done
 
     - name: Post sticky PR comment
-      if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript') && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
+      if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi') && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
       uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
       with:
         header: ${{ inputs.comment-header }}
         message: ${{ steps.run.outputs.markdown }}
 
     - name: Enforce gates
-      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript'
+      if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi'
       shell: bash
       env:
         # Gate values come from the preset-resolution step (single
