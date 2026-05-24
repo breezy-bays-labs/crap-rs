@@ -50,7 +50,7 @@ jobs:
     steps:
       # `persist-credentials: false` — this job never pushes; not
       # persisting the checkout token keeps it out of the build env.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
 
@@ -65,7 +65,7 @@ jobs:
       # the path-require smoke test runs on a deterministic Node rather
       # than whatever the runner image happens to ship.
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
@@ -134,7 +134,7 @@ jobs:
           node -e 'const m = require("crap4ts"); if (typeof m.analyze !== "function") { throw new Error("crap4ts installed from the packed tarball but the analyze export is missing"); } console.log("OK: npm install-gating passed and analyze export present");'
 
       - name: Upload cdylib artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cdylib-${{ matrix.platform }}
           path: packages/crap4ts/${{ matrix.node_name }}
@@ -151,7 +151,7 @@ jobs:
     steps:
       # `persist-credentials: false` — npm publish authenticates via the
       # OIDC `id-token`, not the git checkout token; don't persist it.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
 
@@ -159,7 +159,7 @@ jobs:
       # publishing (https://docs.npmjs.com/trusted-publishers). Node 20
       # ships npm 10.x, which cannot mint the OIDC token and 401s.
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
@@ -191,7 +191,7 @@ jobs:
           echo "version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Download all cdylib artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: cdylib-*
           path: packages/crap4ts/

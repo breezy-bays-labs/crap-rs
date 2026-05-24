@@ -135,7 +135,7 @@ runs:
 
     - name: Install cargo-binstall
       if: steps.lang.outputs.language == 'rust'
-      uses: cargo-bins/cargo-binstall@v1.18.1
+      uses: cargo-bins/cargo-binstall@dc19f1e48450eefe5a29b8da6c6b00a87d730b37 # v1.18.1
 
     - name: Install crap4rs
       if: steps.lang.outputs.language == 'rust'
@@ -269,7 +269,7 @@ runs:
 
     - name: Post sticky PR comment
       if: steps.lang.outputs.language == 'rust' && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
-      uses: marocchino/sticky-pull-request-comment@v2
+      uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
       with:
         header: ${{ inputs.comment-header }}
         message: ${{ steps.run.outputs.markdown }}

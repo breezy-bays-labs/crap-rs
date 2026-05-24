@@ -19,17 +19,17 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
       - run: cargo fmt --check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
@@ -45,9 +45,9 @@ jobs:
           - os: macos-15-intel
             name: macos-x86
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-rust
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
         with:
           tool: cargo-nextest@0.9
       - name: Verify cargo + nextest resolve (broken-rustup canary)
@@ -90,10 +90,12 @@ jobs:
     #
     # Coverage of the bin path is already in the `test` job's
     # `cargo nextest run --workspace --all-targets`; this job is the
-    # cdylib-specific gate. linux-arm is best-effort: GitHub-hosted
-    # arm64 Linux runners are still rolling out, so the matrix targets
-    # the three platforms with stable hosted runners. See follow-up
-    # tracker for linux-arm coverage.
+    # cdylib-specific gate. linux-arm now runs on the GitHub-hosted
+    # `ubuntu-24.04-arm` image (GA early 2026 for public repos on this
+    # org's billing tier) — the cdylib gate covers all four platforms
+    # crap4ts ships native binaries for (#154). Scope is `crap4ts-build`
+    # only; extending the `test` matrix to linux-arm stays a separate
+    # decision.
     name: crap4ts build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -102,12 +104,14 @@ jobs:
         include:
           - os: ubuntu-latest
             name: linux-x86
+          - os: ubuntu-24.04-arm
+            name: linux-arm
           - os: macos-latest
             name: macos-arm
           - os: macos-15-intel
             name: macos-x86
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/setup-rust
         with:
           shared-key: crap4ts-${{ matrix.name }}
@@ -141,19 +145,19 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
         with:
           components: llvm-tools-preview
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
         with:
           tool: cargo-nextest@0.9
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
         with:
           tool: cargo-llvm-cov@0.6
       - run: cargo llvm-cov nextest --lcov --output-path lcov.info
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lcov
           path: lcov.info
@@ -166,10 +170,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: lcov
       - run: cargo build --release --package crap4rs
@@ -208,10 +212,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [coverage]
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: lcov
       - run: cargo build --release --package crap4rs
@@ -249,10 +253,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test]
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
         with:
           tool: cargo-mutants
       - name: Run cargo mutants on crates/crap-core/src/domain/view.rs
@@ -315,10 +319,10 @@ jobs:
       pull-requests: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: lcov
 
@@ -417,9 +421,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.93
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@2ea1b3bdd0261867664fd125505456a7b9c3385c # tracks @1.93 branch
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           shared-key: crap4rs-msrv
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -430,11 +434,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      # SHA-pinned: cargo-deny is the supply-chain gate itself, so a
-      # tag-poisoning attack on the action would silently disable every
-      # other supply-chain check. Tag v2 → 91bf2b6 (verified via
-      # `gh api repos/EmbarkStudios/cargo-deny-action/git/ref/tags/v2`).
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      # cargo-deny is the supply-chain gate itself; the SHA pin guards
+      # against tag poisoning silently disabling every other
+      # supply-chain check. The repo-wide SHA-pinning sweep (#233)
+      # brought every other action up to the same standard — see
+      # AGENTS.md "Supply-chain hygiene".
       - uses: EmbarkStudios/cargo-deny-action@91bf2b620e09e18d6eb78b92e7861937469acedb # v2
         with:
           command: check
@@ -462,7 +467,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Reject AST-library imports in crap-core (leading-token form)
         # Scope: crap-core ONLY. oxc/swc imports are legitimate in
         # crates/crap4ts/ once that lands; crap4rs uses syn. Do NOT
@@ -584,21 +589,19 @@ jobs:
     # Mirrors the `lefthook.yml` pre-push step — single source of truth in
     # `scripts/mutants-skip-lint.py`.
     #
-    # SHA pinning of `actions/checkout@v4` is deliberately deferred to the
-    # repo-wide hardening sweep tracked at crap-rs#233 (`type:chore`,
-    # `priority:later`) — pinning this one job in isolation would diverge
-    # from the rest of the workflow. The two cheap additions that DON'T
-    # require coordinated SHA selection — `permissions: contents: read`
-    # (least privilege) and `persist-credentials: false` (no GITHUB_TOKEN
-    # left in `.git/config` on the runner) — are applied here so the new
-    # job ships hardened by default and #233 only needs to flip the SHA.
+    # `actions/checkout` is SHA-pinned with a trailing `# v4` comment, in
+    # line with the repo-wide convention; `persist-credentials: false`
+    # keeps the checkout token out of the runner's `.git/config` (this
+    # job never pushes), and `permissions: contents: read` enforces
+    # least privilege. See AGENTS.md "Supply-chain hygiene" for the
+    # SHA-pin + Dependabot policy.
     name: mutants-skip lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
       - name: Lint .cargo/mutants.toml `--skip` coverage of adapter-bin-shelling tests
@@ -611,10 +614,44 @@ jobs:
     env:
       RUSTDOCFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           shared-key: crap4rs
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo doc --workspace --no-deps
+
+  zizmor:
+    # Mechanical enforcement of the SHA-pin + workflow-security policy.
+    # Runs `zizmor` (https://woodruffw.github.io/zizmor/) over every
+    # workflow + composite action. The `unpinned-uses` audit is the
+    # primary gate — any new floating-tag `uses:` reference (in a
+    # workflow OR a composite action) fails CI here. Other zizmor
+    # audits (template-injection, excessive-permissions, etc.) ride
+    # along as additional supply-chain hygiene checks at no marginal
+    # cost. Dedicated job (parallelizable, fail-fast) rather than
+    # chained into ast-purity / cargo-deny so a supply-chain regression
+    # surfaces without waiting on the Rust toolchain. zizmor itself is
+    # installed via `pipx run` from the public Python registry — no
+    # third-party action wrapper to pin (the wrapper itself would just
+    # be another `uses:` reference to keep fresh).
+    #
+    # See AGENTS.md "Supply-chain hygiene" for the convention this job
+    # enforces.
+    name: zizmor (workflow security audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Run zizmor on .github/
+        # `pipx run` fetches a pinned-by-PyPI build into a transient
+        # venv; the version constraint locks the audit ruleset so a
+        # zizmor release tightening rules doesn't flip CI red between
+        # PRs. Dependabot's pip ecosystem keeps the spec current —
+        # bumps land via PR.
+        run: pipx run 'zizmor>=1.5,<2' .github/

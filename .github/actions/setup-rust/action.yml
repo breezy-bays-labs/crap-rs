@@ -43,7 +43,13 @@ runs:
       # rustup and reuses it.
       if: runner.os == 'macOS'
       shell: bash
-      run: |
+      # tracked: crap-rs#264 — `echo $HOME/.cargo/bin >> $GITHUB_PATH`
+      # below is intentional and bounded to a hardcoded path under
+      # $HOME, recovering the macOS rustup reinstall; not an
+      # untrusted-input injection vector. Inline `# zizmor: ignore`
+      # on the offending span follows the format documented at
+      # https://docs.zizmor.sh/usage/#ignoring-results.
+      run: | # zizmor: ignore[github-env]
         set -euo pipefail
         brew uninstall --ignore-dependencies --force rustup 2>/dev/null || true
         rm -rf "$HOME/.cargo" "$HOME/.rustup"
@@ -57,12 +63,12 @@ runs:
         "$HOME/.cargo/bin/rustup" --version
 
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
       with:
         targets: ${{ inputs.targets }}
 
     - name: Cache cargo registry + target
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
       with:
         shared-key: ${{ inputs.shared-key }}
         save-if: ${{ inputs.save-if }}
