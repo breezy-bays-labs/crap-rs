@@ -260,6 +260,70 @@ mod tests {
     }
 
     #[test]
+    fn truncation_emits_top_n_and_appends_dropped_notice() {
+        use crate::domain::types::{AnalysisResult, AnalysisSummary};
+        // Five exceeders with strictly-decreasing CRAP — limit=2 must
+        // keep the top two (CRAP 50, 40) and drop the bottom three
+        // (30, 20, 10). The trailing ::notice must name the dropped
+        // count (3) in the exact wording asserted by the BDD scenario.
+        let v50 = make_verdict("worst", "src/a.rs", 12, 10.0, 50.0, RiskLevel::High, 8.0);
+        let v40 = make_verdict("bad", "src/b.rs", 10, 15.0, 40.0, RiskLevel::High, 8.0);
+        let v30 = make_verdict("mid", "src/c.rs", 8, 25.0, 30.0, RiskLevel::High, 8.0);
+        let v20 = make_verdict("low", "src/d.rs", 6, 40.0, 20.0, RiskLevel::High, 8.0);
+        let v10 = make_verdict("least", "src/e.rs", 4, 60.0, 10.0, RiskLevel::Moderate, 8.0);
+        let result = AnalysisResult {
+            functions: vec![v10, v20, v30, v40, v50], // intentionally unsorted
+            summary: AnalysisSummary {
+                total_functions: 5,
+                ..Default::default()
+            },
+            passed: false,
+        };
+        let view = make_view_default(&result);
+        let out = fmt(&view, 2);
+
+        let warnings: Vec<&str> = out
+            .lines()
+            .filter(|l| l.starts_with("::warning "))
+            .collect();
+        assert_eq!(warnings.len(), 2, "expected 2 ::warnings, got:\n{out}");
+        assert!(warnings[0].contains("worst"), "top-1 must be worst: {out}");
+        assert!(warnings[1].contains("bad"), "top-2 must be bad: {out}");
+
+        let notices: Vec<&str> = out.lines().filter(|l| l.starts_with("::notice")).collect();
+        assert_eq!(
+            notices.len(),
+            1,
+            "expected one trailing notice, got:\n{out}"
+        );
+        assert_eq!(
+            notices[0],
+            "::notice::3 more functions exceed threshold; see scorecard for the full list",
+        );
+    }
+
+    #[test]
+    fn no_notice_when_limit_not_exceeded() {
+        // Limit == total eligible: every exceeder is emitted, no
+        // notice line follows.
+        let result = make_single_function_result(
+            "complex_fn",
+            "src/lib.rs",
+            10,
+            20.0,
+            30.0,
+            RiskLevel::High,
+            8.0,
+        );
+        let view = make_view_default(&result);
+        let out = fmt(&view, 10);
+        let warnings = out.lines().filter(|l| l.starts_with("::warning ")).count();
+        let notices = out.lines().filter(|l| l.starts_with("::notice")).count();
+        assert_eq!(warnings, 1);
+        assert_eq!(notices, 0, "no notice expected, got:\n{out}");
+    }
+
+    #[test]
     fn qualified_name_with_colons_passes_through_verbatim() {
         let result = make_single_function_result(
             "module::sub::function",

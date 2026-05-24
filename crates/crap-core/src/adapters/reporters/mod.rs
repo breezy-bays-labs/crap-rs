@@ -22,8 +22,16 @@ pub use scorecard_row::format_scorecard_row;
 pub use summary::format_summary_line;
 pub use table::{format_table, format_table_with_explain};
 
-#[cfg(test)]
-pub(crate) mod test_fixtures {
+/// Reporter test fixtures.
+///
+/// Gated behind `cfg(any(test, feature = "test-helpers"))` so the
+/// helpers stay out of production builds but become available to
+/// downstream adapter integration tests (e.g. crap4rs's cucumber
+/// harness) via the `test-helpers` dev feature. Construction of the
+/// `#[non_exhaustive]` domain types stays in-crate where the
+/// restriction doesn't apply.
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test_fixtures {
     use crate::domain::delta::{self, AnalysisDelta, DeltaView, DeltaViewSpec};
     use crate::domain::types::{
         AnalysisResult, AnalysisSummary, ComplexityContributor, CrapScore, FunctionIdentity,
