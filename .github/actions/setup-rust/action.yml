@@ -22,11 +22,12 @@ inputs:
     default: "true"
   enable-cache:
     description: >-
-      When "false", skip the Swatinem/rust-cache step entirely. Tag-triggered
-      workflows (publish.yml, release.yml) set this to "false" to close the
-      cache-poisoning audit — they should neither READ caches that may have
-      been poisoned by a malicious tag push nor SAVE caches keyed to a tag.
-      Defaults to "true" so PR + main-branch CI keeps using the cache.
+      When "false", skip the Swatinem/rust-cache step entirely. Release-relevant
+      workflows (release-plz.yml — both the release-plz jobs and the downstream
+      build/publish matrices) set this to "false" to close the cache-poisoning
+      audit: a release run must neither READ caches that may have been poisoned
+      nor SAVE caches that subsequent release runs could restore. Defaults to
+      "true" so PR + main-branch CI keeps using the cache.
       See https://docs.zizmor.sh/audits/#cache-poisoning.
     required: false
     default: "true"
@@ -77,10 +78,11 @@ runs:
         targets: ${{ inputs.targets }}
 
     - name: Cache cargo registry + target
-      # `enable-cache: false` skips this step entirely. Tag-triggered
-      # workflows (publish.yml, release.yml) pass that to close the
+      # `enable-cache: false` skips this step entirely. Release-relevant
+      # workflows (release-plz.yml) pass that to close the
       # `cache-poisoning` zizmor audit — a release run must neither
-      # restore a poisoned cache nor save a tag-keyed cache. See
+      # restore a poisoned cache nor save a cache that subsequent
+      # release runs could restore. See
       # https://docs.zizmor.sh/audits/#cache-poisoning.
       if: inputs.enable-cache != 'false'
       uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2

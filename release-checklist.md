@@ -1,5 +1,21 @@
 # Release Checklist
 
+> **Status (post-#270): this document is the pre-release-plz manual
+> ceremony, preserved as historical reference for the v0.5.0 cut and
+> earlier. The canonical forward-looking flow is `release-plz.yml`,
+> which automates conventional-commit-driven version bumps, per-crate
+> CHANGELOG updates, crates.io publish via OIDC, tag creation on the
+> merge commit, and downstream binary/npm publish. The new release-PR
+> review checklist (including the `scripts/sync-crap4ts-package-json.sh`
+> step) lives in the PR body of the auto-opened release PR. The
+> canonical ops-wide rewrite is tracked at
+> [ops#340](https://github.com/breezy-bays-labs/ops/issues/340).**
+>
+> The historical sections below remain accurate for the manual flow
+> they describe; references to `release.yml` and `publish.yml` reflect
+> that flow's workflow names, both of which were removed in the
+> release-plz adoption PR.
+
 Operational steps for cutting a `crap4rs` / `crap-core` release from this
 workspace. The checklist encodes two load-bearing rules that surfaced
 during prior cuts:
