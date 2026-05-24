@@ -435,6 +435,14 @@ jobs:
           threshold: '15'
           comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
           comment-header: 'crap-scorecard-self'
+          # End-to-end smoke for the github-annotations reporter — the
+          # runner intercepts `::warning ...` lines from the action's
+          # stdout and renders them inline on this PR's Files Changed
+          # tab. The action's `Emit inline annotations` step runs the
+          # PR-staged crap4rs with `--format github-annotations`, so a
+          # broken envelope shape or escape regression surfaces as a
+          # missing/mangled annotation on the PR itself.
+          annotations: 'true'
       - name: Assert action outputs are populated
         env:
           MARKDOWN: ${{ steps.crap.outputs.markdown }}

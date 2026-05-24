@@ -148,6 +148,8 @@ row; the aggregator owns the comment.
 | `comment-mode` | `none` | `none` (outputs only) or `sticky` (post/update sticky comment) |
 | `comment-header` | `crap-scorecard` | Sticky-comment identifier |
 | `version` | `latest` | crap4rs version to install (`latest` or pinned tag) |
+| `annotations` | `false` | When `true`, emit `::warning` workflow commands so findings render inline on the PR Files Changed tab (see [Inline annotations](#inline-annotations)) |
+| `annotation-limit` | `''` | Cap on emitted annotations when `annotations: true`. Empty defers to the adapter's default (10) or `[output] annotation_limit` from `config`. Range 1..=100 |
 
 ## Outputs
 
@@ -219,6 +221,36 @@ releases the action emits an empty string and prints a workflow
 warning; the rest of the action (`outputs.markdown`, gates, sticky
 comment) keeps working. Pin the `version` input to `0.4.0` or later
 once it publishes if your workflow consumes `row-json`.
+
+## Inline annotations
+
+When `annotations: true`, the action runs a second pass of the
+analyzer with `--format github-annotations`. That format emits one
+`::warning file=...,line=...,title=CRAP <score>::<message>` workflow
+command per function above threshold; the GitHub Actions runner reads
+these from the step's stdout and renders them as inline annotations
+on the PR's "Files Changed" tab. No GHAS or Code Scanning subscription
+needed.
+
+```yaml
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@main
+  with:
+    coverage: lcov.info
+    threshold: '15'
+    annotations: 'true'
+    annotation-limit: '10'   # optional; default 10
+```
+
+GitHub silently drops annotations past a per-step UI cap (10 warning,
+10 error, 10 notice per step; 50 per job; 50 per workflow). The
+adapter caps emission at `annotation-limit` (default `10`) and
+appends a trailing `::notice::N more functions exceed threshold; see
+scorecard for the full list` line so reviewers know findings were
+dropped. The full set always appears in `outputs.markdown`.
+
+`annotation-limit` can also live in the project's config — set
+`[output] annotation_limit = N` in `crap4rs.toml` (or `crap4ts.toml`)
+and pass the file via `config:`. The CLI input wins when both are set.
 
 ## Pinning
 

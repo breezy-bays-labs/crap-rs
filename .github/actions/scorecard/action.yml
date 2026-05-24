@@ -74,6 +74,27 @@ inputs:
       recent release. Pin to a tag (e.g. `0.2.1`) for reproducible CI.
     required: false
     default: 'latest'
+  annotations:
+    description: |
+      When `true`, emit GitHub Actions `::warning` workflow commands for
+      every function above the threshold so findings render inline on
+      the PR "Files Changed" tab. Universal, free, no GHAS / Code
+      Scanning dependency — the GH Actions runner intercepts the
+      workflow commands directly from the analyzer's stdout. Default
+      `false` keeps the action's stdout clean for callers who consume
+      `outputs.markdown` only. Honors `annotation-limit` (or the
+      project's `[output] annotation_limit` from `inputs.config`).
+    required: false
+    default: 'false'
+  annotation-limit:
+    description: |
+      Cap on the number of `::warning` annotations emitted when
+      `annotations: true`. Default (empty) defers to the adapter's
+      built-in default (10) or the project's `[output] annotation_limit`
+      in the config file passed via `inputs.config`. Range 1..=100;
+      values outside the range are rejected by the adapter's CLI parser.
+    required: false
+    default: ''
 
 outputs:
   markdown:
@@ -318,6 +339,35 @@ runs:
         echo "::group::CRAP scorecard"
         cat "$markdown_file"
         echo "::endgroup::"
+
+    - name: Emit inline annotations
+      if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript') && inputs.annotations == 'true'
+      shell: bash
+      env:
+        LANGUAGE: ${{ steps.lang.outputs.language }}
+        COVERAGE: ${{ inputs.coverage }}
+        SRC: ${{ inputs.src }}
+        THRESHOLD: ${{ inputs.threshold }}
+        CONFIG: ${{ inputs.config }}
+        ANNOTATION_LIMIT: ${{ inputs.annotation-limit }}
+      run: |
+        set -euo pipefail
+        # Stdout MUST flow through to the runner — GitHub Actions reads
+        # the `::warning ...` workflow commands directly from the step's
+        # stdout. Any pipe / redirect would hide them from the runner
+        # and the annotations would never render on the diff view.
+        # `--no-fail` keeps the step green so a failing analysis still
+        # surfaces findings inline; the dedicated "Enforce gates" step
+        # below owns hard gating.
+        if [ "$LANGUAGE" = "rust" ]; then
+          BIN=crap4rs
+        else
+          BIN=crap4ts
+        fi
+        args=(--coverage "$COVERAGE" --src "$SRC" --threshold "$THRESHOLD" --no-fail --format github-annotations)
+        [ -n "$CONFIG" ] && args+=(--config "$CONFIG")
+        [ -n "$ANNOTATION_LIMIT" ] && args+=(--annotation-limit "$ANNOTATION_LIMIT")
+        "$BIN" "${args[@]}"
 
     - name: Post sticky PR comment
       if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript') && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
