@@ -209,6 +209,19 @@ footer.report-footer {
 .tab-panel { display: none; }
 .tab-panel[data-active] { display: block; }
 
+/* Sakura's base `button:hover` paints a magenta background (#982c61) that
+   collides with the flat tab-nav design — the muted text becomes near-
+   illegible against the dark pink fill. The base `.tab` rule resets
+   `background: transparent` for the resting state but the hover branch
+   inherits Sakura's button:hover. Override here so the hover state stays
+   flat (text color shift only). Scoped under `has_delta` so the no-baseline
+   output's CSS bytes are unchanged. */
+.tab:hover,
+.tab:focus-visible {
+  background: transparent;
+  color: var(--text);
+}
+
 .delta-hero { display: flex; flex-direction: column; gap: 0.25rem; }
 .delta-hero .verdict {
   display: inline-flex; align-items: center; gap: 0.3rem;
