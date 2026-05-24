@@ -76,6 +76,10 @@ pub enum FormatArg {
     /// distribution, and per-file collapsible function tables. Inline
     /// CSS, no external assets, mobile-responsive.
     Html,
+    /// GitHub Actions inline annotations — emits `::warning` workflow
+    /// commands so threshold-exceeding findings render inline on the
+    /// PR "Files Changed" tab. Universal, free, no GHAS dependency.
+    GithubAnnotations,
 }
 
 /// One requested output: a format and an optional file destination.
@@ -1325,6 +1329,17 @@ fn render_format<P: ParseDiagnostic>(
         FormatArg::Html => {
             reporters::format_html(view, inputs.threshold, meta.tool_name, meta.tool_version)
         }
+        // GitHub Actions annotations is a gate translation like SARIF —
+        // iterates `view.full.functions` regardless of View shaping so
+        // PR annotations reflect the gate, not a presentation choice.
+        // `usize::MAX` here is a Session-1 placeholder; Session 2
+        // threads `--annotation-limit` through.
+        FormatArg::GithubAnnotations => reporters::format_github_annotations(
+            view,
+            meta.tool_name,
+            meta.tool_version,
+            usize::MAX,
+        ),
     })
 }
 
