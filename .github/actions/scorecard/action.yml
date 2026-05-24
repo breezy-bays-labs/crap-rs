@@ -1000,19 +1000,32 @@ runs:
             done
           } > "$combined_md"
 
+          # Defensive blank line before the EOF delimiter: `cat` doesn't
+          # add a trailing newline to file content that lacks one, and
+          # GH Actions requires the heredoc terminator to be on its own
+          # line. Pre-PR-#260 the markdown reporter always emitted a
+          # trailing `\n`; template-engine migrations can silently strip
+          # it (askama's `{%-` whitespace operator did exactly this in
+          # crap-rs#260), so the action defends against the regression
+          # at the emission point instead of trusting every future
+          # reporter to honor the contract. The blank line is invisible
+          # to downstream markdown renderers.
           {
             echo "markdown<<__CRAP_SCORECARD_EOF__"
             cat "$combined_md"
+            echo ""
             echo "__CRAP_SCORECARD_EOF__"
           } >> "$GITHUB_OUTPUT"
         else
           # Single-language: emit the raw adapter markdown unchanged
           # (back-compat — every byte matches the pre-PR shape). `BIN`
           # carries the loop's only iteration's bin name (`crap4rs` or
-          # `crap4ts`), so the markdown file path is well-defined.
+          # `crap4ts`), so the markdown file path is well-defined. See
+          # the multi-language branch above for the `echo ""` rationale.
           {
             echo "markdown<<__CRAP_SCORECARD_EOF__"
             cat "$RUNNER_TEMP/${BIN}-scorecard.md"
+            echo ""
             echo "__CRAP_SCORECARD_EOF__"
           } >> "$GITHUB_OUTPUT"
         fi

@@ -85,8 +85,23 @@ pub fn format_markdown(
         body,
         delta: delta_block,
     };
-    tmpl.render()
-        .expect("markdown template render is total — all fields owned")
+    let mut out = tmpl
+        .render()
+        .expect("markdown template render is total — all fields owned");
+    // POSIX text files end with `\n`. Pre-PR-#260 the hand-rolled
+    // reporter always emitted a trailing newline; askama's `{%-` ws
+    // operator strips it in the template, and `insta` snapshot
+    // assertions trim trailing whitespace on compare so the drift is
+    // invisible to in-process tests. The composite scorecard action's
+    // `cat <file>` + `echo "<EOF>"` heredoc emission relies on the
+    // trailing `\n` to place the EOF delimiter on its own line — a
+    // missing newline collides with the heredoc terminator and breaks
+    // GH Actions' `$GITHUB_OUTPUT` parsing. Restore the trailing
+    // newline here so the contract holds across all consumers.
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out
 }
 
 #[derive(Template)]
