@@ -124,7 +124,7 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
   Scenario: Default DeltaViewSpec is filter=all, sort=score_delta desc
     When `delta::apply(&delta, DeltaViewSpec::default())` runs
     Then `view.shown` contains every `FunctionChange` in `delta.changes`
-    And rows are ordered by `score_delta.abs()` descending
+    And rows are ordered by signed `score_delta` descending (regressions first, improvements last)
 
   Scenario: Filter by change_kinds=[added] returns only Added
     When `delta::apply` is called with `filters.change_kinds = Some({Added})`
