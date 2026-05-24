@@ -120,8 +120,9 @@ commit SHA isn't).
    `unpinned-uses` finding (mechanical enforcement — "documentation
    rots; CI doesn't").
 
-2. **Floating-branch actions get pinned to a branch-HEAD SHA.**
-   Some actions (e.g. `dtolnay/rust-toolchain@stable`,
+2. **Floating-branch actions get pinned to a branch-HEAD SHA — but
+   Dependabot can't bump them, so manual refresh is required.** Some
+   actions (e.g. `dtolnay/rust-toolchain@stable`,
    `dtolnay/rust-toolchain@1.93`) publish version-channel branches
    rather than tagged releases — `@stable` is a branch that bakes in
    "whatever Rust release is current" and advances every ~6 weeks.
@@ -132,9 +133,16 @@ commit SHA isn't).
    - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
    ```
 
-   The conscious tradeoff: reproducible CI (SHA-locked) at the cost
-   of auto-tracking the Rust stable channel. Dependabot bumps the
-   SHA when the upstream branch advances.
+   **Dependabot's `github-actions` ecosystem tracks updates on an
+   action's default branch (and on tagged releases) — it does NOT
+   track HEAD advances on non-default branches.** For
+   `dtolnay/rust-toolchain` the default branch is `master` (which
+   has different `action.yml` content per version-channel branch),
+   so a Dependabot-proposed SHA from `master` would silently break
+   the action. The pin therefore needs a manual refresh on a
+   quarterly cadence (or before any major Rust release the project
+   depends on). The conscious tradeoff: reproducible CI (SHA-locked)
+   at the cost of manual upkeep on the toolchain-action pin.
 
 3. **Resolve SHAs via `gh api`.** For tag-pinned actions:
 

@@ -650,8 +650,9 @@ jobs:
           persist-credentials: false
       - name: Run zizmor on .github/
         # `pipx run` fetches a pinned-by-PyPI build into a transient
-        # venv; the version constraint locks the audit ruleset so a
-        # zizmor release tightening rules doesn't flip CI red between
-        # PRs. Dependabot's pip ecosystem keeps the spec current —
-        # bumps land via PR.
+        # venv; the `>=1.5,<2` constraint locks the audit ruleset to
+        # the 1.x major so a zizmor release tightening rules doesn't
+        # flip CI red between PRs. Bumping the constraint is a manual
+        # edit (no Dependabot ecosystem covers this invocation form);
+        # the major-version cap means 2.x lands via human-reviewed PR.
         run: pipx run 'zizmor>=1.5,<2' .github/

@@ -3,14 +3,22 @@
 # Keeps the SHA-pinned `uses:` references in `.github/workflows/*.yml`
 # and `.github/actions/*/action.yml` fresh: each weekly run opens a PR
 # per outdated action, bumping the pinned SHA to the latest matching
-# release. Without this, the pins decay silently and the CI gate's
-# only value becomes "things don't change" rather than "things stay
-# current AND pinned".
+# tagged release (or default-branch HEAD, for actions without tags).
+# Without this, the pins decay silently and the CI gate's only value
+# becomes "things don't change" rather than "things stay current AND
+# pinned".
 #
-# zizmor is installed via `pipx run 'zizmor>=1.5,<2'` from PyPI; the
-# `pip` ecosystem keeps the version spec current. The version constraint
-# locks the audit ruleset so a zizmor release that tightens rules
-# doesn't flip CI red between PRs.
+# Coverage caveat: Dependabot's github-actions ecosystem tracks
+# tagged releases + default-branch HEADs only — it does NOT track
+# HEAD advances on non-default branches like
+# `dtolnay/rust-toolchain@stable`. Those pins need manual quarterly
+# refresh; see AGENTS.md "Supply-chain hygiene" rule 2.
+#
+# zizmor (the CI workflow auditor in `ci.yml`) is invoked via
+# `pipx run 'zizmor>=1.5,<2'` rather than tracked through any
+# Dependabot ecosystem — bumping its version spec is a manual edit
+# of `.github/workflows/ci.yml`, opened when zizmor's release notes
+# warrant the upgrade.
 #
 # Companion convention: AGENTS.md → "Supply-chain hygiene".
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
@@ -23,6 +31,14 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # Cooldown delays a Dependabot bump for N days after the upstream
+    # release lands, giving the community time to surface a bad
+    # release before our automation pulls it. Semver-major bumps get
+    # the longer window since they're the highest-risk class. Default
+    # covers minor + patch.
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
     commit-message:
       prefix: "ci"
       include: "scope"
