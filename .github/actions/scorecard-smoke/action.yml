@@ -1,0 +1,148 @@
+name: 'CRAP Scorecard Smoke (internal)'
+description: |
+  Internal composite that exercises the public `./.github/actions/scorecard`
+  composite end-to-end against the PR's locally-built adapter binary. Stages
+  the binary onto PATH, invokes the scorecard action, asserts outputs are
+  populated. Used by the `scorecard-smoke-rust` and `scorecard-smoke-ts` jobs
+  in `ci.yml` to collapse the duplicated smoke logic into one shared body.
+
+  NOT a public action — invoked only via the local `./.github/actions/...`
+  reference from this repo. The supply-chain hygiene rules for external
+  `uses:` references (AGENTS.md `## Supply-chain hygiene` rules 7-10) do not
+  apply to this composite because it never checks out, never runs an
+  external `uses:`, and never holds credentials.
+author: 'Breezy Bays Labs'
+
+inputs:
+  bin-path:
+    description: |
+      Path to the PR's locally-built adapter binary (e.g.
+      `./target/release/crap4rs` or `./target/release/crap4ts`). The
+      composite stages this binary into `$HOME/.cargo/bin/<bin>` so the
+      public scorecard action picks it up via its pre-installed-detection
+      path, dogfooding the PR's analyzer against itself.
+    required: true
+  language:
+    description: |
+      `rust` or `typescript` — drives the bin name the composite stages
+      (`crap4rs` / `crap4ts`) and the post-invocation row-json shape
+      assertion. Pass through to the scorecard action's `language:`
+      input as well.
+    required: true
+  coverage:
+    description: 'Path to the coverage file (LCOV for Rust, Istanbul JSON for TypeScript).'
+    required: true
+  src:
+    description: 'Source root passed to the scorecard action.'
+    required: true
+  threshold:
+    description: 'Threshold passed to the scorecard action.'
+    required: false
+    default: '15'
+  comment-mode:
+    description: '`none` or `sticky` — passed through to the scorecard action.'
+    required: false
+    default: 'none'
+  comment-header:
+    description: 'Sticky-comment identifier when comment-mode is sticky.'
+    required: false
+    default: 'crap-scorecard-self'
+  annotations:
+    description: '`true` to emit inline annotations via the scorecard action.'
+    required: false
+    default: 'false'
+
+outputs:
+  markdown:
+    description: 'Pass-through of the scorecard action markdown output.'
+    value: ${{ steps.crap.outputs.markdown }}
+  row-json:
+    description: 'Pass-through of the scorecard action row-json output.'
+    value: ${{ steps.crap.outputs.row-json }}
+  json-envelope-path:
+    description: 'Pass-through of the scorecard action envelope path output.'
+    value: ${{ steps.crap.outputs.json-envelope-path }}
+  analysis-passed:
+    description: 'Pass-through of the scorecard action analysis-passed output.'
+    value: ${{ steps.crap.outputs.analysis-passed }}
+  threshold-resolved:
+    description: |
+      The threshold value the scorecard action's `Resolve presets` step
+      resolved (preset-derived or raw passthrough). Smoke spot-checks
+      can assert this matches the expected preset-to-raw mapping.
+    value: ${{ steps.crap.outputs.threshold-resolved }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Stage PR binary as pre-installed adapter
+      shell: bash
+      env:
+        BIN_PATH: ${{ inputs.bin-path }}
+        LANGUAGE: ${{ inputs.language }}
+      run: |
+        set -euo pipefail
+        case "$LANGUAGE" in
+          rust)       bin_name=crap4rs ;;
+          typescript) bin_name=crap4ts ;;
+          *)
+            echo "::error::scorecard-smoke: unsupported language '$LANGUAGE'; expected one of: rust, typescript"
+            exit 1
+            ;;
+        esac
+        if [ ! -x "$BIN_PATH" ]; then
+          echo "::error::scorecard-smoke: bin-path '$BIN_PATH' is not an executable file"
+          exit 1
+        fi
+        mkdir -p "$HOME/.cargo/bin"
+        install -m 0755 "$BIN_PATH" "$HOME/.cargo/bin/$bin_name"
+        "$HOME/.cargo/bin/$bin_name" --version
+
+    - name: Dogfood the scorecard action
+      id: crap
+      uses: ./.github/actions/scorecard
+      with:
+        language: ${{ inputs.language }}
+        coverage: ${{ inputs.coverage }}
+        src: ${{ inputs.src }}
+        threshold: ${{ inputs.threshold }}
+        comment-mode: ${{ inputs.comment-mode }}
+        comment-header: ${{ inputs.comment-header }}
+        annotations: ${{ inputs.annotations }}
+
+    - name: Assert scorecard action outputs are populated
+      shell: bash
+      env:
+        LANGUAGE: ${{ inputs.language }}
+        MARKDOWN: ${{ steps.crap.outputs.markdown }}
+        ROW_JSON: ${{ steps.crap.outputs.row-json }}
+        ENVELOPE_PATH: ${{ steps.crap.outputs.json-envelope-path }}
+        ANALYSIS_PASSED: ${{ steps.crap.outputs.analysis-passed }}
+        REGRESSIONS: ${{ steps.crap.outputs.regressions }}
+        NEW_VIOLATIONS: ${{ steps.crap.outputs.new-violations }}
+      run: |
+        set -euo pipefail
+        if [ -z "$MARKDOWN" ]; then
+          echo "::error::scorecard action emitted empty markdown output"
+          exit 1
+        fi
+        test -f "$ENVELOPE_PATH"
+        # crap4ts gets the same row-json contract as crap4rs (locked
+        # by crates/crap-core/tests/scorecard_row_parity.rs). For the
+        # crap4rs path, version-gap windows can legitimately leave the
+        # output empty (the public action emits a warning + empty
+        # string for crap4rs < 0.4.0; the PR-staged binary is current
+        # so it should populate today, but we don't hard-fail to keep
+        # the assertion robust against future bin-name divergence).
+        if [ "$LANGUAGE" = "typescript" ]; then
+          if [ -z "$ROW_JSON" ]; then
+            echo "::error::scorecard action emitted empty row-json output for TypeScript dispatch"
+            exit 1
+          fi
+          if ! printf '%s' "$ROW_JSON" | jq -e '.type == "CrapDelta"' >/dev/null; then
+            echo "::error::row-json missing type=CrapDelta — parity contract broken"
+            printf '%s' "$ROW_JSON" >&2
+            exit 1
+          fi
+        fi
+        echo "scorecard-smoke ($LANGUAGE): analysis_passed=$ANALYSIS_PASSED regressions=$REGRESSIONS new_violations=$NEW_VIOLATIONS"

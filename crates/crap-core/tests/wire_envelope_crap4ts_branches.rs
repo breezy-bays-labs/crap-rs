@@ -144,6 +144,19 @@ fn envelope() {
 
     let mut envelope: Value =
         serde_json::from_slice(&output.stdout).expect("crap4ts --format json emits valid JSON");
+
+    // Layer 1 drop migration (PR #292 — ergonomics-α):
+    // The scorecard-smoke Layer 1 direct-binary probe used to assert
+    // `.tool_version` populated; that probe was dropped when the smoke
+    // job collapsed into the scorecard-smoke composite. The canary now
+    // owns the assertion (pre-strip, since strip_volatile redacts it).
+    assert!(
+        envelope["tool_version"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty()),
+        "envelope.tool_version missing or empty (pre-strip)",
+    );
+
     strip_volatile(&mut envelope);
     strip_tempdir_paths(&mut envelope, &tempdir_str);
 
