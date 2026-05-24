@@ -445,6 +445,92 @@ jobs:
           fi
           echo "strict → threshold=8 ✓"
 
+      # ----------------------------------------------------------------
+      # html-report spot-check (PR #294 acceptance gate).
+      #
+      # Exercises the full HTML render + artifact upload + (when this
+      # job posts a sticky comment) link injection path against the
+      # PR-staged crap4rs binary. comment-mode mirrors the main
+      # dogfood (sticky on pull_request, none otherwise) so the link
+      # injection only fires on PR runs; the artifact upload + URL
+      # output land on every event.
+      #
+      # `html-artifact-name-suffix: '-html-spotcheck'` keeps the
+      # artifact name distinct from any other PR γ-related uploads
+      # this job might add (today there are none, but the suffix is
+      # a future-proofing convenience so this assertion never
+      # collides with the per-OS default suffix of the main dogfood
+      # step if `html-report: true` migrates there later).
+      #
+      # SECURITY NOTE: every shell variable interpolation in the
+      # assertion step's `run:` body reads from the `env:` block;
+      # the `github.run_id` / `github.repository` context fields are
+      # GitHub-controlled (NOT user-controlled), and they still flow
+      # through the env-indirection pattern for consistency with the
+      # rest of this workflow.
+      - name: HTML report spot-check
+        id: html-spot
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          html-report: 'true'
+          html-artifact-name-suffix: '-html-spotcheck'
+          comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
+          comment-header: 'crap-scorecard-html-spotcheck'
+      - name: Assert HTML report wiring
+        env:
+          HTML_URL_RUST: ${{ steps.html-spot.outputs.html-artifact-url-rust }}
+          HTML_URL_TS: ${{ steps.html-spot.outputs.html-artifact-url-typescript }}
+          RUN_ID: ${{ github.run_id }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # 1. html-artifact-url-rust output populated (URL surfaces
+          #    synchronously per actions/upload-artifact@v7's
+          #    artifact-url contract, verified during the PR pre-flight).
+          if [ -z "$HTML_URL_RUST" ]; then
+            echo "::error::html-spot: outputs.html-artifact-url-rust is empty after html-report:true single-language rust dispatch"
+            exit 1
+          fi
+          # 2. html-artifact-url-typescript output empty (TS didn't run).
+          if [ -n "$HTML_URL_TS" ]; then
+            echo "::error::html-spot: outputs.html-artifact-url-typescript should be empty in single-language rust dispatch (got: $HTML_URL_TS)"
+            exit 1
+          fi
+          # 3. Artifact uploaded to the workflow run, named per the
+          #    `-html-spotcheck` suffix override above. `gh api` lists
+          #    artifacts via the REST artifacts endpoint; jq filters
+          #    by name.
+          uploaded="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "crap4rs-report-html-spotcheck") | .name')"
+          if [ -z "$uploaded" ]; then
+            echo "::error::html-spot: artifact 'crap4rs-report-html-spotcheck' missing from workflow run artifacts list"
+            exit 1
+          fi
+          # 4. HTML file written to RUNNER_TEMP parses (closing
+          #    </html> tag present) AND contains a known scorecard
+          #    marker — pick a verbatim template literal the #260
+          #    Askama template emits on every render regardless of
+          #    which functions cross threshold. This is a robust
+          #    marker: it fires even when the analyzed code has zero
+          #    violations.
+          html_file="$RUNNER_TEMP/crap4rs-report.html"
+          if [ ! -f "$html_file" ]; then
+            echo "::error::html-spot: $html_file missing — the render step did not produce the expected file"
+            exit 1
+          fi
+          if ! grep -q '</html>' "$html_file"; then
+            echo "::error::html-spot: rendered HTML missing closing </html> tag — output may be truncated or malformed"
+            exit 1
+          fi
+          if ! grep -q '<h1>crap4rs report</h1>' "$html_file"; then
+            echo "::error::html-spot: rendered HTML missing the '<h1>crap4rs report</h1>' marker — reporter template may have drifted"
+            exit 1
+          fi
+          echo "html-spot: html-report wiring ✓ (artifact uploaded, URL surfaced, HTML rendered with expected marker)"
+
       - name: Preset spot-check — default
         id: preset-default
         uses: ./.github/actions/scorecard

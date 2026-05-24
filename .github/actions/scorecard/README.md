@@ -183,6 +183,111 @@ containing the combined `markdown` output (both per-language sections
 stacked). Aggregator workflows reading the split outputs and
 re-rendering elsewhere should still set `comment-mode: 'none'`.
 
+## HTML report
+
+For PR reviews that benefit from the full file-by-file scorecard (KPI
+tiles, distribution bar, file cards with sortable tables, optional dark
+mode) — set `html-report: true`. The action renders an HTML report via
+`<bin> --format html`, uploads it as a workflow artifact, and (when
+`comment-mode: sticky`) appends a download link to the sticky comment
+body.
+
+When `baseline:` is supplied alongside `html-report: true`, the
+rendered HTML automatically activates the Delta tab (Current vs
+baseline) — no separate input needed.
+
+```yaml
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
+  with:
+    coverage: lcov.info
+    baseline: /tmp/baseline.json
+    html-report: true
+    comment-mode: 'sticky'
+```
+
+| Input | Default | Notes |
+|---|---|---|
+| `html-report` | `false` | When `true`, render + upload + (sticky-only) inject link |
+| `html-artifact-name-suffix` | `''` → `-${{ runner.os }}` | Disambiguates matrix-strategy uploads |
+
+### Why artifact + link, not inline HTML
+
+GitHub PR comments are rendered as **markdown only** — `<script>`,
+`<style>`, inline `data:` images, and most arbitrary HTML/CSS are
+stripped or sanitized. Embedding the rendered HTML in the comment
+body therefore isn't structurally available. The artifact + link
+pattern works with GitHub's existing UI: reviewers click the link,
+GitHub authenticates them, the artifact downloads as a zip, and the
+full report opens in any browser (the renderer is single-file +
+self-contained, no external assets).
+
+### Artifact naming + retention
+
+- **Filename per language**: `crap4rs-report-<suffix>` (Rust) and/or
+  `crap4ts-report-<suffix>` (TypeScript). The default suffix is
+  `-${{ runner.os }}` so the common matrix-over-OS case produces
+  cleanly distinguishable names (`crap4rs-report-Linux`,
+  `crap4rs-report-macOS`). Override via `html-artifact-name-suffix`
+  for matrix dimensions beyond OS (`-Linux-x86_64`, `-Linux-arm64`,
+  …). `actions/upload-artifact@v4+` fails fatally on the second
+  matrix leg attempting to upload to the same artifact name, so a
+  unique suffix per leg is required for matrix-strategy workflows.
+- **Retention**: 90 days (GitHub's default `actions/upload-artifact`
+  retention window — long enough to cover the typical "review the PR
+  within a quarter" use case). The action does not expose a
+  retention override input in this release; if real consumer friction
+  surfaces we can ship an additive `retention-days` input as a
+  follow-up.
+
+### Per-language behavior in multi-language mode
+
+When `languages: rust,typescript` (or `all`) is set alongside
+`html-report: true`, the action uploads **two artifacts** (one per
+language) and the sticky comment carries **two links**:
+
+```
+📊 [Download full HTML report — Rust](<rust-url>) · [TypeScript](<ts-url>)
+```
+
+The two artifact URLs are also surfaced as action outputs
+(`html-artifact-url-rust` + `html-artifact-url-typescript`) so an
+aggregator workflow running `comment-mode: 'none'` can read the URLs
+and render its own link block. When a language is not in the
+resolved set, its respective output is empty.
+
+```yaml
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
+  id: crap
+  with:
+    languages: rust,typescript
+    coverage:    lcov.info
+    coverage-ts: coverage-final.json
+    src:    crates/
+    src-ts: packages/
+    html-report: true
+    comment-mode: 'none'             # aggregator pattern — no sticky
+
+- name: Render combined report
+  run: |
+    echo "Rust:       ${{ steps.crap.outputs.html-artifact-url-rust }}"
+    echo "TypeScript: ${{ steps.crap.outputs.html-artifact-url-typescript }}"
+```
+
+### Aggregator pattern — `comment-mode: none` + `html-report: true`
+
+The action still uploads both artifacts and surfaces their URLs as
+outputs even when `comment-mode: 'none'` — there is no sticky
+comment to inject a link into, but the URLs are still available
+programmatically. Aggregator workflows that compose multiple metric
+rows into one comment can read the HTML-artifact URL outputs and
+render their own link wherever appropriate (sticky comment, Check
+Run summary, Slack message, …).
+
+The artifact URLs only resolve for requests **authenticated with
+GitHub** (per the GH API contract on artifact download URLs), so the
+links are meant for human-followable surfaces (sticky comments,
+Check Run summaries) — not in-job `curl` retrieval.
+
 ## Minimal usage — analysis only, no delta
 
 ```yaml
@@ -307,6 +412,8 @@ row; the aggregator owns the comment.
 | `version` | `latest` | crap4rs version to install (`latest` or pinned tag) |
 | `annotations` | `false` | When `true`, emit `::warning` workflow commands so findings render inline on the PR Files Changed tab (see [Inline annotations](#inline-annotations)) |
 | `annotation-limit` | `''` | Cap on emitted annotations when `annotations: true`. Empty defers to the adapter's default (10) or `[output] annotation_limit` from `config`. Range 1..=100 |
+| `html-report` | `false` | When `true`, render `<bin> --format html` as a workflow artifact and (sticky-only) append a download link to the comment body. Per-language in multi-language mode. See [HTML report](#html-report) |
+| `html-artifact-name-suffix` | `''` (→ `-${{ runner.os }}`) | Suffix appended to the HTML artifact name(s) to disambiguate matrix-strategy uploads. See [HTML report — Artifact naming + retention](#artifact-naming--retention) |
 | `threshold-preset` | `''` | (preset) `strict` (8) \| `default` (15) \| `lenient` (25). Derives `threshold`; raw `threshold:` wins on conflict + warning. See [Presets](#presets) |
 | `run-mode` | `''` | (preset) `full` \| `delta` \| `both` — drives baseline expectations. `delta`/`both` require `baseline:` set. See [Presets](#presets) |
 | `gate-mode` | `''` | (preset) `report-only` \| `gate-on-analysis` \| `gate-on-delta` \| `gate-on-both`. Atomic `analysis-gate` + `delta-gate` pair; raw inputs win on conflict + warning. See [Presets](#presets) |
@@ -326,6 +433,8 @@ row; the aggregator owns the comment.
 | `new-violations` | Count of functions exceeding threshold but not in baseline. Multi-language: SUM across languages |
 | `regressions` | Count of modified functions whose CRAP increased above rendering precision. Multi-language: SUM across languages |
 | `threshold-resolved` | The threshold value the action's `Resolve presets` step resolved (preset-derived or raw passthrough). See [Presets — Threshold-sync invariant](#threshold-sync-invariant) |
+| `html-artifact-url-rust` | (html-report) Workflow artifact URL for the rendered Rust HTML report when `html-report: true` and Rust is in the resolved language set. Empty otherwise. See [HTML report](#html-report) |
+| `html-artifact-url-typescript` | (html-report) Workflow artifact URL for the rendered TypeScript HTML report when `html-report: true` and TypeScript is in the resolved language set. Empty otherwise. See [HTML report](#html-report) |
 
 ## Structured row output (`outputs.row-json`)
 
