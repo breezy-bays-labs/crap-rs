@@ -78,6 +78,12 @@ const DEFAULT_EXCLUDES: &[&str] = &["tests/**", "benches/**", "examples/**"];
 fn main() -> ExitCode {
     let meta = AdapterMeta {
         tool_name: env!("CARGO_PKG_NAME"),
+        // Language-facing label for the HTML reporter's per-adapter
+        // footer row ("Rust · cognitive complexity · line coverage · …").
+        // Distinct from `tool_name` (which carries the binary's package
+        // name) — end users care about which language the row is about,
+        // not the binary that produced it.
+        display_name: "Rust",
         tool_version: env!("CARGO_PKG_VERSION"),
         long_version: env!("CRAP4RS_LONG_VERSION"),
         about: ABOUT,

@@ -1,320 +1,375 @@
-//! HTML reporter — self-contained HTML report for the AnalysisView.
+//! HTML reporter — self-contained HTML report rendered via an askama
+//! compile-time template.
 //!
-//! Produces a single document with inline CSS and no external assets
-//! (no CDN, no fonts). Layout is mobile-responsive via CSS flex/grid
-//! and per-file collapsibility uses native `<details>`/`<summary>` —
-//! no JavaScript required.
+//! Produces a single document with inline CSS + inline `<script>` and
+//! no external assets — no CDN, no font URLs, no `<link>` to anything
+//! external. Layout follows the **Sakura Reports** design system
+//! (crap-rs#260): a verdict-stamped header, 4 KPI tiles, a risk
+//! distribution bar, up to 4 worst offenders, a `<details>` card per
+//! file with a function-level table, and a per-adapter footer carrying
+//! metric / coverage / threshold provenance.
 //!
-//! Color-coded risk levels match the SARIF severity mapping:
-//! - High → red
-//! - Moderate → orange
-//! - Acceptable → yellow
-//! - Low → green
+//! Color-coded risk levels map onto the Sakura ordinal `--risk-1` …
+//! `--risk-4` token ladder (low → high) so light + optional dark mode
+//! both work from the same markup. The inline `<script>` handles the
+//! theme toggle, file-list filter, and `/` keyboard shortcut — no
+//! framework, no build step.
+//!
+//! Templates live under `crates/crap-core/templates/` and are checked
+//! at compile time by the `#[derive(Template)]` macro.
 
-use std::collections::BTreeMap;
-use std::fmt::Write as _;
-
-use crate::domain::types::{
-    AnalysisSummary, ComplexityContributor, FunctionVerdict, RiskDistribution, RiskLevel,
-};
+use crate::cli::AdapterMeta;
+use crate::domain::types::{AnalysisSummary, ComplexityMetric, FunctionVerdict, RiskLevel};
 use crate::domain::view::AnalysisView;
+use askama::Template;
+use std::collections::BTreeMap;
 
 /// Format an `AnalysisView` as a self-contained HTML document.
 ///
-/// The output is one full HTML document (`<!DOCTYPE html>` …
-/// `</html>`). Reporters that want to embed the body in a larger
-/// document should consume the structured view directly rather than
-/// scraping this output.
+/// The output is one full HTML document (`<!doctype html>` …
+/// `</html>`). All CSS is inlined; the bundled `<script>` block has
+/// no external dependencies. Reporters that want to embed the body in
+/// a larger document should consume the structured view directly
+/// rather than scraping this output.
 ///
-/// `tool_name` (the adapter binary's `env!("CARGO_PKG_NAME")`) and `tool_version`
-/// are threaded from the caller — `env!("CARGO_PKG_NAME")` and
-/// `env!("CARGO_PKG_VERSION")` resolve against `crap-core` here, not
-/// the adapter binary, so the calling binary supplies its own identity.
+/// `meta` carries the calling binary's identity, including the
+/// `display_name` ("Rust" / "TypeScript") used by the per-adapter
+/// footer row. `effective_metric` is the runtime-resolved complexity
+/// metric (cognitive vs cyclomatic, post-CLI/config merge); the
+/// footer renders this verbatim so users can see which metric a
+/// report was scored under.
+///
+/// The signature widened from `(view, threshold, &str, &str)` to
+/// `(view, threshold, &AdapterMeta, ComplexityMetric)` in crap-rs#260
+/// (locked plan deviation #1) so the template can render the per-
+/// adapter footer without reading domain state — the dispatcher in
+/// `cli/mod.rs` already holds both in scope.
 pub fn format_html(
     view: &AnalysisView<'_>,
     threshold: f64,
-    tool_name: &str,
-    tool_version: &str,
+    meta: &AdapterMeta,
+    effective_metric: ComplexityMetric,
 ) -> String {
-    let title = format!("{tool_name} v{tool_version} — CRAP Score Analysis");
-
-    let mut body = String::new();
-    body.push_str(&render_header(&title, threshold));
-    body.push_str(&render_summary(&view.full.summary, view.full.passed));
-
-    if visible_section_is_empty(view) {
-        body.push_str("<p class=\"empty\">No functions to display.</p>\n");
-    } else {
-        body.push_str(&render_files_section(view));
-    }
-
-    let mut out = String::new();
-    out.push_str("<!DOCTYPE html>\n");
-    out.push_str("<html lang=\"en\">\n<head>\n");
-    out.push_str("<meta charset=\"utf-8\">\n");
-    out.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
-    let _ = writeln!(out, "<title>{}</title>", escape_html(&title));
-    out.push_str("<style>\n");
-    out.push_str(STYLES);
-    out.push_str("\n</style>\n</head>\n<body>\n");
-    out.push_str(&body);
-    out.push_str("</body>\n</html>\n");
-    out
-}
-
-const STYLES: &str = r#"
-:root {
-  --bg: #ffffff;
-  --fg: #1f2328;
-  --muted: #57606a;
-  --border: #d0d7de;
-  --row-alt: #f6f8fa;
-  --risk-low: #16a34a;
-  --risk-acceptable: #ca8a04;
-  --risk-moderate: #ea580c;
-  --risk-high: #dc2626;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d1117;
-    --fg: #e6edf3;
-    --muted: #8b949e;
-    --border: #30363d;
-    --row-alt: #161b22;
-  }
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  color: var(--fg);
-  background: var(--bg);
-  line-height: 1.45;
-  padding: 1.5rem;
-  max-width: 1200px;
-  margin-inline: auto;
-}
-header h1 { margin: 0 0 0.25rem 0; font-size: 1.5rem; }
-header .threshold { color: var(--muted); font-size: 0.9rem; }
-.badge {
-  display: inline-block;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #fff;
-}
-.badge-pass { background: var(--risk-low); }
-.badge-fail { background: var(--risk-high); }
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.75rem;
-  margin: 1rem 0;
-}
-.stat {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.75rem;
-}
-.stat .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
-.stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 0.25rem; }
-.distribution {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.75rem 0 1.5rem 0;
-}
-.dist-pill {
-  padding: 0.3rem 0.7rem;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-.dist-low { background: var(--risk-low); }
-.dist-acceptable { background: var(--risk-acceptable); }
-.dist-moderate { background: var(--risk-moderate); }
-.dist-high { background: var(--risk-high); }
-details.file {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  margin-bottom: 0.75rem;
-  background: var(--bg);
-}
-details.file > summary {
-  cursor: pointer;
-  padding: 0.6rem 0.85rem;
-  font-weight: 500;
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  user-select: none;
-}
-details.file > summary::before {
-  content: "▶";
-  font-size: 0.7rem;
-  color: var(--muted);
-  transition: transform 0.15s ease;
-}
-details.file[open] > summary::before { transform: rotate(90deg); }
-details.file > summary .file-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-details.file > summary .file-meta { color: var(--muted); font-size: 0.85rem; margin-left: auto; }
-table.functions {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-table.functions th, table.functions td {
-  text-align: left;
-  padding: 0.45rem 0.65rem;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-table.functions th {
-  font-weight: 600;
-  color: var(--muted);
-  background: var(--row-alt);
-}
-table.functions td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
-table.functions td.fn-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.risk {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-.risk-low { background: var(--risk-low); }
-.risk-acceptable { background: var(--risk-acceptable); }
-.risk-moderate { background: var(--risk-moderate); }
-.risk-high { background: var(--risk-high); }
-.exceeds { color: var(--risk-high); font-weight: 600; }
-details.contributors {
-  margin-top: 0.4rem;
-  padding-left: 0.6rem;
-  border-left: 2px solid var(--border);
-}
-details.contributors > summary {
-  cursor: pointer;
-  font-size: 0.82rem;
-  color: var(--muted);
-  user-select: none;
-}
-details.contributors ul {
-  margin: 0.4rem 0 0.2rem 0;
-  padding-left: 1.2rem;
-  font-size: 0.82rem;
-}
-.empty { color: var(--muted); font-style: italic; }
-@media (max-width: 640px) {
-  body { padding: 1rem; }
-  table.functions th:nth-child(2),
-  table.functions td:nth-child(2) { display: none; }
-}
-"#;
-
-fn render_header(title: &str, threshold: f64) -> String {
-    let mut out = String::new();
-    out.push_str("<header>\n");
-    let _ = writeln!(out, "<h1>{}</h1>", escape_html(title));
-    let _ = writeln!(
-        out,
-        "<p class=\"threshold\">Threshold: <strong>{threshold:.2}</strong></p>"
+    let summary = &view.full.summary;
+    let title = format!(
+        "{} v{} — CRAP score analysis",
+        meta.tool_name, meta.tool_version
     );
-    out.push_str("</header>\n");
-    out
+
+    let metric_label = metric_label(effective_metric);
+
+    let (verdict_class, verdict_label, verdict_glyph) = if view.full.passed {
+        ("pass", "PASS", "✓")
+    } else {
+        ("fail", "FAIL", "✕")
+    };
+
+    let is_empty = visible_section_is_empty(view);
+    let summary_view = summary_view(summary, threshold);
+    let files = if is_empty {
+        Vec::new()
+    } else {
+        file_cards(view, threshold)
+    };
+    // Worst-offenders enumerates only over the rendered file set. Under
+    // `--group-by` truncation, the file cards may already be a proper
+    // subset of `view.shown`; including functions from omitted files
+    // here would expose data the file-list deliberately hid.
+    let worst_offenders = if is_empty {
+        Vec::new()
+    } else {
+        worst_offenders_top4_from_files(&files)
+    };
+    let exceeding_file_count = files.iter().filter(|f| f.exceeds_count > 0).count();
+    let high_file_count = files.iter().filter(|f| f.risk_data == 4).count();
+    let file_count = files.len();
+
+    let tmpl = HtmlReport {
+        title,
+        tool_name: meta.tool_name,
+        tool_version: meta.tool_version,
+        adapter_display: meta.display_name,
+        metric_label,
+        verdict_class,
+        verdict_label,
+        verdict_glyph,
+        is_empty,
+        summary: summary_view,
+        worst_offenders,
+        files,
+        file_count,
+        exceeding_file_count,
+        high_file_count,
+    };
+    tmpl.render()
+        .expect("html template render is total — all fields owned")
 }
 
-fn render_summary(summary: &AnalysisSummary, passed: bool) -> String {
-    let mut out = String::new();
-    out.push_str("<section class=\"summary\">\n");
-    let badge = if passed {
-        "<span class=\"badge badge-pass\">PASS</span>"
+#[derive(Template)]
+#[template(path = "html_report.html")]
+struct HtmlReport<'a> {
+    title: String,
+    tool_name: &'a str,
+    tool_version: &'a str,
+    adapter_display: &'a str,
+    metric_label: &'static str,
+    verdict_class: &'static str,
+    verdict_label: &'static str,
+    verdict_glyph: &'static str,
+    is_empty: bool,
+    summary: SummaryView,
+    worst_offenders: Vec<OffenderRow>,
+    files: Vec<FileCard>,
+    file_count: usize,
+    exceeding_file_count: usize,
+    high_file_count: usize,
+}
+
+struct SummaryView {
+    total_functions: usize,
+    total_files: usize,
+    exceeding_threshold: usize,
+    exceeding_pct: String,
+    has_max_crap: bool,
+    max_crap: String,
+    crap_avg: String,
+    crap_med: String,
+    cov_avg: String,
+    cov_avg_risk: u8,
+    cx_avg: String,
+    cx_med: String,
+    cx_max: String,
+    dist_low: usize,
+    dist_acceptable: usize,
+    dist_moderate: usize,
+    dist_high: usize,
+    threshold: String,
+}
+
+struct OffenderRow {
+    rank: usize,
+    fn_name: String,
+    file: String,
+    start_line: usize,
+    end_line: usize,
+    crap: String,
+    risk_data: u8,
+    risk_label: &'static str,
+}
+
+struct FileCard {
+    path: String,
+    risk_data: u8,
+    fn_count: usize,
+    exceeds_count: usize,
+    max_crap: String,
+    open: bool,
+    rows: Vec<FileFnRow>,
+}
+
+struct FileFnRow {
+    fn_name: String,
+    loc: usize,
+    start_line: usize,
+    end_line: usize,
+    cc: u32,
+    cc_risk: u8,
+    cc_bar_pct: u32,
+    cov: String,
+    cov_risk: u8,
+    crap: String,
+    risk_data: u8,
+    risk_label: &'static str,
+    exceeds: bool,
+    over_by: String,
+}
+
+fn summary_view(summary: &AnalysisSummary, threshold: f64) -> SummaryView {
+    let pct = if summary.total_functions == 0 {
+        "0.0".to_string()
     } else {
-        "<span class=\"badge badge-fail\">FAIL</span>"
+        format!(
+            "{:.1}",
+            (summary.exceeding_threshold as f64 / summary.total_functions as f64) * 100.0
+        )
     };
-    let _ = writeln!(out, "<h2>Summary {badge}</h2>");
-    out.push_str("<div class=\"summary-grid\">\n");
-    out.push_str(&stat("Functions", &summary.total_functions.to_string()));
-    out.push_str(&stat("Files", &summary.total_files.to_string()));
-    out.push_str(&stat(
-        "Exceeding threshold",
-        &summary.exceeding_threshold.to_string(),
-    ));
-    out.push_str(&stat(
-        "Average CRAP",
-        &format!("{:.2}", summary.average_crap),
-    ));
-    out.push_str(&stat("Median CRAP", &format!("{:.2}", summary.median_crap)));
     let max_crap = summary
         .max_crap
+        .as_ref()
         .map(|c| format!("{:.2}", c.value))
         .unwrap_or_else(|| "—".to_string());
-    out.push_str(&stat("Max CRAP", &max_crap));
-    out.push_str("</div>\n");
-    out.push_str(&render_distribution(&summary.distribution));
-    out.push_str("</section>\n");
-    out
-}
-
-fn stat(label: &str, value: &str) -> String {
-    format!(
-        "<div class=\"stat\"><div class=\"label\">{}</div><div class=\"value\">{}</div></div>\n",
-        escape_html(label),
-        escape_html(value)
-    )
-}
-
-fn render_distribution(dist: &RiskDistribution) -> String {
-    let mut out = String::new();
-    out.push_str("<div class=\"distribution\" aria-label=\"Risk distribution\">\n");
-    for (level, count, class) in [
-        (RiskLevel::Low, dist.low, "dist-low"),
-        (RiskLevel::Acceptable, dist.acceptable, "dist-acceptable"),
-        (RiskLevel::Moderate, dist.moderate, "dist-moderate"),
-        (RiskLevel::High, dist.high, "dist-high"),
-    ] {
-        let _ = writeln!(
-            out,
-            "<span class=\"dist-pill {class}\">{level}: {count}</span>"
-        );
+    SummaryView {
+        total_functions: summary.total_functions,
+        total_files: summary.total_files,
+        exceeding_threshold: summary.exceeding_threshold,
+        exceeding_pct: pct,
+        has_max_crap: summary.max_crap.is_some(),
+        max_crap,
+        crap_avg: format!("{:.2}", summary.average_crap),
+        crap_med: format!("{:.2}", summary.median_crap),
+        cov_avg: format!("{:.1}", summary.average_coverage),
+        cov_avg_risk: coverage_risk_bucket(summary.average_coverage),
+        cx_avg: format!("{:.1}", summary.average_complexity),
+        cx_med: format!("{:.1}", summary.median_complexity),
+        cx_max: format!("{}", summary.max_complexity),
+        dist_low: summary.distribution.low,
+        dist_acceptable: summary.distribution.acceptable,
+        dist_moderate: summary.distribution.moderate,
+        dist_high: summary.distribution.high,
+        threshold: format!("{:.2}", threshold),
     }
-    out.push_str("</div>\n");
-    out
 }
 
-fn render_files_section(view: &AnalysisView<'_>) -> String {
-    let mut out = String::new();
-    out.push_str("<section class=\"files\">\n<h2>Functions by file</h2>\n");
-    // When `--group-by file` is active, `view.grouped.files` carries the
-    // file-level sort/Top-N selection; respect that order and restrict
-    // the rendered file list to it. Otherwise fall back to the natural
-    // file partition over `view.shown`.
-    if let Some(grouped) = view.grouped.as_ref() {
-        let fns_by_file = group_by_file(&view.shown);
-        for file_summary in &grouped.files {
-            let fns: Vec<&FunctionVerdict> = fns_by_file
-                .get(file_summary.file_path.as_str())
-                .cloned()
-                .unwrap_or_default();
-            out.push_str(&render_file(&file_summary.file_path, &fns));
-        }
+fn worst_offenders_top4_from_files(files: &[FileCard]) -> Vec<OffenderRow> {
+    // Flatten rendered file rows, sort by CRAP descending, take 4.
+    // The file iteration order doesn't matter — we re-sort by CRAP.
+    struct FlatRow<'a> {
+        file: &'a str,
+        row: &'a FileFnRow,
+    }
+    let mut flat: Vec<FlatRow<'_>> = files
+        .iter()
+        .flat_map(|f| {
+            f.rows.iter().map(move |r| FlatRow {
+                file: &f.path,
+                row: r,
+            })
+        })
+        .collect();
+    flat.sort_by(|a, b| {
+        // Parse the formatted CRAP back to f64 for ordering. Cheaper than
+        // threading the raw float through FileFnRow just for this sort.
+        let av: f64 = a.row.crap.parse().unwrap_or(0.0);
+        let bv: f64 = b.row.crap.parse().unwrap_or(0.0);
+        bv.partial_cmp(&av).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    flat.into_iter()
+        .take(4)
+        .enumerate()
+        .map(|(i, fr)| OffenderRow {
+            rank: i + 1,
+            fn_name: fr.row.fn_name.clone(),
+            file: fr.file.to_string(),
+            start_line: fr.row.start_line,
+            end_line: fr.row.end_line,
+            crap: fr.row.crap.clone(),
+            risk_data: fr.row.risk_data,
+            risk_label: fr.row.risk_label,
+        })
+        .collect()
+}
+
+fn file_cards(view: &AnalysisView<'_>, threshold: f64) -> Vec<FileCard> {
+    let fns_by_file = group_by_file(&view.shown);
+
+    // Resolve file order: with grouping, honor the grouped order; else
+    // sort files by max-CRAP descending so the worst offenders surface
+    // at the top of the file list (matches the Sakura design).
+    let file_order: Vec<String> = if let Some(grouped) = view.grouped.as_ref() {
+        grouped.files.iter().map(|f| f.file_path.clone()).collect()
     } else {
-        for (file, fns) in &group_by_file(&view.shown) {
-            out.push_str(&render_file(file, fns));
-        }
-    }
-    out.push_str("</section>\n");
-    out
+        let mut paths: Vec<String> = fns_by_file.keys().map(|k| k.to_string()).collect();
+        paths.sort_by(|a, b| {
+            let ma = fns_by_file
+                .get(a.as_str())
+                .and_then(|v| {
+                    v.iter().map(|f| f.scored.crap.value).fold(None, |acc, x| {
+                        Some(match acc {
+                            Some(y) if y > x => y,
+                            _ => x,
+                        })
+                    })
+                })
+                .unwrap_or(f64::NEG_INFINITY);
+            let mb = fns_by_file
+                .get(b.as_str())
+                .and_then(|v| {
+                    v.iter().map(|f| f.scored.crap.value).fold(None, |acc, x| {
+                        Some(match acc {
+                            Some(y) if y > x => y,
+                            _ => x,
+                        })
+                    })
+                })
+                .unwrap_or(f64::NEG_INFINITY);
+            mb.partial_cmp(&ma).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        paths
+    };
+
+    file_order
+        .into_iter()
+        .filter_map(|file| {
+            let fns = fns_by_file.get(file.as_str())?.clone();
+            Some(build_file_card(file, &fns, threshold))
+        })
+        .collect()
 }
 
-/// True when there are no rows to render in the file section. Honors
-/// the shaped view: with grouping active, considers the post-truncate
-/// file list; otherwise considers the post-filter `shown` rows.
+fn build_file_card(file: String, fns: &[&FunctionVerdict], threshold: f64) -> FileCard {
+    let exceeds_count = fns.iter().filter(|f| f.exceeds).count();
+    let max_crap_value = fns
+        .iter()
+        .map(|f| f.scored.crap.value)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let max_crap = if max_crap_value.is_finite() {
+        format!("{:.2}", max_crap_value)
+    } else {
+        "—".to_string()
+    };
+    let card_risk = fns
+        .iter()
+        .map(|f| risk_data(f.scored.crap.risk_level))
+        .max()
+        .unwrap_or(1);
+    let open = exceeds_count > 0;
+
+    let rows: Vec<FileFnRow> = fns.iter().map(|v| file_fn_row(v, threshold)).collect();
+
+    FileCard {
+        path: file,
+        risk_data: card_risk,
+        fn_count: fns.len(),
+        exceeds_count,
+        max_crap,
+        open,
+        rows,
+    }
+}
+
+fn file_fn_row(v: &FunctionVerdict, threshold: f64) -> FileFnRow {
+    let span = &v.scored.identity.span;
+    let loc = span
+        .end_line
+        .saturating_sub(span.start_line)
+        .saturating_add(1);
+    let cov = v.scored.coverage_percent;
+    // Bar fill caps at 100% but the complexity number can exceed it; we
+    // scale by /20 so a CC of 20 renders as a full bar (matches the
+    // Sakura design's exemplar).
+    let cc_bar_pct = (v.scored.complexity * 5).min(100);
+    let over_by_val = (v.scored.crap.value - threshold).max(0.0);
+    FileFnRow {
+        fn_name: v.scored.identity.qualified_name.clone(),
+        loc,
+        start_line: span.start_line,
+        end_line: span.end_line,
+        cc: v.scored.complexity,
+        cc_risk: complexity_risk_bucket(v.scored.complexity),
+        cc_bar_pct,
+        cov: format!("{:.1}", cov),
+        cov_risk: coverage_risk_bucket(cov),
+        crap: format!("{:.2}", v.scored.crap.value),
+        risk_data: risk_data(v.scored.crap.risk_level),
+        risk_label: risk_label(v.scored.crap.risk_level),
+        exceeds: v.exceeds,
+        over_by: format!("{:.2}", over_by_val),
+    }
+}
+
+/// True when there are no rows to render. Mirrors the prior reporter's
+/// `visible_section_is_empty` semantics: honors grouping, otherwise
+/// considers the post-filter `shown` rows.
 fn visible_section_is_empty(view: &AnalysisView<'_>) -> bool {
     match view.grouped.as_ref() {
         Some(g) => g.files.is_empty(),
@@ -341,102 +396,16 @@ fn group_by_file<'a>(rows: &[&'a FunctionVerdict]) -> BTreeMap<&'a str, Vec<&'a 
     map
 }
 
-fn render_file(file: &str, fns: &[&FunctionVerdict]) -> String {
-    let exceeds_count = fns.iter().filter(|f| f.exceeds).count();
-    let max_crap = fns
-        .iter()
-        .map(|f| f.scored.crap.value)
-        .fold(f64::NEG_INFINITY, f64::max);
-    let max_crap_str = if max_crap.is_finite() {
-        format!("{max_crap:.2}")
-    } else {
-        "—".to_string()
-    };
-    let open_attr = if exceeds_count > 0 { " open" } else { "" };
-    let mut out = String::new();
-    let _ = write!(
-        out,
-        "<details class=\"file\"{open_attr}>\n<summary>\
-         <span class=\"file-path\">{}</span>\
-         <span class=\"file-meta\">{} fn · max CRAP {} · {} over</span>\
-         </summary>\n",
-        escape_html(file),
-        fns.len(),
-        max_crap_str,
-        exceeds_count
-    );
-    out.push_str("<table class=\"functions\">\n");
-    out.push_str(
-        "<thead><tr>\
-        <th>Function</th><th>Lines</th><th class=\"numeric\">CC</th>\
-        <th class=\"numeric\">Cov %</th><th class=\"numeric\">CRAP</th>\
-        <th>Risk</th></tr></thead>\n",
-    );
-    out.push_str("<tbody>\n");
-    for v in fns {
-        out.push_str(&render_function_row(v));
+fn risk_data(level: RiskLevel) -> u8 {
+    match level {
+        RiskLevel::Low => 1,
+        RiskLevel::Acceptable => 2,
+        RiskLevel::Moderate => 3,
+        RiskLevel::High => 4,
     }
-    out.push_str("</tbody>\n</table>\n</details>\n");
-    out
 }
 
-fn render_function_row(v: &FunctionVerdict) -> String {
-    let span = &v.scored.identity.span;
-    let crap_class = if v.exceeds { " exceeds" } else { "" };
-    let crap_cell = format!(
-        "<td class=\"numeric{crap_class}\">{:.2}</td>",
-        v.scored.crap.value
-    );
-    let mut out = String::new();
-    let _ = writeln!(
-        out,
-        "<tr>\
-         <td class=\"fn-name\">{name}</td>\
-         <td>{start}–{end}</td>\
-         <td class=\"numeric\">{cc}</td>\
-         <td class=\"numeric\">{cov:.1}</td>\
-         {crap}\
-         <td><span class=\"risk risk-{risk_class}\">{risk}</span></td>\
-         </tr>",
-        name = escape_html(&v.scored.identity.qualified_name),
-        start = span.start_line,
-        end = span.end_line,
-        cc = v.scored.complexity,
-        cov = v.scored.coverage_percent,
-        crap = crap_cell,
-        risk_class = risk_class_name(v.scored.crap.risk_level),
-        risk = v.scored.crap.risk_level,
-    );
-    if !v.scored.contributors.is_empty() {
-        out.push_str("<tr><td colspan=\"6\">\n");
-        out.push_str(&render_contributors(&v.scored.contributors));
-        out.push_str("</td></tr>\n");
-    }
-    out
-}
-
-fn render_contributors(contributors: &[ComplexityContributor]) -> String {
-    let mut out = String::new();
-    let _ = write!(
-        out,
-        "<details class=\"contributors\">\n<summary>{} contributors</summary>\n<ul>\n",
-        contributors.len()
-    );
-    for c in contributors {
-        let _ = writeln!(
-            out,
-            "<li>line {line}: <code>{kind}</code> (+{inc}, depth {depth})</li>",
-            line = c.line,
-            kind = escape_html(&c.kind.to_string()),
-            inc = c.increment,
-            depth = c.nesting_depth,
-        );
-    }
-    out.push_str("</ul>\n</details>\n");
-    out
-}
-
-fn risk_class_name(level: RiskLevel) -> &'static str {
+fn risk_label(level: RiskLevel) -> &'static str {
     match level {
         RiskLevel::Low => "low",
         RiskLevel::Acceptable => "acceptable",
@@ -445,84 +414,148 @@ fn risk_class_name(level: RiskLevel) -> &'static str {
     }
 }
 
-/// Minimal HTML escape for text nodes and attribute values.
-fn escape_html(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            _ => out.push(ch),
-        }
+fn coverage_risk_bucket(pct: f64) -> u8 {
+    // High coverage = low risk. Mirrors the design's color choices.
+    if pct >= 80.0 {
+        1
+    } else if pct >= 60.0 {
+        2
+    } else if pct >= 40.0 {
+        3
+    } else {
+        4
     }
-    out
+}
+
+fn complexity_risk_bucket(cc: u32) -> u8 {
+    // Loose mapping for the inline bar tint — same risk ladder as
+    // CRAP itself but coarser. CC 1–3 low, 4–6 acceptable, 7–10
+    // moderate, 11+ high.
+    match cc {
+        0..=3 => 1,
+        4..=6 => 2,
+        7..=10 => 3,
+        _ => 4,
+    }
+}
+
+fn metric_label(metric: ComplexityMetric) -> &'static str {
+    match metric {
+        ComplexityMetric::Cognitive => "cognitive",
+        ComplexityMetric::Cyclomatic => "cyclomatic",
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::{
-        TEST_TOOL_NAME, TEST_TOOL_VERSION, make_empty_result, make_multi_function_result,
-        make_single_function_result, make_view_default,
+        TEST_RULE_HELP_URI, TEST_TOOL_INFO_URI, TEST_TOOL_NAME, TEST_TOOL_VERSION,
+        make_empty_result, make_multi_function_result, make_single_function_result,
+        make_view_default,
     };
     use crate::domain::types::RiskLevel;
+
+    fn test_meta() -> AdapterMeta {
+        AdapterMeta {
+            tool_name: TEST_TOOL_NAME,
+            display_name: "Test",
+            tool_version: TEST_TOOL_VERSION,
+            long_version: TEST_TOOL_VERSION,
+            about: "test",
+            long_about: "test",
+            after_help: "",
+            coverage_hint: "test",
+            extensions: &["rs"],
+            tool_info_uri: TEST_TOOL_INFO_URI,
+            rule_help_uri: TEST_RULE_HELP_URI,
+            config_file_name: "test-adapter.toml",
+            default_excludes: &[],
+            forced_excludes: &[],
+            default_metric: ComplexityMetric::Cognitive,
+        }
+    }
+
+    fn html(view: &AnalysisView<'_>) -> String {
+        format_html(view, 8.0, &test_meta(), ComplexityMetric::Cognitive)
+    }
 
     #[test]
     fn empty_renders_doctype_and_empty_marker() {
         let result = make_empty_result();
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(html.starts_with("<!DOCTYPE html>"));
-        assert!(html.contains("No functions to display"));
-        assert!(html.ends_with("</html>\n"));
+        let out = html(&make_view_default(&result));
+        assert!(out.starts_with("<!doctype html>"));
+        assert!(out.contains("No functions to display"));
+        assert!(out.contains("</html>"));
     }
 
     #[test]
     fn self_contained_no_external_assets() {
         let result = make_multi_function_result();
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        // No <script>, no <link>, no external font/CDN URLs.
-        assert!(!html.contains("<script"), "html should ship no JS for v1");
-        assert!(!html.contains("<link"));
-        assert!(!html.contains("http://"));
-        assert!(!html.contains("https://"));
-        assert!(!html.contains("@import"));
+        let out = html(&make_view_default(&result));
+        // No `<script src=…>` (inline scripts are now permitted per
+        // the Sakura design handoff for theme/filter behavior).
+        assert!(
+            !out.contains("<script src"),
+            "html should ship no external scripts"
+        );
+        // No `<link …>` to any external stylesheet/font/asset.
+        assert!(
+            !out.contains("<link "),
+            "html should ship no <link> elements"
+        );
+        // No `@import` directives in any inline `<style>` block.
+        assert!(
+            !out.contains("@import"),
+            "html should ship no @import directives"
+        );
+        // No `src="http…"` or `href="http…"` attributes (the
+        // *fetched-asset* patterns). Bare `http://` substrings are
+        // allowed because XML namespace declarations like
+        // `<svg xmlns='http://www.w3.org/2000/svg'>` use the URL form
+        // by spec without triggering any network access — and Sakura's
+        // inline-SVG `data:` URI for the search icon contains one.
+        for fetched in [
+            "src=\"http://",
+            "src=\"https://",
+            "href=\"http://",
+            "href=\"https://",
+        ] {
+            assert!(
+                !out.contains(fetched),
+                "html should ship no externally-fetched assets, found `{fetched}`"
+            );
+        }
     }
 
     #[test]
     fn passes_when_no_violations() {
         let result =
             make_single_function_result("ok", "src/lib.rs", 1, 100.0, 1.0, RiskLevel::Low, 8.0);
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(html.contains("badge badge-pass\">PASS"));
-        assert!(!html.contains("badge badge-fail\">FAIL"));
+        let out = html(&make_view_default(&result));
+        assert!(out.contains("verdict is-pass"));
+        assert!(!out.contains("verdict is-fail"));
     }
 
     #[test]
     fn fails_when_threshold_exceeded() {
         let result =
             make_single_function_result("bad", "src/lib.rs", 20, 10.0, 45.0, RiskLevel::High, 8.0);
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(html.contains("badge badge-fail\">FAIL"));
-        assert!(html.contains("risk risk-high"));
-        // Exceeding functions show the file pre-expanded.
-        assert!(html.contains("<details class=\"file\" open>"));
+        let out = html(&make_view_default(&result));
+        assert!(out.contains("verdict is-fail"));
+        // The failing row carries the high risk-pill via data-risk=4.
+        assert!(out.contains("data-risk=\"4\""));
+        // Exceeding files render pre-expanded.
+        assert!(out.contains("severity-card file-card") && out.contains(" open>"));
     }
 
     #[test]
-    fn risk_levels_render_distinct_classes() {
+    fn risk_levels_render_distinct_data_attrs() {
         let result = make_multi_function_result();
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(html.contains("risk-low"));
-        assert!(html.contains("risk-moderate"));
-        assert!(html.contains("risk-high"));
+        let out = html(&make_view_default(&result));
+        assert!(out.contains("data-risk=\"1\""));
+        assert!(out.contains("data-risk=\"3\""));
+        assert!(out.contains("data-risk=\"4\""));
     }
 
     #[test]
@@ -536,10 +569,9 @@ mod tests {
             RiskLevel::Low,
             8.0,
         );
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(!html.contains("<script>alert"));
-        assert!(html.contains("&lt;script&gt;"));
+        let out = html(&make_view_default(&result));
+        assert!(!out.contains("<script>alert"));
+        assert!(out.contains("&#60;script&#62;") || out.contains("&lt;script&gt;"));
     }
 
     #[test]
@@ -553,50 +585,42 @@ mod tests {
             RiskLevel::Low,
             8.0,
         );
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(!html.contains("<dangerous>"));
-        assert!(html.contains("&lt;dangerous&gt;"));
+        let out = html(&make_view_default(&result));
+        assert!(!out.contains("src/<dangerous>"));
+        assert!(out.contains("&#60;dangerous&#62;") || out.contains("&lt;dangerous&gt;"));
     }
 
     #[test]
     fn groups_functions_by_file() {
         let result = make_multi_function_result();
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        // Three distinct files in the fixture.
-        assert_eq!(html.matches("<details class=\"file\"").count(), 3);
+        let out = html(&make_view_default(&result));
+        // Three distinct files in the fixture → three file cards.
+        assert_eq!(out.matches("class=\"severity-card file-card\"").count(), 3);
     }
 
     #[test]
     fn risk_distribution_shows_all_buckets() {
         let result = make_multi_function_result();
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(html.contains("dist-low"));
-        assert!(html.contains("dist-acceptable"));
-        assert!(html.contains("dist-moderate"));
-        assert!(html.contains("dist-high"));
+        let out = html(&make_view_default(&result));
+        for risk in [1u8, 2, 3, 4] {
+            let needle = format!("dist-seg\" data-risk=\"{risk}\"");
+            assert!(out.contains(&needle), "missing dist-seg for risk {risk}");
+        }
     }
 
     #[test]
     fn doctype_present_and_lang_set() {
         let result = make_empty_result();
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(html.contains("<!DOCTYPE html>"));
-        assert!(html.contains("<html lang=\"en\">"));
-        assert!(html.contains("viewport"));
+        let out = html(&make_view_default(&result));
+        assert!(out.contains("<!doctype html>"));
+        assert!(out.contains("<html lang=\"en\">"));
+        assert!(out.contains("viewport"));
     }
 
     #[test]
     fn empty_after_filter_renders_empty_marker() {
-        // The fixture has functions in `full`, but a filter that strips
-        // every function from `shown` should produce the empty section
-        // — not a stale "Functions by file" header with no contents.
         use crate::domain::view::{self, CoverageRange, Filters, ViewSpec};
         let result = make_multi_function_result();
-        // Fixture coverage maxes out at 95% — a 99–100% band drops all.
         let spec = ViewSpec {
             filters: Filters {
                 coverage_range: Some(CoverageRange::new(99.0, 100.0).unwrap()),
@@ -605,21 +629,14 @@ mod tests {
             ..ViewSpec::default()
         };
         let view = view::apply(&result, spec);
-        assert!(
-            view.shown.is_empty(),
-            "fixture pre-condition: shown should be empty under this filter"
-        );
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        assert!(html.contains("No functions to display"));
-        assert!(!html.contains("Functions by file"));
+        assert!(view.shown.is_empty());
+        let out = html(&view);
+        assert!(out.contains("No functions to display"));
+        assert!(!out.contains("Functions by file"));
     }
 
     #[test]
     fn grouped_view_honors_file_top_n_and_order() {
-        // Under `--group-by file --top 1`, only the worst file should
-        // appear in the rendered output. The fixture's worst file
-        // (highest CRAP) is `src/domain/crap.rs` (complex_fn @ 45.2);
-        // the other two should be omitted.
         use crate::domain::view::{self, GroupKey, SortKey, ViewSpec};
         let result = make_multi_function_result();
         let spec = ViewSpec {
@@ -630,39 +647,65 @@ mod tests {
         };
         let view = view::apply(&result, spec);
         assert!(view.grouped.is_some());
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
+        let out = html(&view);
         assert_eq!(
-            html.matches("<details class=\"file\"").count(),
+            out.matches("class=\"severity-card file-card\"").count(),
             1,
             "only the top-1 file should be rendered when grouped"
         );
-        assert!(html.contains("src/domain/crap.rs"));
-        assert!(!html.contains("src/lib.rs"));
-        assert!(!html.contains("src/adapters/coverage/mod.rs"));
+        assert!(out.contains("src/domain/crap.rs"));
+        assert!(!out.contains("src/lib.rs"));
+        assert!(!out.contains("src/adapters/coverage/mod.rs"));
     }
 
-    /// Byte-level snapshot lock for the HTML reporter.
-    ///
-    /// Complements the existing structural asserts (`PASS`/`FAIL`
-    /// badge, risk-class strings, self-contained markup) with a
-    /// full-document anchor so future format edits are reviewable
-    /// rather than silent. Mirrors the per-reporter pattern from
-    /// `json`, `markdown`, `sarif`, `csv`, `table`.
-    ///
-    /// Uses `make_multi_function_result` (3 functions spanning
-    /// Low/Moderate/High risk + a failing summary) and the default
-    /// view spec — the same fixture every other reporter snapshot
-    /// pins so cross-reporter diffs stay readable.
-    ///
-    /// Tool version pinned to "0.4.0" to match the surrounding
-    /// suite; the value is interpolated into the document header so
-    /// any unpinned ad-hoc version would churn the snapshot on every
-    /// crate-version bump.
+    #[test]
+    fn per_adapter_footer_renders_metric_and_threshold() {
+        let result = make_multi_function_result();
+        let out = format_html(
+            &make_view_default(&result),
+            8.0,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+        );
+        assert!(out.contains("footer-adapters"));
+        assert!(
+            out.contains(">Test<"),
+            "display_name should appear in footer"
+        );
+        assert!(
+            out.contains("cognitive complexity"),
+            "footer should show effective metric"
+        );
+        assert!(out.contains("8.00"), "footer should show threshold");
+    }
+
+    #[test]
+    fn footer_reflects_cyclomatic_when_effective_metric_is_cyclomatic() {
+        let result = make_multi_function_result();
+        let out = format_html(
+            &make_view_default(&result),
+            10.0,
+            &test_meta(),
+            ComplexityMetric::Cyclomatic,
+        );
+        assert!(out.contains("cyclomatic complexity"));
+        assert!(out.contains("10.00"));
+    }
+
+    #[test]
+    fn dark_mode_toggle_present() {
+        let result = make_multi_function_result();
+        let out = html(&make_view_default(&result));
+        assert!(out.contains("id=\"theme-toggle\""));
+        assert!(out.contains("data-theme"));
+    }
+
+    /// Byte-level snapshot lock for the HTML reporter under the
+    /// Sakura design (crap-rs#260).
     #[test]
     fn full_html_snapshot() {
         let result = make_multi_function_result();
-        let view = make_view_default(&result);
-        let html = format_html(&view, 8.0, TEST_TOOL_NAME, TEST_TOOL_VERSION);
-        insta::assert_snapshot!(html);
+        let out = html(&make_view_default(&result));
+        insta::assert_snapshot!(out);
     }
 }

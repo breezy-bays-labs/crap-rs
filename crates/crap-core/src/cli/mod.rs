@@ -670,6 +670,14 @@ pub struct AdapterMeta {
     /// clap's `--version` output, the `name` field in SARIF, and the
     /// header line in table/markdown/html reporters.
     pub tool_name: &'static str,
+    /// Human-readable adapter label (e.g., `"Rust"`, `"TypeScript"`).
+    /// Surfaced in the HTML reporter's per-adapter footer row so end
+    /// users read "Rust · cognitive complexity" instead of the binary
+    /// name. Production binaries supply the language name; tests use
+    /// a synthetic label. Distinct from `tool_name` because the
+    /// binary's package name is the wrong granularity for the
+    /// adapter-provenance footer.
+    pub display_name: &'static str,
     /// Short version string (e.g., `"0.5.0"`). Threaded to every
     /// reporter alongside `tool_name`.
     pub tool_version: &'static str,
@@ -768,6 +776,10 @@ impl AdapterMeta {
         debug_assert!(
             !self.tool_name.is_empty(),
             "AdapterMeta.tool_name must not be empty"
+        );
+        debug_assert!(
+            !self.display_name.is_empty(),
+            "AdapterMeta.display_name must not be empty"
         );
         debug_assert!(
             !self.tool_version.is_empty(),
@@ -1345,8 +1357,8 @@ fn render_format<P: ParseDiagnostic>(
             cli.display.explain,
             cli.display.md_full_table,
             cli.display.md_top,
-            meta.tool_name,
-            meta.tool_version,
+            meta,
+            inputs.metric,
         ),
         FormatArg::Csv => reporters::format_csv(view, delta_view, inputs.metric),
         // SARIF is a gate translation, not a display: it iterates
@@ -1364,9 +1376,7 @@ fn render_format<P: ParseDiagnostic>(
         FormatArg::ScorecardRow => {
             format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
         }
-        FormatArg::Html => {
-            reporters::format_html(view, inputs.threshold, meta.tool_name, meta.tool_version)
-        }
+        FormatArg::Html => reporters::format_html(view, inputs.threshold, meta, inputs.metric),
         // GitHub Actions annotations is a gate translation like SARIF —
         // iterates `view.full.functions` regardless of View shaping so
         // PR annotations reflect the gate, not a presentation choice.
@@ -2965,6 +2975,7 @@ mod tests {
     fn fake_meta() -> AdapterMeta {
         AdapterMeta {
             tool_name: "fake-adapter",
+            display_name: "Fake",
             tool_version: "9.9.9",
             long_version: "9.9.9 (test 2099-01-01)",
             about: "Fake adapter for tests",

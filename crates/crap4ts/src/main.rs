@@ -43,6 +43,11 @@ const COVERAGE_HINT: &str = "ensure tests ran with coverage enabled (e.g. `c8 --
 fn main() -> ExitCode {
     let meta = AdapterMeta {
         tool_name: env!("CARGO_PKG_NAME"),
+        // Language-facing label for the HTML reporter's per-adapter
+        // footer row ("TypeScript · cyclomatic complexity · line
+        // coverage · …"). Distinct from `tool_name` — end users
+        // identify rows by language, not by package name.
+        display_name: "TypeScript",
         tool_version: env!("CARGO_PKG_VERSION"),
         long_version: env!("CRAP4TS_LONG_VERSION"),
         about: ABOUT,

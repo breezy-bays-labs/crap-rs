@@ -1,0 +1,223 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Sakura Reports — colors and type
+   The token layer for CLI-tool HTML reports.
+
+   Sakura.css 1.5.0 is the baseline. These tokens override Sakura's
+   prose-reader defaults to land at a dashboard density without taking
+   on a full design system.
+
+   Light + dark values are both defined. The dark block applies when
+   the document carries `data-theme="dark"` on the root element. Tools
+   that don't want a theme toggle can omit the dark stylesheet entirely
+   and ship light-only.
+   ───────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Type ──────────────────────────────────────────────────────────── */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-body:     0.8125rem;  /* 13px — body. Headers scale above this.       */
+  --fs-h1:       2em;        /* 26px — page title                            */
+  --fs-h2:       1.5em;      /* 19.5px — page-level section heading          */
+  --fs-h3:       1.25em;     /* 16.25px — in-panel title                     */
+  --fs-h4:       1.1em;      /* ~14.3px — table title                        */
+  --fs-label:    0.78em;     /* uppercase section labels */
+  --fs-small:    0.85em;     /* captions, hints */
+  --fs-th:       0.6875rem;  /* table column headers */
+  --fs-td:       0.75rem;    /* table cells */
+  --fs-code:     0.8125rem;  /* compiled SQL blocks */
+
+  --tracking-label: 0.06em;
+  --tracking-th:    0.04em;
+  --line-height-body: 1.5;
+  --line-height-tight: 1.25;
+
+  /* ── Semantic neutrals ─────────────────────────────────────────────── */
+  --bg:            #ffffff;
+  --bg-elevated:   #f1f1f1;    /* callouts, code blocks */
+  --text:          #4a4a4a;
+  --text-muted:    #6a6a72;
+  --border:        #c4c4c4;
+  --hairline:      #e1e1e1;
+
+  --accent:        #1d7484;    /* Sakura teal — links, callout border */
+  --accent-hover:  #982c61;    /* Sakura magenta — link:hover */
+
+  /* ── Status ────────────────────────────────────────────────────────── */
+  --danger:        #b3261e;
+  --danger-bg:     #fdecea;
+  --success:       #006d3a;
+  --success-bg:    #e1eedb;
+
+  /* ── Selection (DAG nodes, etc.) ───────────────────────────────────── */
+  --selected:      #E91E63;    /* hot pink — reserved for selection only */
+
+  /* ── Risk band ladder (ordinal severity) ───────────────────────────────
+     A four-step ordinal scale for CI / static-analysis tools that classify
+     items into severity bands. Distinct from the edge vocabulary below:
+     edges are *categorical* (LEFT JOIN ≠ INNER JOIN, no ordering); risk
+     bands are *ordinal* (1 < 2 < 3 < 4).
+
+     Token names are intentionally abstract (`--risk-1` … `--risk-4`) so
+     each tool can label them in its own vocabulary
+     (low/acceptable/moderate/high, ok/notice/warn/error, etc.).
+
+     Each band has three values:
+       --risk-N        primary color (used on stripe / pill bg / bar fill)
+       --risk-N-on     darkened tone for text on the tint
+       --risk-N-tint   pale background for tinted rows / chip fills          */
+  --risk-1:        #2c6a37;   /* green   — lowest / safest                  */
+  --risk-1-on:     #1f4d27;
+  --risk-1-tint:   #e4efe5;
+  --risk-2:        #2e5c8a;   /* blue    — minor / informational            */
+  --risk-2-on:     #21426a;
+  --risk-2-tint:   #e1eaf3;
+  --risk-3:        #a06320;   /* amber   — caution                          */
+  --risk-3-on:     #7a4a18;
+  --risk-3-tint:   #f5e9d7;
+  --risk-4:        #b3261e;   /* red     — highest / critical (=--danger)   */
+  --risk-4-on:     #8a1e17;
+  --risk-4-tint:   #fdecea;
+
+  /* Verdict colors map to the risk ladder. Don't introduce new hues here;
+     the point is that PASS = the same green as the lowest risk band. */
+  --verdict-pass:  var(--risk-1);
+  --verdict-warn:  var(--risk-3);
+  --verdict-fail:  var(--risk-4);
+
+  /* ── Categorical legend palette ────────────────────────────────────────
+     Seven-step *categorical* palette for chart series, diagram nodes /
+     edges, tag colors, status legends — any place where N items need
+     distinct, side-by-side colors with no implied ordering.
+
+     Distinct from the risk ladder above: legend colors are categorical
+     (legend-3 ≠ "higher than" legend-2), the ladder is ordinal. Use the
+     right one for the job.
+
+     Colorblind-safe, derived from the Okabe-Ito palette. `--legend-1` is
+     a dark anchor so it stays readable for "default" / "structural" /
+     "no category" series; the dark-mode override flips it to light for
+     the same purpose. Line-style variation (dashed, dotted) is
+     orthogonal — see `.line.is-dashed` / `.legend-edge.is-dashed`. */
+  --legend-1:    #1c1c1f;   /* near-black — structural / anchor             */
+  --legend-2:    #009E73;   /* green                                        */
+  --legend-3:    #0072B2;   /* blue                                         */
+  --legend-4:    #56B4E9;   /* light blue                                   */
+  --legend-5:    #CC79A7;   /* pink                                         */
+  --legend-6:    #982c61;   /* magenta                                      */
+  --legend-7:    #E69F00;   /* orange                                       */
+
+  /* ── SQL syntax highlighting ───────────────────────────────────────── */
+  --sql-keyword: #1d7484;
+  --sql-string:  #006d3a;
+  --sql-comment: #6a6a72;
+  --sql-jinja:   #982c61;
+
+  /* ── Spacing ───────────────────────────────────────────────────────── */
+  --page-max-width: min(120rem, 100% - 4rem);
+  --section-gap:    1rem;
+  --panel-pad:      1rem;
+  --table-cell-pad: 0.2rem 0.5rem;
+  --radius-sm:      4px;
+  --radius-md:      6px;
+  --radius-lg:      8px;
+}
+
+html[data-theme="dark"] {
+  --bg:            #0e0e10;
+  --bg-elevated:   #17171a;
+  --text:          #e7e7e7;
+  --text-muted:    #9a9aa0;
+  --border:        #2c2c30;
+  --hairline:      #1f1f22;
+
+  --accent:        #4ea3df;
+  --accent-hover:  #ff7eb1;
+
+  --danger:        #ff6b63;
+  --danger-bg:     #2a1311;
+
+  --selected:      #ff5fa2;
+
+  --legend-1:    #e7e7e7;   /* anchor flips light for dark backgrounds */
+  --sql-keyword: #4ea3df;
+  --sql-string:  #6fc69a;
+  --sql-jinja:   #E69F00;
+
+  /* Risk ladder — lifted in lightness for dark backgrounds, but the
+     hue family stays the same so semantics carry over. */
+  --risk-1:        #4f9a5d;
+  --risk-1-on:     #8fcf99;
+  --risk-1-tint:   #1a2e1f;
+  --risk-2:        #5e8fc2;
+  --risk-2-on:     #a3c1e0;
+  --risk-2-tint:   #182333;
+  --risk-3:        #d18f3a;
+  --risk-3-on:     #ecbf80;
+  --risk-3-tint:   #2e2516;
+  --risk-4:        #ff6b63;   /* matches dark --danger */
+  --risk-4-on:     #ff9d97;
+  --risk-4-tint:   #2a1311;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────── */
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+body {
+  font-size: var(--fs-body);
+  line-height: var(--line-height-body);
+  max-width: var(--page-max-width);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  font-weight: 600;
+}
+h1 { font-size: var(--fs-h1); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+h4 { font-size: var(--fs-h4); }
+
+p { margin-bottom: 0.875rem; }
+
+a, a:visited { color: var(--accent); }
+a:hover      { color: var(--accent-hover); }
+
+code, pre, kbd { font-family: var(--font-mono); }
+code, kbd {
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-sm);
+}
+pre code { background: transparent; padding: 0; }
+
+::selection { background: var(--accent); color: #fff; }
+
+/* ── Section labels (panel headers, etc.) ────────────────────────────── */
+.section-label,
+.panel-header h2,
+.cte-dag-header h2 {
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-muted);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ── Muted text ──────────────────────────────────────────────────────── */
+.muted { color: var(--text-muted); }

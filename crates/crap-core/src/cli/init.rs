@@ -277,6 +277,7 @@ mod tests {
     fn fake_meta() -> AdapterMeta {
         AdapterMeta {
             tool_name: "fake-adapter",
+            display_name: "Fake",
             tool_version: "0.5.0",
             long_version: "0.5.0",
             about: "test",
