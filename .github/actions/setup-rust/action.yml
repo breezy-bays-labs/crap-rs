@@ -20,6 +20,16 @@ inputs:
       Defaults to "true" (rust-cache's own default).
     required: false
     default: "true"
+  enable-cache:
+    description: >-
+      When "false", skip the Swatinem/rust-cache step entirely. Tag-triggered
+      workflows (publish.yml, release.yml) set this to "false" to close the
+      cache-poisoning audit — they should neither READ caches that may have
+      been poisoned by a malicious tag push nor SAVE caches keyed to a tag.
+      Defaults to "true" so PR + main-branch CI keeps using the cache.
+      See https://docs.zizmor.sh/audits/#cache-poisoning.
+    required: false
+    default: "true"
   targets:
     description: >-
       Comma-separated rustup target triples to add, passed through to
@@ -43,12 +53,11 @@ runs:
       # rustup and reuses it.
       if: runner.os == 'macOS'
       shell: bash
-      # tracked: crap-rs#264 — `echo $HOME/.cargo/bin >> $GITHUB_PATH`
-      # below is intentional and bounded to a hardcoded path under
-      # $HOME, recovering the macOS rustup reinstall; not an
-      # untrusted-input injection vector. Inline `# zizmor: ignore`
-      # on the offending span follows the format documented at
-      # https://docs.zizmor.sh/usage/#ignoring-results.
+      # `echo $HOME/.cargo/bin >> $GITHUB_PATH` below is intentional and
+      # bounded to a hardcoded path under $HOME, recovering the macOS rustup
+      # reinstall; not an untrusted-input injection vector. Inline
+      # `# zizmor: ignore[github-env]` on the offending span follows the
+      # format documented at https://docs.zizmor.sh/usage/#ignoring-results.
       run: | # zizmor: ignore[github-env]
         set -euo pipefail
         brew uninstall --ignore-dependencies --force rustup 2>/dev/null || true
@@ -68,6 +77,12 @@ runs:
         targets: ${{ inputs.targets }}
 
     - name: Cache cargo registry + target
+      # `enable-cache: false` skips this step entirely. Tag-triggered
+      # workflows (publish.yml, release.yml) pass that to close the
+      # `cache-poisoning` zizmor audit — a release run must neither
+      # restore a poisoned cache nor save a tag-keyed cache. See
+      # https://docs.zizmor.sh/audits/#cache-poisoning.
+      if: inputs.enable-cache != 'false'
       uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       with:
         shared-key: ${{ inputs.shared-key }}
