@@ -432,7 +432,17 @@ jobs:
         with:
           coverage: lcov.info
           src: crates/crap4rs/src
-          threshold: '15'
+          # Strict cutoff (matches `--strict` for the cognitive metric,
+          # see #218 for the calibration). Default threshold 15 turns
+          # up zero findings on the current codebase, which leaves the
+          # annotations dogfood with nothing to render. Strict surfaces
+          # the genuinely-worst routines so a regression in the
+          # github-annotations reporter (envelope shape, escape codec,
+          # truncation notice) is detectable on the PR itself. Tracking
+          # cleanup of the offending functions in
+          # https://github.com/breezy-bays-labs/crap-rs/issues/289 so
+          # this can eventually flip to `analysis-gate: 'true'`.
+          threshold: '8'
           comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
           comment-header: 'crap-scorecard-self'
           # End-to-end smoke for the github-annotations reporter — the
