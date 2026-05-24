@@ -249,9 +249,13 @@ fn assert_value_shape(row: &Value, adapter: &str) {
         "{adapter}: threshold must be a non-negative integer, got {:?}",
         obj.get("threshold")
     );
+    // `delta_count` is signed in the domain (`i32` on
+    // `CrapDeltaRowData`): `current_count - baseline_count`, which can
+    // be negative when violations decrease vs the baseline. Validate
+    // as a signed integer.
     assert!(
-        obj.get("delta_count").and_then(Value::as_u64).is_some(),
-        "{adapter}: delta_count must be a non-negative integer, got {:?}",
+        obj.get("delta_count").and_then(Value::as_i64).is_some(),
+        "{adapter}: delta_count must be a signed integer, got {:?}",
         obj.get("delta_count")
     );
     assert!(
