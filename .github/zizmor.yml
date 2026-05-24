@@ -1,0 +1,67 @@
+# zizmor configuration for the crap-rs workspace.
+#
+# The CI gate (`pipx run 'zizmor>=1.5,<2' .github/`) runs the full
+# audit set, but a handful of audits are scope-deferred to a tracked
+# follow-up. Each entry below names the audit, the reason for the
+# scope deferral, and the issue that owns the cleanup — mirroring the
+# accountability pattern in `~/.claude/rules/exclusions.md` ("every
+# exclusion needs a `tracked:` reference").
+#
+# Composite action findings cannot be suppressed here — zizmor.yml
+# accepts workflow base filenames only. Composite actions use inline
+# `# zizmor: ignore[<audit>]` comments instead; see
+# `.github/actions/*/action.yml` for the inline tracked-to-#264
+# annotations.
+#
+# When the follow-up lands, the corresponding rule block is removed
+# (or downgraded back to default) and the audit fires unconditionally.
+#
+# https://docs.zizmor.sh/configuration/
+
+rules:
+  # tracked: crap-rs#264 — workflow-wide `persist-credentials: false`
+  # sweep is scope-deferred from #233 (SHA-pin sweep). `publish.yml`
+  # already ships hardened; `ci.yml` + `release.yml` still inherit
+  # the default. The audit re-enables when #264 lands.
+  artipacked:
+    ignore:
+      - ci.yml
+      - release.yml
+
+  # tracked: crap-rs#264 — scoped per-job `permissions:` blocks are
+  # the other half of the #264 workflow-hardening sweep. The
+  # `mutants-skip-lint` job in `ci.yml` ships with `contents: read`
+  # as the pattern to mirror; remaining jobs inherit defaults until
+  # the sweep lands.
+  excessive-permissions:
+    ignore:
+      - ci.yml
+      - release.yml
+
+  # tracked: crap-rs#264 — cache-poisoning findings on the release
+  # workflows (publish.yml's setup-node + release.yml's rust-cache)
+  # need a per-step audit of cache key uniqueness vs. release-tag
+  # provenance. Scope-deferred from #233 (SHA-pin sweep). The PR
+  # workflows (ci.yml) are unaffected — only `push: tags` workflows
+  # surface this audit.
+  cache-poisoning:
+    ignore:
+      - publish.yml
+      - release.yml
+
+  # tracked: crap-rs#264 — informational suggestion to migrate
+  # `cargo publish` to crates.io OIDC trusted publishing once it's
+  # GA (npm OIDC is already wired in publish.yml). Crates.io trusted
+  # publishing landed in early 2026 and is being adopted gradually;
+  # the migration is a deliberate follow-up.
+  use-trusted-publishing:
+    ignore:
+      - release.yml
+
+  # tracked: crap-rs#264 — informational suggestion to replace
+  # `softprops/action-gh-release` with a `gh release create` script
+  # step (one less third-party action to keep SHA-pinned). Migration
+  # is a per-step rewrite; scope-deferred from #233.
+  superfluous-actions:
+    ignore:
+      - release.yml

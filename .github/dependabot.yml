@@ -1,0 +1,62 @@
+# Dependabot configuration for the crap-rs workspace.
+#
+# Keeps the SHA-pinned `uses:` references in `.github/workflows/*.yml`
+# and `.github/actions/*/action.yml` fresh: each weekly run opens a PR
+# per outdated action, bumping the pinned SHA to the latest matching
+# tagged release (or default-branch HEAD, for actions without tags).
+# Without this, the pins decay silently and the CI gate's only value
+# becomes "things don't change" rather than "things stay current AND
+# pinned".
+#
+# Coverage caveat: Dependabot's github-actions ecosystem tracks
+# tagged releases + default-branch HEADs only — it does NOT track
+# HEAD advances on non-default branches like
+# `dtolnay/rust-toolchain@stable`. Those pins need manual quarterly
+# refresh; see AGENTS.md "Supply-chain hygiene" rule 2.
+#
+# zizmor (the CI workflow auditor in `ci.yml`) is invoked via
+# `pipx run 'zizmor>=1.5,<2'` rather than tracked through any
+# Dependabot ecosystem — bumping its version spec is a manual edit
+# of `.github/workflows/ci.yml`, opened when zizmor's release notes
+# warrant the upgrade.
+#
+# Companion convention: AGENTS.md → "Supply-chain hygiene".
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    # Cooldown delays a Dependabot bump for N days after the upstream
+    # release lands, giving the community time to surface a bad
+    # release before our automation pulls it. The `github-actions`
+    # ecosystem only supports the flat `default-days` knob
+    # (semver-major/minor/patch granularity is reserved for
+    # ecosystems with semver semantics like npm/cargo/pip).
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "type:chore"
+      - "priority:soon"
+    groups:
+      # Group all GitHub Actions bumps into one weekly PR so reviewers
+      # see the full supply-chain delta at once instead of one PR per
+      # action. Excludes major-version bumps — those land as separate
+      # PRs that need human review (breaking-change semantics).
+      # `patterns: ["*"]` is the explicit selector (Dependabot groups
+      # require at least one of `patterns`, `exclude-patterns`, or
+      # `dependency-type`); `update-types` then narrows the scope.
+      github-actions:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
