@@ -1,0 +1,429 @@
+name: release-plz
+
+# Drives crates.io publishing via release-plz + OIDC trusted publishing
+# for the 3-crate workspace (crap-core / crap4rs / crap4ts). Replaces
+# the prior `release.yml` (tag-triggered binary build) and `publish.yml`
+# (tag-triggered npm publish for crap4ts) with a single push-to-main
+# trigger: release-plz opens a release PR, the PR carries the
+# version bumps + changelog updates, and merge drives publication.
+#
+# Job graph:
+#   push:main → release-plz-pr           (opens/updates release PR)
+#             → release-plz-release      (publishes + creates per-crate tags)
+#                  ├─ build-crap4ts-cdylib → publish-crap4ts-npm   (if crap4ts published)
+#                  └─ build-crap4rs-binaries → upload-crap4rs-assets (if crap4rs published)
+#
+# The cdylib build matrix and npm publish job port verbatim from the
+# retired publish.yml; the binary build matrix ports verbatim from
+# the retired release.yml. Gating on `needs.release-plz-release.outputs`
+# replaces the tag-trigger filtering those workflows used.
+#
+# Companion files:
+#   release-plz.toml — multi-crate release-plz config
+#   crates/crap4rs/Cargo.toml [package.metadata.binstall] pkg-url —
+#     references the same `crap4rs-v{version}` tag shape this workflow
+#     creates via release-plz.
+
+on:
+  push:
+    branches: [main]
+
+# Least-privilege default; per-job permissions elevate as needed.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release-plz-pr:
+    name: Open/update release PR
+    runs-on: ubuntu-latest
+    concurrency:
+      # Serialize release-PR opens so two concurrent push events don't
+      # race to create two competing release PRs against the same ref.
+      group: release-plz-pr-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # `persist-credentials: false` — release-plz authenticates with
+      # the GH App / GITHUB_TOKEN directly; the checkout token is not
+      # consumed by subsequent steps and must not linger in the runner.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # `enable-cache: false` — release-plz reaches into crates.io
+      # for version data and writes back to git via release-plz/action;
+      # neither restoring nor saving caches keeps this workflow on the
+      # same cache-poisoning posture as the (former) tag-triggered
+      # release/publish workflows. See https://docs.zizmor.sh/audits/#cache-poisoning.
+      - uses: ./.github/actions/setup-rust
+        with:
+          enable-cache: "false"
+
+      - uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
+        with:
+          command: release-pr
+
+  release-plz-release:
+    name: Publish + tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # for git tag pushes + downstream gh release create
+      id-token: write       # for crates.io OIDC trusted publishing
+      pull-requests: read   # to read the merged release PR via release-plz outputs
+    outputs:
+      releases: ${{ steps.release-plz.outputs.releases }}
+      releases_created: ${{ steps.release-plz.outputs.releases_created }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          enable-cache: "false"
+
+      - id: release-plz
+        uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
+        with:
+          command: release
+          # CARGO_REGISTRY_TOKEN is intentionally absent: with
+          # `id-token: write` granted above, release-plz mints a
+          # short-lived OIDC token that crates.io verifies against
+          # the trusted-publisher binding configured out-of-band on
+          # crates.io's "Trusted Publishers" settings for each crate.
+          # The first auto-opened release PR can be inspected and
+          # `dry_run: true` toggled via a `RELEASE_PLZ_DRY_RUN` repo
+          # variable if a canary run is needed before the first
+          # real publish:
+          # dry_run: ${{ vars.RELEASE_PLZ_DRY_RUN }}
+
+  build-crap4ts-cdylib:
+    name: Build crap4ts cdylib (${{ matrix.platform }})
+    needs: release-plz-release
+    if: needs.release-plz-release.outputs.releases_created == 'true' && contains(fromJSON(needs.release-plz-release.outputs.releases).*.package_name, 'crap4ts')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64-gnu
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: libcrap4ts.so
+            node_name: crap4ts.linux-x64-gnu.node
+          - platform: darwin-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+            artifact: libcrap4ts.dylib
+            node_name: crap4ts.darwin-arm64.node
+          - platform: darwin-x64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            artifact: libcrap4ts.dylib
+            node_name: crap4ts.darwin-x64.node
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      # `persist-credentials: false` — this job never pushes; not
+      # persisting the checkout token keeps it out of the build env.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # `enable-cache: false` — release-relevant workflow; a
+      # poisoned cache would otherwise become part of the published
+      # cdylib. Closes the `cache-poisoning` zizmor audit. See
+      # https://docs.zizmor.sh/audits/#cache-poisoning.
+      # `shared-key` becomes inert when caching is disabled but is kept for
+      # symmetry with the (former) cached path.
+      - name: Set up Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: publish-${{ matrix.platform }}
+          targets: ${{ matrix.target }}
+          enable-cache: "false"
+
+      # Node 24 (npm 11.x) is pinned so the install-gating check below
+      # exercises an npm new enough to enforce the `libc` field, and so
+      # the path-require smoke test runs on a deterministic Node rather
+      # than whatever the runner image happens to ship.
+      #
+      # `cache:` input is intentionally omitted — `actions/setup-node` only
+      # caches when the input is set. zizmor's `cache-poisoning` audit
+      # flags this on release-relevant workflows by default; inline-suppress
+      # since no cache is actually populated here.
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 # zizmor: ignore[cache-poisoning]
+        with:
+          node-version: '24'
+
+      - name: Build cdylib
+        env:
+          CARGO_TARGET: ${{ matrix.target }}
+        run: |
+          cargo build \
+            --package crap4ts \
+            --release \
+            --lib \
+            --features napi-binding \
+            --target "$CARGO_TARGET"
+
+      - name: Rename cdylib to napi .node filename
+        env:
+          CARGO_TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
+          NODE_NAME: ${{ matrix.node_name }}
+        run: |
+          cp "target/$CARGO_TARGET/release/$ARTIFACT" \
+             "packages/crap4ts/$NODE_NAME"
+          ls -la "packages/crap4ts/$NODE_NAME"
+
+      - name: Smoke-test cdylib loads in Node
+        env:
+          NODE_NAME: ${{ matrix.node_name }}
+        run: |
+          node --input-type=commonjs -e '
+            const name = process.env.NODE_NAME;
+            const lib = require("./packages/crap4ts/" + name);
+            if (typeof lib.analyze !== "function") {
+              throw new Error("cdylib loaded but analyze export missing");
+            }
+            console.log("OK: analyze export present");
+          '
+
+      # The smoke test above require()s the .node directly, which bypasses
+      # npm's os/cpu/libc install-gating — so a bad gating field is invisible
+      # to it. crap4ts 2.0.0-rc.1 shipped a stray `libc` entry that made
+      # `npm install` reject every macOS install with EBADPLATFORM; the
+      # path-require smoke test stayed green and the defect reached npm,
+      # caught only by a sandbox install during the soak. Packing the
+      # package and installing the tarball into a clean project reproduces
+      # that gating on this runner's native platform, pre-publish, so a
+      # packaging defect fails the workflow instead of reaching the registry.
+      - name: Verify npm packaging + install-gating
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          ( cd packages/crap4ts && npm pack --pack-destination "$work" )
+          tarball="$(ls "$work"/crap4ts-*.tgz)"
+          echo "packed: $(basename "$tarball")"
+          consumer="$work/consumer"
+          mkdir -p "$consumer"
+          cd "$consumer"
+          npm init -y >/dev/null
+          # `npm install` exits non-zero on EBADPLATFORM; the explicit
+          # node_modules check is a backstop so the failure stays loud even
+          # if a future npm softens platform mismatch to a warning.
+          npm install --no-audit --no-fund "$tarball"
+          if [ ! -d node_modules/crap4ts ]; then
+            echo "::error::npm did not install crap4ts — os/cpu/libc gating rejected this platform (see EBADPLATFORM above). Packaging defect."
+            exit 1
+          fi
+          node -e 'const m = require("crap4ts"); if (typeof m.analyze !== "function") { throw new Error("crap4ts installed from the packed tarball but the analyze export is missing"); } console.log("OK: npm install-gating passed and analyze export present");'
+
+      - name: Upload cdylib artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cdylib-${{ matrix.platform }}
+          path: packages/crap4ts/${{ matrix.node_name }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-crap4ts-npm:
+    name: Publish crap4ts to npm
+    needs: build-crap4ts-cdylib
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # `persist-credentials: false` — npm publish authenticates via the
+      # OIDC `id-token`, not the git checkout token; don't persist it.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Node 24 + npm >= 11.5.1 are the floor for npm OIDC trusted
+      # publishing (https://docs.npmjs.com/trusted-publishers). Node 20
+      # ships npm 10.x, which cannot mint the OIDC token and 401s.
+      #
+      # `cache:` input is intentionally omitted — `actions/setup-node` only
+      # caches when the input is set. zizmor's `cache-poisoning` audit
+      # flags this on release-relevant workflows by default; inline-suppress
+      # since no cache is actually populated here.
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 # zizmor: ignore[cache-poisoning]
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to an OIDC-capable version
+        run: npm install -g npm@^11.5.1
+
+      - name: Verify package.json + Cargo.toml versions match
+        # Belt-and-braces check. Until the GitHub-App-driven automated
+        # sync ships, packages/crap4ts/package.json is bumped by a
+        # reviewer running scripts/sync-crap4ts-package-json.sh against
+        # the release PR before merge. This step catches the rare case
+        # where the package.json bump was skipped — release-plz would
+        # otherwise publish to crates.io with a fresh Cargo.toml version
+        # while npm receives the stale package.json. The verified
+        # version is exported so the publish step derives the dist-tag
+        # without re-parsing.
+        id: verify
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./packages/crap4ts/package.json').version")
+          CARGO_VERSION=$(grep -m1 '^version' crates/crap4ts/Cargo.toml | sed -E 's/version *= *"(.*)"/\1/')
+          echo "npm:    ${PKG_VERSION}"
+          echo "cargo:  ${CARGO_VERSION}"
+          if [ "${PKG_VERSION}" != "${CARGO_VERSION}" ]; then
+            echo "::error::version mismatch between package.json (${PKG_VERSION}) and Cargo.toml (${CARGO_VERSION}). Run scripts/sync-crap4ts-package-json.sh on the release PR before merging."
+            exit 1
+          fi
+          echo "version=${CARGO_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all cdylib artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: cdylib-*
+          path: packages/crap4ts/
+          merge-multiple: true
+
+      - name: Confirm all platforms present in tarball
+        run: |
+          cd packages/crap4ts
+          ls -la ./*.node
+          for plat in crap4ts.linux-x64-gnu.node crap4ts.darwin-arm64.node crap4ts.darwin-x64.node; do
+            test -f "$plat" || { echo "::error::missing $plat"; exit 1; }
+          done
+
+      # Prereleases (version contains a hyphen, e.g. `2.0.0-rc.1`) publish
+      # under the `rc` dist-tag so `latest` keeps pointing at the current
+      # stable release during a soak; a plain `2.0.0` publishes to
+      # `latest`. Without an explicit `--tag`, npm sends every version —
+      # prereleases included — to `latest`.
+      - name: Publish to npm with provenance (OIDC)
+        env:
+          VERSION: ${{ steps.verify.outputs.version }}
+        run: |
+          if [[ "$VERSION" == *-* ]]; then
+            NPM_TAG="rc"
+          else
+            NPM_TAG="latest"
+          fi
+          echo "publishing crap4ts@${VERSION} under dist-tag '${NPM_TAG}'"
+          npm publish --provenance --access public --tag "$NPM_TAG"
+        working-directory: packages/crap4ts
+
+  build-crap4rs-binaries:
+    name: Build crap4rs binaries (${{ matrix.name }})
+    needs: release-plz-release
+    if: needs.release-plz-release.outputs.releases_created == 'true' && contains(fromJSON(needs.release-plz-release.outputs.releases).*.package_name, 'crap4rs')
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            name: macos-x86
+    steps:
+      # `persist-credentials: false` — this job never pushes; not persisting
+      # the checkout token keeps it out of the runner env (closes the
+      # `artipacked` zizmor audit). See AGENTS.md "Supply-chain hygiene".
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # `enable-cache: false` — release-relevant workflow; a poisoned
+      # cache from a malicious push would otherwise become part of the
+      # released artifact. Closes the `cache-poisoning` zizmor audit.
+      # See https://docs.zizmor.sh/audits/#cache-poisoning.
+      - uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.target }}
+          enable-cache: "false"
+
+      - run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package binary
+        run: tar czf crap4rs-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release crap4rs
+
+      - name: Verify asset filename invariant
+        # The binstall pkg-url in crates/crap4rs/Cargo.toml expects the
+        # tarball to be named exactly `crap4rs-${target}.tar.gz` (e.g.
+        # `crap4rs-x86_64-unknown-linux-gnu.tar.gz`). If a future edit
+        # to the tar step drifts the filename, fail loudly here rather
+        # than landing a release where `cargo binstall crap4rs` silently
+        # falls back to `cargo install`.
+        env:
+          MATRIX_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tarballs=( crap4rs-*.tar.gz )
+          if [ "${#tarballs[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one crap4rs-*.tar.gz, found ${#tarballs[@]}: ${tarballs[*]:-<none>}"
+            exit 1
+          fi
+          expected="crap4rs-${MATRIX_TARGET}.tar.gz"
+          if [ "${tarballs[0]}" != "$expected" ]; then
+            echo "::error::asset filename drift — binstall pkg-url depends on the '${expected}' shape, found '${tarballs[0]}'"
+            exit 1
+          fi
+          echo "OK: asset filename matches binstall pkg-url shape (${tarballs[0]})"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: crap4rs-${{ matrix.target }}
+          path: crap4rs-${{ matrix.target }}.tar.gz
+
+  upload-crap4rs-assets:
+    name: Upload crap4rs binaries to GH release
+    needs: [release-plz-release, build-crap4rs-binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # `gh release upload` appends assets to the release release-plz
+      # already created when it published the crap4rs crate. The tag
+      # is the `crap4rs-v{version}` string read off
+      # `needs.release-plz-release.outputs.releases`; jq pulls the
+      # single entry for `package_name == "crap4rs"`.
+      - name: Append binaries to crap4rs GH release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES_JSON: ${{ needs.release-plz-release.outputs.releases }}
+        run: |
+          set -euo pipefail
+          TAG=$(echo "$RELEASES_JSON" | jq -r '.[] | select(.package_name=="crap4rs") | .tag')
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "::error::could not derive crap4rs tag from release-plz outputs"
+            exit 1
+          fi
+          echo "uploading to $TAG"
+          gh release upload "$TAG" --clobber artifacts/*.tar.gz

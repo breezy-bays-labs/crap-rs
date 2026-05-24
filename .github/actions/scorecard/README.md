@@ -353,6 +353,15 @@ When `version` is pinned to a specific tag (e.g. `version: '0.2.2'`), the
 action **always reinstalls** that exact version, ignoring whatever happens
 to be on `PATH`. Pinned-version semantics override pre-installed semantics.
 
+> **Tag-prefix cutover.** Releases up to and including `crap4rs` 0.5.0
+> live under `v{version}` tags; from the first release-plz-driven
+> publish onward, the canonical install path is
+> `cargo binstall crap4rs@<version>` and tarballs land under the
+> per-crate `crap4rs-v{version}` tag pattern. crates.io-registered
+> binstall metadata carries the right URL for each version, so users
+> never need to choose the tag pattern by hand — `cargo binstall
+> crap4rs@<version>` resolves correctly across the cutover.
+
 ```yaml
 # Example: dogfood a workspace-local build
 - run: cargo build --release
