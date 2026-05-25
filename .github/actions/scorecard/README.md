@@ -1,19 +1,52 @@
 # `crap-scorecard` action
 
-Runs `crap4rs` on a coverage file and emits a markdown scorecard. Composable
-into aggregator PR-comment bots; can also post its own sticky comment.
+[![CRAP Scorecard](https://img.shields.io/badge/CRAP-scorecard-orange?logo=github)](https://github.com/breezy-bays-labs/crap-rs/blob/main/.github/workflows/examples/crap-scorecard.yml)
 
-## Why composite, not standalone
+Runs `crap4rs` (Rust) or `crap4ts` (TypeScript) on a coverage file and
+emits a markdown scorecard. Composable into aggregator PR-comment bots;
+can also post its own sticky comment.
 
-The scorecard is typically one row in a richer "PR metrics" comment
-that aggregates multiple quality signals (coverage, CRAP, mutation,
-module size, architecture violations, etc.). This action exposes the
-rendered markdown as an **output** so an aggregator job can drop it
-into a larger sticky comment without two bots fighting over the same
-comment.
+## Quick start
 
-For repos that only care about CRAP, set `comment-mode: sticky` and the
-action manages its own sticky comment.
+Copy [`.github/workflows/examples/crap-scorecard.yml`](../../workflows/examples/crap-scorecard.yml)
+into your repo's `.github/workflows/` directory, change `coverage:` to
+your coverage file path, push, done. The 4 preset inputs
+(`threshold-preset`, `run-mode`, `gate-mode`, `languages`) cover the
+common case in ~6 lines of YAML — no decisions about gate booleans,
+threshold drift, or per-language metric defaults required.
+
+Mixed Rust + TypeScript repo? Set `languages: rust,typescript` (or
+`all`) and add `coverage-ts:` + `src-ts:`. Both adapters run in one
+action invocation; ONE sticky comment with both scorecards stacked.
+The crap4rs adapter defaults to cognitive complexity; crap4ts defaults
+to cyclomatic — both language-appropriate. See [Notes](#notes) for the
+invariant and [Multi-language](#multi-language) for the paired-input
+contract.
+
+Want the rendered HTML report (KPI tiles, file cards, optional dark
+mode, optional delta tab)? Set `html-report: true` — uploaded as a
+workflow artifact + linked in the sticky comment. See [HTML report](#html-report).
+
+> **Fork PRs:** the templated example requests `pull-requests: write`,
+> but GitHub issues a read-only `GITHUB_TOKEN` for `pull_request` events
+> from forks regardless of the `permissions:` block. The sticky comment
+> step silently no-ops on those runs. See
+> [Pattern 2 — Standalone § Sticky comments and fork PRs](#sticky-comments-and-fork-prs)
+> below for the two standard workarounds (`pull_request_target` with
+> hardened checkout OR a separate `workflow_run`-triggered comment
+> workflow). Same-repo branches are unaffected.
+
+The rest of this document is reference material:
+[Languages](#languages) / [Presets](#presets) /
+[Multi-language](#multi-language) / [HTML report](#html-report) for
+input-surface details, [Patterns](#patterns) for the three standard
+integration shapes (minimal / standalone / aggregator),
+[Inputs](#inputs) + [Outputs](#outputs) tables for the complete
+surface, [Structured row output](#structured-row-output-outputsrow-json)
++ [Inline annotations](#inline-annotations) +
+[Pinning](#pinning) + [Pre-installed binary (advanced)](#pre-installed-binary-advanced)
+for power-user concerns, and [Notes](#notes) for design-decision
+documentation.
 
 ## Languages
 
@@ -288,7 +321,14 @@ GitHub** (per the GH API contract on artifact download URLs), so the
 links are meant for human-followable surfaces (sticky comments,
 Check Run summaries) — not in-job `curl` retrieval.
 
-## Minimal usage — analysis only, no delta
+## Patterns
+
+The three standard integration shapes. Pattern 1 is what the [Quick
+start](#quick-start) section above expands into; Pattern 2 adds
+baseline orchestration for delta-mode runs; Pattern 3 is the
+aggregator pattern (one row of a richer metrics comment).
+
+### Pattern 1 — Minimal (analysis only, no delta)
 
 ```yaml
 - uses: actions/checkout@v4
@@ -301,7 +341,7 @@ Check Run summaries) — not in-job `curl` retrieval.
 - run: echo "${{ steps.crap.outputs.markdown }}"
 ```
 
-## Standalone PR-comment bot — analysis + baseline + sticky
+### Pattern 2 — Standalone (analysis + baseline + sticky)
 
 The caller is responsible for producing the baseline JSON envelope (typically
 a coverage run on the PR base). This action does **not** auto-checkout the
@@ -344,7 +384,7 @@ jobs:
           comment-header: 'crap-scorecard'
 ```
 
-### Sticky comments and fork PRs
+#### Sticky comments and fork PRs
 
 GitHub issues a **read-only `GITHUB_TOKEN`** for `pull_request` events
 triggered from forks, regardless of the job-level `permissions:` block. The
@@ -361,7 +401,7 @@ If you need fork-PR coverage, two well-trodden options:
 Most projects pick "no fork-PR sticky comments" until they have a concrete
 need — same-repo coverage is sufficient for internal review.
 
-## Aggregator pattern — one row of a richer metrics comment
+### Pattern 3 — Aggregator (one row of a richer metrics comment)
 
 When a PR-metrics aggregator composes coverage + CRAP + mutation +
 module size into one sticky comment, this action contributes the CRAP
@@ -589,3 +629,46 @@ to be on `PATH`. Pinned-version semantics override pre-installed semantics.
 - **`comment-mode` separates plumbing from content.** The same scorecard
   string serves standalone bots and aggregators — only the post step
   changes.
+
+## Notes
+
+### Metric-default invariant (per-language)
+
+The action **never passes `--metric` to the adapter binary**. Each
+adapter picks its language-appropriate default per
+`AdapterMeta::default_metric`:
+
+| Adapter | Default metric | Rationale |
+|---|---|---|
+| `crap4rs` | **cognitive** (SonarSource S3776 / G. Ann Campbell) | Idiomatic Rust frequently uses `match`/`if let` chains that cyclomatic complexity over-counts; cognitive complexity is calibrated for the readability cost humans actually pay |
+| `crap4ts` | **cyclomatic** (McCabe 1976) | Established TypeScript/JavaScript convention (ESLint, SonarJS); the ecosystem's existing tooling and thresholds are calibrated for cyclomatic |
+
+The cognitive-vs-cyclomatic decision is a per-language calibration —
+not a knob the action exposes — because the threshold values shipped
+with the preset surface (`threshold-preset: strict|default|lenient`)
+are calibrated against each adapter's chosen metric. Flipping metrics
+without re-calibrating thresholds would silently misreport. The
+`Presets` § [Per-language metric defaults](#per-language-metric-defaults)
+above documents the threshold-calibration mechanics; this section
+documents the higher-level invariant.
+
+Override is available per-crate via the `config:` input — point at a
+`crap4rs.toml` (or `crap4ts.toml`) with `[analysis] metric = "..."` —
+but the override carries the responsibility of re-calibrating the
+threshold yourself. The repo's
+[quick-start dogfood smoke](../../workflows/quick-start-smoke.yml)
+mechanically asserts this invariant via
+`<bin> --format json | jq -r '.metric'`, so a refactor that flips a
+default fails CI loudly. See
+[crap-rs#218](https://github.com/breezy-bays-labs/crap-rs/issues/218)
+for the metric-keyed calibration mechanism + ADR rationale.
+
+### Why composite, not standalone
+
+The scorecard is typically one row in a richer "PR metrics" comment
+that aggregates multiple quality signals (coverage, CRAP, mutation,
+module size, architecture violations, etc.). This action exposes the
+rendered markdown as an **output** so an aggregator job can drop it
+into a larger sticky comment without two bots fighting over the same
+comment. For repos that only care about CRAP, set `comment-mode:
+sticky` and the action manages its own sticky comment.
