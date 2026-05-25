@@ -323,24 +323,55 @@ outputs:
       preset-to-raw mapping (e.g. `threshold-preset: strict` resolved
       to 8 on the cognitive scale).
     value: ${{ steps.presets.outputs.threshold }}
+  html-artifact-url:
+    description: |
+      Workflow artifact URL for the rendered HTML report when
+      `html-report: true`. In single-language mode this is the
+      per-language artifact URL (Rust or TypeScript depending on
+      resolved language). In multi-language mode (PR ζ #315) this is
+      the unified artifact URL — one HTML document carrying both
+      adapters' analyses with a Language / Combined toggle.
+      Empty string when `html-report: false`.
+      The URL only resolves for requests authenticated with GitHub
+      (per the GH API contract on artifact download URLs) — it is
+      meant for sticky-comment links and aggregator surfacing, not
+      for in-job `curl` retrieval.
+    value: ${{ steps.upload-unified.outputs.artifact-url || steps.upload-rust.outputs.artifact-url || steps.upload-typescript.outputs.artifact-url }}
   html-artifact-url-rust:
     description: |
       Workflow artifact URL for the rendered Rust HTML report when
-      `html-report: true` and Rust is in the resolved language set.
-      Empty string otherwise (including when `html-report: false`).
-      Pair with `outputs.html-artifact-url-typescript` in
-      multi-language aggregator workflows. The URL only resolves for
-      requests authenticated with GitHub (per the GH API contract on
-      artifact download URLs) — it is meant for sticky-comment links
-      and aggregator surfacing, not for in-job `curl` retrieval.
-    value: ${{ steps.upload-rust.outputs.artifact-url }}
+      `html-report: true`.
+
+      **DEPRECATED in multi-language mode** (PR ζ #315): in
+      multi-language mode this output now resolves to
+      `<unified-url>#rust` — a deep-link anchor into the Rust panel
+      of the unified HTML document — and the action emits a
+      `::warning::` directing consumers to read
+      `outputs.html-artifact-url` instead. The per-language output
+      will be removed in a future major version.
+
+      In single-language `language: rust` mode the behavior is
+      unchanged from γ (#294): the URL points at the standalone
+      Rust-only artifact, and no deprecation warning is emitted.
+
+      See `html-artifact-url` for URL-authentication semantics.
+    value: ${{ steps.presets.outputs.is_multi == 'true' && format('{0}#rust', steps.upload-unified.outputs.artifact-url) || steps.upload-rust.outputs.artifact-url }}
   html-artifact-url-typescript:
     description: |
       Workflow artifact URL for the rendered TypeScript HTML report
-      when `html-report: true` and TypeScript is in the resolved
-      language set. Empty string otherwise. See
-      `html-artifact-url-rust` for URL-authentication semantics.
-    value: ${{ steps.upload-typescript.outputs.artifact-url }}
+      when `html-report: true`.
+
+      **DEPRECATED in multi-language mode** (PR ζ #315): in
+      multi-language mode this output now resolves to
+      `<unified-url>#typescript` — a deep-link anchor into the
+      TypeScript panel of the unified HTML document. See
+      `html-artifact-url-rust` for the deprecation contract.
+
+      In single-language `language: typescript` mode the behavior is
+      unchanged from γ (#294): the URL points at the standalone
+      TypeScript-only artifact, and no deprecation warning is
+      emitted.
+    value: ${{ steps.presets.outputs.is_multi == 'true' && format('{0}#typescript', steps.upload-unified.outputs.artifact-url) || steps.upload-typescript.outputs.artifact-url }}
 
 runs:
   using: 'composite'
@@ -1291,9 +1322,23 @@ runs:
     # (`043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1`). Consistency
     # over chasing dependabot's latest — a future bump rebases all
     # three pins in one weekly group.
+    # PR γ (#294): per-language HTML artifact upload. Each step runs
+    # ONLY when `html-report: true` AND the resolved language matches
+    # AND the run is single-language (not multi).
+    #
+    # PR ζ (#315): the per-language uploads now gate `language ==
+    # 'rust'` / `language == 'typescript'` instead of also matching
+    # 'multi'. In multi-language mode, the per-language artifacts are
+    # superseded by the unified-render artifact uploaded by the
+    # `Upload unified HTML report` step below; emitting both would
+    # double the artifact count and contradict the "ONE artifact in
+    # multi-language mode" invariant the deprecation contract relies
+    # on. The `*-rust` / `*-typescript` outputs continue to populate
+    # in multi-language mode as deep-link redirects to the unified
+    # artifact — see the outputs block above for the redirect logic.
     - name: Upload Rust HTML report
       id: upload-rust
-      if: inputs.html-report == 'true' && (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'multi')
+      if: inputs.html-report == 'true' && steps.lang.outputs.language == 'rust'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: crap4rs-report${{ inputs.html-artifact-name-suffix == '' && format('-{0}', runner.os) || inputs.html-artifact-name-suffix }}
@@ -1302,20 +1347,74 @@ runs:
 
     - name: Upload TypeScript HTML report
       id: upload-typescript
-      if: inputs.html-report == 'true' && (steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi')
+      if: inputs.html-report == 'true' && steps.lang.outputs.language == 'typescript'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: crap4ts-report${{ inputs.html-artifact-name-suffix == '' && format('-{0}', runner.os) || inputs.html-artifact-name-suffix }}
         path: ${{ steps.run.outputs.html_path_typescript }}
         if-no-files-found: error
 
-    # PR γ (#294): compose the sticky-comment body by appending the
-    # HTML-artifact download link(s) to the rendered markdown when
-    # `html-report: true`. Runs unconditionally (no `if:`) so the
-    # downstream sticky step always reads `steps.compose.outputs.message`
-    # — the appended-link branch is gated by `$HTML_REPORT == "true"`
-    # inside the bash so the no-`html-report` path passes the markdown
-    # through byte-identically (existing-consumer back-compat).
+    # PR ζ (#315): multi-language unified HTML pipeline.
+    #
+    # Three additive steps gated on `html-report: true` AND
+    # `is_multi == 'true'` (single-language mode skips all three,
+    # preserving byte-identical γ behavior for callers who never set
+    # `languages: rust,typescript`).
+    #
+    # The install step uses `taiki-e/install-action` (SHA-pinned per
+    # AGENTS.md Supply-chain hygiene Rule 3) with `tool: crap-render`
+    # so the action resolves the binary through crap-core's
+    # `[package.metadata.binstall]` block — installing the pre-built
+    # tarball from the latest `crap-core-vX.Y.Z` release. Falls back
+    # to `cargo install` on cache miss, but the build matrix in
+    # release-plz.yml's `build-crap-core-binaries` job uploads
+    # tarballs with every crap-core release so the binstall path is
+    # the dominant install route.
+    - name: Install crap-render
+      if: inputs.html-report == 'true' && steps.presets.outputs.is_multi == 'true'
+      uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+      with:
+        tool: crap-render
+
+    - name: Render unified HTML
+      id: render-unified
+      if: inputs.html-report == 'true' && steps.presets.outputs.is_multi == 'true'
+      shell: bash
+      env:
+        # The per-language envelopes were already produced by the
+        # `Run analysis` loop above (saved to
+        # `$RUNNER_TEMP/${BIN}-envelope.json`). The unified renderer
+        # composes both into one HTML document with a Language /
+        # Combined toggle.
+        RUST_ENV: ${{ runner.temp }}/crap4rs-envelope.json
+        TS_ENV: ${{ runner.temp }}/crap4ts-envelope.json
+        UNIFIED: ${{ runner.temp }}/crap-scorecard-unified.html
+      run: |
+        set -euo pipefail
+        crap-render \
+          --input "rust=${RUST_ENV}" \
+          --input "typescript=${TS_ENV}" \
+          --format html \
+          --output "${UNIFIED}"
+        echo "unified_path=${UNIFIED}" >> "$GITHUB_OUTPUT"
+
+    - name: Upload unified HTML report
+      id: upload-unified
+      if: inputs.html-report == 'true' && steps.presets.outputs.is_multi == 'true'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: crap-scorecard-report${{ inputs.html-artifact-name-suffix == '' && format('-{0}', runner.os) || inputs.html-artifact-name-suffix }}
+        path: ${{ steps.render-unified.outputs.unified_path }}
+        if-no-files-found: error
+
+    # PR γ (#294) + ζ (#315): compose the sticky-comment body by
+    # appending the HTML-artifact download link(s) to the rendered
+    # markdown when `html-report: true`. Runs unconditionally (no
+    # `if:`) so the downstream sticky step always reads
+    # `steps.compose.outputs.message` — the appended-link branch is
+    # gated by `$HTML_REPORT == "true"` inside the bash so the
+    # no-`html-report` path passes the markdown through byte-
+    # identically (existing-consumer back-compat).
     #
     # Step always runs the same way regardless of `comment-mode:` to
     # keep the output side-effect-free for aggregator consumers
@@ -1323,10 +1422,17 @@ runs:
     # entirely — they read `outputs.markdown` and the action-level
     # `html-artifact-url-*` outputs directly).
     #
-    # Sticky-link shape per the shape-doc lock:
+    # Sticky-link shape:
     #   * single-language: `📊 [Download full HTML report](<url>)`
-    #   * multi-language:  `📊 [Download full HTML report — Rust](<rust>)
-    #                       · [TypeScript](<ts>)`
+    #   * multi-language:  `📊 [Open report](<unified>) ·
+    #                       [Rust panel](<unified>#rust) ·
+    #                       [TypeScript panel](<unified>#typescript)`
+    #
+    # The multi-language shape ships one canonical link to the unified
+    # HTML document plus two deep-link anchors so reviewers can land
+    # directly on a per-language panel. Replaces γ's two separate
+    # per-language URLs (which produced two confusing "Download" links
+    # in the PR comment).
     #
     # Heredoc trailing-newline lesson (#260): both the markdown body
     # AND the appended link block emit an explicit `echo ""` before
@@ -1348,6 +1454,11 @@ runs:
         LANGUAGE: ${{ steps.lang.outputs.language }}
         HTML_URL_RUST: ${{ steps.upload-rust.outputs.artifact-url }}
         HTML_URL_TS: ${{ steps.upload-typescript.outputs.artifact-url }}
+        # PR ζ (#315): unified artifact URL produced by the
+        # `Upload unified HTML report` step. Populates in
+        # multi-language mode only; empty in single-language mode
+        # (per the step's `if:` gate).
+        HTML_URL_UNIFIED: ${{ steps.upload-unified.outputs.artifact-url }}
       run: |
         set -euo pipefail
         composed_file="$RUNNER_TEMP/scorecard-sticky-message.md"
@@ -1360,24 +1471,23 @@ runs:
         fi
 
         if [ "$HTML_REPORT" = "true" ]; then
-          # Guard the link append on actual upload success — when
-          # upload-artifact's step is skipped (the `if:` evaluated
+          # Guard the link append on actual upload success — when an
+          # upload-artifact step is skipped (its `if:` evaluated
           # false) or failed, its `artifact-url` output is empty, and
           # the action-level outputs are documented as empty in that
-          # case. Append the link only for languages that produced a
-          # URL.
+          # case. Append the link only when a URL is present.
           #
           # URLs wrapped in `<...>` per the GFM convention — keeps the
           # link renderable even if a future artifact-URL shape includes
           # parentheses or spaces (gemini catch on PR #312).
           link_block=""
           if [ "$IS_MULTI" = "true" ]; then
-            if [ -n "$HTML_URL_RUST" ] && [ -n "$HTML_URL_TS" ]; then
-              link_block="📊 [Download full HTML report — Rust](<$HTML_URL_RUST>) · [TypeScript](<$HTML_URL_TS>)"
-            elif [ -n "$HTML_URL_RUST" ]; then
-              link_block="📊 [Download full HTML report — Rust](<$HTML_URL_RUST>)"
-            elif [ -n "$HTML_URL_TS" ]; then
-              link_block="📊 [Download full HTML report — TypeScript](<$HTML_URL_TS>)"
+            # PR ζ (#315): in multi-language mode the unified artifact
+            # is the canonical destination. Two deep-link anchors
+            # (#rust / #typescript) let reviewers jump straight to a
+            # language panel.
+            if [ -n "$HTML_URL_UNIFIED" ]; then
+              link_block="📊 [Open report](<$HTML_URL_UNIFIED>) · [Rust panel](<${HTML_URL_UNIFIED}#rust>) · [TypeScript panel](<${HTML_URL_UNIFIED}#typescript>)"
             fi
           elif [ "$LANGUAGE" = "rust" ] && [ -n "$HTML_URL_RUST" ]; then
             link_block="📊 [Download full HTML report](<$HTML_URL_RUST>)"
@@ -1392,6 +1502,15 @@ runs:
             # into one — the extra is invisible.
             printf '\n\n%s\n' "$link_block" >> "$composed_file"
           fi
+        fi
+
+        # PR ζ (#315): emit `::warning::` deprecation notice for
+        # callers reading `outputs.html-artifact-url-{rust,typescript}`
+        # in multi-language mode. The per-language outputs now resolve
+        # to `<unified>#<lang>` deep-link anchors; future major version
+        # will remove them entirely.
+        if [ "$IS_MULTI" = "true" ] && [ "$HTML_REPORT" = "true" ]; then
+          echo "::warning::scorecard action: outputs.html-artifact-url-rust and outputs.html-artifact-url-typescript are deprecated in multi-language mode and now resolve to deep-link anchors on outputs.html-artifact-url. Update aggregator workflows to read outputs.html-artifact-url instead."
         fi
 
         # Emit the composed body as a heredoc-style output. Explicit

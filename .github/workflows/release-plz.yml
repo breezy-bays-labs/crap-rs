@@ -10,8 +10,9 @@ name: release-plz
 # Job graph:
 #   push:main → release-plz-pr           (opens/updates release PR)
 #             → release-plz-release      (publishes + creates per-crate tags)
-#                  ├─ build-crap4ts-cdylib → publish-crap4ts-npm   (if crap4ts published)
-#                  └─ build-crap4rs-binaries → upload-crap4rs-assets (if crap4rs published)
+#                  ├─ build-crap4ts-cdylib → publish-crap4ts-npm        (if crap4ts published)
+#                  ├─ build-crap4rs-binaries → upload-crap4rs-assets    (if crap4rs published)
+#                  └─ build-crap-core-binaries → upload-crap-core-assets (if crap-core published, PR ζ #315)
 #   pull_request: → sync-crap4ts-package-json  (release-plz-opened PRs only)
 #
 # The cdylib build matrix and npm publish job port verbatim from the
@@ -34,6 +35,10 @@ name: release-plz
 #   crates/crap4rs/Cargo.toml [package.metadata.binstall] pkg-url —
 #     references the same `crap4rs-v{version}` tag shape this workflow
 #     creates via release-plz.
+#   crates/crap-core/Cargo.toml [package.metadata.binstall] pkg-url —
+#     references the `crap-core-v{version}` tag shape so cargo-binstall
+#     resolves the `crap-render` binary tarball uploaded by the
+#     build-crap-core-binaries matrix below (PR ζ #315).
 
 on:
   push:
@@ -491,6 +496,127 @@ jobs:
           fi
           echo "uploading to $TAG"
           gh release upload "$TAG" --clobber artifacts/*.tar.gz
+
+  # PR ζ (#315): crap-core ships the multi-language `crap-render`
+  # binary alongside the library publish. The matrix mirrors
+  # `build-crap4rs-binaries` above; each leg produces a
+  # `crap-render-${target}.tar.gz` matching the binstall pkg-url
+  # declared in crates/crap-core/Cargo.toml's
+  # `[package.metadata.binstall]` block. Without this job the
+  # composite scorecard action's `taiki-e/install-action with tool:
+  # crap-render` step would silently fall back to `cargo install` on
+  # every multi-language CI run (slow); landing the matrix here keeps
+  # the binstall path live from the first crap-core ≥ 0.7.0 release.
+  build-crap-core-binaries:
+    name: Build crap-core binaries (${{ matrix.name }})
+    needs: release-plz-release
+    if: needs.release-plz-release.outputs.releases_created == 'true' && contains(fromJSON(needs.release-plz-release.outputs.releases).*.package_name, 'crap-core')
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            name: macos-x86
+    steps:
+      # `persist-credentials: false` — this job never pushes; same
+      # rationale as build-crap4rs-binaries above.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # `enable-cache: false` — release-relevant workflow; closes the
+      # `cache-poisoning` zizmor audit.
+      - uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.target }}
+          enable-cache: "false"
+
+      # Build only the crap-render binary (not the full workspace).
+      # `--bin crap-render` keeps the matrix lean — neither the
+      # crap4rs nor crap4ts adapter binaries are needed for the
+      # crap-render artifact upload.
+      - run: cargo build --release --target ${{ matrix.target }} --bin crap-render --package crap-core
+
+      - name: Package binary
+        # Bare binary at archive root — matches the binstall pkg-url
+        # `bin-dir = "{ bin }{ binary-ext }"` declaration in crap-core's
+        # Cargo.toml. The `-C` flag rewrites the working directory so
+        # the tarball doesn't carry the `target/<target>/release/`
+        # prefix that would otherwise break binstall extraction.
+        run: tar czf crap-render-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release crap-render
+
+      - name: Verify asset filename invariant
+        # The binstall pkg-url in crates/crap-core/Cargo.toml expects
+        # the tarball to be named exactly `crap-render-${target}.tar.gz`
+        # (e.g. `crap-render-x86_64-unknown-linux-gnu.tar.gz`). Fail
+        # loudly here on filename drift rather than shipping a release
+        # where `cargo binstall crap-core` silently falls back to
+        # `cargo install`.
+        env:
+          MATRIX_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tarballs=( crap-render-*.tar.gz )
+          if [ "${#tarballs[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one crap-render-*.tar.gz, found ${#tarballs[@]}: ${tarballs[*]:-<none>}"
+            exit 1
+          fi
+          expected="crap-render-${MATRIX_TARGET}.tar.gz"
+          if [ "${tarballs[0]}" != "$expected" ]; then
+            echo "::error::asset filename drift — binstall pkg-url depends on the '${expected}' shape, found '${tarballs[0]}'"
+            exit 1
+          fi
+          echo "OK: asset filename matches binstall pkg-url shape (${tarballs[0]})"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: crap-render-${{ matrix.target }}
+          path: crap-render-${{ matrix.target }}.tar.gz
+
+  upload-crap-core-assets:
+    name: Upload crap-core binaries to GH release
+    needs: [release-plz-release, build-crap-core-binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # `gh release upload` appends assets to the release release-plz
+      # already created when it published the crap-core crate. The tag
+      # is the `crap-core-v{version}` string read off
+      # `needs.release-plz-release.outputs.releases`; jq pulls the
+      # single entry for `package_name == "crap-core"`.
+      - name: Append binaries to crap-core GH release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES_JSON: ${{ needs.release-plz-release.outputs.releases }}
+        run: |
+          set -euo pipefail
+          TAG=$(echo "$RELEASES_JSON" | jq -r '.[] | select(.package_name=="crap-core") | .tag')
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "::error::could not derive crap-core tag from release-plz outputs"
+            exit 1
+          fi
+          echo "uploading to $TAG"
+          gh release upload "$TAG" --clobber artifacts/crap-render-*.tar.gz
 
   sync-crap4ts-package-json:
     # Auto-sync packages/crap4ts/package.json from crates/crap4ts/Cargo.toml
