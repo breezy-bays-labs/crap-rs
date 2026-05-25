@@ -1,19 +1,44 @@
 [package]
 name = "crap-core"
-version = "0.6.0"
+version = "0.7.0"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Language-agnostic foundation for the CRAP analyzer family — domain types, port traits, and shared invariants for crap4rs / future crap4ts."
+description = "Language-agnostic foundation for the CRAP analyzer family — domain types, port traits, and shared invariants for crap4rs / future crap4ts. Ships a crap-render binary for multi-language unified HTML report composition."
 keywords = ["crap", "complexity", "coverage", "testing", "quality"]
-categories = ["development-tools::testing"]
+categories = ["development-tools::testing", "command-line-utilities"]
 readme = "README.md"
+
+[package.metadata.binstall]
+# The `crap-core-v{version}` tag prefix is the per-crate tag pattern
+# created by release-plz on every crap-core publish (see
+# release-plz.toml workspace `git_tag_name`). The `release-plz.yml`
+# workflow's `build-crap-core-binaries` matrix produces tarballs at
+# exactly the `{name}-{target}.tar.gz` shape this URL expects; the
+# matrix's filename-invariant assertion step fails loudly if a future
+# edit drifts that shape.
+pkg-url = "{ repo }/releases/download/crap-core-v{ version }/{ name }-{ target }.tar.gz"
+pkg-fmt = "tgz"
+# Binary lives at the archive root (the build matrix's
+# `tar -C target/{target}/release crap-render` places it there).
+bin-dir = "{ bin }{ binary-ext }"
 
 [lib]
 name = "crap_core"
 path = "src/lib.rs"
+
+# Multi-language CRAP HTML renderer. Composes per-adapter JSON
+# envelopes into one unified HTML document; consumed by the composite
+# scorecard action in multi-language mode, and invocable manually for
+# debugging. The library entries
+# (`crap_core::domain::multi_lang`, `crap_core::core::compose`,
+# `crap_core::adapters::reporters::format_html_multi`) carry the
+# composition + rendering logic; this binary is a thin CLI shim.
+[[bin]]
+name = "crap-render"
+path = "src/bin/crap-render.rs"
 
 [features]
 # Exposes `crap_core::test_strategies::*` (proptest generators + the

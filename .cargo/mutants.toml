@@ -27,6 +27,16 @@
 #     unmutated baseline. The other three tests in that file exec
 #     crap4ts (which IS built under `--package crap4ts`), so only this
 #     fn is skipped — the rest stay live as mutant-killers.
+#   * `crap_render_cli.rs` (test fns prefixed `crap_render_`) — exec
+#     the crap-render bin via `cargo_bin("crap-render")` (lives in
+#     crap-core; crap4{rs,ts}-bin shelling is NOT involved). Under
+#     `--package crap-core` the crap-render bin IS built so the
+#     unmutated baseline passes; the skip is included defensively
+#     because these CLI tests are slow per-mutant relative to their
+#     mutation-killing surface (they exercise the bin's argument
+#     parsing + envelope ingestion, not view.rs's decision points the
+#     view.rs gate targets), so keeping them in the gate would inflate
+#     per-mutant runtime without changing the mutant-killed set.
 #
 # All three are still fully exercised every PR by the `Test
 # (linux-x86)` / `Test (macos-arm)` / `Test (macos-x86)` jobs, which
@@ -44,6 +54,8 @@ additional_cargo_test_args = [
     "default_gate",
     "--skip",
     "crap4rs_no_flag_default_cognitive_still_works",
+    "--skip",
+    "crap_render",
 ]
 
 # Warm each parallel worker's scratch tree with our /target dir.
