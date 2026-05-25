@@ -11,6 +11,7 @@
 //! siblings (crap4ts's Istanbul adapter), per ADR D9
 //! (mixed-dispatch-strategy).
 
+pub mod compose;
 pub mod walker;
 
 use std::path::{Path, PathBuf};
