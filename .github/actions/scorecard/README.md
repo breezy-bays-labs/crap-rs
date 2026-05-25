@@ -557,9 +557,10 @@ needed.
 GitHub silently drops annotations past a per-step UI cap (10 warning,
 10 error, 10 notice per step; 50 per job; 50 per workflow). The
 adapter caps emission at `annotation-limit` (default `10`) and
-appends a trailing `::notice::N more functions exceed threshold; see
-scorecard for the full list` line so reviewers know findings were
-dropped. The full set always appears in `outputs.markdown`.
+appends a trailing
+`::notice::N more functions exceed threshold; see scorecard for the full list`
+line so reviewers know findings were dropped. The full set always
+appears in `outputs.markdown`.
 
 `annotation-limit` can also live in the project's config — set
 `[output] annotation_limit = N` in `crap4rs.toml` (or `crap4ts.toml`)
@@ -604,8 +605,8 @@ to be on `PATH`. Pinned-version semantics override pre-installed semantics.
 > `cargo binstall crap4rs@<version>` and tarballs land under the
 > per-crate `crap4rs-v{version}` tag pattern. crates.io-registered
 > binstall metadata carries the right URL for each version, so users
-> never need to choose the tag pattern by hand — `cargo binstall
-> crap4rs@<version>` resolves correctly across the cutover.
+> never need to choose the tag pattern by hand —
+> `cargo binstall crap4rs@<version>` resolves correctly across the cutover.
 
 ```yaml
 # Example: dogfood a workspace-local build
@@ -670,5 +671,5 @@ that aggregates multiple quality signals (coverage, CRAP, mutation,
 module size, architecture violations, etc.). This action exposes the
 rendered markdown as an **output** so an aggregator job can drop it
 into a larger sticky comment without two bots fighting over the same
-comment. For repos that only care about CRAP, set `comment-mode:
-sticky` and the action manages its own sticky comment.
+comment. For repos that only care about CRAP, set
+`comment-mode: sticky` and the action manages its own sticky comment.
