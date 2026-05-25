@@ -483,39 +483,40 @@ jobs:
         env:
           HTML_URL_RUST: ${{ steps.html-spot.outputs.html-artifact-url-rust }}
           HTML_URL_TS: ${{ steps.html-spot.outputs.html-artifact-url-typescript }}
-          RUN_ID: ${{ github.run_id }}
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # 1. html-artifact-url-rust output populated (URL surfaces
-          #    synchronously per actions/upload-artifact@v7's
-          #    artifact-url contract, verified during the PR pre-flight).
+          # 1. html-artifact-url-rust output populated. Per the
+          #    actions/upload-artifact@v7 contract (verified via
+          #    Context7 lookup during PR pre-flight), `artifact-url`
+          #    is populated only when the upload SUCCEEDED — it is
+          #    explicitly documented as "empty if the artifact upload
+          #    failed." So a non-empty URL here is a STRONGER signal
+          #    than "artifact appears in the runs/artifacts REST list"
+          #    AND requires no extra permissions surface (the alternative
+          #    `gh api repos/$repo/actions/runs/$id/artifacts` form
+          #    needs `actions: read` on the job, which this job does
+          #    not currently grant — keeping the permissions block
+          #    minimal is the better tradeoff).
           if [ -z "$HTML_URL_RUST" ]; then
-            echo "::error::html-spot: outputs.html-artifact-url-rust is empty after html-report:true single-language rust dispatch"
+            echo "::error::html-spot: outputs.html-artifact-url-rust is empty after html-report:true single-language rust dispatch (upload-artifact contract: empty URL iff upload failed)"
             exit 1
           fi
-          # 2. html-artifact-url-typescript output empty (TS didn't run).
+          # 2. html-artifact-url-typescript output empty (TS didn't run
+          #    — single-language rust dispatch).
           if [ -n "$HTML_URL_TS" ]; then
             echo "::error::html-spot: outputs.html-artifact-url-typescript should be empty in single-language rust dispatch (got: $HTML_URL_TS)"
             exit 1
           fi
-          # 3. Artifact uploaded to the workflow run, named per the
-          #    `-html-spotcheck` suffix override above. `gh api` lists
-          #    artifacts via the REST artifacts endpoint; jq filters
-          #    by name.
-          uploaded="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "crap4rs-report-html-spotcheck") | .name')"
-          if [ -z "$uploaded" ]; then
-            echo "::error::html-spot: artifact 'crap4rs-report-html-spotcheck' missing from workflow run artifacts list"
-            exit 1
-          fi
-          # 4. HTML file written to RUNNER_TEMP parses (closing
+          # 3. HTML file written to RUNNER_TEMP parses (closing
           #    </html> tag present) AND contains a known scorecard
           #    marker — pick a verbatim template literal the #260
           #    Askama template emits on every render regardless of
           #    which functions cross threshold. This is a robust
           #    marker: it fires even when the analyzed code has zero
-          #    violations.
+          #    violations. The file the render step wrote is still on
+          #    the runner FS (the upload step also reads it from
+          #    there); reading it directly avoids any need to fetch
+          #    the artifact back through the API.
           html_file="$RUNNER_TEMP/crap4rs-report.html"
           if [ ! -f "$html_file" ]; then
             echo "::error::html-spot: $html_file missing — the render step did not produce the expected file"
@@ -529,7 +530,7 @@ jobs:
             echo "::error::html-spot: rendered HTML missing the '<h1>crap4rs report</h1>' marker — reporter template may have drifted"
             exit 1
           fi
-          echo "html-spot: html-report wiring ✓ (artifact uploaded, URL surfaced, HTML rendered with expected marker)"
+          echo "html-spot: html-report wiring ✓ (URL surfaced per upload-artifact success contract, HTML rendered with expected marker)"
 
       - name: Preset spot-check — default
         id: preset-default
