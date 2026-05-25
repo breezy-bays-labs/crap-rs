@@ -1358,6 +1358,39 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo doc --workspace --no-deps
 
+  release-plz-app-scope-audit:
+    # Leaf-scope drift check: assert this repo's name appears in the
+    # canonical release-plz App allowlist
+    # (breezy-bays-labs/.github/release-plz-allowlist.toml). Catches
+    # the case where a PR on the .github repo silently drops this
+    # repo from the allowlist — without this gate that drift would
+    # only surface at the next release-plz token-mint attempt,
+    # mid-release.
+    #
+    # NOT an org-global audit. A leaf-scope check runs on the default
+    # GITHUB_TOKEN (repo-scoped, sufficient to read public contents
+    # via the contents API). The complementary org-global audit
+    # — compare the canonical TOML against the App's actual
+    # per-repo installations — needs an Org Admin PAT, so it lives in
+    # a centralized cron in the breezy-bays-labs/.github repo rather
+    # than every consumer's CI.
+    name: release-plz App scope audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+        with:
+          tool: dasel
+      - name: Audit allowlist for this repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/release-plz-app-scope-audit.sh
+
   zizmor:
     # Mechanical enforcement of the SHA-pin + workflow-security policy.
     # Runs `zizmor` (https://woodruffw.github.io/zizmor/) over every
