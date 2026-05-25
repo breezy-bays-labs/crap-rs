@@ -150,7 +150,13 @@ jobs:
           src-ts: ${{ steps.ts-fixture.outputs.src }}
           threshold-preset: default
           run-mode: full        # no baseline produced in this smoke
-          gate-mode: report-only
+          # PR delta #295 user-review: enable the analysis gate at
+          # threshold=15 so the project actually enforces what its
+          # templated example advocates. Today the workspace passes at
+          # threshold=15 (zero functions above); when crap-rs#273
+          # cleanup lands, both this gate and the templated example flip
+          # to `threshold-preset: strict` (=8) without further plumbing.
+          gate-mode: gate-on-analysis
           comment-mode: sticky
           comment-header: 'crap-scorecard-quickstart-smoke'
           html-report: true
@@ -278,3 +284,73 @@ jobs:
             exit 1
           fi
           echo "crap4ts  --format json | jq -r .metric = cyclomatic ok"
+
+      # Gate (g) — `--format table` dogfood (the human-facing terminal
+      # output format). PR delta #295 user-review: dogfood every output
+      # format from a single CI job. The table reporter renders to
+      # stdout via comfy-table; the assertion checks the output is
+      # non-empty AND carries at least one expected token from the
+      # workspace fixture so a future renderer regression that emits
+      # an empty table (e.g. an off-by-one filter) surfaces here.
+      - name: Gate (g) — --format table dogfood (crap4rs + crap4ts)
+        env:
+          TS_COVERAGE: ${{ steps.ts-fixture.outputs.coverage }}
+          TS_SRC:      ${{ steps.ts-fixture.outputs.src }}
+        run: |
+          set -euo pipefail
+          RUST_TABLE=$(crap4rs --coverage lcov.info --src crates/crap-core/src --format table --no-fail)
+          RUST_BYTES=$(printf '%s' "$RUST_TABLE" | wc -c)
+          if [ "$RUST_BYTES" -lt 100 ]; then
+            echo "::error::crap4rs --format table output too small (${RUST_BYTES} bytes); expected at least 100 bytes of table content"
+            exit 1
+          fi
+          if ! printf '%s\n' "$RUST_TABLE" | grep -qE 'CRAP|Risk|Function'; then
+            echo "::error::crap4rs --format table missing expected column headers (CRAP|Risk|Function)"
+            exit 1
+          fi
+          echo "crap4rs --format table = ${RUST_BYTES} bytes with expected headers ok"
+
+          TS_TABLE=$(crap4ts --coverage "$TS_COVERAGE" --src "$TS_SRC" --format table --no-fail)
+          TS_BYTES=$(printf '%s' "$TS_TABLE" | wc -c)
+          if [ "$TS_BYTES" -lt 100 ]; then
+            echo "::error::crap4ts --format table output too small (${TS_BYTES} bytes); expected at least 100 bytes of table content"
+            exit 1
+          fi
+          if ! printf '%s\n' "$TS_TABLE" | grep -qE 'CRAP|Risk|Function'; then
+            echo "::error::crap4ts --format table missing expected column headers (CRAP|Risk|Function)"
+            exit 1
+          fi
+          echo "crap4ts  --format table = ${TS_BYTES} bytes with expected headers ok"
+
+      # Gate (h) — `--format scorecard-row` dogfood (single-line JSON
+      # row for aggregator/dashboard consumers, per the locked Row::CrapDelta
+      # schema enforced by `crates/crap-core/tests/scorecard_row_parity.rs`).
+      # Assert the output parses as JSON AND carries every top-level key
+      # consumers rely on. Both adapters MUST emit the structurally-
+      # identical shape (the parity test guards this in-process; this
+      # gate guards end-to-end).
+      - name: Gate (h) — --format scorecard-row dogfood (crap4rs + crap4ts)
+        env:
+          TS_COVERAGE: ${{ steps.ts-fixture.outputs.coverage }}
+          TS_SRC:      ${{ steps.ts-fixture.outputs.src }}
+        run: |
+          set -euo pipefail
+          for bin in crap4rs crap4ts; do
+            if [ "$bin" = "crap4rs" ]; then
+              ROW=$($bin --coverage lcov.info --src crates/crap-core/src --format scorecard-row --no-fail)
+            else
+              ROW=$($bin --coverage "$TS_COVERAGE" --src "$TS_SRC" --format scorecard-row --no-fail)
+            fi
+            if ! printf '%s' "$ROW" | jq -e . >/dev/null 2>&1; then
+              echo "::error::$bin --format scorecard-row produced invalid JSON"
+              echo "got: $ROW"
+              exit 1
+            fi
+            for key in type id label anchor status; do
+              if ! printf '%s' "$ROW" | jq -e --arg k "$key" 'has($k)' >/dev/null 2>&1; then
+                echo "::error::$bin --format scorecard-row missing required key '$key' (Row::CrapDelta schema)"
+                exit 1
+              fi
+            done
+            echo "$bin --format scorecard-row = valid JSON with all required keys ok"
+          done

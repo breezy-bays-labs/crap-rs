@@ -58,9 +58,9 @@ jobs:
       - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>  # pin to a crap-rs release SHA
         with:
           coverage: lcov.info
-          threshold-preset: default
-          run-mode: both
-          gate-mode: report-only
+          threshold-preset: default       # 15 (cognitive); flip to `strict` (=8) when ready
+          run-mode: both                  # both = analysis-only + delta vs `baseline:` envelope
+          gate-mode: gate-on-analysis     # fail the job on functions above threshold; swap to `report-only` to soft-launch
           comment-mode: sticky
           html-report: true
           languages: rust   # or `rust,typescript` (also add `coverage-ts:` + `src-ts:`)

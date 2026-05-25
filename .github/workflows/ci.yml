@@ -197,56 +197,19 @@ jobs:
           path: lcov.info
           retention-days: 7
 
-  self-check:
-    name: Self-referential CRAP check
-    runs-on: ubuntu-latest
-    needs: [coverage, clippy, test]
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: lcov
-      - run: cargo build --release --package crap4rs
-      # S4 (#136) widens self-check from one-shot `--src crates/crap4rs/src`
-      # to per-crate run-twice. Both must pass. NOT `--src crates` —
-      # InputArgs.src is single-path; recursive walk would pull in
-      # crates/crap4ts/napi/ (post-S5), tests/fixtures/*.lcov, proptest
-      # seeds. Targeted `--src` per crate keeps the boundary strict.
-      - name: Debug — LCOV SF path shape
-        # Diagnostic only. LcovParser::normalize_path strips an absolute
-        # `--src` prefix from absolute SF records, so absolute paths are
-        # fine. This step prints a sample so a future run-twice mismatch
-        # has visible evidence (e.g. path divergence between
-        # `--src crates/crap-core/src` and the SF prefix in lcov.info).
-        run: |
-          set -euo pipefail
-          echo "First 5 SF records in lcov.info:"
-          head -200 lcov.info | grep '^SF:' | head -5 || true
-          echo "Working directory: $PWD"
-      # --threshold 15 (the post-#272 `default` tier) is a temporary
-      # softening of the self-check while crap-rs#273 refactors the 23
-      # functions in (8, 15] CRAP back under the new --strict cutoff
-      # (cognitive 8). When #273 lands all three legs flip back to
-      # --strict and this comment + the tracked: marker can come out.
-      # tracked: crap-rs#273
-      - name: Self-CRAP — crap-core
-        run: ./target/release/crap4rs --coverage lcov.info --src crates/crap-core/src --threshold 15 --color always
-      # tracked: crap-rs#273
-      - name: Self-CRAP — crap4rs
-        run: ./target/release/crap4rs --coverage lcov.info --src crates/crap4rs/src --threshold 15 --color always
-      # crap4ts/src is Rust — analyzed by the crap4rs binary, NOT crap4ts
-      # (which needs Istanbul JSON; there is no TS in crates/crap4ts/src).
-      # Reuses the single ./target/release/crap4rs built once above
-      # (rust-cache warm) — no per-leg recompile.
-      # tracked: crap-rs#273
-      - name: Self-CRAP — crap4ts (Rust source)
-        run: ./target/release/crap4rs --coverage lcov.info --src crates/crap4ts/src --threshold 15 --color always
+  # PR delta #295 removed the standalone self-check job (Self-referential
+  # CRAP check). Its strict-15 cargo-run gating on crap-core/crap4rs/
+  # crap4ts source is subsumed by the quickstart-smoke job (in
+  # quick-start-smoke.yml) which now dogfoods the composite action with
+  # gate-mode: gate-on-analysis + threshold-preset: default (15) — same
+  # threshold, but exercises the consumer-facing surface end-to-end
+  # instead of a separate cargo-run path. Coverage trade-off documented
+  # on PR #313: quickstart-smoke targets crates/crap-core/src only;
+  # crap4rs/src + crap4ts/src self-coverage previously asserted here
+  # becomes the responsibility of the per-crate clippy + tests gates
+  # plus the self-crap-view per-function check below. Restoring
+  # per-crate composite-action gating is tracked under crap-rs#273
+  # (the ticket that already governs the strict-8 cleanup).
 
   self-crap-view:
     name: domain/view.rs per-function CC <= 15
@@ -399,8 +362,12 @@ jobs:
           # https://github.com/breezy-bays-labs/crap-rs/issues/289 so
           # this can eventually flip to `analysis-gate: 'true'`.
           threshold: '8'
-          comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
-          comment-header: 'crap-scorecard-self'
+          # PR delta #295: suppress sticky. quickstart-smoke (workflow
+          # quick-start-smoke.yml) is the single reviewer-facing scorecard;
+          # the smoke jobs in ci.yml retain their assertion value (they
+          # still build the binary + invoke the action + check outputs)
+          # but no longer add reviewer noise to PRs.
+          comment-mode: 'none'
           # End-to-end smoke for the github-annotations reporter — the
           # runner intercepts `::warning ...` lines from the action's
           # stdout and renders them inline on this PR's Files Changed
@@ -477,8 +444,10 @@ jobs:
           threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
           html-report: 'true'
           html-artifact-name-suffix: '-html-spotcheck'
-          comment-mode: ${{ github.event_name == 'pull_request' && 'sticky' || 'none' }}
-          comment-header: 'crap-scorecard-html-spotcheck'
+          # PR delta #295: suppress sticky for the same reason as the
+          # main dogfood step above — quickstart-smoke owns the single
+          # reviewer-facing scorecard sticky.
+          comment-mode: 'none'
       - name: Assert HTML report wiring
         env:
           HTML_URL_RUST: ${{ steps.html-spot.outputs.html-artifact-url-rust }}
