@@ -289,9 +289,16 @@ jobs:
       # output format). PR delta #295 user-review: dogfood every output
       # format from a single CI job. The table reporter renders to
       # stdout via comfy-table; the assertion checks the output is
-      # non-empty AND carries at least one expected token from the
-      # workspace fixture so a future renderer regression that emits
-      # an empty table (e.g. an off-by-one filter) surfaces here.
+      # non-empty AND carries the expected column headers so a future
+      # renderer regression that emits an empty table (e.g. an off-by-
+      # one filter) surfaces here.
+      #
+      # SIGPIPE gotcha: under `set -o pipefail`, `printf | grep -q`
+      # propagates printf's SIGPIPE (exit 141) as the pipeline exit
+      # whenever grep matches and exits before printf finishes writing.
+      # `if !` then inverts the false-positive non-zero, entering the
+      # error branch on what was actually a successful match. Bash's
+      # native `=~` regex operator avoids the pipe entirely.
       - name: Gate (g) — --format table dogfood (crap4rs + crap4ts)
         env:
           TS_COVERAGE: ${{ steps.ts-fixture.outputs.coverage }}
@@ -299,24 +306,24 @@ jobs:
         run: |
           set -euo pipefail
           RUST_TABLE=$(crap4rs --coverage lcov.info --src crates/crap-core/src --format table --no-fail)
-          RUST_BYTES=$(printf '%s' "$RUST_TABLE" | wc -c)
+          RUST_BYTES=${#RUST_TABLE}
           if [ "$RUST_BYTES" -lt 100 ]; then
             echo "::error::crap4rs --format table output too small (${RUST_BYTES} bytes); expected at least 100 bytes of table content"
             exit 1
           fi
-          if ! printf '%s\n' "$RUST_TABLE" | grep -qE 'CRAP|Risk|Function'; then
+          if [[ ! "$RUST_TABLE" =~ (CRAP|Risk|Function) ]]; then
             echo "::error::crap4rs --format table missing expected column headers (CRAP|Risk|Function)"
             exit 1
           fi
           echo "crap4rs --format table = ${RUST_BYTES} bytes with expected headers ok"
 
           TS_TABLE=$(crap4ts --coverage "$TS_COVERAGE" --src "$TS_SRC" --format table --no-fail)
-          TS_BYTES=$(printf '%s' "$TS_TABLE" | wc -c)
+          TS_BYTES=${#TS_TABLE}
           if [ "$TS_BYTES" -lt 100 ]; then
             echo "::error::crap4ts --format table output too small (${TS_BYTES} bytes); expected at least 100 bytes of table content"
             exit 1
           fi
-          if ! printf '%s\n' "$TS_TABLE" | grep -qE 'CRAP|Risk|Function'; then
+          if [[ ! "$TS_TABLE" =~ (CRAP|Risk|Function) ]]; then
             echo "::error::crap4ts --format table missing expected column headers (CRAP|Risk|Function)"
             exit 1
           fi
