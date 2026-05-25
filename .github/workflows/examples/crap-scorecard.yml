@@ -46,6 +46,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # Prereq: cargo-llvm-cov + llvm-tools-preview. The default
+      # `ubuntu-latest` runner image does NOT carry either out of the
+      # box; this repo's own `quick-start-smoke.yml` workflow shows the
+      # full toolchain setup (dtolnay/rust-toolchain + llvm-tools-preview
+      # + taiki-e/install-action installing cargo-llvm-cov). Substitute
+      # for your own coverage tool if you generate LCOV differently
+      # (`cargo tarpaulin --out lcov`, `grcov`, etc.).
       - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 
       - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>  # pin to a crap-rs release SHA
