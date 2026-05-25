@@ -434,6 +434,7 @@ name = "crap4rs"
 version = "0.6.0"
 dependencies = [
  "anyhow",
+ "assert_cmd",
  "clap",
  "clap_complete",
  "clap_complete_nushell",

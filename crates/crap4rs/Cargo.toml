@@ -94,6 +94,12 @@ jsonschema = { workspace = true }
 # harness; future siblings (crap4ts) consume their own bindings.
 cucumber = { workspace = true, features = ["libtest"] }
 tokio = { workspace = true }
+# Cross-crate binary invocation for the multi-language BDD harness:
+# `multi_lang_html_cucumber.rs` runs the `crap-render` binary that
+# ships from crap-core (PR ζ #315). `env!("CARGO_BIN_EXE_*")` is only
+# set inside the bin's own crate's tests, so assert_cmd's workspace-
+# aware `Command::cargo_bin("crap-render")` is required here.
+assert_cmd = { workspace = true }
 
 # ── Cucumber-rs test targets ──
 # Each migrated `.feature` file gets its own `[[test]]` entry. The
@@ -112,4 +118,8 @@ harness = false
 
 [[test]]
 name = "github_annotations_cucumber"
+harness = false
+
+[[test]]
+name = "multi_lang_html_cucumber"
 harness = false
