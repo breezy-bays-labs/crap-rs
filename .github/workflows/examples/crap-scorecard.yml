@@ -1,0 +1,66 @@
+# Templated CRAP-scorecard workflow — copy this file into your repo's
+# `.github/workflows/` directory, change `coverage:` to your coverage
+# file path, push, done.
+#
+# This file lives at `.github/workflows/examples/` (subdirectory) so
+# GitHub Actions does NOT auto-trigger it inside this repo. Workflow
+# triggers only fire for files DIRECTLY under `.github/workflows/` —
+# subdirectories are documentation. The repo's own dogfood smoke at
+# `.github/workflows/quick-start-smoke.yml` invokes the action with
+# identical inputs to keep this file mechanically honest.
+#
+# The 4 preset inputs (`threshold-preset`, `run-mode`, `gate-mode`,
+# `languages`) cover the common case in 6 lines of YAML — no decisions
+# about gate booleans, threshold drift, or per-language metric defaults
+# required. Each preset is documented at
+# `.github/actions/scorecard/README.md` § Presets.
+#
+# Mixed Rust + TypeScript repo? Set `languages: rust,typescript` (or
+# `all`) and add `coverage-ts: <your-istanbul-json>` + `src-ts: <your-ts-root>`.
+# Both adapters run in one action invocation; ONE sticky comment with
+# both scorecards stacked. See § Multi-language in the action README.
+#
+# Override individual inputs as needed — e.g. swap `threshold-preset:
+# default` (= threshold 15) for an explicit `threshold: '20'`; the raw
+# input wins on conflict + the action emits a `::warning::` so the
+# double-config is visible.
+name: CRAP Scorecard
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # for the sticky comment (see fork-PR caveat in README § Quick start)
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Prereq: cargo-llvm-cov + llvm-tools-preview. The default
+      # `ubuntu-latest` runner image does NOT carry either out of the
+      # box; this repo's own `quick-start-smoke.yml` workflow shows the
+      # full toolchain setup (dtolnay/rust-toolchain + llvm-tools-preview
+      # + taiki-e/install-action installing cargo-llvm-cov). Substitute
+      # for your own coverage tool if you generate LCOV differently
+      # (`cargo tarpaulin --out lcov`, `grcov`, etc.).
+      - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>  # pin to a crap-rs release SHA
+        with:
+          coverage: lcov.info
+          threshold-preset: default       # 15 (cognitive); flip to `strict` (=8) when ready
+          run-mode: both                  # both = analysis-only + delta vs `baseline:` envelope
+          gate-mode: gate-on-analysis     # fail the job on functions above threshold; swap to `report-only` to soft-launch
+          comment-mode: sticky
+          html-report: true
+          languages: rust   # or `rust,typescript` (also add `coverage-ts:` + `src-ts:`)

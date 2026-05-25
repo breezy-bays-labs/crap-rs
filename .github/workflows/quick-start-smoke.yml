@@ -1,0 +1,363 @@
+# Quick-start dogfood smoke for the templated example at
+# `.github/workflows/examples/crap-scorecard.yml`. Invokes the public
+# scorecard action with the SAME inputs as the templated example, plus
+# a few mechanical assertions that lock the consumer-visible behaviors
+# the README's "Quick start" section advertises:
+#
+#   (a) green completion within 15 min (the ergonomic-success metric
+#       per shape-doc § Open Q 7 / impl-plan AC #10 — hard gate, not
+#       a soft warning, because soft-failing it lets the budget rot)
+#   (b) `outputs.markdown` non-empty
+#   (c) Combined multi-language markdown carries BOTH per-language
+#       section headers (`### Rust (crap4rs)` + `### TypeScript (crap4ts)`)
+#   (d) HTML artifact uploaded (read action-level output non-empty —
+#       structurally stronger than a `gh api artifacts` REST check
+#       that would require an `actions: read` perm elevation; the
+#       action surfaces `html-artifact-url-{rust,typescript}` outputs
+#       per #294 specifically for this kind of programmatic check)
+#   (e) Sticky comment posted on `pull_request` events (under a
+#       distinct header `crap-scorecard-quickstart-smoke` so the
+#       existing `scorecard-smoke-rust` / `-ts` jobs' `crap-scorecard-self`
+#       sticky doesn't collide with this one)
+#   (f) Metric-default invariant (ADR-d): crap4rs --format json
+#       declares `.metric == cognitive`; crap4ts declares `.metric ==
+#       cyclomatic`. THIS IS the mechanical enforcement that the
+#       action's per-language metric defaults stay correct without the
+#       action ever passing `--metric` to the adapter binary.
+#
+# Triggered on `pull_request` + `push: [main]` to keep main green.
+# Files under `.github/workflows/examples/` are documentation only and
+# do not auto-trigger (subdirectories ignored by GHA).
+name: Quick-start dogfood smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quickstart-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # sticky comment under the dedicated header
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # ----------------------------------------------------------------
+      # Build BOTH adapter binaries from the PR source and stage them
+      # onto PATH so the action's pre-installed-binary detection short-
+      # circuits its binstall steps (same pattern as
+      # `scorecard-smoke-ts` / `scorecard-smoke-multi-lang` in ci.yml).
+      # This dogfoods THIS PR's adapter binaries, not whatever
+      # `cargo binstall crap4rs/crap4ts` would resolve to — closing the
+      # version-drift surface between adapter source and the action.
+      # ----------------------------------------------------------------
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+        with:
+          tool: cargo-nextest@0.9
+      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+        with:
+          tool: cargo-llvm-cov@0.6
+
+      - name: Build PR adapter binaries (crap4rs + crap4ts)
+        run: cargo build --release --package crap4rs --package crap4ts
+
+      - name: Stage PR binaries as pre-installed adapters
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cargo/bin"
+          install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
+          install -m 0755 ./target/release/crap4ts  "$HOME/.cargo/bin/crap4ts"
+          crap4rs --version
+          crap4ts --version
+
+      # ----------------------------------------------------------------
+      # Generate Rust LCOV for the workspace. The smoke runs cold, no
+      # cross-workflow artifact reuse: separate workflow files can't
+      # share artifacts cleanly, and the 15-min budget IS the cold-run
+      # metric-of-record. If we can't finish in 15 min cold, that's the
+      # ergonomic signal.
+      # ----------------------------------------------------------------
+      - name: Generate Rust LCOV (workspace)
+        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
+
+      # ----------------------------------------------------------------
+      # Prepare a TS Istanbul fixture under a stable workspace path so
+      # the action's `coverage-ts:` + `src-ts:` resolve the coverage
+      # `path` entries cleanly. Same template substitution pattern as
+      # `scorecard-smoke-ts` (ci.yml).
+      # ----------------------------------------------------------------
+      - name: Prepare Istanbul JSON fixture (TS side)
+        id: ts-fixture
+        env:
+          SRC_ROOT: ${{ runner.temp }}/ts-quickstart-smoke
+        run: |
+          set -euo pipefail
+          mkdir -p "$SRC_ROOT"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/simple.ts   "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/arrow.ts    "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/Button.tsx  "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/map.ts      "$SRC_ROOT/"
+          cp crates/crap4ts/tests/fixtures/ts-fixtures/mixed.ts    "$SRC_ROOT/"
+          sed "s|{SRC_ROOT}|$SRC_ROOT|g" \
+            crates/crap4ts/tests/fixtures/istanbul-jest/coverage-final.json \
+            > "$SRC_ROOT/coverage-final.json"
+          echo "coverage=$SRC_ROOT/coverage-final.json" >> "$GITHUB_OUTPUT"
+          echo "src=$SRC_ROOT" >> "$GITHUB_OUTPUT"
+
+      # ----------------------------------------------------------------
+      # Record wall-clock start BEFORE the action invocation. Gate (a)
+      # asserts (end - start) <= 900s after the action returns.
+      # ----------------------------------------------------------------
+      - name: Record start time
+        id: start-time
+        run: echo "epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # ----------------------------------------------------------------
+      # Invoke the action with the SAME inputs as the templated example
+      # (`.github/workflows/examples/crap-scorecard.yml`), PLUS:
+      #   - `languages: rust,typescript` (instead of `rust`) so the
+      #     multi-language section-headers assertion (gate c) has
+      #     something to check
+      #   - paired `coverage-ts:` + `src-ts:` for the TS side
+      #   - `comment-header: 'crap-scorecard-quickstart-smoke'` to
+      #     avoid sticky collision with `scorecard-smoke-rust`'s
+      #     `crap-scorecard-self`
+      # The templated example uses `languages: rust` because that's
+      # the simplest single-language happy path; this smoke exercises
+      # the multi-language path because it's the strictly-richer
+      # superset (multi-language emits everything single-language does
+      # PLUS the wrapper + per-lang headers + 2 artifacts).
+      # ----------------------------------------------------------------
+      - name: Invoke crap-scorecard (multi-language dogfood)
+        id: crap
+        uses: ./.github/actions/scorecard
+        with:
+          coverage:    lcov.info
+          coverage-ts: ${{ steps.ts-fixture.outputs.coverage }}
+          src:    crates/crap4rs/src
+          src-ts: ${{ steps.ts-fixture.outputs.src }}
+          threshold-preset: default
+          run-mode: full        # no baseline produced in this smoke
+          # PR delta #295 user-review: enable the analysis gate at
+          # threshold=15 so the project actually enforces what its
+          # templated example advocates. Today the workspace passes at
+          # threshold=15 (zero functions above); when crap-rs#273
+          # cleanup lands, both this gate and the templated example flip
+          # to `threshold-preset: strict` (=8) without further plumbing.
+          gate-mode: gate-on-analysis
+          comment-mode: sticky
+          comment-header: 'crap-scorecard-quickstart-smoke'
+          html-report: true
+          languages: rust,typescript
+
+      # ================================================================
+      # Assertions
+      # ================================================================
+
+      # Gate (a) — wall-clock <= 900s (15 min). Hard gate; soft-failing
+      # would let the ergonomic-success budget rot silently.
+      - name: Gate (a) — wall-clock <= 15 minutes
+        env:
+          T_START: ${{ steps.start-time.outputs.epoch }}
+        run: |
+          set -euo pipefail
+          T_END="$(date +%s)"
+          ELAPSED=$(( T_END - T_START ))
+          echo "Wall-clock: ${ELAPSED}s (budget: 900s)"
+          if [ "$ELAPSED" -gt 900 ]; then
+            echo "::error::Quick-start smoke exceeded 15-minute budget (${ELAPSED}s > 900s). The templated example's ergonomic-success metric is the cold-runner end-to-end time; if this is bleeding, the user experience is degrading."
+            exit 1
+          fi
+
+      # Gate (b) — `outputs.markdown` non-empty.
+      - name: Gate (b) — markdown output non-empty
+        env:
+          MARKDOWN: ${{ steps.crap.outputs.markdown }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MARKDOWN" ]; then
+            echo "::error::action's markdown output is empty"
+            exit 1
+          fi
+          # Don't echo the whole markdown into logs — it's already in
+          # the sticky comment. Just confirm size.
+          BYTES=$(printf '%s' "$MARKDOWN" | wc -c)
+          echo "markdown output: ${BYTES} bytes"
+
+      # Gate (c) — multi-language section headers present.
+      - name: Gate (c) — multi-language section headers in combined markdown
+        env:
+          MARKDOWN: ${{ steps.crap.outputs.markdown }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s\n' "$MARKDOWN" | grep -qF '### Rust (crap4rs)'; then
+            echo "::error::combined markdown missing '### Rust (crap4rs)' section header"
+            exit 1
+          fi
+          if ! printf '%s\n' "$MARKDOWN" | grep -qF '### TypeScript (crap4ts)'; then
+            echo "::error::combined markdown missing '### TypeScript (crap4ts)' section header"
+            exit 1
+          fi
+          echo "both per-language section headers present"
+
+      # Gate (d) — HTML artifact uploaded. Use the action-level outputs
+      # (non-empty iff upload succeeded) rather than `gh api .../runs/$id/artifacts`
+      # which would need an `actions: read` perm elevation. Matches the
+      # γ smoke pattern.
+      - name: Gate (d) — HTML artifacts uploaded (both languages)
+        env:
+          URL_RUST: ${{ steps.crap.outputs.html-artifact-url-rust }}
+          URL_TS:   ${{ steps.crap.outputs.html-artifact-url-typescript }}
+        run: |
+          set -euo pipefail
+          if [ -z "$URL_RUST" ]; then
+            echo "::error::html-artifact-url-rust is empty (Rust HTML upload failed or output not surfaced)"
+            exit 1
+          fi
+          if [ -z "$URL_TS" ]; then
+            echo "::error::html-artifact-url-typescript is empty (TS HTML upload failed or output not surfaced)"
+            exit 1
+          fi
+          echo "Rust HTML artifact URL: $URL_RUST"
+          echo "TS   HTML artifact URL: $URL_TS"
+
+      # Gate (e) — sticky comment posted (only on `pull_request`).
+      # Skips on `push` events (no PR context to read comments from).
+      - name: Gate (e) — sticky comment posted under the quickstart header
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # The sticky-comment action posts a hidden HTML marker that
+          # encodes the comment-header — search for the header string
+          # in the comment bodies.
+          if gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
+               --jq '.[].body' \
+             | grep -qF 'crap-scorecard-quickstart-smoke'; then
+            echo "sticky comment under header 'crap-scorecard-quickstart-smoke' found"
+          else
+            echo "::error::no sticky comment found under header 'crap-scorecard-quickstart-smoke'"
+            exit 1
+          fi
+
+      # Gate (f) — metric-default mechanical assertion (ADR-d). The
+      # action never passes `--metric` to the adapter binaries; each
+      # adapter falls back to its language-appropriate default
+      # (`AdapterMeta::default_metric`). This step shells the adapters
+      # directly and proves the JSON envelope's `.metric` field
+      # matches the documented defaults. If either side drifts (e.g. a
+      # main-branch refactor flips a default), this gate fails loudly
+      # and the templated example's "no metric decision required"
+      # ergonomic guarantee no longer holds.
+      - name: Gate (f) — metric-default invariant (crap4rs=cognitive, crap4ts=cyclomatic)
+        env:
+          TS_COVERAGE: ${{ steps.ts-fixture.outputs.coverage }}
+          TS_SRC:      ${{ steps.ts-fixture.outputs.src }}
+        run: |
+          set -euo pipefail
+
+          RUST_METRIC=$(crap4rs --coverage lcov.info --src crates/crap-core/src --format json --no-fail | jq -r '.metric')
+          if [ "$RUST_METRIC" != "cognitive" ]; then
+            echo "::error::crap4rs default metric drift: .metric is '$RUST_METRIC', expected 'cognitive' per ADR-d (see crap-rs#218)"
+            exit 1
+          fi
+          echo "crap4rs --format json | jq -r .metric = cognitive  ok"
+
+          TS_METRIC=$(crap4ts --coverage "$TS_COVERAGE" --src "$TS_SRC" --format json --no-fail | jq -r '.metric')
+          if [ "$TS_METRIC" != "cyclomatic" ]; then
+            echo "::error::crap4ts default metric drift: .metric is '$TS_METRIC', expected 'cyclomatic' per ADR-d (see crap-rs#218)"
+            exit 1
+          fi
+          echo "crap4ts  --format json | jq -r .metric = cyclomatic ok"
+
+      # Gate (g) — `--format table` dogfood (the human-facing terminal
+      # output format). PR delta #295 user-review: dogfood every output
+      # format from a single CI job. The table reporter renders to
+      # stdout via comfy-table; the assertion checks the output is
+      # non-empty AND carries the expected column headers so a future
+      # renderer regression that emits an empty table (e.g. an off-by-
+      # one filter) surfaces here.
+      #
+      # SIGPIPE gotcha: under `set -o pipefail`, `printf | grep -q`
+      # propagates printf's SIGPIPE (exit 141) as the pipeline exit
+      # whenever grep matches and exits before printf finishes writing.
+      # `if !` then inverts the false-positive non-zero, entering the
+      # error branch on what was actually a successful match. Bash's
+      # native `=~` regex operator avoids the pipe entirely.
+      - name: Gate (g) — --format table dogfood (crap4rs + crap4ts)
+        env:
+          TS_COVERAGE: ${{ steps.ts-fixture.outputs.coverage }}
+          TS_SRC:      ${{ steps.ts-fixture.outputs.src }}
+        run: |
+          set -euo pipefail
+          RUST_TABLE=$(crap4rs --coverage lcov.info --src crates/crap-core/src --format table --no-fail)
+          RUST_BYTES=${#RUST_TABLE}
+          if [ "$RUST_BYTES" -lt 100 ]; then
+            echo "::error::crap4rs --format table output too small (${RUST_BYTES} bytes); expected at least 100 bytes of table content"
+            exit 1
+          fi
+          if [[ ! "$RUST_TABLE" =~ (CRAP|Risk|Function) ]]; then
+            echo "::error::crap4rs --format table missing expected column headers (CRAP|Risk|Function)"
+            exit 1
+          fi
+          echo "crap4rs --format table = ${RUST_BYTES} bytes with expected headers ok"
+
+          TS_TABLE=$(crap4ts --coverage "$TS_COVERAGE" --src "$TS_SRC" --format table --no-fail)
+          TS_BYTES=${#TS_TABLE}
+          if [ "$TS_BYTES" -lt 100 ]; then
+            echo "::error::crap4ts --format table output too small (${TS_BYTES} bytes); expected at least 100 bytes of table content"
+            exit 1
+          fi
+          if [[ ! "$TS_TABLE" =~ (CRAP|Risk|Function) ]]; then
+            echo "::error::crap4ts --format table missing expected column headers (CRAP|Risk|Function)"
+            exit 1
+          fi
+          echo "crap4ts  --format table = ${TS_BYTES} bytes with expected headers ok"
+
+      # Gate (h) — `--format scorecard-row` dogfood (single-line JSON
+      # row for aggregator/dashboard consumers, per the locked Row::CrapDelta
+      # schema enforced by `crates/crap-core/tests/scorecard_row_parity.rs`).
+      # Assert the output parses as JSON AND carries every top-level key
+      # consumers rely on. Both adapters MUST emit the structurally-
+      # identical shape (the parity test guards this in-process; this
+      # gate guards end-to-end).
+      - name: Gate (h) — --format scorecard-row dogfood (crap4rs + crap4ts)
+        env:
+          TS_COVERAGE: ${{ steps.ts-fixture.outputs.coverage }}
+          TS_SRC:      ${{ steps.ts-fixture.outputs.src }}
+        run: |
+          set -euo pipefail
+          for bin in crap4rs crap4ts; do
+            if [ "$bin" = "crap4rs" ]; then
+              ROW=$($bin --coverage lcov.info --src crates/crap-core/src --format scorecard-row --no-fail)
+            else
+              ROW=$($bin --coverage "$TS_COVERAGE" --src "$TS_SRC" --format scorecard-row --no-fail)
+            fi
+            if ! printf '%s' "$ROW" | jq -e . >/dev/null 2>&1; then
+              echo "::error::$bin --format scorecard-row produced invalid JSON"
+              echo "got: $ROW"
+              exit 1
+            fi
+            for key in type id label anchor status; do
+              if ! printf '%s' "$ROW" | jq -e --arg k "$key" 'has($k)' >/dev/null 2>&1; then
+                echo "::error::$bin --format scorecard-row missing required key '$key' (Row::CrapDelta schema)"
+                exit 1
+              fi
+            done
+            echo "$bin --format scorecard-row = valid JSON with all required keys ok"
+          done
