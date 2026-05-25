@@ -14,7 +14,7 @@ pub mod table;
 pub use advice_summary::render_summary as render_advice_summary;
 pub use csv::format_csv;
 pub use github_annotations::format_github_annotations;
-pub use html::format_html;
+pub use html::{HtmlMultiOptions, format_html, format_html_multi};
 pub use json::{JsonConfig, format_json};
 pub use markdown::format_markdown;
 pub use sarif::format_sarif;

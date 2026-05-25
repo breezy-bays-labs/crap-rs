@@ -231,6 +231,7 @@ mod tests {
                 tool_name: tool_name.to_string(),
                 display_name: display_name.to_string(),
                 language: language.to_string(),
+                tool_version: "0.0.0-test".to_string(),
                 metric,
                 threshold,
                 view: view::apply(&self.result, ViewSpec::default()),

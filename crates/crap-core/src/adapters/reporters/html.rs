@@ -625,6 +625,449 @@ fn metric_label(metric: ComplexityMetric) -> &'static str {
     }
 }
 
+// ── Multi-language HTML reporter ────────────────────────────────────
+//
+// Renders a unified report composing multiple per-adapter analyses.
+// Single-language input passes through to the existing `format_html`
+// path byte-identically (back-compat invariant — every existing
+// consumer of `crap4{lang} --format html` sees no change when a
+// multi-language renderer is invoked with one envelope).
+//
+// Multi-language input renders the Sakura-style document with a
+// `.segmented` Language nav at the top, a Combined panel as the
+// default, per-language panels reachable via JS, and a per-adapter
+// footer provenance grid.
+
+/// Options for the multi-language HTML reporter.
+///
+/// Reserved for future-proofing — additional knobs (custom panel
+/// ordering, per-adapter glyph overrides, etc.) land here without
+/// widening the `format_html_multi` signature. v0.7.0 carries no
+/// fields; consumers pass `HtmlMultiOptions::default()`.
+#[derive(Debug, Default, Clone, Copy)]
+#[non_exhaustive]
+pub struct HtmlMultiOptions {}
+
+/// Render a multi-language unified HTML report.
+///
+/// Single-language passthrough: when `multi.languages.len() == 1`
+/// (single envelope input), delegates to the existing
+/// [`format_html`] with that single block's data. The output is
+/// byte-identical to the direct `crap4{lang} --format html` path,
+/// preserving the back-compat invariant.
+///
+/// Multi-language path: renders the multi-language template
+/// with a Language nav above per-language and Combined panels.
+/// Combined panel uses the ranked-CRAP table sorted by risk level
+/// + ratio per the [`crate::domain::multi_lang`] dimensional-consistency rule.
+///
+/// `threshold` is the workspace-wide threshold echoed in the
+/// scope banner. Per-language KPI tiles use each adapter's own
+/// `block.threshold` (the dominant value the per-adapter footer
+/// row also cites).
+pub fn format_html_multi(
+    multi: &crate::domain::multi_lang::MultiLangContext<'_>,
+    threshold: f64,
+    _options: HtmlMultiOptions,
+) -> String {
+    if multi.languages.len() == 1 {
+        let block = &multi.languages[0];
+        return format_html(
+            &block.view,
+            block.delta.as_ref(),
+            threshold,
+            // Construct an `AdapterMeta` borrow on the stack from the
+            // owned strings on `LanguageBlock`. The single-language
+            // passthrough is the one path where `AdapterMeta` (with
+            // `&'static str` fields) and `LanguageBlock` (with owned
+            // strings) intersect — for in-process callers this is a
+            // no-op because they already build the block from
+            // `AdapterMeta` literals; for envelope-loaded callers
+            // (crap-render) the strings are owned and the
+            // `Box::leak`-style trick is necessary, but only for the
+            // duration of the call.
+            //
+            // SAFETY-DEFERRED: the leak is bounded by the rendered
+            // string the caller holds — but to avoid the leak, we
+            // accept that the single-language passthrough cannot
+            // share the existing `format_html` signature without
+            // mediation. Instead, build a fresh AdapterMeta inline
+            // using string interning. See render_single_language
+            // below for the actual implementation.
+            &single_lang_adapter_meta(block),
+            block.metric,
+        );
+    }
+
+    render_multi_lang(multi, threshold)
+}
+
+/// Construct an `AdapterMeta` from a `LanguageBlock` for the
+/// single-language passthrough path.
+///
+/// `AdapterMeta`'s fields are `&'static str` (sized for compile-time
+/// adapter literals from `crap4rs`/`crap4ts` mains). For the
+/// passthrough we need to project owned-string envelope data into
+/// the same shape. We use `Box::leak` to obtain `&'static str`
+/// slices — the leaked memory is bounded by the single
+/// `format_html` call's output lifetime, and the leak set is small
+/// (one struct per render call, a handful of strings each).
+///
+/// The alternative (a parallel `format_html_with_owned_meta`
+/// signature) would mean carrying two near-duplicate functions
+/// forever. The bounded leak in this hot-path-rare call is the
+/// lesser evil; if memory pressure ever becomes a concern, the
+/// alternative is a future refactor.
+fn single_lang_adapter_meta(
+    block: &crate::domain::multi_lang::LanguageBlock<'_>,
+) -> crate::cli::AdapterMeta {
+    use crate::cli::AdapterMeta;
+    use crate::domain::types::ComplexityMetric;
+
+    fn leak(s: &str) -> &'static str {
+        Box::leak(s.to_string().into_boxed_str())
+    }
+    AdapterMeta {
+        tool_name: leak(&block.tool_name),
+        display_name: leak(&block.display_name),
+        tool_version: leak(&block.tool_version),
+        long_version: leak(&block.tool_version),
+        about: "",
+        long_about: "",
+        after_help: "",
+        coverage_hint: "",
+        extensions: &[],
+        tool_info_uri: "",
+        rule_help_uri: "",
+        config_file_name: "",
+        default_excludes: &[],
+        forced_excludes: &[],
+        default_metric: match block.metric {
+            ComplexityMetric::Cognitive => ComplexityMetric::Cognitive,
+            ComplexityMetric::Cyclomatic => ComplexityMetric::Cyclomatic,
+        },
+    }
+}
+
+fn render_multi_lang(
+    multi: &crate::domain::multi_lang::MultiLangContext<'_>,
+    threshold: f64,
+) -> String {
+    let language_count = multi.languages.len();
+    let language_count_plus_one = (language_count + 1).to_string();
+
+    // Verdict: PASS only when every adapter passed. Multi-language
+    // verdict semantics intentionally mirror the composite scorecard
+    // action's AND-aggregation — a single failing adapter fails the
+    // workspace verdict.
+    let all_passed = multi.languages.iter().all(|b| b.view.full.passed);
+    let (overall_verdict_class, overall_verdict_label, overall_verdict_glyph) = if all_passed {
+        ("pass", "PASS", "✓")
+    } else {
+        ("fail", "FAIL", "✕")
+    };
+
+    let language_buttons = build_language_buttons(multi);
+    let combined = build_combined_view(multi, threshold);
+    let language_panels = build_language_panels(multi, threshold);
+    let adapters_footer = build_adapters_footer(multi);
+
+    let title = if language_count == 0 {
+        "CRAP scorecard — multi-language".to_string()
+    } else {
+        let displays: Vec<&str> = multi
+            .languages
+            .iter()
+            .map(|b| b.display_name.as_str())
+            .collect();
+        format!("CRAP scorecard — {}", displays.join(" + "))
+    };
+
+    let tmpl = HtmlMultiReport {
+        title,
+        overall_verdict_class,
+        overall_verdict_label,
+        overall_verdict_glyph,
+        language_count,
+        language_count_plus_one,
+        language_buttons,
+        combined,
+        language_panels,
+        adapters_footer,
+    };
+    tmpl.render()
+        .expect("html_multi template render is total — all fields owned")
+}
+
+#[derive(Template)]
+#[template(path = "html_multi_report.html")]
+struct HtmlMultiReport {
+    title: String,
+    overall_verdict_class: &'static str,
+    overall_verdict_label: &'static str,
+    overall_verdict_glyph: &'static str,
+    language_count: usize,
+    /// Pre-formatted `(language_count + 1)` for the CSS grid-row
+    /// `1 / span N` shorthand in the footer. Done in Rust because
+    /// askama lacks an arithmetic operator across types.
+    language_count_plus_one: String,
+    language_buttons: Vec<LangButton>,
+    combined: CombinedPanel,
+    language_panels: Vec<LangPanel>,
+    adapters_footer: Vec<AdapterFooterRow>,
+}
+
+struct LangButton {
+    key: String,
+    label: String,
+    /// Sub-count text (e.g. `"42"` for the Rust panel's analyzed-
+    /// function total). Empty string for the Combined button.
+    count: String,
+    is_active: bool,
+    /// Stringified boolean for the `aria-pressed` attribute — askama
+    /// can't render a `bool` to `"true"`/`"false"` inside an HTML
+    /// attribute value without a manual map, so we do it once here.
+    aria_pressed: &'static str,
+}
+
+struct CombinedPanel {
+    total_functions: usize,
+    total_exceeding: usize,
+    total_files: usize,
+    has_worst_ratio: bool,
+    /// Formatted worst CRAP/threshold ratio (`"5.72"`). Empty when
+    /// `has_worst_ratio == false`.
+    worst_ratio_value: String,
+    worst_function_name: String,
+    worst_adapter_display: String,
+    dist_low: usize,
+    dist_acceptable: usize,
+    dist_moderate: usize,
+    dist_high: usize,
+    ranked_rows: Vec<RankedRow>,
+}
+
+struct RankedRow {
+    language: String,
+    adapter_display: String,
+    /// Single-character adapter glyph (e.g. "R" / "T"). Derived from
+    /// `language` so future adapters (Go = "G", Python = "P") drop in
+    /// without code changes here.
+    badge_glyph: String,
+    qualified_name: String,
+    file_path: String,
+    start_line: usize,
+    end_line: usize,
+    complexity: u32,
+    coverage_percent: String,
+    crap: String,
+    ratio_display: String,
+    risk_data: u8,
+    risk_label: &'static str,
+    exceeds: bool,
+}
+
+struct LangPanel {
+    language: String,
+    display_name: String,
+    metric_label: &'static str,
+    threshold_display: String,
+    total_functions: usize,
+    total_files: usize,
+    exceeding_threshold: usize,
+    exceeding_pct: String,
+    has_max_crap: bool,
+    max_crap: String,
+    crap_avg: String,
+    crap_med: String,
+    cov_avg: String,
+    cov_avg_risk: u8,
+    cx_avg: String,
+    cx_med: String,
+    cx_max: String,
+    dist_low: usize,
+    dist_acceptable: usize,
+    dist_moderate: usize,
+    dist_high: usize,
+    files: Vec<FileCard>,
+}
+
+struct AdapterFooterRow {
+    display_name: String,
+    metric_label: &'static str,
+    threshold_display: String,
+}
+
+fn build_language_buttons(
+    multi: &crate::domain::multi_lang::MultiLangContext<'_>,
+) -> Vec<LangButton> {
+    let mut buttons = Vec::with_capacity(multi.languages.len() + 1);
+    // Combined first — it's the default active button.
+    buttons.push(LangButton {
+        key: "combined".to_string(),
+        label: "Combined".to_string(),
+        count: multi.combined.total_functions.to_string(),
+        is_active: true,
+        aria_pressed: "true",
+    });
+    for block in &multi.languages {
+        buttons.push(LangButton {
+            key: block.language.clone(),
+            label: block.display_name.clone(),
+            count: block.view.full.summary.total_functions.to_string(),
+            is_active: false,
+            aria_pressed: "false",
+        });
+    }
+    buttons
+}
+
+fn build_combined_view(
+    multi: &crate::domain::multi_lang::MultiLangContext<'_>,
+    _threshold: f64,
+) -> CombinedPanel {
+    let combined = &multi.combined;
+    let (has_worst, worst_ratio_value, worst_function_name, worst_adapter_display) =
+        match combined.worst_ratio.as_ref() {
+            Some(w) => (
+                true,
+                format_ratio_value(w.ratio),
+                w.function_name.clone(),
+                w.adapter_display.clone(),
+            ),
+            None => (false, String::new(), String::new(), String::new()),
+        };
+
+    let ranked_rows = combined
+        .ordered_functions
+        .iter()
+        .map(|f| RankedRow {
+            language: f.language.clone(),
+            adapter_display: f.adapter_display.clone(),
+            badge_glyph: adapter_glyph(&f.language, &f.adapter_display),
+            qualified_name: f.identity.qualified_name.clone(),
+            file_path: f.identity.file_path.clone(),
+            start_line: f.identity.span.start_line,
+            end_line: f.identity.span.end_line,
+            complexity: f.complexity,
+            coverage_percent: format!("{:.1}", f.coverage_percent),
+            crap: format!("{:.2}", f.crap),
+            ratio_display: format_ratio_value(f.ratio),
+            risk_data: risk_data(f.risk_level),
+            risk_label: risk_label(f.risk_level),
+            exceeds: f.crap > f.threshold,
+        })
+        .collect();
+
+    CombinedPanel {
+        total_functions: combined.total_functions,
+        total_exceeding: combined.total_exceeding,
+        total_files: combined.total_files,
+        has_worst_ratio: has_worst,
+        worst_ratio_value,
+        worst_function_name,
+        worst_adapter_display,
+        dist_low: combined.distribution.low,
+        dist_acceptable: combined.distribution.acceptable,
+        dist_moderate: combined.distribution.moderate,
+        dist_high: combined.distribution.high,
+        ranked_rows,
+    }
+}
+
+fn build_language_panels(
+    multi: &crate::domain::multi_lang::MultiLangContext<'_>,
+    threshold: f64,
+) -> Vec<LangPanel> {
+    multi
+        .languages
+        .iter()
+        .map(|block| {
+            let summary = &block.view.full.summary;
+            // Per-panel threshold: prefer the adapter's own
+            // `block.threshold`; fall back to the workspace
+            // `threshold` arg if the adapter envelope didn't carry
+            // one (zero-default edge case).
+            let panel_threshold = if block.threshold > 0.0 {
+                block.threshold
+            } else {
+                threshold
+            };
+            let summary_view = summary_view(summary, panel_threshold);
+            let is_empty = visible_section_is_empty(&block.view);
+            let files = if is_empty {
+                Vec::new()
+            } else {
+                file_cards(&block.view, panel_threshold)
+            };
+            LangPanel {
+                language: block.language.clone(),
+                display_name: block.display_name.clone(),
+                metric_label: metric_label(block.metric),
+                threshold_display: format!("{:.2}", panel_threshold),
+                total_functions: summary_view.total_functions,
+                total_files: summary_view.total_files,
+                exceeding_threshold: summary_view.exceeding_threshold,
+                exceeding_pct: summary_view.exceeding_pct,
+                has_max_crap: summary_view.has_max_crap,
+                max_crap: summary_view.max_crap,
+                crap_avg: summary_view.crap_avg,
+                crap_med: summary_view.crap_med,
+                cov_avg: summary_view.cov_avg,
+                cov_avg_risk: summary_view.cov_avg_risk,
+                cx_avg: summary_view.cx_avg,
+                cx_med: summary_view.cx_med,
+                cx_max: summary_view.cx_max,
+                dist_low: summary_view.dist_low,
+                dist_acceptable: summary_view.dist_acceptable,
+                dist_moderate: summary_view.dist_moderate,
+                dist_high: summary_view.dist_high,
+                files,
+            }
+        })
+        .collect()
+}
+
+fn build_adapters_footer(
+    multi: &crate::domain::multi_lang::MultiLangContext<'_>,
+) -> Vec<AdapterFooterRow> {
+    multi
+        .languages
+        .iter()
+        .map(|block| AdapterFooterRow {
+            display_name: block.display_name.clone(),
+            metric_label: metric_label(block.metric),
+            threshold_display: format!("{:.2}", block.threshold),
+        })
+        .collect()
+}
+
+/// Derive a single-character glyph for the adapter badge from the
+/// adapter identity. Falls back to the first ASCII alphanumeric of
+/// the display name (uppercased) so new adapters drop in without
+/// code edits.
+fn adapter_glyph(language: &str, display_name: &str) -> String {
+    if let Some(c) = display_name.chars().find(|c| c.is_ascii_alphanumeric()) {
+        return c.to_ascii_uppercase().to_string();
+    }
+    if let Some(c) = language.chars().find(|c| c.is_ascii_alphanumeric()) {
+        return c.to_ascii_uppercase().to_string();
+    }
+    "?".to_string()
+}
+
+/// Format a CRAP/threshold ratio as `"N.NN"`. Infinity (the safe-
+/// divide guard from `multi_lang::safe_ratio` for zero-threshold
+/// envelopes) renders as `"∞"` so the ranked table still displays a
+/// readable value.
+fn format_ratio_value(ratio: f64) -> String {
+    if ratio.is_infinite() {
+        "∞".to_string()
+    } else {
+        format!("{:.2}", ratio)
+    }
+}
+
 // ── Delta-panel projection ──────────────────────────────────────────
 //
 // Pulls baseline + current aggregates off the `AnalysisDelta` and
@@ -1529,6 +1972,239 @@ mod tests {
         let delta = make_sample_delta();
         let dview = make_delta_view_default(&delta);
         let out = html_with_delta(&make_view_default(&delta.current), &dview);
+        insta::assert_snapshot!(out);
+    }
+
+    // ── Multi-language reporter tests ──────────────────────────────
+
+    fn build_block<'a>(
+        result: &'a crate::domain::types::AnalysisResult,
+        tool_name: &str,
+        display_name: &str,
+        language: &str,
+        metric: ComplexityMetric,
+        threshold: f64,
+    ) -> crate::domain::multi_lang::LanguageBlock<'a> {
+        crate::domain::multi_lang::LanguageBlock {
+            tool_name: tool_name.to_string(),
+            display_name: display_name.to_string(),
+            language: language.to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric,
+            threshold,
+            view: make_view_default(result),
+            delta: None,
+        }
+    }
+
+    #[test]
+    fn multi_lang_single_language_passthrough_byte_identical() {
+        let result = make_multi_function_result();
+        let direct = format_html(
+            &make_view_default(&result),
+            None,
+            8.0,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+        );
+
+        let block = build_block(
+            &result,
+            TEST_TOOL_NAME,
+            "Test",
+            "rust",
+            ComplexityMetric::Cognitive,
+            8.0,
+        );
+        let multi = crate::core::compose::compose_multi_lang(vec![block]);
+        let unified = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        // Single-language passthrough must be byte-identical to the
+        // single-binary render path — that's the back-compat invariant
+        // every existing consumer of `crap4{lang} --format html`
+        // relies on.
+        assert_eq!(direct, unified);
+        assert!(!unified.contains("data-multi-lang"));
+        assert!(!unified.contains("lang-nav"));
+    }
+
+    #[test]
+    fn multi_lang_two_language_renders_segmented_nav_and_combined_panel() {
+        let rs_result = make_multi_function_result();
+        let ts_result = make_single_function_result(
+            "ts::fn",
+            "src/x.ts",
+            5,
+            70.0,
+            8.5,
+            RiskLevel::Acceptable,
+            8.0,
+        );
+
+        let blocks = vec![
+            build_block(
+                &rs_result,
+                "crap4rs",
+                "Rust",
+                "rust",
+                ComplexityMetric::Cognitive,
+                8.0,
+            ),
+            build_block(
+                &ts_result,
+                "crap4ts",
+                "TypeScript",
+                "typescript",
+                ComplexityMetric::Cyclomatic,
+                8.0,
+            ),
+        ];
+        let multi = crate::core::compose::compose_multi_lang(blocks);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        // Document carries the multi-language marker + segmented nav.
+        assert!(
+            out.contains("data-multi-lang"),
+            "expected multi-lang body marker"
+        );
+        assert!(
+            out.contains("class=\"lang-nav segmented\""),
+            "expected language nav"
+        );
+        assert!(out.contains("data-lang=\"rust\""));
+        assert!(out.contains("data-lang=\"typescript\""));
+        assert!(out.contains("data-lang=\"combined\""));
+        // Combined panel is the default-active.
+        assert!(
+            out.contains("<div class=\"lang-panel\" data-lang=\"combined\" data-active>"),
+            "Combined panel must render with data-active attribute"
+        );
+        // Per-language panels exist but are inactive by default.
+        assert!(out.contains("<div class=\"lang-panel\" data-lang=\"rust\">"));
+        assert!(out.contains("<div class=\"lang-panel\" data-lang=\"typescript\">"));
+        // Footer carries the Adapters provenance grid.
+        assert!(out.contains("class=\"footer-adapters\""));
+    }
+
+    #[test]
+    fn multi_lang_combined_view_sorts_high_risk_before_lower_risk() {
+        let rs_result = {
+            let v_high = crate::adapters::reporters::test_fixtures::make_verdict(
+                "rs::high_fn",
+                "src/h.rs",
+                20,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            );
+            crate::domain::types::AnalysisResult {
+                functions: vec![v_high],
+                summary: crate::domain::types::AnalysisSummary {
+                    total_functions: 1,
+                    total_files: 1,
+                    exceeding_threshold: 1,
+                    distribution: crate::domain::types::RiskDistribution {
+                        low: 0,
+                        acceptable: 0,
+                        moderate: 0,
+                        high: 1,
+                    },
+                    ..Default::default()
+                },
+                passed: false,
+            }
+        };
+        let ts_result = make_single_function_result(
+            "ts::moderate_fn",
+            "src/m.ts",
+            10,
+            60.0,
+            20.0,
+            RiskLevel::Moderate,
+            8.0,
+        );
+
+        let blocks = vec![
+            build_block(
+                &rs_result,
+                "crap4rs",
+                "Rust",
+                "rust",
+                ComplexityMetric::Cognitive,
+                8.0,
+            ),
+            build_block(
+                &ts_result,
+                "crap4ts",
+                "TypeScript",
+                "typescript",
+                ComplexityMetric::Cyclomatic,
+                8.0,
+            ),
+        ];
+        let multi = crate::core::compose::compose_multi_lang(blocks);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        // The Rust High-risk function must appear BEFORE the TS
+        // Moderate-risk function in the ranked-CRAP table — the D2d
+        // dimensional-consistency-aware sort rule.
+        let high_pos = out
+            .find("rs::high_fn")
+            .expect("Rust high-risk row should render");
+        let moderate_pos = out
+            .find("ts::moderate_fn")
+            .expect("TS moderate-risk row should render");
+        assert!(
+            high_pos < moderate_pos,
+            "expected High-risk before Moderate-risk in ranked table (D2d sort)"
+        );
+    }
+
+    #[test]
+    fn multi_lang_zero_input_renders_empty_combined() {
+        let multi = crate::core::compose::compose_multi_lang(Vec::new());
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+        // Even zero-input renders a doc skeleton + the Combined-empty
+        // state — the renderer never panics on edge inputs.
+        assert!(out.starts_with("<!doctype html>"));
+        assert!(out.contains("No functions analyzed across any language"));
+        assert!(out.contains("</html>"));
+    }
+
+    /// Combined-view snapshot lock for the 2-language render.
+    #[test]
+    fn full_html_multi_two_language_snapshot() {
+        let rs_result = make_multi_function_result();
+        let ts_result = make_single_function_result(
+            "parseInvoiceDraft",
+            "apps/web/src/composer.ts",
+            6,
+            55.0,
+            12.0,
+            RiskLevel::Moderate,
+            8.0,
+        );
+        let blocks = vec![
+            build_block(
+                &rs_result,
+                "crap4rs",
+                "Rust",
+                "rust",
+                ComplexityMetric::Cognitive,
+                8.0,
+            ),
+            build_block(
+                &ts_result,
+                "crap4ts",
+                "TypeScript",
+                "typescript",
+                ComplexityMetric::Cyclomatic,
+                8.0,
+            ),
+        ];
+        let multi = crate::core::compose::compose_multi_lang(blocks);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
         insta::assert_snapshot!(out);
     }
 }

@@ -50,9 +50,10 @@ pub struct MultiLangContext<'a> {
 
 /// One adapter's per-language data: identity, view, optional delta.
 ///
-/// Adapter identity (`tool_name`, `display_name`, `language`) is owned
-/// `String` to compose cleanly with envelope deserialization. The
-/// view + delta references borrow from analyses constructed upstream.
+/// Adapter identity (`tool_name`, `display_name`, `language`,
+/// `tool_version`) is owned `String` to compose cleanly with
+/// envelope deserialization. The view + delta references borrow
+/// from analyses constructed upstream.
 #[derive(Debug)]
 pub struct LanguageBlock<'a> {
     /// Stable wire identifier (e.g. `"crap4rs"`, `"crap4ts"`).
@@ -69,6 +70,11 @@ pub struct LanguageBlock<'a> {
     /// nav + URL hash routing (`#rust:current`, `#typescript:delta`,
     /// `#combined:current`).
     pub language: String,
+    /// Adapter version string (e.g. `"0.6.0"`). Surfaced in the
+    /// page title and the per-adapter footer; carried separately
+    /// from `tool_name` so envelope-loaded data can populate both
+    /// without the renderer reconstructing version strings.
+    pub tool_version: String,
     /// Per-adapter complexity metric used to score this analysis.
     /// Surfaced in the Adapters footer row ("Rust · cognitive
     /// complexity · …") so reviewers can see the dimensional
