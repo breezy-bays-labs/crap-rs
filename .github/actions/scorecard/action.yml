@@ -242,12 +242,13 @@ inputs:
     description: |
       Optional suffix appended to the HTML artifact name(s) to
       disambiguate uploads in matrix-strategy workflows. The action
-      defaults to `-${{ runner.os }}` so a matrix over OS gets
-      `crap4rs-report-Linux` / `crap4rs-report-macOS` cleanly. Override
-      to a custom suffix (e.g. `-${{ matrix.platform }}-${{ matrix.arch }}`)
-      when the matrix exceeds the OS dimension. Without a unique suffix,
-      `actions/upload-artifact@v4+` fails fatally on the second matrix
-      leg attempting to upload to the same artifact name.
+      defaults to `-<runner.os>` (Linux/macOS/Windows) so a matrix
+      over OS gets `crap4rs-report-Linux` / `crap4rs-report-macOS`
+      cleanly. Override to a custom suffix (e.g. a `matrix.platform`
+      + `matrix.arch` combination) when the matrix exceeds the OS
+      dimension. Without a unique suffix, `actions/upload-artifact@v4+`
+      fails fatally on the second matrix leg attempting to upload to
+      the same artifact name.
 
       Only consulted when `html-report: true`.
     required: false
@@ -1273,8 +1274,8 @@ runs:
     #
     # `name:` carries a suffix to disambiguate matrix-strategy uploads.
     # actions/upload-artifact@v4+ fails fatally on second-leg uploads
-    # under the same artifact name; the default `-${{ runner.os }}`
-    # covers the common OS-matrix case (`crap4rs-report-Linux` /
+    # under the same artifact name; the default `-<runner.os>` covers
+    # the common OS-matrix case (`crap4rs-report-Linux` /
     # `crap4rs-report-macOS` cleanly distinguishable). Callers with
     # matrix dimensions beyond OS override via `html-artifact-name-suffix`.
     #
