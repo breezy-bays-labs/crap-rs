@@ -12,11 +12,22 @@ name: release-plz
 #             → release-plz-release      (publishes + creates per-crate tags)
 #                  ├─ build-crap4ts-cdylib → publish-crap4ts-npm   (if crap4ts published)
 #                  └─ build-crap4rs-binaries → upload-crap4rs-assets (if crap4rs published)
+#   pull_request: → sync-crap4ts-package-json  (release-plz-opened PRs only)
 #
 # The cdylib build matrix and npm publish job port verbatim from the
 # retired publish.yml; the binary build matrix ports verbatim from
 # the retired release.yml. Gating on `needs.release-plz-release.outputs`
 # replaces the tag-trigger filtering those workflows used.
+#
+# release-plz-pr / release-plz-release / sync-crap4ts-package-json all
+# operate under an org-wide GitHub App identity (release-plz). The
+# App token is minted by the release-plz-app-token composite (hosted
+# in breezy-bays-labs/.github) and passed to release-plz/action via
+# env GITHUB_TOKEN; the workflow's own GITHUB_TOKEN stays scoped to
+# contents:read. Pushes signed by the App identity fire downstream
+# pull_request workflows (the default GITHUB_TOKEN's pushes don't,
+# which is why the sync job couldn't run from the release PR before
+# this identity adoption).
 #
 # Companion files:
 #   release-plz.toml — multi-crate release-plz config
@@ -27,6 +38,15 @@ name: release-plz
 on:
   push:
     branches: [main]
+  # The sync-crap4ts-package-json job (below) listens for release-plz's
+  # auto-opened release PRs. Both event types are needed: `opened`
+  # catches the initial PR, `synchronize` catches subsequent updates
+  # (release-plz force-pushes the release branch when push:main bumps
+  # the release set). Other jobs in this workflow ignore PR events via
+  # job-level `if: github.event_name == 'push'` gates so they stay
+  # push-only.
+  pull_request:
+    types: [opened, synchronize]
 
 # Least-privilege default; per-job permissions elevate as needed.
 permissions:
@@ -39,18 +59,26 @@ jobs:
   release-plz-pr:
     name: Open/update release PR
     runs-on: ubuntu-latest
+    # Push-only: pull_request events go to sync-crap4ts-package-json.
+    if: github.event_name == 'push'
+    # Scopes the org-level secrets (RELEASE_PLZ_APP_ID +
+    # RELEASE_PLZ_APP_PRIVATE_KEY) to this deployment environment so
+    # other workflows in this repo can't read them by accident.
+    environment: release-plz
     concurrency:
       # Serialize release-PR opens so two concurrent push events don't
       # race to create two competing release PRs against the same ref.
       group: release-plz-pr-${{ github.ref }}
       cancel-in-progress: false
     permissions:
-      contents: write
-      pull-requests: write
+      # The workflow's own GITHUB_TOKEN is intentionally read-only —
+      # all writes (release-PR branch push, PR open/update) happen via
+      # the App token minted below.
+      contents: read
     steps:
       # `persist-credentials: false` — release-plz authenticates with
-      # the GH App / GITHUB_TOKEN directly; the checkout token is not
-      # consumed by subsequent steps and must not linger in the runner.
+      # the App token directly; the checkout token is not consumed by
+      # subsequent steps and must not linger in the runner.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
@@ -65,26 +93,43 @@ jobs:
         with:
           enable-cache: "false"
 
+      - name: Mint release-plz App token
+        id: app-token
+        uses: breezy-bays-labs/.github/actions/release-plz-app-token@bdd828ba04ebe832c4a1da8efd1cc6853aae8302 # release-plz-app-token-v0.1.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
         with:
           command: release-pr
         env:
-          # The action's git-config substep reads GITHUB_TOKEN to query
-          # the GraphQL viewer endpoint and configure the commit author
-          # identity for the auto-opened release PR. The workflow-level
-          # default `permissions: contents: read` plus this job's
-          # contents:write + pull-requests:write grant are what the
-          # short-lived token carries; the env passthrough is the
-          # plumbing release-plz's sub-action expects.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # release-plz/action's git-config substep reads GITHUB_TOKEN
+          # to query the viewer endpoint and configure the commit
+          # author identity for the auto-opened release PR. The App
+          # token carries the write scopes; the workflow's own token
+          # remains read-only.
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
   release-plz-release:
     name: Publish + tag
     runs-on: ubuntu-latest
+    # Push-only: pull_request events go to sync-crap4ts-package-json.
+    if: github.event_name == 'push'
+    # Scopes the org-level App secrets to this deployment environment.
+    environment: release-plz
     permissions:
-      contents: write       # for git tag pushes + downstream gh release create
-      id-token: write       # for crates.io OIDC trusted publishing
-      pull-requests: read   # to read the merged release PR via release-plz outputs
+      # Workflow GITHUB_TOKEN stays read-only — App token (minted
+      # below) does the git tag pushes and gh release creates. The
+      # id-token mint must happen at the workflow-runner level for
+      # crates.io OIDC; pull-requests:read lets release-plz/action
+      # read the merged release PR via the workflow's GITHUB_TOKEN
+      # when that path isn't App-token-mediated.
+      contents: read
+      id-token: write
+      pull-requests: read
     outputs:
       releases: ${{ steps.release-plz.outputs.releases }}
       releases_created: ${{ steps.release-plz.outputs.releases_created }}
@@ -98,10 +143,19 @@ jobs:
         with:
           enable-cache: "false"
 
+      - name: Mint release-plz App token
+        id: app-token
+        uses: breezy-bays-labs/.github/actions/release-plz-app-token@bdd828ba04ebe832c4a1da8efd1cc6853aae8302 # release-plz-app-token-v0.1.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
       - id: release-plz
         uses: release-plz/action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
           command: release
           # CARGO_REGISTRY_TOKEN is intentionally absent: with
@@ -279,15 +333,14 @@ jobs:
         run: npm install -g npm@^11.5.1
 
       - name: Verify package.json + Cargo.toml versions match
-        # Belt-and-braces check. Until the GitHub-App-driven automated
-        # sync ships, packages/crap4ts/package.json is bumped by a
-        # reviewer running scripts/sync-crap4ts-package-json.sh against
-        # the release PR before merge. This step catches the rare case
-        # where the package.json bump was skipped — release-plz would
-        # otherwise publish to crates.io with a fresh Cargo.toml version
-        # while npm receives the stale package.json. The verified
-        # version is exported so the publish step derives the dist-tag
-        # without re-parsing.
+        # Belt-and-braces check. package.json is normally bumped on
+        # the release PR by the sync-crap4ts-package-json job
+        # (release-plz.yml, pull_request-keyed). This step catches the
+        # rare case where that automation didn't run or didn't commit
+        # — release-plz would otherwise publish to crates.io with a
+        # fresh Cargo.toml version while npm receives the stale
+        # package.json. The verified version is exported so the
+        # publish step derives the dist-tag without re-parsing.
         id: verify
         run: |
           set -euo pipefail
@@ -296,7 +349,7 @@ jobs:
           echo "npm:    ${PKG_VERSION}"
           echo "cargo:  ${CARGO_VERSION}"
           if [ "${PKG_VERSION}" != "${CARGO_VERSION}" ]; then
-            echo "::error::version mismatch between package.json (${PKG_VERSION}) and Cargo.toml (${CARGO_VERSION}). Run scripts/sync-crap4ts-package-json.sh on the release PR before merging."
+            echo "::error::version mismatch between package.json (${PKG_VERSION}) and Cargo.toml (${CARGO_VERSION}). The sync-crap4ts-package-json job should have committed the package.json bump on the release PR — check its run log (Actions tab on the merged release PR). As an escape hatch, scripts/sync-crap4ts-package-json.sh can still be run locally against the PR head."
             exit 1
           fi
           echo "version=${CARGO_VERSION}" >> "$GITHUB_OUTPUT"
@@ -438,3 +491,58 @@ jobs:
           fi
           echo "uploading to $TAG"
           gh release upload "$TAG" --clobber artifacts/*.tar.gz
+
+  sync-crap4ts-package-json:
+    # Auto-sync packages/crap4ts/package.json from crates/crap4ts/Cargo.toml
+    # on every release-plz-opened PR. The publish-crap4ts-npm job's
+    # version-match check fails the publish if these drift, so the sync
+    # has to happen on the release PR itself — before merge — and the
+    # commit has to live on the PR head ref so the merge picks it up.
+    #
+    # The head-ref filter scopes this job to release-plz's auto-opened
+    # branches (release-plz convention: `release-plz-<timestamp>`). It
+    # does NOT fire on human-opened PRs.
+    #
+    # Loop termination: the sync script's version-compare early-exit
+    # plus a tree-state guard against HEAD ensure that the App-token
+    # push from the first useful run triggers exactly one no-op
+    # re-run on pull_request:synchronize.
+    name: Sync crap4ts package.json
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-plz-')
+    environment: release-plz
+    concurrency:
+      # Cancel an in-flight sync if a new push lands — the new run
+      # will pick up the latest tree and the script is idempotent.
+      group: sync-crap4ts-${{ github.head_ref }}
+      cancel-in-progress: true
+    permissions:
+      # Workflow GITHUB_TOKEN read-only; the App token does the
+      # commit + push.
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Check out the release PR's head ref so the commit lands on
+          # the same branch the PR is tracking.
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          # release-relevant workflow: a poisoned cache could
+          # propagate into the published package.json bump.
+          enable-cache: "false"
+
+      - name: Mint release-plz App token
+        id: app-token
+        uses: breezy-bays-labs/.github/actions/release-plz-app-token@bdd828ba04ebe832c4a1da8efd1cc6853aae8302 # release-plz-app-token-v0.1.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Sync package.json
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: ./scripts/sync-crap4ts-package-json.sh

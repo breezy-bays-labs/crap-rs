@@ -1358,6 +1358,58 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo doc --workspace --no-deps
 
+  release-plz-app-scope-audit:
+    # Leaf-scope drift check: assert this repo's name appears in the
+    # canonical release-plz App allowlist
+    # (breezy-bays-labs/.github/release-plz-allowlist.toml). Catches
+    # the case where a PR on the .github repo silently drops this
+    # repo from the allowlist — without this gate that drift would
+    # only surface at the next release-plz token-mint attempt,
+    # mid-release.
+    #
+    # NOT an org-global audit. A leaf-scope check runs on the default
+    # GITHUB_TOKEN (repo-scoped, sufficient to read public contents
+    # via the contents API). The complementary org-global audit
+    # — compare the canonical TOML against the App's actual
+    # per-repo installations — needs an Org Admin PAT, so it lives in
+    # a centralized cron in the breezy-bays-labs/.github repo rather
+    # than every consumer's CI.
+    name: release-plz App scope audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      # `dasel` (TOML-aware parser used by the audit script) is not
+      # currently available via taiki-e/install-action OR
+      # cargo-binstall's prebuilt-binary index, so we curl the
+      # upstream binary directly and verify a SHA256 baked into this
+      # step. Bumping the version is a two-step manual edit (new
+      # DASEL_VERSION + recompute DASEL_SHA256), kept inline so the
+      # supply-chain provenance stays in one place — Dependabot
+      # doesn't have an ecosystem for curl-fetched binaries.
+      - name: Install dasel
+        env:
+          DASEL_VERSION: v2.8.1
+          DASEL_SHA256: 21fda0a4dc3c779c42737eca4b37e4f187d7ab91ba6301eed97b801af84a9ea2
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            "https://github.com/TomWright/dasel/releases/download/${DASEL_VERSION}/dasel_linux_amd64" \
+            -o /tmp/dasel
+          echo "${DASEL_SHA256}  /tmp/dasel" | sha256sum -c -
+          chmod +x /tmp/dasel
+          mkdir -p "$HOME/.local/bin"
+          mv /tmp/dasel "$HOME/.local/bin/dasel"
+          dasel --version
+      - name: Audit allowlist for this repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/release-plz-app-scope-audit.sh
+
   zizmor:
     # Mechanical enforcement of the SHA-pin + workflow-security policy.
     # Runs `zizmor` (https://woodruffw.github.io/zizmor/) over every
