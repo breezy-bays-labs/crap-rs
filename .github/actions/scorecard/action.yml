@@ -1338,7 +1338,11 @@ runs:
       if: steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi'
       shell: bash
       env:
-        MARKDOWN: ${{ steps.run.outputs.markdown }}
+        # Markdown body is read FROM the temp files Run analysis already
+        # wrote (rather than re-piped through an env var) so we don't
+        # tip the 64 KB env-var limit on large projects — gemini catch
+        # on PR #312. Filenames: `${BIN}-scorecard.md` for single-lang,
+        # `scorecard-combined.md` for multi-lang (see L898 + L1050).
         HTML_REPORT: ${{ inputs.html-report }}
         IS_MULTI: ${{ steps.presets.outputs.is_multi }}
         LANGUAGE: ${{ steps.lang.outputs.language }}
@@ -1347,8 +1351,13 @@ runs:
       run: |
         set -euo pipefail
         composed_file="$RUNNER_TEMP/scorecard-sticky-message.md"
-        : > "$composed_file"
-        printf '%s' "$MARKDOWN" > "$composed_file"
+        if [ "$LANGUAGE" = "multi" ]; then
+          cat "$RUNNER_TEMP/scorecard-combined.md" > "$composed_file"
+        elif [ "$LANGUAGE" = "rust" ]; then
+          cat "$RUNNER_TEMP/crap4rs-scorecard.md" > "$composed_file"
+        else
+          cat "$RUNNER_TEMP/crap4ts-scorecard.md" > "$composed_file"
+        fi
 
         if [ "$HTML_REPORT" = "true" ]; then
           # Guard the link append on actual upload success — when
@@ -1357,19 +1366,23 @@ runs:
           # the action-level outputs are documented as empty in that
           # case. Append the link only for languages that produced a
           # URL.
+          #
+          # URLs wrapped in `<...>` per the GFM convention — keeps the
+          # link renderable even if a future artifact-URL shape includes
+          # parentheses or spaces (gemini catch on PR #312).
           link_block=""
           if [ "$IS_MULTI" = "true" ]; then
             if [ -n "$HTML_URL_RUST" ] && [ -n "$HTML_URL_TS" ]; then
-              link_block="📊 [Download full HTML report — Rust]($HTML_URL_RUST) · [TypeScript]($HTML_URL_TS)"
+              link_block="📊 [Download full HTML report — Rust](<$HTML_URL_RUST>) · [TypeScript](<$HTML_URL_TS>)"
             elif [ -n "$HTML_URL_RUST" ]; then
-              link_block="📊 [Download full HTML report — Rust]($HTML_URL_RUST)"
+              link_block="📊 [Download full HTML report — Rust](<$HTML_URL_RUST>)"
             elif [ -n "$HTML_URL_TS" ]; then
-              link_block="📊 [Download full HTML report — TypeScript]($HTML_URL_TS)"
+              link_block="📊 [Download full HTML report — TypeScript](<$HTML_URL_TS>)"
             fi
           elif [ "$LANGUAGE" = "rust" ] && [ -n "$HTML_URL_RUST" ]; then
-            link_block="📊 [Download full HTML report]($HTML_URL_RUST)"
+            link_block="📊 [Download full HTML report](<$HTML_URL_RUST>)"
           elif [ "$LANGUAGE" = "typescript" ] && [ -n "$HTML_URL_TS" ]; then
-            link_block="📊 [Download full HTML report]($HTML_URL_TS)"
+            link_block="📊 [Download full HTML report](<$HTML_URL_TS>)"
           fi
           if [ -n "$link_block" ]; then
             # Two trailing newlines BEFORE the link block guarantee a
