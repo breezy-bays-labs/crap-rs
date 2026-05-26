@@ -105,6 +105,17 @@ askama = { workspace = true }
 proptest = { workspace = true, optional = true }
 
 [dev-dependencies]
+# Self-referential dev-dep enabling the `test-helpers` feature for
+# integration tests under `crates/crap-core/tests/`. Without this,
+# external test crates (e.g. `tests/multi_lang_passthrough.rs`) can't
+# import `crap_core::adapters::reporters::test_fixtures` — the gate
+# `#[cfg(any(test, feature = "test-helpers"))]` only sees `test` for
+# in-crate tests, not for external test crates. Workspace builds
+# (`cargo nextest run --workspace`) get the feature via crap4rs's
+# dev-dep on crap-core; package-scoped builds like
+# `cargo mutants --package crap-core` and `cargo test -p crap-core`
+# need it declared here.
+crap-core = { path = ".", features = ["test-helpers"] }
 # `proptest` powers the property tests interleaved through the domain
 # modules; `pretty_assertions` improves diff output.
 proptest = { workspace = true }

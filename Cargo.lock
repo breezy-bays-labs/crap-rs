@@ -416,6 +416,7 @@ dependencies = [
  "clap_complete_nushell",
  "colored",
  "comfy-table",
+ "crap-core",
  "globset",
  "ignore",
  "insta",
