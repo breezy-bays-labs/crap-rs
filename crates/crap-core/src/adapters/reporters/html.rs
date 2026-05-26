@@ -739,6 +739,9 @@ fn render_multi_lang(
     let combined = build_combined_view(multi, threshold);
     let language_panels = build_language_panels(multi, threshold);
     let adapters_footer = build_adapters_footer(multi);
+    let combined_delta = crate::core::compose::compose_combined_delta(&multi.languages);
+    let has_view_axis = combined_delta.is_some();
+    let combined_delta_panel = combined_delta.map(|cd| Box::new(build_combined_delta_panel(cd)));
 
     let title = if language_count == 0 {
         "CRAP scorecard — multi-language".to_string()
@@ -762,6 +765,8 @@ fn render_multi_lang(
         combined,
         language_panels,
         adapters_footer,
+        has_view_axis,
+        combined_delta_panel,
     };
     tmpl.render()
         .expect("html_multi template render is total — all fields owned")
@@ -783,6 +788,18 @@ struct HtmlMultiReport {
     combined: CombinedPanel,
     language_panels: Vec<LangPanel>,
     adapters_footer: Vec<AdapterFooterRow>,
+    /// True when at least one language supplied a baseline, so the
+    /// View axis nav (Current / Delta tabs) should be rendered
+    /// inside each `.lang-panel`. The whole no-baseline path stays
+    /// byte-for-byte equivalent to the v0.7.0 multi-language render
+    /// when this is `false`, mirroring `format_html`'s
+    /// `has_delta`-gated tabs pattern.
+    has_view_axis: bool,
+    /// Combined Delta panel: cross-adapter aggregate + ranked
+    /// regressions/new violations. Boxed to keep the dominant
+    /// no-baseline arm cheap; same `large_enum_variant` rationale
+    /// as the single-language `delta_panel`.
+    combined_delta_panel: Option<Box<CombinedDeltaPanel>>,
 }
 
 struct LangButton {
@@ -858,12 +875,116 @@ struct LangPanel {
     dist_moderate: usize,
     dist_high: usize,
     files: Vec<FileCard>,
+    /// True when this language supplied a baseline. The template
+    /// renders the Delta tab as enabled when `true`, disabled +
+    /// titled with a no-baseline tooltip when `false`. The Current
+    /// tab is always enabled.
+    has_delta: bool,
+    /// Tab-count badge for the Current tab — total analyzed
+    /// functions, mirroring the single-language template's
+    /// `current_tab_count`.
+    current_tab_count: usize,
+    /// Tab-count badge for the Delta tab — sum of all change kinds.
+    /// Zero when this language has no baseline.
+    delta_tab_count: u32,
+    /// Drives the inline news-dot indicator on the Delta tab when
+    /// regressions or new violations are present.
+    delta_has_news: bool,
+    /// Per-language delta panel. Boxed for the same
+    /// `large_enum_variant` reason as the single-language reporter
+    /// — the dominant no-baseline arm stays cheap.
+    delta_panel: Option<Box<DeltaPanel>>,
 }
 
 struct AdapterFooterRow {
     display_name: String,
     metric_label: &'static str,
     threshold_display: String,
+}
+
+/// Combined Delta panel — cross-adapter aggregate plus a ranked list
+/// of regressions + new violations across every language with a
+/// baseline.
+///
+/// Boxed at the `HtmlMultiReport` level to keep the dominant
+/// no-baseline arm cheap; same `large_enum_variant` rationale as the
+/// per-language reporter's `DeltaPanel`. Built by
+/// `build_combined_delta_panel` from a `CombinedDelta` aggregate
+/// produced by `compose_combined_delta`.
+struct CombinedDeltaPanel {
+    /// Aggregate change counts across contributing languages.
+    /// Drives the scope-banner copy + delta tab badge counts.
+    summary: CombinedDeltaPanelSummary,
+    /// Verdict pill class for the Combined Delta hero. "pass" when
+    /// every contributing language passed; "fail" when any reported
+    /// a new violation (AND-aggregated across blocks). Mirrors the
+    /// per-language reporter's verdict polarity exactly.
+    verdict_class: &'static str,
+    verdict_label: &'static str,
+    verdict_glyph: &'static str,
+    /// Display labels of languages that contributed a baseline.
+    /// Surfaced in the scope-banner copy so reviewers see which
+    /// languages this aggregate represents.
+    contributing_languages: Vec<String>,
+    /// Display labels of languages with no baseline. Rendered as a
+    /// scope-banner note ("TypeScript has no baseline yet — provide
+    /// one via …") so the asymmetry between Current and Delta views
+    /// is visible in-document, not just at the disabled-tab level.
+    missing_baseline_languages: Vec<String>,
+    /// Workspace-wide ranked rows. Sort: risk band desc, then
+    /// CRAP/threshold ratio desc within band; per-row `kind`
+    /// distinguishes regressions from new functions.
+    ranked_rows: Vec<CombinedDeltaRow>,
+}
+
+#[derive(Clone, Copy)]
+struct CombinedDeltaPanelSummary {
+    added: u32,
+    removed: u32,
+    modified: u32,
+    regressions: u32,
+    improvements: u32,
+    new_violations: u32,
+}
+
+/// One row of the Combined Delta ranked table — same shape as
+/// `RankedRow` plus baseline + delta cells so reviewers see the
+/// before/after CRAP transition without leaving the row.
+struct CombinedDeltaRow {
+    language: String,
+    adapter_display: String,
+    badge_glyph: String,
+    qualified_name: String,
+    file_path: String,
+    start_line: usize,
+    end_line: usize,
+    /// Render label for the per-row kind: `"regression"` or `"new"`.
+    /// Drives the per-row badge so reviewers can distinguish a
+    /// modified-with-regression row from a brand-new function at a
+    /// glance.
+    kind_label: &'static str,
+    /// Baseline CRAP value, `"5.20"` formatted, or empty for new
+    /// functions.
+    baseline_crap: String,
+    /// Current CRAP value, `"45.20"` formatted.
+    current_crap: String,
+    /// CRAP / threshold for the current row, formatted as `"5.65"`
+    /// or `"∞"` for the zero-threshold safe-divide guard.
+    ratio_display: String,
+    /// Signed delta string `"+40.00"`; empty for new functions.
+    delta_value: String,
+    /// `"▲"` / `"▼"` / `""` mirror of the per-language delta panel
+    /// row glyphs. Empty when delta_value is empty.
+    delta_glyph: &'static str,
+    /// `"up"` / `"down"` / `"flat"` for chip color.
+    delta_direction: &'static str,
+    /// Current risk-pill data-risk value (1..=4).
+    current_risk: u8,
+    /// Current risk-pill text label.
+    current_risk_label: &'static str,
+    /// True when the current row's CRAP exceeds its adapter's
+    /// threshold. Drives the `data-exceeds="1"` row-tint.
+    exceeds: bool,
 }
 
 fn build_language_buttons(
@@ -968,6 +1089,17 @@ fn build_language_panels(
             } else {
                 file_cards(&block.view, panel_threshold)
             };
+            let delta_panel = block.delta.as_ref().map(|d| Box::new(build_delta_panel(d)));
+            let has_delta = delta_panel.is_some();
+            let current_tab_count = if is_empty { 0 } else { summary.total_functions };
+            let delta_tab_count = delta_panel
+                .as_ref()
+                .map(|p| p.summary.added + p.summary.removed + p.summary.modified)
+                .unwrap_or(0);
+            let delta_has_news = delta_panel
+                .as_ref()
+                .map(|p| p.summary.regressions > 0 || p.summary.new_violations > 0)
+                .unwrap_or(false);
             LangPanel {
                 language: block.language.clone(),
                 display_name: block.display_name.clone(),
@@ -991,6 +1123,11 @@ fn build_language_panels(
                 dist_moderate: summary_view.dist_moderate,
                 dist_high: summary_view.dist_high,
                 files,
+                has_delta,
+                current_tab_count,
+                delta_tab_count,
+                delta_has_news,
+                delta_panel,
             }
         })
         .collect()
@@ -1033,6 +1170,87 @@ fn format_ratio_value(ratio: f64) -> String {
         "∞".to_string()
     } else {
         format!("{:.2}", ratio)
+    }
+}
+
+/// Build the Combined Delta panel template projection from the
+/// composed cross-adapter aggregate.
+///
+/// Verdict polarity mirrors the per-language reporter: any
+/// `new_violations` count above zero flips the verdict to
+/// REGRESSED; otherwise PASS. Caller has already guaranteed at least
+/// one language contributed (the aggregate is wrapped in `Option<>`
+/// so the no-baseline arm of the renderer never reaches this code).
+fn build_combined_delta_panel(cd: crate::domain::multi_lang::CombinedDelta) -> CombinedDeltaPanel {
+    let summary = CombinedDeltaPanelSummary {
+        added: cd.summary.added,
+        removed: cd.summary.removed,
+        modified: cd.summary.modified,
+        regressions: cd.summary.regressions,
+        improvements: cd.summary.improvements,
+        new_violations: cd.summary.new_violations,
+    };
+
+    let (verdict_class, verdict_label, verdict_glyph) = if cd.summary.passed {
+        ("pass", "PASS", "✓")
+    } else {
+        ("fail", "REGRESSED", "▲")
+    };
+
+    let ranked_rows: Vec<CombinedDeltaRow> = cd
+        .ordered_rows
+        .into_iter()
+        .map(|r| {
+            let (kind_label, baseline_crap, delta_value, delta_glyph, delta_direction) =
+                match r.kind {
+                    crate::domain::multi_lang::RankedDeltaKind::Regression => {
+                        let baseline = r
+                            .baseline
+                            .as_ref()
+                            .expect("regressions always carry a baseline snapshot");
+                        let delta = r.current.crap - baseline.crap;
+                        (
+                            "regression",
+                            format!("{:.2}", baseline.crap),
+                            format!("{:+.2}", delta),
+                            signed_glyph_f64(delta),
+                            direction_f64(delta),
+                        )
+                    }
+                    crate::domain::multi_lang::RankedDeltaKind::NewFunction => {
+                        ("new", String::new(), String::new(), "", "flat")
+                    }
+                };
+            CombinedDeltaRow {
+                badge_glyph: adapter_glyph(&r.language, &r.adapter_display),
+                language: r.language,
+                adapter_display: r.adapter_display,
+                qualified_name: r.current.identity.qualified_name.clone(),
+                file_path: r.current.identity.file_path.clone(),
+                start_line: r.current.identity.span.start_line,
+                end_line: r.current.identity.span.end_line,
+                kind_label,
+                baseline_crap,
+                current_crap: format!("{:.2}", r.current.crap),
+                ratio_display: format_ratio_value(r.ratio),
+                delta_value,
+                delta_glyph,
+                delta_direction,
+                current_risk: risk_data(r.current.risk_level),
+                current_risk_label: risk_label(r.current.risk_level),
+                exceeds: r.current.exceeds,
+            }
+        })
+        .collect();
+
+    CombinedDeltaPanel {
+        summary,
+        verdict_class,
+        verdict_label,
+        verdict_glyph,
+        contributing_languages: cd.contributing_languages,
+        missing_baseline_languages: cd.missing_baseline_languages,
+        ranked_rows,
     }
 }
 
@@ -1362,6 +1580,7 @@ mod tests {
         make_empty_result, make_multi_function_result, make_single_function_result,
         make_view_default,
     };
+    use crate::domain::multi_lang::LanguageBlock;
     use crate::domain::types::RiskLevel;
 
     fn test_meta() -> AdapterMeta {
@@ -2174,5 +2393,620 @@ mod tests {
         let multi = crate::core::compose::compose_multi_lang(blocks);
         let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
         insta::assert_snapshot!(out);
+    }
+
+    // ── View axis tests (per-language Current/Delta + Combined Delta) ──
+
+    /// Helper: produce a Rust + TypeScript pair of baselines + current
+    /// fixtures that exercises every Delta affordance:
+    ///   - Rust regression (CRAP 10 → 22, Acceptable → Moderate)
+    ///   - Rust improvement (CRAP 14 → 6, Moderate → Acceptable)
+    ///   - Rust new function (Added, exceeds threshold → new violation)
+    ///   - TypeScript regression with smaller-band crossing
+    ///
+    /// Returns four owned `AnalysisResult`s (rs_baseline, rs_current,
+    /// ts_baseline, ts_current) so callers can build `AnalysisDelta`s
+    /// in place and borrow into `LanguageBlock`s.
+    #[allow(clippy::type_complexity)]
+    fn two_lang_baseline_current_fixtures() -> (
+        crate::domain::types::AnalysisResult,
+        crate::domain::types::AnalysisResult,
+        crate::domain::types::AnalysisResult,
+        crate::domain::types::AnalysisResult,
+    ) {
+        use crate::adapters::reporters::test_fixtures::make_verdict;
+        use crate::domain::types::{AnalysisResult, AnalysisSummary, CrapScore, RiskDistribution};
+
+        // Rust baseline: regressing (10.0, Acceptable), improving (14.0, Moderate)
+        let rs_baseline = AnalysisResult {
+            functions: vec![
+                make_verdict(
+                    "rs::regressing",
+                    "src/lib.rs",
+                    5,
+                    70.0,
+                    10.0,
+                    RiskLevel::Acceptable,
+                    8.0,
+                ),
+                make_verdict(
+                    "rs::improving",
+                    "src/lib.rs",
+                    8,
+                    50.0,
+                    14.0,
+                    RiskLevel::Moderate,
+                    8.0,
+                ),
+            ],
+            summary: AnalysisSummary {
+                total_functions: 2,
+                total_files: 1,
+                exceeding_threshold: 1,
+                average_crap: 12.0,
+                median_crap: 12.0,
+                max_crap: Some(CrapScore {
+                    value: 14.0,
+                    risk_level: RiskLevel::Moderate,
+                }),
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 1,
+                    moderate: 1,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: false,
+        };
+
+        // Rust current: regressing → Moderate, improving → Acceptable,
+        // plus a brand-new function that exceeds threshold.
+        let rs_current = AnalysisResult {
+            functions: vec![
+                make_verdict(
+                    "rs::regressing",
+                    "src/lib.rs",
+                    8,
+                    55.0,
+                    22.0,
+                    RiskLevel::Moderate,
+                    8.0,
+                ),
+                make_verdict(
+                    "rs::improving",
+                    "src/lib.rs",
+                    4,
+                    85.0,
+                    6.0,
+                    RiskLevel::Acceptable,
+                    8.0,
+                ),
+                make_verdict(
+                    "rs::brand_new",
+                    "src/new.rs",
+                    10,
+                    40.0,
+                    15.0,
+                    RiskLevel::Moderate,
+                    8.0,
+                ),
+            ],
+            summary: AnalysisSummary {
+                total_functions: 3,
+                total_files: 2,
+                exceeding_threshold: 2,
+                average_crap: 14.33,
+                median_crap: 15.0,
+                max_crap: Some(CrapScore {
+                    value: 22.0,
+                    risk_level: RiskLevel::Moderate,
+                }),
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 1,
+                    moderate: 2,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: false,
+        };
+
+        // TypeScript baseline: one Acceptable function.
+        let ts_baseline = AnalysisResult {
+            functions: vec![make_verdict(
+                "ts::parser",
+                "apps/web/src/parser.ts",
+                5,
+                75.0,
+                7.0,
+                RiskLevel::Acceptable,
+                8.0,
+            )],
+            summary: AnalysisSummary {
+                total_functions: 1,
+                total_files: 1,
+                exceeding_threshold: 0,
+                average_crap: 7.0,
+                median_crap: 7.0,
+                max_crap: Some(CrapScore {
+                    value: 7.0,
+                    risk_level: RiskLevel::Acceptable,
+                }),
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 1,
+                    moderate: 0,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: true,
+        };
+
+        // TypeScript current: regression on parser (7.0 → 13.0).
+        let ts_current = AnalysisResult {
+            functions: vec![make_verdict(
+                "ts::parser",
+                "apps/web/src/parser.ts",
+                7,
+                60.0,
+                13.0,
+                RiskLevel::Moderate,
+                8.0,
+            )],
+            summary: AnalysisSummary {
+                total_functions: 1,
+                total_files: 1,
+                exceeding_threshold: 1,
+                average_crap: 13.0,
+                median_crap: 13.0,
+                max_crap: Some(CrapScore {
+                    value: 13.0,
+                    risk_level: RiskLevel::Moderate,
+                }),
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 0,
+                    moderate: 1,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: false,
+        };
+
+        (rs_baseline, rs_current, ts_baseline, ts_current)
+    }
+
+    /// View axis renders per-language Current/Delta tabs and the
+    /// Combined panel exposes its own Delta tab when at least one
+    /// language has a baseline.
+    #[test]
+    fn multi_lang_view_axis_renders_when_any_language_has_baseline() {
+        let (rs_b, rs_c, ts_b, ts_c) = two_lang_baseline_current_fixtures();
+        let rs_delta = crate::domain::delta::compute(rs_b, rs_c.clone());
+        let ts_delta = crate::domain::delta::compute(ts_b, ts_c.clone());
+
+        let rs_block = LanguageBlock {
+            tool_name: "crap4rs".to_string(),
+            display_name: "Rust".to_string(),
+            language: "rust".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cognitive,
+            threshold: 8.0,
+            view: make_view_default(&rs_c),
+            delta: Some(crate::domain::delta::apply(
+                &rs_delta,
+                crate::domain::delta::DeltaViewSpec::default(),
+            )),
+        };
+        let ts_block = LanguageBlock {
+            tool_name: "crap4ts".to_string(),
+            display_name: "TypeScript".to_string(),
+            language: "typescript".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cyclomatic,
+            threshold: 8.0,
+            view: make_view_default(&ts_c),
+            delta: Some(crate::domain::delta::apply(
+                &ts_delta,
+                crate::domain::delta::DeltaViewSpec::default(),
+            )),
+        };
+        let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        // Tab nav present on the Combined panel.
+        assert!(
+            out.contains(r#"<nav class="tabs" role="tablist" aria-label="Combined views">"#),
+            "Combined panel must carry View axis tabs when any language has a baseline"
+        );
+        // Per-language Delta tabs present and enabled for both languages.
+        assert!(
+            out.contains(r#"<nav class="tabs" role="tablist" aria-label="Rust views">"#),
+            "Rust panel must carry View axis tabs"
+        );
+        assert!(
+            out.contains(r#"<nav class="tabs" role="tablist" aria-label="TypeScript views">"#),
+            "TypeScript panel must carry View axis tabs"
+        );
+        // No disabled Delta tab when both languages have baselines.
+        assert!(
+            !out.contains(r#"title="no baseline available"#),
+            "no language should render the disabled Delta tooltip when both have baselines"
+        );
+        // Combined Delta hero references both contributing languages.
+        assert!(out.contains("Comparing</strong> current run vs baseline across"));
+        // Per-language Delta panels carry the per-row regression rows.
+        assert!(
+            out.contains("rs::regressing"),
+            "Rust regression row must surface in the Rust Delta panel"
+        );
+    }
+
+    /// Mismatched-baseline scenario: only Rust has a baseline. The
+    /// TypeScript panel must render the Delta tab DISABLED with the
+    /// no-baseline tooltip; the Combined Delta scope-banner must note
+    /// TypeScript's missing baseline.
+    #[test]
+    fn multi_lang_mismatched_baselines_disables_typescript_delta_tab() {
+        let (rs_b, rs_c, _ts_b, ts_c) = two_lang_baseline_current_fixtures();
+        let rs_delta = crate::domain::delta::compute(rs_b, rs_c.clone());
+
+        let rs_block = LanguageBlock {
+            tool_name: "crap4rs".to_string(),
+            display_name: "Rust".to_string(),
+            language: "rust".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cognitive,
+            threshold: 8.0,
+            view: make_view_default(&rs_c),
+            delta: Some(crate::domain::delta::apply(
+                &rs_delta,
+                crate::domain::delta::DeltaViewSpec::default(),
+            )),
+        };
+        let ts_block = LanguageBlock {
+            tool_name: "crap4ts".to_string(),
+            display_name: "TypeScript".to_string(),
+            language: "typescript".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cyclomatic,
+            threshold: 8.0,
+            view: make_view_default(&ts_c),
+            delta: None,
+        };
+        let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        // Rust Delta tab is enabled (no disabled marker).
+        let rs_nav_start = out
+            .find(r#"aria-label="Rust views""#)
+            .expect("Rust tabs nav present");
+        let next_close = out[rs_nav_start..].find("</nav>").unwrap();
+        let rs_nav = &out[rs_nav_start..rs_nav_start + next_close];
+        assert!(
+            !rs_nav.contains("disabled"),
+            "Rust Delta tab must be enabled when Rust has a baseline; got: {rs_nav}"
+        );
+
+        // TypeScript Delta tab IS disabled with the no-baseline title.
+        let ts_nav_start = out
+            .find(r#"aria-label="TypeScript views""#)
+            .expect("TypeScript tabs nav present");
+        let next_close = out[ts_nav_start..].find("</nav>").unwrap();
+        let ts_nav = &out[ts_nav_start..ts_nav_start + next_close];
+        assert!(
+            ts_nav.contains("disabled"),
+            "TypeScript Delta tab must be disabled when TypeScript has no baseline; got: {ts_nav}"
+        );
+        assert!(
+            ts_nav.contains(r#"title="no baseline available for TypeScript""#),
+            "Disabled Delta tab must carry the no-baseline tooltip; got: {ts_nav}"
+        );
+
+        // Combined Delta scope-banner surfaces the missing-baseline note.
+        assert!(
+            out.contains(r#"class="missing-baseline-note""#),
+            "Combined Delta hero must render the missing-baseline note"
+        );
+        assert!(
+            out.contains("<strong>TypeScript</strong>") && out.contains("has no baseline yet"),
+            "missing-baseline-note must name TypeScript"
+        );
+    }
+
+    /// Combined → Delta ranks regressions and new functions by risk
+    /// band desc then ratio desc, mixing rows from both adapters.
+    #[test]
+    fn multi_lang_combined_delta_ranks_cross_adapter_by_risk_band_then_ratio() {
+        use crate::adapters::reporters::test_fixtures::make_verdict;
+        use crate::domain::types::{AnalysisResult, AnalysisSummary, CrapScore, RiskDistribution};
+
+        // Rust baseline: low-risk Acceptable function.
+        let rs_baseline = AnalysisResult {
+            functions: vec![make_verdict(
+                "rs::regressing_hard",
+                "src/lib.rs",
+                4,
+                75.0,
+                6.0,
+                RiskLevel::Acceptable,
+                8.0,
+            )],
+            summary: AnalysisSummary {
+                total_functions: 1,
+                total_files: 1,
+                exceeding_threshold: 0,
+                average_crap: 6.0,
+                median_crap: 6.0,
+                max_crap: Some(CrapScore {
+                    value: 6.0,
+                    risk_level: RiskLevel::Acceptable,
+                }),
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 1,
+                    moderate: 0,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: true,
+        };
+        // Rust current: a brutal regression to High risk; ratio ~5.7
+        let rs_current = AnalysisResult {
+            functions: vec![make_verdict(
+                "rs::regressing_hard",
+                "src/lib.rs",
+                20,
+                30.0,
+                45.6,
+                RiskLevel::High,
+                8.0,
+            )],
+            summary: AnalysisSummary {
+                total_functions: 1,
+                total_files: 1,
+                exceeding_threshold: 1,
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 0,
+                    moderate: 0,
+                    high: 1,
+                },
+                ..Default::default()
+            },
+            passed: false,
+        };
+
+        // TypeScript baseline: another low-risk function.
+        let ts_baseline = AnalysisResult {
+            functions: vec![make_verdict(
+                "ts::moderate_change",
+                "src/parser.ts",
+                4,
+                75.0,
+                6.0,
+                RiskLevel::Acceptable,
+                8.0,
+            )],
+            summary: AnalysisSummary {
+                total_functions: 1,
+                total_files: 1,
+                exceeding_threshold: 0,
+                average_crap: 6.0,
+                median_crap: 6.0,
+                max_crap: Some(CrapScore {
+                    value: 6.0,
+                    risk_level: RiskLevel::Acceptable,
+                }),
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 1,
+                    moderate: 0,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: true,
+        };
+        // TypeScript current: regression to Moderate; ratio 2.5
+        let ts_current = AnalysisResult {
+            functions: vec![make_verdict(
+                "ts::moderate_change",
+                "src/parser.ts",
+                10,
+                60.0,
+                20.0,
+                RiskLevel::Moderate,
+                8.0,
+            )],
+            summary: AnalysisSummary {
+                total_functions: 1,
+                total_files: 1,
+                exceeding_threshold: 1,
+                distribution: RiskDistribution {
+                    low: 0,
+                    acceptable: 0,
+                    moderate: 1,
+                    high: 0,
+                },
+                ..Default::default()
+            },
+            passed: false,
+        };
+
+        let rs_delta_full = crate::domain::delta::compute(rs_baseline, rs_current.clone());
+        let ts_delta_full = crate::domain::delta::compute(ts_baseline, ts_current.clone());
+
+        let blocks = vec![
+            LanguageBlock {
+                tool_name: "crap4rs".to_string(),
+                display_name: "Rust".to_string(),
+                language: "rust".to_string(),
+                tool_version: TEST_TOOL_VERSION.to_string(),
+                metric: ComplexityMetric::Cognitive,
+                threshold: 8.0,
+                view: make_view_default(&rs_current),
+                delta: Some(crate::domain::delta::apply(
+                    &rs_delta_full,
+                    crate::domain::delta::DeltaViewSpec::default(),
+                )),
+            },
+            LanguageBlock {
+                tool_name: "crap4ts".to_string(),
+                display_name: "TypeScript".to_string(),
+                language: "typescript".to_string(),
+                tool_version: TEST_TOOL_VERSION.to_string(),
+                metric: ComplexityMetric::Cyclomatic,
+                threshold: 8.0,
+                view: make_view_default(&ts_current),
+                delta: Some(crate::domain::delta::apply(
+                    &ts_delta_full,
+                    crate::domain::delta::DeltaViewSpec::default(),
+                )),
+            },
+        ];
+        let multi = crate::core::compose::compose_multi_lang(blocks);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        // Locate the Combined Delta tab panel and confirm the Rust
+        // High-risk row appears before the TypeScript Moderate-risk
+        // row inside it.
+        let combined_delta_start = out
+            .find(r#"data-tab="delta" role="tabpanel""#)
+            .expect("Combined Delta tab-panel must render");
+        let combined_delta_section = &out[combined_delta_start..];
+        let rs_pos = combined_delta_section
+            .find("rs::regressing_hard")
+            .expect("Rust High-risk regression must surface in Combined Delta");
+        let ts_pos = combined_delta_section
+            .find("ts::moderate_change")
+            .expect("TypeScript Moderate-risk regression must surface in Combined Delta");
+        assert!(
+            rs_pos < ts_pos,
+            "Rust High-risk regression must rank ahead of TypeScript Moderate-risk regression in Combined Delta (D2d sort: risk band desc, ratio desc)"
+        );
+    }
+
+    /// Insta snapshot lock for the both-baselines View axis render.
+    #[test]
+    fn full_html_multi_two_language_with_baselines_snapshot() {
+        let (rs_b, rs_c, ts_b, ts_c) = two_lang_baseline_current_fixtures();
+        let rs_delta = crate::domain::delta::compute(rs_b, rs_c.clone());
+        let ts_delta = crate::domain::delta::compute(ts_b, ts_c.clone());
+
+        let rs_block = LanguageBlock {
+            tool_name: "crap4rs".to_string(),
+            display_name: "Rust".to_string(),
+            language: "rust".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cognitive,
+            threshold: 8.0,
+            view: make_view_default(&rs_c),
+            delta: Some(crate::domain::delta::apply(
+                &rs_delta,
+                crate::domain::delta::DeltaViewSpec::default(),
+            )),
+        };
+        let ts_block = LanguageBlock {
+            tool_name: "crap4ts".to_string(),
+            display_name: "TypeScript".to_string(),
+            language: "typescript".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cyclomatic,
+            threshold: 8.0,
+            view: make_view_default(&ts_c),
+            delta: Some(crate::domain::delta::apply(
+                &ts_delta,
+                crate::domain::delta::DeltaViewSpec::default(),
+            )),
+        };
+        let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+        insta::assert_snapshot!(out);
+    }
+
+    /// Insta snapshot lock for the mismatched-baseline scenario
+    /// (Rust has a baseline; TypeScript doesn't).
+    #[test]
+    fn full_html_multi_mismatched_baseline_snapshot() {
+        let (rs_b, rs_c, _ts_b, ts_c) = two_lang_baseline_current_fixtures();
+        let rs_delta = crate::domain::delta::compute(rs_b, rs_c.clone());
+
+        let rs_block = LanguageBlock {
+            tool_name: "crap4rs".to_string(),
+            display_name: "Rust".to_string(),
+            language: "rust".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cognitive,
+            threshold: 8.0,
+            view: make_view_default(&rs_c),
+            delta: Some(crate::domain::delta::apply(
+                &rs_delta,
+                crate::domain::delta::DeltaViewSpec::default(),
+            )),
+        };
+        let ts_block = LanguageBlock {
+            tool_name: "crap4ts".to_string(),
+            display_name: "TypeScript".to_string(),
+            language: "typescript".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cyclomatic,
+            threshold: 8.0,
+            view: make_view_default(&ts_c),
+            delta: None,
+        };
+        let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+        insta::assert_snapshot!(out);
+    }
+
+    /// Single-language passthrough must remain byte-identical to the
+    /// single-binary path even when the language carries a baseline.
+    /// Confirms the new View axis plumbing in the multi-lang glue
+    /// doesn't leak into the n=1 short-circuit.
+    #[test]
+    fn multi_lang_single_language_passthrough_byte_identical_with_baseline() {
+        use crate::adapters::reporters::test_fixtures::{
+            make_delta_view_default, make_sample_delta,
+        };
+
+        let delta = make_sample_delta();
+        let view = make_view_default(&delta.current);
+        let dview = make_delta_view_default(&delta);
+
+        let direct = format_html(
+            &view,
+            Some(&dview),
+            8.0,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+        );
+
+        let block = LanguageBlock {
+            tool_name: TEST_TOOL_NAME.to_string(),
+            display_name: "Test".to_string(),
+            language: "rust".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cognitive,
+            threshold: 8.0,
+            view: make_view_default(&delta.current),
+            delta: Some(make_delta_view_default(&delta)),
+        };
+        let multi = crate::core::compose::compose_multi_lang(vec![block]);
+        let unified = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        assert_eq!(
+            direct, unified,
+            "single-language passthrough must be byte-identical to format_html WITH a baseline too — the n=1 short-circuit must not gain multi-lang chrome when delta is present"
+        );
+        assert!(
+            !unified.contains("data-multi-lang"),
+            "single-language passthrough must not render the multi-lang body marker"
+        );
     }
 }

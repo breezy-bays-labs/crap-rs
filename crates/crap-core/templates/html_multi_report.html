@@ -125,6 +125,68 @@
   }
   .footer-adapters .adapter .ad-name { font-weight: 600; }
   .footer-adapters .adapter .ad-meta { color: var(--text-muted); font-weight: 400; }
+
+  /* ── View axis (Current / Delta) — reused per-language and on Combined ──
+     Hide inactive tab panels; the JS switcher sets data-active on the
+     panel matching the user's URL hash (default `#combined:current`).
+     Matches the single-language template's rule at html_report.html so
+     the affordance vocabulary stays consistent. */
+  [data-multi-lang] .tab-panel { display: none; }
+  [data-multi-lang] .tab-panel[data-active] { display: block; }
+
+  /* Disabled Delta tab (language has no baseline). Caller paints the
+     tooltip via `title`; we visually communicate disabled state by
+     dimming the label + denying pointer events. */
+  [data-multi-lang] .tabs .tab[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* Sakura's base `button:hover` paints a magenta background that
+     collides with the flat tab-nav design. The base `.tab` rule resets
+     transparent for resting; hover would inherit the magenta. Mirror
+     the single-language template's override so the View axis hover
+     state stays flat (color shift only). */
+  [data-multi-lang] .tab:hover,
+  [data-multi-lang] .tab:focus-visible {
+    background: transparent;
+    color: var(--text);
+  }
+
+  /* Per-row kind badge in the Combined Delta ranking table. Two
+     kinds: "regression" (modified, CRAP increased) and "new"
+     (newly-added function). Coloring uses risk tokens so the badge
+     vocabulary stays in the existing Sakura palette. */
+  .kind-pill {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+    border: 1px solid var(--hairline);
+    background: var(--bg-elevated);
+    color: var(--text);
+  }
+  .kind-pill[data-kind="regression"] {
+    color: var(--risk-3);
+    border-color: color-mix(in srgb, var(--risk-3) 35%, var(--hairline));
+  }
+  .kind-pill[data-kind="new"] {
+    color: var(--risk-2);
+    border-color: color-mix(in srgb, var(--risk-2) 35%, var(--hairline));
+  }
+
+  /* Asymmetric-baseline note in the Combined Delta scope banner.
+     Painted as a subdued advisory line so it's visible without
+     fighting the verdict pill for attention. */
+  .missing-baseline-note {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+  }
 </style>
 </head>
 <body data-multi-lang>
@@ -154,6 +216,24 @@
 
 <!-- ── Combined panel ──────────────────────────────────────────────── -->
 <div class="lang-panel" data-lang="combined" data-active>
+  {%- if has_view_axis %}
+  {# View axis only renders when at least one language supplied a
+     baseline; the no-baseline path matches the v0.7.0 multi-language
+     render byte-for-byte. -#}
+  <nav class="tabs" role="tablist" aria-label="Combined views">
+    <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
+      Current run <span class="tab-count">{{ combined.total_functions }}</span>
+    </button>
+    {%- if let Some(cd) = combined_delta_panel %}
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button">
+      Delta vs baseline
+      {%- if cd.summary.new_violations > 0 || cd.summary.regressions > 0 %} <span class="tab-dot" aria-hidden="true"></span>{% endif %}
+      <span class="tab-count">{{ cd.summary.regressions + cd.summary.new_violations }} changed</span>
+    </button>
+    {%- endif %}
+  </nav>
+  <div class="tab-panel" data-tab="current" data-active role="tabpanel">
+  {%- endif %}
   <section class="scope-banner" aria-label="Combined scope">
     <p>
       <strong>{{ combined.total_exceeding }} of {{ combined.total_functions }}</strong>
@@ -258,11 +338,127 @@
   {% else %}
   <div class="empty-state">No functions analyzed across any language.</div>
   {% endif %}
+  {%- if has_view_axis %}
+  </div>{# /tab-panel[current] for Combined #}
+  {%- if let Some(cd) = combined_delta_panel %}
+  <div class="tab-panel" data-tab="delta" role="tabpanel">
+    <section class="scope-banner delta-hero" aria-label="Combined Delta scope">
+      <p>
+        <strong>Comparing</strong> current run vs baseline across
+        {% if cd.contributing_languages.len() == 1 -%}
+        the {{ cd.contributing_languages[0] }} adapter.
+        {%- else -%}
+        {{ cd.contributing_languages.len() }} adapters
+        ({% for lang in cd.contributing_languages %}{% if !loop.first %}, {% endif %}{{ lang }}{% endfor %}).
+        {%- endif %}
+        <span class="verdict is-{{ cd.verdict_class }}" aria-label="Combined Delta verdict: {{ cd.verdict_label }}">
+          <span class="verdict-glyph">{{ cd.verdict_glyph }}</span>
+          {{ cd.verdict_label }}
+        </span>
+        <span class="meta">
+          {{ cd.summary.added }} added · {{ cd.summary.removed }} removed · {{ cd.summary.modified }} modified ·
+          {{ cd.summary.regressions }} {% if cd.summary.regressions == 1 %}regression{% else %}regressions{% endif %} ·
+          {{ cd.summary.improvements }} {% if cd.summary.improvements == 1 %}improvement{% else %}improvements{% endif %} ·
+          {{ cd.summary.new_violations }} new {% if cd.summary.new_violations == 1 %}violation{% else %}violations{% endif %}
+        </span>
+      </p>
+      {%- if !cd.missing_baseline_languages.is_empty() %}
+      <p class="missing-baseline-note">
+        {% for lang in cd.missing_baseline_languages %}{% if !loop.first %}, {% endif %}<strong>{{ lang }}</strong>{% endfor %}
+        {% if cd.missing_baseline_languages.len() == 1 -%}
+        has no baseline yet — its Delta tab is disabled until one is supplied.
+        {%- else -%}
+        have no baselines yet — their Delta tabs are disabled until baselines are supplied.
+        {%- endif %}
+      </p>
+      {%- endif %}
+    </section>
+
+    {%- if !cd.ranked_rows.is_empty() %}
+    <section aria-label="Combined Delta ranking">
+      <h2>Workspace regressions &amp; new functions <span class="muted">· by risk band, then CRAP/threshold ratio</span></h2>
+      <p class="ranked-note">
+        Cross-adapter delta ordering uses risk level (per-adapter calibrated) then
+        CRAP/threshold ratio. Raw CRAP scores are not dimensionally equivalent
+        across adapters with different complexity metrics; the per-language Delta
+        tabs below show within-adapter rankings.
+      </p>
+      <table class="ranked-table">
+        <thead><tr>
+          <th>Adapter</th>
+          <th>Function</th>
+          <th>File</th>
+          <th>Kind</th>
+          <th class="num">Baseline</th>
+          <th class="num">Current</th>
+          <th class="num">Δ</th>
+          <th class="num">Ratio</th>
+          <th>Risk</th>
+        </tr></thead>
+        <tbody>
+          {% for row in cd.ranked_rows %}
+          <tr data-lang="{{ row.language }}" data-kind="{{ row.kind_label }}"{% if row.exceeds %} data-exceeds="1"{% endif %}>
+            <td>
+              <span class="adapter-badge" title="{{ row.adapter_display }} adapter" aria-label="{{ row.adapter_display }} adapter">{{ row.badge_glyph }}</span>
+              <span class="sr-only">{{ row.adapter_display }}</span>
+            </td>
+            <td><span class="fn-name">{{ row.qualified_name }}</span></td>
+            <td><span class="fn-path">{{ row.file_path }} L{{ row.start_line }}–{{ row.end_line }}</span></td>
+            <td><span class="kind-pill" data-kind="{{ row.kind_label }}">{{ row.kind_label }}</span></td>
+            <td class="num">{% if !row.baseline_crap.is_empty() %}{{ row.baseline_crap }}{% else %}—{% endif %}</td>
+            <td class="num">{{ row.current_crap }}</td>
+            <td class="num">
+              {%- if !row.delta_value.is_empty() -%}
+              <span class="delta-chip" data-direction="{{ row.delta_direction }}" data-regression="1">
+                {%- if !row.delta_glyph.is_empty() %}<span class="chip-glyph" aria-hidden="true">{{ row.delta_glyph }}</span>{% endif %}
+                <span class="chip-value">{{ row.delta_value }}</span>
+              </span>
+              {%- else -%}
+              —
+              {%- endif %}
+            </td>
+            <td class="num">{{ row.ratio_display }}</td>
+            <td><span class="risk-pill" data-risk="{{ row.current_risk }}">{{ row.current_risk_label }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {%- else %}
+    <div class="empty-state">No regressions or new functions across contributing languages.</div>
+    {%- endif %}
+  </div>{# /tab-panel[delta] for Combined #}
+  {%- endif %}
+  {%- endif %}
 </div>
 
 <!-- ── Per-language panels ─────────────────────────────────────────── -->
 {% for panel in language_panels %}
 <div class="lang-panel" data-lang="{{ panel.language }}">
+  {%- if has_view_axis %}
+  {# Per-language View axis. Languages with no baseline render the
+     Delta tab DISABLED so the layout stays symmetric across panels
+     (the absent-baseline asymmetry is communicated by the disabled
+     state itself plus the scope-banner note in the Combined Delta
+     view). -#}
+  <nav class="tabs" role="tablist" aria-label="{{ panel.display_name }} views">
+    <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
+      Current run <span class="tab-count">{{ panel.current_tab_count }}</span>
+    </button>
+    {%- if panel.has_delta %}
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button">
+      {%- if let Some(dp) = panel.delta_panel %}Delta vs {{ dp.baseline_ref }}{% endif %}
+      {%- if panel.delta_has_news %} <span class="tab-dot" aria-hidden="true"></span>{% endif %}
+      <span class="tab-count">{{ panel.delta_tab_count }} changed</span>
+    </button>
+    {%- else %}
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baseline available for {{ panel.display_name }}">
+      Delta vs baseline <span class="tab-count">—</span>
+    </button>
+    {%- endif %}
+  </nav>
+  <div class="tab-panel" data-tab="current" data-active role="tabpanel">
+  {%- endif %}
   <section class="scope-banner" aria-label="{{ panel.display_name }} scope">
     <p>
       <strong>{{ panel.exceeding_threshold }} of {{ panel.total_functions }}</strong>
@@ -364,6 +560,151 @@
   {% else %}
   <div class="empty-state">No functions analyzed by the {{ panel.display_name }} adapter.</div>
   {% endif %}
+  {%- if has_view_axis %}
+  </div>{# /tab-panel[current] for this language #}
+  {%- if let Some(dp) = panel.delta_panel %}
+  <div class="tab-panel" data-tab="delta" role="tabpanel">
+    {# Delta hero — verdict + summary line. -#}
+    <section class="scope-banner delta-hero" aria-label="{{ panel.display_name }} Delta scope">
+      <p>
+        <strong>Comparing</strong> current run vs <code>{{ dp.baseline_ref }}</code>.
+        <span class="verdict is-{{ dp.verdict_class }}" aria-label="Delta verdict: {{ dp.verdict_label }}">
+          <span class="verdict-glyph">{{ dp.verdict_glyph }}</span>
+          {{ dp.verdict_label }}
+        </span>
+        <span class="meta">
+          {{ dp.summary.added }} added · {{ dp.summary.removed }} removed · {{ dp.summary.modified }} modified ·
+          {{ dp.summary.regressions }} {% if dp.summary.regressions == 1 %}regression{% else %}regressions{% endif %} ·
+          {{ dp.summary.improvements }} {% if dp.summary.improvements == 1 %}improvement{% else %}improvements{% endif %} ·
+          {{ dp.summary.new_violations }} new {% if dp.summary.new_violations == 1 %}violation{% else %}violations{% endif %}
+        </span>
+      </p>
+    </section>
+
+    {# Delta KPI grid (4 tiles). -#}
+    <section class="delta-kpi-grid" aria-label="{{ panel.display_name }} Delta summary">
+      {% for kpi in dp.kpis %}
+      <div class="delta-kpi" data-direction="{{ kpi.direction }}"{% if kpi.is_regression %} data-regression="1"{% endif %}>
+        <span class="delta-kpi-label">{{ kpi.label }}</span>
+        <div class="delta-kpi-ba">
+          <span class="before">{{ kpi.before }}</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">{{ kpi.after }}</span>
+        </div>
+        {% if !kpi.chip_value.is_empty() %}
+        <span class="delta-chip" data-direction="{{ kpi.direction }}"{% if kpi.is_regression %} data-regression="1"{% endif %}>
+          {% if !kpi.chip_glyph.is_empty() %}<span class="chip-glyph" aria-hidden="true">{{ kpi.chip_glyph }}</span>{% endif %}
+          <span class="chip-value">{{ kpi.chip_value }}</span>
+        </span>
+        {% endif %}
+        {% if !kpi.note.is_empty() %}
+        <span class="delta-kpi-foot">{{ kpi.note }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </section>
+
+    {# Regressions table. -#}
+    {% if !dp.regressions.is_empty() %}
+    <section aria-label="{{ panel.display_name }} regressions">
+      <h2>Regressions <span class="delta-section-count">{{ dp.regressions.len() }}</span></h2>
+      <table class="delta-table regressions">
+        <thead><tr>
+          <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+        </tr></thead>
+        <tbody>
+          {% for row in dp.regressions %}
+          <tr{% if row.exceeds %} data-exceeds="1"{% endif %}>
+            <td>
+              <span class="fn-name">{{ row.qualified_name }}</span>
+              <span class="fn-loc">{{ row.file }} L{{ row.start_line }}–{{ row.end_line }}</span>
+            </td>
+            <td class="num">{{ row.baseline_crap }}</td>
+            <td class="num">{{ row.current_crap }}</td>
+            <td><span class="ba-cell"><span class="b">{{ row.baseline_cov }}</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">{{ row.current_cov }}</span></span></td>
+            <td>
+              <span class="transition-pill">
+                <span class="risk-pill" data-risk="{{ row.baseline_risk }}">{{ row.baseline_risk_label }}</span>
+                <span class="arrow" aria-hidden="true">→</span>
+                <span class="risk-pill" data-risk="{{ row.current_risk }}">{{ row.current_risk_label }}</span>
+              </span>
+            </td>
+            <td class="num"><span class="delta-chip" data-direction="{{ row.delta_direction }}" data-regression="1">{% if !row.delta_glyph.is_empty() %}<span class="chip-glyph" aria-hidden="true">{{ row.delta_glyph }}</span>{% endif %} <span class="chip-value">{{ row.delta_value }}</span></span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    {# Improvements table. -#}
+    {% if !dp.improvements.is_empty() %}
+    <section aria-label="{{ panel.display_name }} improvements">
+      <h2>Improvements <span class="delta-section-count">{{ dp.improvements.len() }}</span></h2>
+      <table class="delta-table improvements">
+        <thead><tr>
+          <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+        </tr></thead>
+        <tbody>
+          {% for row in dp.improvements %}
+          <tr>
+            <td>
+              <span class="fn-name">{{ row.qualified_name }}</span>
+              <span class="fn-loc">{{ row.file }} L{{ row.start_line }}–{{ row.end_line }}</span>
+            </td>
+            <td class="num">{{ row.baseline_crap }}</td>
+            <td class="num">{{ row.current_crap }}</td>
+            <td><span class="ba-cell"><span class="b">{{ row.baseline_cov }}</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">{{ row.current_cov }}</span></span></td>
+            <td>
+              <span class="transition-pill">
+                <span class="risk-pill" data-risk="{{ row.baseline_risk }}">{{ row.baseline_risk_label }}</span>
+                <span class="arrow" aria-hidden="true">→</span>
+                <span class="risk-pill" data-risk="{{ row.current_risk }}">{{ row.current_risk_label }}</span>
+              </span>
+            </td>
+            <td class="num"><span class="delta-chip" data-direction="{{ row.delta_direction }}">{% if !row.delta_glyph.is_empty() %}<span class="chip-glyph" aria-hidden="true">{{ row.delta_glyph }}</span>{% endif %} <span class="chip-value">{{ row.delta_value }}</span></span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    {# New functions table. -#}
+    {% if !dp.new_functions.is_empty() %}
+    <section aria-label="{{ panel.display_name }} new functions">
+      <h2>New functions <span class="delta-section-count">{{ dp.new_functions.len() }}</span></h2>
+      <table class="delta-table new-functions">
+        <thead><tr>
+          <th>Function</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk</th>
+        </tr></thead>
+        <tbody>
+          {% for row in dp.new_functions %}
+          <tr{% if row.exceeds %} data-exceeds="1"{% endif %}>
+            <td>
+              <span class="fn-name">{{ row.qualified_name }}</span>
+              <span class="fn-loc">{{ row.file }} L{{ row.start_line }}–{{ row.end_line }}</span>
+            </td>
+            <td class="num">{{ row.current_crap }}</td>
+            <td class="num">{{ row.current_cov }}</td>
+            <td><span class="risk-pill" data-risk="{{ row.current_risk }}">{{ row.current_risk_label }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    {# Unchanged note (chat1.md trim — single-line note, not a full table). -#}
+    {% if dp.unchanged_count > 0 %}
+    <p class="delta-unchanged">
+      {{ dp.unchanged_count }} {% if dp.unchanged_count == 1 %}function{% else %}functions{% endif %}
+      unchanged (CRAP score within ±0.005). Expand the <strong>Current run</strong> tab to inspect {% if dp.unchanged_count == 1 %}it{% else %}them{% endif %}.
+    </p>
+    {% endif %}
+  </div>{# /tab-panel[delta] for this language #}
+  {%- endif %}
+  {%- endif %}
 </div>
 {% endfor %}
 
@@ -386,41 +727,138 @@
     if (stored === "dark") root.setAttribute("data-theme", "dark");
   })();
 
-  // ── Language switcher (segmented) ──────────────────────────────────
-  // Switches which .lang-panel is visible. URL hash routes by
-  // `#lang:tab` per breadboard D7; for v0.7.0 only the language axis
-  // is wired (no Delta tab axis yet — folded in once cross-language
-  // delta support lands). Default on first load: `#combined`.
+  // ── Two-axis switcher (Language × View) ────────────────────────────
+  // URL hash format is `#<lang>:<view>` where <lang> is one of the
+  // segmented Language buttons (e.g. "rust", "typescript", "combined")
+  // and <view> is one of the per-panel View buttons (e.g. "current",
+  // "delta"). Default on first load when no hash is supplied:
+  // `#combined:current`. Switching Language preserves View; switching
+  // View preserves Language. If the user navigates to a disabled
+  // tab (e.g. `#typescript:delta` when TypeScript has no baseline)
+  // we silently fall back to the language's `current` view rather
+  // than leaving a half-broken state on screen.
   (function () {
-    var buttons = [].slice.call(document.querySelectorAll('[data-multi-lang] .lang-nav [data-lang]'));
-    var panels = [].slice.call(document.querySelectorAll('[data-multi-lang] .lang-panel[data-lang]'));
-    if (buttons.length === 0 || panels.length === 0) return;
+    var langButtons = [].slice.call(document.querySelectorAll('[data-multi-lang] .lang-nav [data-lang]'));
+    var langPanels = [].slice.call(document.querySelectorAll('[data-multi-lang] .lang-panel[data-lang]'));
+    if (langButtons.length === 0 || langPanels.length === 0) return;
 
-    function activate(name) {
+    function currentLang() {
+      var active = document.querySelector('[data-multi-lang] .lang-panel[data-active]');
+      return active ? active.dataset.lang : null;
+    }
+
+    function currentView(panel) {
+      var active = panel ? panel.querySelector('.tab-panel[data-active]') : null;
+      return active ? active.dataset.tab : null;
+    }
+
+    // Test whether the per-language Delta tab is disabled — drives
+    // the fallback in setHash() when a stale hash points at a tab
+    // that doesn't exist for the resolved language.
+    function tabIsDisabled(panel, view) {
+      var btn = panel.querySelector('.tabs .tab[data-tab="' + view + '"]');
+      return !!(btn && btn.hasAttribute('disabled'));
+    }
+
+    function activateLang(name) {
       var matched = false;
-      buttons.forEach(function (b) {
+      langButtons.forEach(function (b) {
         var on = b.dataset.lang === name;
-        b.classList.toggle("is-active", on);
-        b.setAttribute("aria-pressed", String(on));
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-pressed', String(on));
         if (on) matched = true;
       });
-      if (!matched) return;
-      panels.forEach(function (p) {
-        if (p.dataset.lang === name) p.setAttribute("data-active", "");
-        else p.removeAttribute("data-active");
+      if (!matched) return null;
+      var newPanel = null;
+      langPanels.forEach(function (p) {
+        if (p.dataset.lang === name) {
+          p.setAttribute('data-active', '');
+          newPanel = p;
+        } else {
+          p.removeAttribute('data-active');
+        }
       });
-      var hashTarget = "#" + name;
-      if (location.hash !== hashTarget) {
-        history.replaceState(null, "", hashTarget);
+      return newPanel;
+    }
+
+    function activateView(panel, view) {
+      if (!panel) return null;
+      // Resolve the View axis only when this language has a `.tabs`
+      // group. Panels without baselines may still expose a disabled
+      // Delta tab; if `view` targets it, fall back to `current` so
+      // the rendered state stays consistent.
+      var tabs = [].slice.call(panel.querySelectorAll('.tabs .tab[data-tab]'));
+      if (tabs.length === 0) return null;
+      var resolved = view;
+      if (tabIsDisabled(panel, view)) {
+        resolved = 'current';
+        if (typeof console !== 'undefined' && console.info) {
+          console.info('[crap-rs] Falling back to #' + panel.dataset.lang + ':current — Delta tab is disabled for this language.');
+        }
+      }
+      tabs.forEach(function (t) {
+        t.setAttribute('aria-selected', String(t.dataset.tab === resolved));
+      });
+      [].slice.call(panel.querySelectorAll('.tab-panel[data-tab]')).forEach(function (p) {
+        if (p.dataset.tab === resolved) p.setAttribute('data-active', '');
+        else p.removeAttribute('data-active');
+      });
+      return resolved;
+    }
+
+    function setHash(lang, view) {
+      var target = '#' + lang + (view ? ':' + view : '');
+      if (location.hash !== target) {
+        history.replaceState(null, '', target);
       }
     }
 
-    buttons.forEach(function (b) {
-      b.addEventListener("click", function () { activate(b.dataset.lang); });
+    function go(lang, view) {
+      var panel = activateLang(lang);
+      var actualView = panel ? activateView(panel, view || 'current') : null;
+      setHash(lang, actualView || view || 'current');
+    }
+
+    // Wire Language buttons. Clicking a Language preserves the
+    // currently-active View where possible (per shaping D6 state-
+    // preservation rule).
+    langButtons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var lang = b.dataset.lang;
+        // Read the current panel's active view BEFORE switching;
+        // we preserve it on the new panel where available.
+        var preservedView = currentView(document.querySelector('[data-multi-lang] .lang-panel[data-active]')) || 'current';
+        go(lang, preservedView);
+      });
     });
 
-    var hash = (location.hash || "").replace(/^#/, "").split(":")[0];
-    if (hash) activate(hash);
+    // Wire View buttons across every language panel. Use event
+    // delegation on each panel so the disabled-tab fallback runs
+    // through the same code path.
+    langPanels.forEach(function (panel) {
+      [].slice.call(panel.querySelectorAll('.tabs .tab[data-tab]')).forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          if (tab.hasAttribute('disabled')) return;
+          var lang = panel.dataset.lang;
+          go(lang, tab.dataset.tab);
+        });
+      });
+    });
+
+    // Initial state — parse the URL hash if present, otherwise
+    // default to `#combined:current` per D7. Split on `:` to
+    // separate the two axes.
+    var rawHash = (location.hash || '').replace(/^#/, '');
+    var parts = rawHash.split(':');
+    var lang = parts[0] || 'combined';
+    var view = parts[1] || 'current';
+    // If the hash names a language that doesn't exist in this
+    // report (e.g. a stale `#go:current` link from a prior run),
+    // fall back to `combined` silently.
+    if (!langButtons.some(function (b) { return b.dataset.lang === lang; })) {
+      lang = 'combined';
+    }
+    go(lang, view);
   })();
 </script>
 
