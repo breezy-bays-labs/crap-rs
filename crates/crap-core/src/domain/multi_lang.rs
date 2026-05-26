@@ -21,7 +21,7 @@
 //! amounts to producing a `LanguageBlock` from its envelope — no
 //! changes here.
 
-use crate::domain::delta::DeltaView;
+use crate::domain::delta::{DeltaSummary, DeltaView};
 use crate::domain::types::{ComplexityMetric, FunctionIdentity, RiskDistribution, RiskLevel};
 use crate::domain::view::AnalysisView;
 
@@ -164,6 +164,162 @@ pub struct RankedFunction {
     /// Complexity number (cognitive or cyclomatic per the adapter's
     /// `metric` field — see `LanguageBlock.metric`).
     pub complexity: u32,
+}
+
+/// Cross-adapter delta aggregation produced by composition when at
+/// least one adapter supplied a baseline.
+///
+/// Carries summed change counts (additive — each adapter scans
+/// disjoint source trees, so a Rust regression and a TypeScript
+/// regression are independent events) plus a workspace-wide ranking
+/// of regressions + new violations sorted by risk band desc, then
+/// CRAP/threshold ratio desc within band — the same
+/// dimensional-consistency rule that governs the Current-view
+/// Combined ranking.
+///
+/// Languages that did not supply a baseline contribute nothing here;
+/// their `LanguageBlock.delta` is `None` and the renderer surfaces
+/// the gap as a disabled Delta tab on that language's panel.
+#[derive(Debug, Default)]
+pub struct CombinedDelta {
+    /// Aggregate counts across every contributing language. Each
+    /// field sums the corresponding `DeltaSummary` field for
+    /// languages whose `LanguageBlock.delta` was `Some`.
+    pub summary: CombinedDeltaSummary,
+    /// Display labels of every language whose baseline contributed
+    /// to this aggregate (e.g. `["Rust", "TypeScript"]`). Renderers
+    /// surface this list so reviewers see which languages are
+    /// represented — crucial for the mismatched-baseline case where
+    /// the Combined Delta represents fewer languages than the
+    /// Combined Current view.
+    pub contributing_languages: Vec<String>,
+    /// Display labels of languages that did NOT supply a baseline.
+    /// Renderers surface this so reviewers understand the
+    /// asymmetry — Combined Delta cannot reason about a language
+    /// without a baseline.
+    pub missing_baseline_languages: Vec<String>,
+    /// Workspace-wide ranking of regressions + new violations. Sort
+    /// key: risk level desc (per-adapter calibrated), then
+    /// CRAP/threshold ratio desc within band. Stable tie-break by
+    /// qualified name asc + file path asc.
+    pub ordered_rows: Vec<RankedDeltaRow>,
+}
+
+/// Aggregate of `DeltaSummary` counts across multiple adapters. Each
+/// field is the sum of the corresponding field across every
+/// `LanguageBlock.delta` that was `Some`.
+///
+/// `passed` defaults to `true` (vacuous AND over zero contributors)
+/// and is AND-folded with each contributing language's
+/// `DeltaSummary.passed`. The Combined Delta aggregate only renders
+/// when at least one language contributed, so a `Default` aggregate
+/// is never rendered — the renderer reads `CombinedDelta` through an
+/// `Option<>`.
+#[derive(Debug, Clone, Copy)]
+pub struct CombinedDeltaSummary {
+    pub added: u32,
+    pub removed: u32,
+    pub modified: u32,
+    pub regressions: u32,
+    pub improvements: u32,
+    pub new_violations: u32,
+    /// True only when every contributing language passed (no new
+    /// violations on any adapter). AND-aggregated across contributing
+    /// blocks; starts `true` (vacuous AND over zero contributors).
+    pub passed: bool,
+}
+
+impl Default for CombinedDeltaSummary {
+    fn default() -> Self {
+        Self {
+            added: 0,
+            removed: 0,
+            modified: 0,
+            regressions: 0,
+            improvements: 0,
+            new_violations: 0,
+            passed: true,
+        }
+    }
+}
+
+/// One row of the Combined Delta ranked table — a single regression
+/// or new violation from any adapter, ready to render.
+///
+/// Carries enough adapter identity to paint the per-row adapter badge
+/// and threshold to compute the dimensionally-consistent ratio that
+/// drives within-band ordering.
+#[derive(Debug, Clone)]
+pub struct RankedDeltaRow {
+    /// Wire language tag of the source adapter.
+    pub language: String,
+    /// Human display label of the source adapter.
+    pub adapter_display: String,
+    /// Whether this row represents an Added (new) function or a
+    /// Modified function whose CRAP score regressed. Drives the
+    /// renderer's row labelling ("new violation" vs "regression").
+    pub kind: RankedDeltaKind,
+    /// Baseline function snapshot. `None` for Added (no baseline).
+    pub baseline: Option<DeltaRowSnapshot>,
+    /// Current function snapshot. Always present.
+    pub current: DeltaRowSnapshot,
+    /// Adapter threshold at the time of the current analysis.
+    /// Drives the dimensionally-consistent ratio (CRAP /
+    /// threshold) that orders rows within a risk band.
+    pub threshold: f64,
+    /// CRAP / threshold for the current row. Dimensionally
+    /// consistent within an adapter's risk band — see
+    /// [`safe_ratio`].
+    pub ratio: f64,
+}
+
+/// Two flavors of cross-adapter delta row the Combined Delta table
+/// surfaces. Improvements are not ranked here — only regressions and
+/// new violations are surfaced, matching the per-language delta
+/// reporter's regression-focused affordance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RankedDeltaKind {
+    /// A `Modified` change whose CRAP score increased by at least
+    /// the 0.005 cutoff (matches the per-language reporter).
+    Regression,
+    /// An `Added` change — a new function (whose risk may or may not
+    /// exceed threshold; both are surfaced so reviewers see the
+    /// surface area of new work).
+    NewFunction,
+}
+
+/// Per-row snapshot of identity + scoring used by both baseline and
+/// current sides of a `RankedDeltaRow`. Keeping this lightweight (no
+/// borrows back into the source `AnalysisDelta`) lets the renderer
+/// own its rendering data after composition, mirroring the same
+/// pattern used by `RankedFunction` for the Current-view combined
+/// table.
+#[derive(Debug, Clone)]
+pub struct DeltaRowSnapshot {
+    pub identity: FunctionIdentity,
+    pub crap: f64,
+    pub coverage_percent: f64,
+    pub risk_level: RiskLevel,
+    /// True when this snapshot exceeds its adapter's threshold (the
+    /// `exceeds` flag from `FunctionVerdict`). For the baseline
+    /// snapshot, this captures whether the baseline ALREADY exceeded
+    /// threshold; for current, whether it exceeds NOW.
+    pub exceeds: bool,
+}
+
+impl CombinedDeltaSummary {
+    /// Fold one per-language `DeltaSummary` into this aggregate.
+    /// Idempotent — called once per contributing language during
+    /// composition.
+    pub fn fold(&mut self, other: &DeltaSummary) {
+        self.added += other.added;
+        self.removed += other.removed;
+        self.modified += other.modified;
+        self.regressions += other.regressions;
+        self.improvements += other.improvements;
+        self.new_violations += other.new_violations;
+        self.passed = self.passed && other.passed;
+    }
 }
 
 /// Worst CRAP/threshold ratio observed across all adapters.

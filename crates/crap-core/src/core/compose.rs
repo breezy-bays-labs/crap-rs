@@ -14,11 +14,13 @@
 //! ratio ARE dimensionally consistent — they answer "how far over
 //! this adapter's own threshold" — and produce an honest ordering.
 
+use crate::domain::delta::FunctionChange;
 use crate::domain::multi_lang::{
-    CombinedSummary, LanguageBlock, MultiLangContext, RankedFunction, WorstRatio, risk_level_rank,
+    CombinedDelta, CombinedDeltaSummary, CombinedSummary, DeltaRowSnapshot, LanguageBlock,
+    MultiLangContext, RankedDeltaKind, RankedDeltaRow, RankedFunction, WorstRatio, risk_level_rank,
     safe_ratio,
 };
-use crate::domain::types::RiskDistribution;
+use crate::domain::types::{FunctionVerdict, RiskDistribution};
 use std::cmp::Ordering;
 
 /// Compose per-language blocks into a multi-language report context.
@@ -112,6 +114,164 @@ fn compute_combined_summary(blocks: &[LanguageBlock<'_>]) -> CombinedSummary {
         distribution,
         ordered_functions: ordered,
     }
+}
+
+/// Compose a cross-adapter Combined Delta aggregate, or `None` when
+/// no language supplied a baseline.
+///
+/// Returns `None` precisely when every block's `delta` field is
+/// `None` — the renderer uses that signal to suppress the View axis
+/// nav entirely (no language has a Delta to show).
+///
+/// When at least one language contributed a baseline, this returns
+/// `Some(CombinedDelta)` carrying:
+/// - Summed change counts across contributing languages
+/// - Display labels listing which languages contributed AND which
+///   are missing a baseline (so the renderer can surface the
+///   asymmetry to reviewers)
+/// - A workspace-wide ranked list of regressions + new functions,
+///   sorted by risk band desc then CRAP/threshold ratio desc within
+///   band (same dimensional-consistency rule as the Current-view
+///   Combined ranking)
+///
+/// Improvements are intentionally not surfaced in the ranked list —
+/// the Combined Delta affordance is regression-focused, matching the
+/// per-language delta reporter's separate-improvements-table
+/// arrangement at the chat1.md trim.
+pub fn compose_combined_delta(blocks: &[LanguageBlock<'_>]) -> Option<CombinedDelta> {
+    // Detect the no-baseline case up-front so we can short-circuit
+    // without allocating any intermediate state.
+    if blocks.iter().all(|b| b.delta.is_none()) {
+        return None;
+    }
+
+    let mut summary = CombinedDeltaSummary::default();
+    let mut contributing_languages: Vec<String> = Vec::new();
+    let mut missing_baseline_languages: Vec<String> = Vec::new();
+    let mut ordered_rows: Vec<RankedDeltaRow> = Vec::new();
+
+    for block in blocks {
+        match block.delta.as_ref() {
+            Some(delta_view) => {
+                summary.fold(&delta_view.full.summary);
+                contributing_languages.push(block.display_name.clone());
+                collect_ranked_rows(&mut ordered_rows, block, delta_view);
+            }
+            None => {
+                missing_baseline_languages.push(block.display_name.clone());
+            }
+        }
+    }
+
+    ordered_rows.sort_by(rank_delta_row_cmp);
+
+    Some(CombinedDelta {
+        summary,
+        contributing_languages,
+        missing_baseline_languages,
+        ordered_rows,
+    })
+}
+
+fn collect_ranked_rows(
+    out: &mut Vec<RankedDeltaRow>,
+    block: &LanguageBlock<'_>,
+    delta_view: &crate::domain::delta::DeltaView<'_>,
+) {
+    // Walk the un-truncated change list so a per-language `--top N`
+    // doesn't silently drop rows from the workspace ranking. The
+    // Combined Delta table applies its own ranking; per-language
+    // truncation is presentational, not authoritative.
+    for change in &delta_view.full.changes {
+        match change {
+            FunctionChange::Modified { baseline, current } => {
+                let crap_delta = current.scored.crap.value - baseline.scored.crap.value;
+                // Regression threshold matches the per-language
+                // reporter's 0.005 cutoff — a smaller delta rounds
+                // to "+0.00" in the {:.2} cell output and would
+                // look like a false flag.
+                if crap_delta >= 0.005 {
+                    out.push(make_ranked_row(
+                        block,
+                        Some(baseline),
+                        current,
+                        RankedDeltaKind::Regression,
+                    ));
+                }
+            }
+            FunctionChange::Added { current } => {
+                out.push(make_ranked_row(
+                    block,
+                    None,
+                    current,
+                    RankedDeltaKind::NewFunction,
+                ));
+            }
+            FunctionChange::Removed { .. } => {
+                // v1 design intentionally drops Removed-zero rows
+                // here for the same reason the per-language
+                // reporter does at chat1.md — Combined Delta is
+                // regression-focused; removed functions don't add
+                // risk.
+            }
+        }
+    }
+}
+
+fn make_ranked_row(
+    block: &LanguageBlock<'_>,
+    baseline: Option<&FunctionVerdict>,
+    current: &FunctionVerdict,
+    kind: RankedDeltaKind,
+) -> RankedDeltaRow {
+    let ratio = safe_ratio(current.scored.crap.value, block.threshold);
+    RankedDeltaRow {
+        language: block.language.clone(),
+        adapter_display: block.display_name.clone(),
+        kind,
+        baseline: baseline.map(snapshot_from_verdict),
+        current: snapshot_from_verdict(current),
+        threshold: block.threshold,
+        ratio,
+    }
+}
+
+fn snapshot_from_verdict(verdict: &FunctionVerdict) -> DeltaRowSnapshot {
+    DeltaRowSnapshot {
+        identity: verdict.scored.identity.clone(),
+        crap: verdict.scored.crap.value,
+        coverage_percent: verdict.scored.coverage_percent,
+        risk_level: verdict.scored.crap.risk_level,
+        exceeds: verdict.exceeds,
+    }
+}
+
+/// Comparator for [`RankedDeltaRow`]. Same rule as the Current-view
+/// ranking: risk level desc (per-adapter calibrated), then
+/// CRAP/threshold ratio desc (dimensionally consistent within band),
+/// then stable tie-break by qualified name asc + file path asc.
+fn rank_delta_row_cmp(a: &RankedDeltaRow, b: &RankedDeltaRow) -> Ordering {
+    let risk_cmp =
+        risk_level_rank(b.current.risk_level).cmp(&risk_level_rank(a.current.risk_level));
+    if risk_cmp != Ordering::Equal {
+        return risk_cmp;
+    }
+    let ratio_cmp = b.ratio.partial_cmp(&a.ratio).unwrap_or(Ordering::Equal);
+    if ratio_cmp != Ordering::Equal {
+        return ratio_cmp;
+    }
+    let name_cmp = a
+        .current
+        .identity
+        .qualified_name
+        .cmp(&b.current.identity.qualified_name);
+    if name_cmp != Ordering::Equal {
+        return name_cmp;
+    }
+    a.current
+        .identity
+        .file_path
+        .cmp(&b.current.identity.file_path)
 }
 
 /// Comparator for [`RankedFunction`]. Risk level desc, then ratio
@@ -473,5 +633,395 @@ mod tests {
         )]);
         let worst = ctx.combined.worst_ratio.expect("worst ratio should be set");
         assert!(worst.ratio.is_infinite());
+    }
+
+    // ── compose_combined_delta tests (View axis cross-adapter delta) ──
+
+    use crate::domain::delta::{self, DeltaViewSpec};
+
+    /// Build a `LanguageBlock` from a baseline + current pair. The
+    /// owned `AnalysisResult` for current is held on the holder; the
+    /// `DeltaView` borrows from an `AnalysisDelta` we construct in
+    /// the `block` accessor.
+    struct DeltaFixture {
+        baseline: AnalysisResult,
+        current: AnalysisResult,
+    }
+
+    impl DeltaFixture {
+        fn from_fixtures(baseline: Fixture, current: Fixture) -> Self {
+            Self {
+                baseline: baseline.result,
+                current: current.result,
+            }
+        }
+
+        fn block_with_baseline<'a>(
+            &'a self,
+            holder: &'a mut Option<crate::domain::delta::AnalysisDelta>,
+            tool_name: &str,
+            display_name: &str,
+            language: &str,
+            metric: ComplexityMetric,
+            threshold: f64,
+        ) -> LanguageBlock<'a> {
+            *holder = Some(delta::compute(self.baseline.clone(), self.current.clone()));
+            let analysis_delta = holder.as_ref().expect("just populated");
+            LanguageBlock {
+                tool_name: tool_name.to_string(),
+                display_name: display_name.to_string(),
+                language: language.to_string(),
+                tool_version: "0.0.0-test".to_string(),
+                metric,
+                threshold,
+                view: view::apply(&self.current, ViewSpec::default()),
+                delta: Some(delta::apply(analysis_delta, DeltaViewSpec::default())),
+            }
+        }
+    }
+
+    /// Verifies the no-baseline short-circuit. Composition should
+    /// return `None` cheaply so the renderer can suppress the View
+    /// axis nav entirely.
+    #[test]
+    fn compose_combined_delta_returns_none_when_no_block_has_baseline() {
+        let fx = Fixture::new(vec![(
+            "fn::any",
+            "src/x.rs",
+            5.0,
+            8.0,
+            RiskLevel::Low,
+            3,
+            80.0,
+        )]);
+        let block = fx.block("crap4rs", "Rust", "rust", ComplexityMetric::Cognitive, 8.0);
+        assert!(compose_combined_delta(&[block]).is_none());
+    }
+
+    /// Mismatched-baseline scenario: only one language supplied a
+    /// baseline. The aggregate must surface it as contributing and
+    /// list the other language under `missing_baseline_languages` so
+    /// the renderer can paint the disabled Delta tab + scope-banner
+    /// asymmetry note.
+    #[test]
+    fn compose_combined_delta_marks_missing_baselines() {
+        let baseline_rs = Fixture::new(vec![(
+            "rs::a",
+            "src/a.rs",
+            4.0,
+            8.0,
+            RiskLevel::Low,
+            3,
+            80.0,
+        )]);
+        let current_rs = Fixture::new(vec![(
+            "rs::a",
+            "src/a.rs",
+            6.0,
+            8.0,
+            RiskLevel::Acceptable,
+            5,
+            70.0,
+        )]);
+        let rs_dfx = DeltaFixture::from_fixtures(baseline_rs, current_rs);
+        let mut rs_delta = None;
+        let rs_block = rs_dfx.block_with_baseline(
+            &mut rs_delta,
+            "crap4rs",
+            "Rust",
+            "rust",
+            ComplexityMetric::Cognitive,
+            8.0,
+        );
+
+        let ts_fx = Fixture::new(vec![(
+            "ts::b",
+            "src/b.ts",
+            3.0,
+            8.0,
+            RiskLevel::Low,
+            3,
+            90.0,
+        )]);
+        let ts_block = ts_fx.block(
+            "crap4ts",
+            "TypeScript",
+            "typescript",
+            ComplexityMetric::Cyclomatic,
+            8.0,
+        );
+
+        let combined = compose_combined_delta(&[rs_block, ts_block])
+            .expect("at least one language has a baseline");
+        assert_eq!(
+            combined.contributing_languages,
+            vec!["Rust".to_string()],
+            "Only Rust contributed a baseline"
+        );
+        assert_eq!(
+            combined.missing_baseline_languages,
+            vec!["TypeScript".to_string()],
+            "TypeScript has no baseline; renderer paints disabled Delta tab on its panel"
+        );
+    }
+
+    /// Cross-adapter regression ranking: a Rust High-risk regression
+    /// must rank ahead of a TypeScript Moderate-risk regression, per
+    /// the dimensional-consistency rule (risk band desc, then
+    /// ratio).
+    #[test]
+    fn compose_combined_delta_ranks_high_risk_before_moderate_across_adapters() {
+        let baseline_rs = Fixture::new(vec![(
+            "rs::scary_fn",
+            "src/h.rs",
+            10.0,
+            8.0,
+            RiskLevel::Acceptable,
+            10,
+            60.0,
+        )]);
+        let current_rs = Fixture::new(vec![(
+            "rs::scary_fn",
+            "src/h.rs",
+            45.6,
+            8.0,
+            RiskLevel::High,
+            20,
+            30.0,
+        )]);
+        let rs_dfx = DeltaFixture::from_fixtures(baseline_rs, current_rs);
+
+        let baseline_ts = Fixture::new(vec![(
+            "ts::moderate_change",
+            "src/m.ts",
+            14.0,
+            8.0,
+            RiskLevel::Moderate,
+            8,
+            65.0,
+        )]);
+        let current_ts = Fixture::new(vec![(
+            "ts::moderate_change",
+            "src/m.ts",
+            20.0,
+            8.0,
+            RiskLevel::Moderate,
+            10,
+            60.0,
+        )]);
+        let ts_dfx = DeltaFixture::from_fixtures(baseline_ts, current_ts);
+
+        let mut rs_delta = None;
+        let mut ts_delta = None;
+        let blocks = vec![
+            rs_dfx.block_with_baseline(
+                &mut rs_delta,
+                "crap4rs",
+                "Rust",
+                "rust",
+                ComplexityMetric::Cognitive,
+                8.0,
+            ),
+            ts_dfx.block_with_baseline(
+                &mut ts_delta,
+                "crap4ts",
+                "TypeScript",
+                "typescript",
+                ComplexityMetric::Cyclomatic,
+                8.0,
+            ),
+        ];
+
+        let combined =
+            compose_combined_delta(&blocks).expect("both languages contributed baselines");
+        let names: Vec<&str> = combined
+            .ordered_rows
+            .iter()
+            .map(|r| r.current.identity.qualified_name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["rs::scary_fn", "ts::moderate_change"],
+            "High-risk Rust regression must rank ahead of Moderate-risk TS regression"
+        );
+        // Per-row kind identifies regressions.
+        for row in &combined.ordered_rows {
+            assert_eq!(row.kind, RankedDeltaKind::Regression);
+        }
+        // Aggregate summary AND-folds passed across contributing
+        // blocks. Neither baseline → current crossed the threshold
+        // (both stayed below or scored as regressions but didn't
+        // produce a new-violation count of 1), so the fold reflects
+        // each block's `DeltaSummary.passed`.
+        assert_eq!(combined.summary.regressions, 2);
+        assert_eq!(combined.summary.new_violations, 0);
+    }
+
+    /// Within-band tie-break: two Moderate-risk regressions from
+    /// different adapters must order by CRAP/threshold ratio desc.
+    /// Higher ratio first.
+    #[test]
+    fn compose_combined_delta_orders_within_band_by_ratio_desc() {
+        let baseline_rs = Fixture::new(vec![(
+            "rs::change",
+            "src/r.rs",
+            10.0,
+            8.0,
+            RiskLevel::Acceptable,
+            5,
+            70.0,
+        )]);
+        let current_rs = Fixture::new(vec![(
+            "rs::change",
+            "src/r.rs",
+            18.0,
+            8.0,
+            RiskLevel::Moderate,
+            8,
+            55.0,
+        )]);
+        let rs_dfx = DeltaFixture::from_fixtures(baseline_rs, current_rs);
+        // ratio_rs = 18.0 / 8.0 = 2.25
+
+        let baseline_ts = Fixture::new(vec![(
+            "ts::change",
+            "src/t.ts",
+            10.0,
+            8.0,
+            RiskLevel::Acceptable,
+            5,
+            70.0,
+        )]);
+        let current_ts = Fixture::new(vec![(
+            "ts::change",
+            "src/t.ts",
+            24.0,
+            8.0,
+            RiskLevel::Moderate,
+            10,
+            45.0,
+        )]);
+        let ts_dfx = DeltaFixture::from_fixtures(baseline_ts, current_ts);
+        // ratio_ts = 24.0 / 8.0 = 3.00 — higher ratio than rs
+
+        let mut rs_delta = None;
+        let mut ts_delta = None;
+        let blocks = vec![
+            rs_dfx.block_with_baseline(
+                &mut rs_delta,
+                "crap4rs",
+                "Rust",
+                "rust",
+                ComplexityMetric::Cognitive,
+                8.0,
+            ),
+            ts_dfx.block_with_baseline(
+                &mut ts_delta,
+                "crap4ts",
+                "TypeScript",
+                "typescript",
+                ComplexityMetric::Cyclomatic,
+                8.0,
+            ),
+        ];
+
+        let combined = compose_combined_delta(&blocks).expect("both contributed baselines");
+        let names: Vec<&str> = combined
+            .ordered_rows
+            .iter()
+            .map(|r| r.current.identity.qualified_name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["ts::change", "rs::change"],
+            "Within Moderate band, TS row at ratio 3.0 ranks ahead of RS row at ratio 2.25"
+        );
+    }
+
+    /// Added (new) functions surface in the ranked list with the
+    /// NewFunction kind, alongside regressions. Improvements are
+    /// intentionally suppressed — Combined Delta is
+    /// regression-focused.
+    #[test]
+    fn compose_combined_delta_includes_added_and_excludes_improvements() {
+        let baseline = Fixture::new(vec![
+            (
+                "fn::regressing",
+                "src/r.rs",
+                10.0,
+                8.0,
+                RiskLevel::Acceptable,
+                6,
+                70.0,
+            ),
+            (
+                "fn::improving",
+                "src/i.rs",
+                14.0,
+                8.0,
+                RiskLevel::Moderate,
+                8,
+                50.0,
+            ),
+        ]);
+        let current = Fixture::new(vec![
+            (
+                "fn::regressing",
+                "src/r.rs",
+                20.0,
+                8.0,
+                RiskLevel::Moderate,
+                10,
+                50.0,
+            ),
+            (
+                "fn::improving",
+                "src/i.rs",
+                6.0,
+                8.0,
+                RiskLevel::Acceptable,
+                4,
+                85.0,
+            ),
+            (
+                "fn::brand_new",
+                "src/n.rs",
+                12.0,
+                8.0,
+                RiskLevel::Moderate,
+                7,
+                55.0,
+            ),
+        ]);
+        let dfx = DeltaFixture::from_fixtures(baseline, current);
+        let mut delta_holder = None;
+        let block = dfx.block_with_baseline(
+            &mut delta_holder,
+            "crap4rs",
+            "Rust",
+            "rust",
+            ComplexityMetric::Cognitive,
+            8.0,
+        );
+
+        let combined = compose_combined_delta(&[block]).expect("Rust block contributed a baseline");
+        let kinds: Vec<(&str, RankedDeltaKind)> = combined
+            .ordered_rows
+            .iter()
+            .map(|r| (r.current.identity.qualified_name.as_str(), r.kind))
+            .collect();
+        // Regression + Added surface; improvement is excluded.
+        assert!(
+            kinds.contains(&("fn::regressing", RankedDeltaKind::Regression)),
+            "regression must surface"
+        );
+        assert!(
+            kinds.contains(&("fn::brand_new", RankedDeltaKind::NewFunction)),
+            "added (new) function must surface"
+        );
+        assert!(
+            !kinds.iter().any(|(n, _)| *n == "fn::improving"),
+            "improvement must NOT surface — Combined Delta is regression-focused"
+        );
     }
 }
