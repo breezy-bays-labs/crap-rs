@@ -125,7 +125,7 @@ const MINIMAL_ENVELOPE_V2: &str = r#"{
 const MINIMAL_ENVELOPE_TS_V2: &str = r#"{
   "schema_version": 2,
   "tool_version": "2.0.0",
-  "language": "rust",
+  "language": "typescript",
   "timestamp": "2026-05-25T12:00:00Z",
   "metric": "cyclomatic",
   "threshold": 8.0,

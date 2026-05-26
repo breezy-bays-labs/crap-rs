@@ -56,11 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `crap-core` now ships a binary alongside the library. This
-    diverges from the scrap4rs peer-repo convention of "library
-    crate, never a binary"; the divergence is documented in
-    `~/Github/ops/decisions/crap-rs/adr-multi-lang-renderer-placement.md`.
-    The change is non-breaking for existing library consumers — the
-    `[[bin]]` target compiles only when explicitly built.
+    diverges from the `crap4rs` peer-crate convention of "library
+    crate, never a binary"; the divergence is intentional — the
+    multi-language renderer needs both `crap4rs` and `crap4ts` data
+    in one process, which neither adapter binary can satisfy alone,
+    and placing the renderer in `crap-core` keeps the rendering
+    pipeline language-neutral. The change is non-breaking for
+    existing library consumers — the `[[bin]]` target compiles only
+    when explicitly built.
 - The `crap-core` description and categories pick up the new
     `command-line-utilities` category so crates.io discovery surfaces
     the renderer.

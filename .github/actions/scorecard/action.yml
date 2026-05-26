@@ -355,7 +355,7 @@ outputs:
       Rust-only artifact, and no deprecation warning is emitted.
 
       See `html-artifact-url` for URL-authentication semantics.
-    value: ${{ steps.presets.outputs.is_multi == 'true' && format('{0}#rust', steps.upload-unified.outputs.artifact-url) || steps.upload-rust.outputs.artifact-url }}
+    value: ${{ steps.upload-unified.outputs.artifact-url != '' && format('{0}#rust', steps.upload-unified.outputs.artifact-url) || steps.upload-rust.outputs.artifact-url }}
   html-artifact-url-typescript:
     description: |
       Workflow artifact URL for the rendered TypeScript HTML report
@@ -371,7 +371,7 @@ outputs:
       unchanged from γ (#294): the URL points at the standalone
       TypeScript-only artifact, and no deprecation warning is
       emitted.
-    value: ${{ steps.presets.outputs.is_multi == 'true' && format('{0}#typescript', steps.upload-unified.outputs.artifact-url) || steps.upload-typescript.outputs.artifact-url }}
+    value: ${{ steps.upload-unified.outputs.artifact-url != '' && format('{0}#typescript', steps.upload-unified.outputs.artifact-url) || steps.upload-typescript.outputs.artifact-url }}
 
 runs:
   using: 'composite'

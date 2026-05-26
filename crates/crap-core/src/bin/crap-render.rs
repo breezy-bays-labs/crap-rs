@@ -35,7 +35,8 @@
 //! double-render the same data; the error message points at the
 //! collision.
 
-use std::fs;
+use std::fs::{self, File};
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -206,9 +207,14 @@ fn parse_input_spec(spec: &str) -> Result<ParsedEnvelope> {
         bail!("invalid --input spec '{spec}': file path must not be empty");
     }
 
-    let json = fs::read_to_string(&path)
-        .with_context(|| format!("reading envelope at {}", path.display()))?;
-    let envelope: WireEnvelope = serde_json::from_str(&json)
+    // Stream the envelope via BufReader so very large analyses don't
+    // require loading the full file into memory before parsing.
+    // `from_reader` reads forward through the JSON document; on a
+    // typical workspace this is functionally equivalent to slurping
+    // but bounds peak memory in the high-input case.
+    let file =
+        File::open(&path).with_context(|| format!("opening envelope at {}", path.display()))?;
+    let envelope: WireEnvelope = serde_json::from_reader(BufReader::new(file))
         .with_context(|| format!("parsing JSON envelope at {}", path.display()))?;
 
     if !SUPPORTED_SCHEMA_VERSIONS.contains(&envelope.schema_version) {

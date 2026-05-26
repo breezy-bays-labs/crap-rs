@@ -281,7 +281,7 @@ Combined toggle at the top of the page. The sticky comment carries
 **one canonical link** plus two deep-link anchors so reviewers can
 land directly on a per-language panel:
 
-```
+```text
 📊 [Open report](<unified-url>) · [Rust panel](<unified-url>#rust) · [TypeScript panel](<unified-url>#typescript)
 ```
 
