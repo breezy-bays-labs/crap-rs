@@ -70,17 +70,25 @@ jobs:
         with:
           tool: cargo-llvm-cov@0.6
 
-      - name: Build PR adapter binaries (crap4rs + crap4ts)
-        run: cargo build --release --package crap4rs --package crap4ts
+      - name: Build PR adapter binaries (crap4rs + crap4ts + crap-render)
+        # `crap-render` lives in `crap-core` and ships alongside the
+        # adapter binaries. Picking up only that bin keeps the build
+        # surface minimal while staging the multi-language renderer
+        # under PATH for the action's pre-installed-detection branch.
+        run: |
+          cargo build --release --package crap4rs --package crap4ts
+          cargo build --release --bin crap-render --package crap-core
 
       - name: Stage PR binaries as pre-installed adapters
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.cargo/bin"
-          install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
-          install -m 0755 ./target/release/crap4ts  "$HOME/.cargo/bin/crap4ts"
+          install -m 0755 ./target/release/crap4rs    "$HOME/.cargo/bin/crap4rs"
+          install -m 0755 ./target/release/crap4ts    "$HOME/.cargo/bin/crap4ts"
+          install -m 0755 ./target/release/crap-render "$HOME/.cargo/bin/crap-render"
           crap4rs --version
           crap4ts --version
+          crap-render --help >/dev/null 2>&1 && echo "crap-render: ok"
 
       # ----------------------------------------------------------------
       # Generate Rust LCOV for the workspace. The smoke runs cold, no

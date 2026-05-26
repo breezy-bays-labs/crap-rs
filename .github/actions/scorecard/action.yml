@@ -1361,20 +1361,31 @@ runs:
     # preserving byte-identical γ behavior for callers who never set
     # `languages: rust,typescript`).
     #
-    # The install step uses `taiki-e/install-action` (SHA-pinned per
-    # AGENTS.md Supply-chain hygiene Rule 3) with `tool: crap-render`
-    # so the action resolves the binary through crap-core's
-    # `[package.metadata.binstall]` block — installing the pre-built
-    # tarball from the latest `crap-core-vX.Y.Z` release. Falls back
-    # to `cargo install` on cache miss, but the build matrix in
-    # release-plz.yml's `build-crap-core-binaries` job uploads
-    # tarballs with every crap-core release so the binstall path is
-    # the dominant install route.
+    # The install step mirrors the pre-installed-detection pattern
+    # used for the adapter binaries above: if a `crap-render` is
+    # already on PATH (workspace-local build staged by a pre-step,
+    # for end-to-end dogfooding), skip the binstall and reuse it.
+    # Otherwise resolve through `cargo binstall` against crap-core's
+    # `[package.metadata.binstall]` block, which downloads the
+    # pre-built tarball from the latest `crap-core-vX.Y.Z` release
+    # uploaded by release-plz.yml's `build-crap-core-binaries` job.
+    #
+    # Until crap-core ships a release carrying crap-render (which
+    # `release-plz` will trigger on the first crap-core 0.7.0+ merge),
+    # binstall has nothing to resolve and the step fails — that's why
+    # this PR's own CI smokes stage the workspace-built `crap-render`
+    # onto PATH so the pre-installed branch fires.
     - name: Install crap-render
       if: inputs.html-report == 'true' && steps.presets.outputs.is_multi == 'true'
-      uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
-      with:
-        tool: crap-render
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v crap-render >/dev/null 2>&1; then
+          echo "Pre-installed crap-render detected ($(crap-render --version 2>/dev/null || echo 'version unknown')); skipping binstall."
+        else
+          cargo binstall --no-confirm crap-render || cargo install crap-render
+        fi
+        crap-render --help >/dev/null 2>&1 || true
 
     - name: Render unified HTML
       id: render-unified
