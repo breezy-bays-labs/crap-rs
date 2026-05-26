@@ -1223,8 +1223,7 @@ jobs:
             file_hits=$(awk '/#\[cfg\(test\)\]/{exit} {print FILENAME":"NR":"$0}' "$f" \
               | grep -F -e '"crap4rs"' -e '"crap4ts"' || true)
             if [ -n "$file_hits" ]; then
-              hits="${hits}${file_hits}
-"
+              hits="${hits}${file_hits}"$'\n'
             fi
           done <<< "$files"
           if [ -z "$hits" ]; then
