@@ -40,6 +40,13 @@ struct MultiLangWorld {
     /// Output of the last crap-render invocation. None until the
     /// scenario's When step has run.
     output: Option<Output>,
+    /// Loaded contents of `.github/actions/scorecard/action.yml` for
+    /// the composite-action scenario. Set by the Given step that
+    /// declares a workspace configured with a single language adapter.
+    /// Captured during Given so the When step has executable work to
+    /// do (parse + validate structural fitness) and the Then steps
+    /// share a single read.
+    action_yml: Option<String>,
 }
 
 impl MultiLangWorld {
@@ -70,6 +77,7 @@ impl MultiLangWorld {
 /// scenarios. Keep them positional for readability at call sites.
 #[allow(clippy::too_many_arguments)]
 fn synth_envelope(
+    language: &str,
     qualified_name: &str,
     file_path: &str,
     metric: &str,
@@ -91,7 +99,7 @@ fn synth_envelope(
         r#"{{
   "schema_version": 2,
   "tool_version": "0.0.0-test",
-  "language": "rust",
+  "language": "{language}",
   "timestamp": "2026-05-25T12:00:00Z",
   "metric": "{metric}",
   "threshold": {threshold},
@@ -172,6 +180,7 @@ fn write_envelope(world: &mut MultiLangWorld, language: &str, filename: &str, bo
 #[given("a crap4rs JSON envelope from a representative workspace")]
 fn given_crap4rs_envelope_representative(world: &mut MultiLangWorld) {
     let body = synth_envelope(
+        "rust",
         "compute_crap",
         "src/lib.rs",
         "cognitive",
@@ -187,6 +196,7 @@ fn given_crap4rs_envelope_representative(world: &mut MultiLangWorld) {
 #[given("a crap4rs JSON envelope and a crap4ts JSON envelope from one workspace")]
 fn given_two_language_envelopes(world: &mut MultiLangWorld) {
     let rs = synth_envelope(
+        "rust",
         "compute_crap",
         "src/lib.rs",
         "cognitive",
@@ -197,6 +207,7 @@ fn given_two_language_envelopes(world: &mut MultiLangWorld) {
         80.0,
     );
     let ts = synth_envelope(
+        "typescript",
         "parseInvoice",
         "src/parse.ts",
         "cyclomatic",
@@ -214,6 +225,7 @@ fn given_two_language_envelopes(world: &mut MultiLangWorld) {
 fn given_crap4rs_high_risk_envelope(world: &mut MultiLangWorld) {
     // ratio = 5.7 = 45.6 / 8.0
     let body = synth_envelope(
+        "rust",
         "view::analyze_view",
         "src/domain/view.rs",
         "cognitive",
@@ -230,6 +242,7 @@ fn given_crap4rs_high_risk_envelope(world: &mut MultiLangWorld) {
 fn given_crap4ts_moderate_envelope(world: &mut MultiLangWorld) {
     // ratio = 2.5 = 20.0 / 8.0
     let body = synth_envelope(
+        "typescript",
         "parseInvoice",
         "src/parse.ts",
         "cyclomatic",
@@ -244,10 +257,30 @@ fn given_crap4ts_moderate_envelope(world: &mut MultiLangWorld) {
 
 #[given("two JSON envelopes carrying different schema_version values")]
 fn given_mismatched_schema_envelopes(world: &mut MultiLangWorld) {
-    let good = synth_envelope("ok", "src/lib.rs", "cognitive", 4.0, 8.0, "low", 3, 90.0);
+    let good = synth_envelope(
+        "rust",
+        "ok",
+        "src/lib.rs",
+        "cognitive",
+        4.0,
+        8.0,
+        "low",
+        3,
+        90.0,
+    );
     // Replace schema_version with an unsupported value (99).
-    let bad = synth_envelope("bad", "src/lib.ts", "cyclomatic", 4.0, 8.0, "low", 3, 90.0)
-        .replace(r#""schema_version": 2"#, r#""schema_version": 99"#);
+    let bad = synth_envelope(
+        "typescript",
+        "bad",
+        "src/lib.ts",
+        "cyclomatic",
+        4.0,
+        8.0,
+        "low",
+        3,
+        90.0,
+    )
+    .replace(r#""schema_version": 2"#, r#""schema_version": 99"#);
     write_envelope(world, "rust", "good.json", &good);
     write_envelope(world, "typescript", "bad.json", &bad);
 }
@@ -255,6 +288,7 @@ fn given_mismatched_schema_envelopes(world: &mut MultiLangWorld) {
 #[given("two crap4rs JSON envelopes from the same workspace")]
 fn given_two_crap4rs_envelopes(world: &mut MultiLangWorld) {
     let body = synth_envelope(
+        "rust",
         "compute_crap",
         "src/lib.rs",
         "cognitive",
@@ -271,10 +305,15 @@ fn given_two_crap4rs_envelopes(world: &mut MultiLangWorld) {
 }
 
 #[given("a workspace configured with a single language adapter")]
-fn given_workspace_single_language(_world: &mut MultiLangWorld) {
-    // No envelope needed — this scenario verifies the composite
-    // action's documented `if:` gate. The 'Then' step reads
-    // `.github/actions/scorecard/action.yml` directly.
+fn given_workspace_single_language(world: &mut MultiLangWorld) {
+    // Composite-action scenario: the contract under test is the
+    // declarative gating in `.github/actions/scorecard/action.yml`,
+    // not a runtime workflow execution. We capture the action.yml
+    // contents here so subsequent steps have shared, scenario-owned
+    // state rather than re-reading the file from each Then step.
+    let yml = std::fs::read_to_string(action_yml_path())
+        .expect("read .github/actions/scorecard/action.yml");
+    world.action_yml = Some(yml);
 }
 
 // ── When steps ───────────────────────────────────────────────────────
@@ -319,10 +358,26 @@ fn when_run_both_envelopes_default_format(world: &mut MultiLangWorld) {
 }
 
 #[when("the composite scorecard action runs with html-report set true and one language")]
-fn when_action_single_language(_world: &mut MultiLangWorld) {
-    // Pure read-only verification — no command executed. The Then
-    // step reads the action.yml file directly to confirm the
-    // documented gating.
+fn when_action_single_language(world: &mut MultiLangWorld) {
+    // The "run" under test is a contract check, not a workflow
+    // execution: assert the captured action.yml is structurally
+    // intact (non-empty + contains the top-level `steps:` keyword)
+    // so the Then steps' substring assertions run against a real
+    // composite-action document rather than a malformed file. The
+    // Given step has already loaded the contents; this step performs
+    // the contract precondition.
+    let yml = world
+        .action_yml
+        .as_ref()
+        .expect("Given step should have loaded action.yml");
+    assert!(
+        !yml.trim().is_empty(),
+        "action.yml must not be empty for the composite-action scenario"
+    );
+    assert!(
+        yml.contains("\nruns:") && yml.contains("\n  steps:"),
+        "action.yml must be a composite action with `runs:` + `steps:`; got truncated content"
+    );
 }
 
 // ── Then steps ───────────────────────────────────────────────────────
@@ -451,7 +506,7 @@ fn then_error_names_schema(world: &mut MultiLangWorld) {
     );
 }
 
-#[then("the error message names the duplicate tool_name")]
+#[then("the error message names the duplicate language")]
 fn then_error_names_duplicate(world: &mut MultiLangWorld) {
     let stderr = world.stderr();
     assert!(
@@ -461,12 +516,14 @@ fn then_error_names_duplicate(world: &mut MultiLangWorld) {
 }
 
 #[then("the workflow produces exactly one HTML artifact named after the adapter")]
-fn then_action_one_artifact_named_after_adapter(_world: &mut MultiLangWorld) {
+fn then_action_one_artifact_named_after_adapter(world: &mut MultiLangWorld) {
     // Verified by reading action.yml — single-language mode
     // produces either `crap4rs-report-*` or `crap4ts-report-*` (not
     // `crap-scorecard-report-*`), guarded by the resolved language.
-    let action_yml = std::fs::read_to_string(action_yml_path())
-        .expect("read .github/actions/scorecard/action.yml");
+    let action_yml = world
+        .action_yml
+        .as_ref()
+        .expect("Given step should have loaded action.yml");
     assert!(
         action_yml.contains("crap4rs-report${{ inputs.html-artifact-name-suffix"),
         "action.yml should declare per-language crap4rs artifact upload"
@@ -489,9 +546,11 @@ fn then_action_one_artifact_named_after_adapter(_world: &mut MultiLangWorld) {
 }
 
 #[then("the unified HTML render step does not execute")]
-fn then_unified_render_skipped(_world: &mut MultiLangWorld) {
-    let action_yml = std::fs::read_to_string(action_yml_path())
-        .expect("read .github/actions/scorecard/action.yml");
+fn then_unified_render_skipped(world: &mut MultiLangWorld) {
+    let action_yml = world
+        .action_yml
+        .as_ref()
+        .expect("Given step should have loaded action.yml");
     assert!(
         action_yml.contains(
             "if: inputs.html-report == 'true' && steps.presets.outputs.is_multi == 'true'"

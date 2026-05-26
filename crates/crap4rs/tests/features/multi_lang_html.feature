@@ -63,7 +63,7 @@ Feature: Multi-language unified HTML report
     Given two crap4rs JSON envelopes from the same workspace
     When crap-render is invoked with both envelopes
     Then crap-render exits with non-zero status
-    And the error message names the duplicate tool_name
+    And the error message names the duplicate language
 
   # ── Single-language composite-action mode ──────────────────────────
 
