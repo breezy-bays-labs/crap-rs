@@ -8,6 +8,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `crap-core` is the language-agnostic foundation shared by the
 `crap4rs` (Rust) and `crap4ts` (TypeScript) adapters.
 
+## [0.7.0]
+
+### Added
+
+- New multi-language domain types in `crap_core::domain::multi_lang`:
+    `MultiLangContext`, `LanguageBlock`, `CombinedSummary`,
+    `RankedFunction`, `WorstRatio`. The types are N-agnostic — adapter
+    identity (`tool_name`, `display_name`, `language`, `tool_version`)
+    is carried as owned `String` so envelope-loaded data composes
+    cleanly, and `compose_multi_lang` takes `Vec<LanguageBlock>` with
+    no hardcoded language list. Adding a future adapter (e.g.
+    `crap4go`, `crap4py`) is purely additive — no domain or library
+    changes required. (crap-rs#315)
+- `crap_core::core::compose::compose_multi_lang(blocks)` — pure
+    function that aggregates per-adapter blocks into a
+    `MultiLangContext`. Combined-view ranking applies the
+    dimensional-consistency-aware sort: risk level descending
+    (per-adapter calibrated), then CRAP/threshold ratio descending
+    within band. Raw CRAP scores are NOT used as the primary sort
+    because complexity metrics (cognitive vs cyclomatic) scale
+    differently across adapters; per-tier risk + ratio is
+    dimensionally honest. (crap-rs#315)
+- `crap_core::adapters::reporters::format_html_multi(multi, threshold,
+    options)` — renders a `MultiLangContext` as a unified HTML
+    document. Single-language passthrough (when
+    `multi.languages.len() == 1`) delegates to `format_html` for
+    byte-identical output. Multi-language input renders the
+    `html_multi_report.html` template with `.segmented` Language nav
+    (Rust / TypeScript / Combined), Combined-default panel, per-row
+    adapter badges in the ranked-CRAP table, and a per-adapter
+    Adapters provenance grid in the footer. (crap-rs#315)
+- New `crap-render` `[[bin]]` target in `crap-core`. CLI shape:
+    `crap-render --input <LANG>=<FILE> [--input <LANG>=<FILE>...]
+    --format html [--output <PATH>]`. Validates envelope
+    `schema_version ∈ {1, 2}` (mirrors the baseline loader's accepted
+    range) and refuses duplicate language keys. Consumed by the
+    composite scorecard action in multi-language mode; also invocable
+    manually for debugging. (crap-rs#315)
+- `[package.metadata.binstall]` block in `crap-core/Cargo.toml`
+    mirroring the `crap4rs` pattern. `cargo binstall crap-core` (or
+    `taiki-e/install-action with tool: crap-render`) resolves to the
+    pre-compiled `crap-render-<target>.tar.gz` uploaded by the
+    `build-crap-core-binaries` matrix in `release-plz.yml`.
+    (crap-rs#315)
+
+### Changed
+
+- `crap-core` now ships a binary alongside the library. This
+    diverges from the `crap4rs` peer-crate convention of "library
+    crate, never a binary"; the divergence is intentional — the
+    multi-language renderer needs both `crap4rs` and `crap4ts` data
+    in one process, which neither adapter binary can satisfy alone,
+    and placing the renderer in `crap-core` keeps the rendering
+    pipeline language-neutral. The change is non-breaking for
+    existing library consumers — the `[[bin]]` target compiles only
+    when explicitly built.
+- The `crap-core` description and categories pick up the new
+    `command-line-utilities` category so crates.io discovery surfaces
+    the renderer.
+
+### Adapter schema compatibility
+
+`crap-render` enforces that all input envelopes carry a
+`schema_version` in `{1, 2}`. If you upgrade one adapter (e.g.
+`crap4rs` to a version emitting `schema_version: 3`) but leave the
+other on an older version emitting `schema_version: 1` or `2`,
+`crap-render` will fail fast with an actionable error rather than
+silently produce a mangled combined view. Keep `crap4rs` and
+`crap4ts` reasonably up-to-date; major version bumps are documented
+in each crate's CHANGELOG.
+
 ## [0.6.0]
 
 ### Added

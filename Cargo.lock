@@ -406,7 +406,7 @@ checksum = "417bef24afe1460300965a25ff4a24b8b45ad011948302ec221e8a0a81eb2c79"
 
 [[package]]
 name = "crap-core"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "askama",
@@ -416,6 +416,7 @@ dependencies = [
  "clap_complete_nushell",
  "colored",
  "comfy-table",
+ "crap-core",
  "globset",
  "ignore",
  "insta",
@@ -434,6 +435,7 @@ name = "crap4rs"
 version = "0.6.0"
 dependencies = [
  "anyhow",
+ "assert_cmd",
  "clap",
  "clap_complete",
  "clap_complete_nushell",

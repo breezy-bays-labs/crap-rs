@@ -297,6 +297,38 @@ missing. The CI smoke in this repo dogfoods the typescript branch
 using the workspace-built `target/release/crap4ts` prepended to
 `PATH`.
 
+### Multi-language unified HTML render
+
+`html-report: true` + `languages: rust,typescript` (or `all`) routes
+through the `crap-render` binary that ships with `crap-core` (≥
+0.7.0). The action runs three additive steps gated on
+`steps.presets.outputs.is_multi == 'true'`:
+
+1. `Install crap-render` via `taiki-e/install-action@v2` — resolves
+   through `crap-core`'s `[package.metadata.binstall]` block to the
+   pre-built `crap-render-<target>.tar.gz` uploaded by the
+   `build-crap-core-binaries` matrix in `release-plz.yml`.
+2. `Render unified HTML` composes per-language envelopes via
+   `crap-render --input rust=... --input typescript=... --format html`.
+3. `Upload unified HTML report` uploads the rendered document as
+   `crap-scorecard-report-<suffix>` (default suffix
+   `-${{ runner.os }}`).
+
+The unified URL is surfaced on the new `outputs.html-artifact-url`
+action output. The legacy per-language outputs
+(`html-artifact-url-{rust,typescript}`) now resolve to
+`<unified-url>#<lang>` deep-link anchors in multi-language mode and
+the action emits a `::warning::` deprecation notice. Single-language
+mode preserves byte-identical γ behavior — the three new steps are
+all skipped.
+
+The renderer's library entry points live alongside the existing
+reporter and domain types:
+`crap_core::domain::multi_lang::{MultiLangContext, LanguageBlock,
+CombinedSummary}`, `crap_core::core::compose::compose_multi_lang`,
+`crap_core::adapters::reporters::format_html_multi`. ADR for the
+placement decision: `~/Github/ops/decisions/crap-rs/adr-multi-lang-renderer-placement.md`.
+
 ## Mutation testing
 
 `cargo mutants` is the surviving-mutant gate on a **dual-file

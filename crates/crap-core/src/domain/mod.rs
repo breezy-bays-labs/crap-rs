@@ -2,6 +2,7 @@ pub mod crap;
 pub mod delta;
 pub mod diagnostic;
 pub mod matching;
+pub mod multi_lang;
 pub mod summary;
 pub mod threshold;
 pub mod types;

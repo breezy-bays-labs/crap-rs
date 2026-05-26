@@ -43,6 +43,16 @@ confidence-threshold = 0.93
 # duplicates. Promote to `deny` at v1.0.
 multiple-versions = "warn"
 wildcards = "deny"
+# Allow wildcard versions on path-based deps. PR ζ #315 introduced a
+# self-referential dev-dep on crap-core (`crap-core = { path = ".",
+# features = ["test-helpers"] }`) so `cargo test -p crap-core` and
+# `cargo mutants --package crap-core` can build the integration tests
+# that consume the feature-gated `test_fixtures` module. The path-dep
+# version is implicit (= wildcard), which cargo-deny otherwise rejects
+# under `wildcards = "deny"`. The flag is cargo-deny's documented
+# escape hatch for exactly this case — it keeps the wildcard ban
+# enforced on registry deps while allowing local path crates.
+allow-wildcard-paths = true
 allow = []
 deny = []
 

@@ -272,21 +272,31 @@ self-contained, no external assets).
   surfaces we can ship an additive `retention-days` input as a
   follow-up.
 
-### Per-language behavior in multi-language mode
+### Multi-language unified HTML
 
 When `languages: rust,typescript` (or `all`) is set alongside
-`html-report: true`, the action uploads **two artifacts** (one per
-language) and the sticky comment carries **two links**:
+`html-report: true`, the action renders **one unified HTML
+document** carrying both adapters' analyses with a Language /
+Combined toggle at the top of the page. The sticky comment carries
+**one canonical link** plus two deep-link anchors so reviewers can
+land directly on a per-language panel:
 
-```
-📊 [Download full HTML report — Rust](<rust-url>) · [TypeScript](<ts-url>)
+```text
+📊 [Open report](<unified-url>) · [Rust panel](<unified-url>#rust) · [TypeScript panel](<unified-url>#typescript)
 ```
 
-The two artifact URLs are also surfaced as action outputs
-(`html-artifact-url-rust` + `html-artifact-url-typescript`) so an
-aggregator workflow running `comment-mode: 'none'` can read the URLs
-and render its own link block. When a language is not in the
-resolved set, its respective output is empty.
+The unified artifact uploads as `crap-scorecard-report-<suffix>`
+(default suffix `-${{ runner.os }}`); the per-language artifact
+names (`crap4rs-report-*` / `crap4ts-report-*`) are not used in
+multi-language mode.
+
+The unified URL is surfaced on the new `html-artifact-url` action
+output. The legacy per-language outputs
+(`html-artifact-url-rust` + `html-artifact-url-typescript`) now
+resolve to `<unified-url>#rust` / `<unified-url>#typescript` deep-
+link anchors and the action emits a `::warning::` deprecation
+notice. Update aggregator workflows to read `html-artifact-url`
+instead.
 
 ```yaml
 - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
@@ -302,9 +312,43 @@ resolved set, its respective output is empty.
 
 - name: Render combined report
   run: |
-    echo "Rust:       ${{ steps.crap.outputs.html-artifact-url-rust }}"
-    echo "TypeScript: ${{ steps.crap.outputs.html-artifact-url-typescript }}"
+    echo "Unified:    ${{ steps.crap.outputs.html-artifact-url }}"
+    echo "Rust panel: ${{ steps.crap.outputs.html-artifact-url }}#rust"
+    echo "TS panel:   ${{ steps.crap.outputs.html-artifact-url }}#typescript"
 ```
+
+#### How the unified render works
+
+The unified document is produced by the `crap-render` binary that
+ships with `crap-core` (≥ 0.7.0). In multi-language mode the action
+runs three additive steps:
+
+1. `Install crap-render` via `taiki-e/install-action@v2` (the binary
+   is published to GitHub Releases via `crap-core`'s binstall
+   packaging on each `crap-core-v<version>` tag).
+2. `Render unified HTML` invokes
+   `crap-render --input rust=<rs-envelope> --input typescript=<ts-envelope>
+   --format html --output <runner.temp>/crap-scorecard-unified.html`
+   composing the per-language envelopes already captured by the
+   `Run analysis` loop above.
+3. `Upload unified HTML report` uploads the rendered file as
+   `crap-scorecard-report-<suffix>`.
+
+Single-language mode (`languages: rust` or `languages: typescript`)
+skips all three steps and falls back to the per-language artifact
+upload pattern unchanged — back-compat invariant for existing
+consumers.
+
+#### Adapter schema compatibility
+
+`crap-render` enforces that all input envelopes carry a
+`schema_version` in `{1, 2}`. If you upgrade one adapter (e.g.
+`crap4rs` to a version emitting `schema_version: 3`) but leave the
+other on an older version emitting `schema_version: 1` or `2`,
+`crap-render` will fail fast with an actionable error rather than
+silently produce a mangled combined view. Keep `crap4rs` and
+`crap4ts` reasonably up-to-date; major version bumps are documented
+in each crate's CHANGELOG.
 
 ### Aggregator pattern — `comment-mode: none` + `html-report: true`
 
@@ -473,8 +517,9 @@ row; the aggregator owns the comment.
 | `new-violations` | Count of functions exceeding threshold but not in baseline. Multi-language: SUM across languages |
 | `regressions` | Count of modified functions whose CRAP increased above rendering precision. Multi-language: SUM across languages |
 | `threshold-resolved` | The threshold value the action's `Resolve presets` step resolved (preset-derived or raw passthrough). See [Presets — Threshold-sync invariant](#threshold-sync-invariant) |
-| `html-artifact-url-rust` | (html-report) Workflow artifact URL for the rendered Rust HTML report when `html-report: true` and Rust is in the resolved language set. Empty otherwise. See [HTML report](#html-report) |
-| `html-artifact-url-typescript` | (html-report) Workflow artifact URL for the rendered TypeScript HTML report when `html-report: true` and TypeScript is in the resolved language set. Empty otherwise. See [HTML report](#html-report) |
+| `html-artifact-url` | (html-report, NEW in PR ζ #315) Workflow artifact URL for the rendered HTML report. In single-language mode this is the per-language artifact URL; in multi-language mode this is the unified artifact URL. See [Multi-language unified HTML](#multi-language-unified-html) |
+| `html-artifact-url-rust` | (html-report) Workflow artifact URL for the rendered Rust HTML report. **DEPRECATED in multi-language mode**: resolves to `<unified-url>#rust` deep-link anchor + `::warning::` directing consumers to `html-artifact-url`. In single-language `rust` mode the behavior is unchanged (URL of the standalone Rust artifact). See [Multi-language unified HTML](#multi-language-unified-html) |
+| `html-artifact-url-typescript` | (html-report) Workflow artifact URL for the rendered TypeScript HTML report. **DEPRECATED in multi-language mode**: resolves to `<unified-url>#typescript` deep-link anchor + `::warning::`. In single-language `typescript` mode the behavior is unchanged. See [Multi-language unified HTML](#multi-language-unified-html) |
 
 ## Structured row output (`outputs.row-json`)
 

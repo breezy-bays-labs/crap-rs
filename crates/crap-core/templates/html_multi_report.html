@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+
+<style>
+{# Inline Sakura base + report tokens + structural styles, same as
+   the single-language template. {% include %} is byte-identical
+   content so single-language passthrough delegates to format_html. -#}
+{% include "assets/sakura-1.5.0.css" %}
+{% include "assets/report-styles.css" %}
+{% include "assets/colors_and_type.css" %}
+</style>
+
+<style>
+  /* ── Multi-language overlay (chrome only — file-cards stay UNSCOPED) ──
+     The new nav primitive and the panel-visibility rules live under
+     [data-multi-lang] so they cannot affect the single-language path.
+     The Combined ranked-CRAP table reuses .file-fns / .risk-pill /
+     .crap-cell classes unscoped — they are part of the shared design
+     system, not new multi-language chrome. */
+  body { padding: 1.25rem 2rem 3rem; font-family: var(--font-sans); color: var(--text); background: var(--bg); }
+
+  .report-header {
+    display: flex; align-items: baseline;
+    gap: 0.75rem; flex-wrap: wrap;
+    margin: 0 0 1rem;
+  }
+  .report-header h1 { margin: 0; font-size: var(--fs-h1); }
+  .report-header .grow { flex: 1; }
+
+  [data-multi-lang] .lang-nav {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin: 0 0 1.25rem;
+    flex-wrap: wrap;
+  }
+  [data-multi-lang] .lang-nav .lang-nav-label {
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+    font-size: var(--fs-label);
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  [data-multi-lang] .lang-panel { display: none; }
+  [data-multi-lang] .lang-panel[data-active] { display: block; }
+
+  /* Adapter badge in Combined ranked-CRAP table — sits left of the
+     function name. Icon-only with sr-only text per D4d-fallback (the
+     Sakura palette has no warm/cool adapter tokens, so icon
+     differentiation is primary; tint is omitted rather than
+     misappropriating the risk palette). */
+  .adapter-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.25rem; height: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-right: 0.5rem;
+  }
+
+  .ranked-table { width: 100%; border-collapse: collapse; font-size: var(--fs-td); }
+  .ranked-table th {
+    text-align: left;
+    padding: 0.4rem 0.875rem;
+    font-family: var(--font-mono);
+    font-size: var(--fs-th);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-th);
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--bg-elevated);
+  }
+  .ranked-table th.num { text-align: right; }
+  .ranked-table td {
+    padding: 0.45rem 0.875rem;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+  }
+  .ranked-table tr:last-child td { border-bottom: 0; }
+  .ranked-table tr[data-exceeds="1"] td { background: var(--risk-4-tint); }
+  .ranked-table td.num { text-align: right; }
+  .ranked-table .fn-name { font-family: var(--font-mono); font-weight: 500; }
+  .ranked-table .fn-path { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-muted); }
+
+  footer.report-footer {
+    margin-top: 2rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--hairline);
+    color: var(--text-muted);
+    font-size: var(--fs-small);
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem;
+    justify-content: space-between;
+  }
+  .footer-adapters {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.75rem;
+    row-gap: 0.15rem;
+    align-items: baseline;
+    text-align: left;
+    max-width: 60%;
+  }
+  .footer-adapters .label {
+    grid-column: 1;
+    grid-row: 1 / span {{ language_count_plus_one }};
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+    font-size: var(--fs-label);
+    font-weight: 600;
+    align-self: start;
+  }
+  .footer-adapters .adapter {
+    grid-column: 2;
+    font-family: var(--font-mono);
+    color: var(--text);
+  }
+  .footer-adapters .adapter .ad-name { font-weight: 600; }
+  .footer-adapters .adapter .ad-meta { color: var(--text-muted); font-weight: 400; }
+</style>
+</head>
+<body data-multi-lang>
+
+<header class="report-header">
+  <h1>CRAP scorecard — multi-language</h1>
+  <span class="grow"></span>
+  {# Verdict mirrors the worst-case across adapters: PASS only when
+     every adapter passed. -#}
+  <span class="verdict is-{{ overall_verdict_class }}" aria-label="Verdict: {{ overall_verdict_label }}">
+    <span class="verdict-glyph">{{ overall_verdict_glyph }}</span>
+    {{ overall_verdict_label }}
+  </span>
+</header>
+
+<nav class="lang-nav segmented" role="radiogroup" aria-label="Language">
+  <span class="lang-nav-label">Language</span>
+  {% for lang in language_buttons %}
+  <button type="button"
+          class="seg{% if lang.is_active %} is-active{% endif %}"
+          data-lang="{{ lang.key }}"
+          aria-pressed="{{ lang.aria_pressed }}">
+    {{ lang.label }} <span class="count">{{ lang.count }}</span>
+  </button>
+  {% endfor %}
+</nav>
+
+<!-- ── Combined panel ──────────────────────────────────────────────── -->
+<div class="lang-panel" data-lang="combined" data-active>
+  <section class="scope-banner" aria-label="Combined scope">
+    <p>
+      <strong>{{ combined.total_exceeding }} of {{ combined.total_functions }}</strong>
+      {% if combined.total_exceeding == 1 -%}
+      function exceeds its adapter threshold across the workspace.
+      {%- else -%}
+      functions exceed their adapter thresholds across the workspace.
+      {%- endif %}
+      {% if combined.has_worst_ratio %}
+      Worst offender at <code>{{ combined.worst_ratio_value }}×</code> over threshold ({{ combined.worst_function_name }}, {{ combined.worst_adapter_display }}).
+      {% endif %}
+      <span class="meta">{{ combined.total_files }} {% if combined.total_files == 1 %}file{% else %}files{% endif %} · {{ language_count }} adapters</span>
+    </p>
+  </section>
+
+  <section class="kpi-grid" aria-label="Combined summary">
+    <div class="kpi">
+      <span class="kpi-label">Workspace functions</span>
+      <span class="kpi-value">{{ combined.total_functions }}</span>
+      <span class="kpi-foot">summed across {{ language_count }} adapters</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Exceeding threshold</span>
+      <span class="kpi-value">{{ combined.total_exceeding }}<span class="kpi-unit">/ {{ combined.total_functions }}</span></span>
+      <span class="kpi-foot">per each adapter's calibrated threshold</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Files analyzed</span>
+      <span class="kpi-value">{{ combined.total_files }}</span>
+      <span class="kpi-foot">disjoint source trees</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Worst CRAP/threshold ratio</span>
+      <span class="kpi-value">{% if combined.has_worst_ratio %}{{ combined.worst_ratio_value }}×{% else %}—{% endif %}</span>
+      <span class="kpi-foot">{% if combined.has_worst_ratio %}{{ combined.worst_adapter_display }} adapter{% else %}no functions analyzed{% endif %}</span>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Combined risk distribution">
+    <div class="panel-header"><h2>Risk distribution</h2></div>
+    <div class="dist-bar">
+      <span class="dist-seg" data-risk="1" style="flex:{{ combined.dist_low }}" title="low: {{ combined.dist_low }} functions">
+        <span class="dist-count">{{ combined.dist_low }}</span><span class="dist-label">low</span>
+      </span>
+      <span class="dist-seg" data-risk="2" style="flex:{{ combined.dist_acceptable }}" title="acceptable: {{ combined.dist_acceptable }} functions">
+        <span class="dist-count">{{ combined.dist_acceptable }}</span><span class="dist-label">acceptable</span>
+      </span>
+      <span class="dist-seg" data-risk="3" style="flex:{{ combined.dist_moderate }}" title="moderate: {{ combined.dist_moderate }} functions">
+        <span class="dist-count">{{ combined.dist_moderate }}</span><span class="dist-label">moderate</span>
+      </span>
+      <span class="dist-seg" data-risk="4" style="flex:{{ combined.dist_high }}" title="high: {{ combined.dist_high }} functions">
+        <span class="dist-count">{{ combined.dist_high }}</span><span class="dist-label">high</span>
+      </span>
+    </div>
+    <div class="dist-legend">
+      <span><i class="legend-dot" style="background:var(--risk-1)"></i>low — per-adapter calibrated</span>
+      <span><i class="legend-dot" style="background:var(--risk-2)"></i>acceptable</span>
+      <span><i class="legend-dot" style="background:var(--risk-3)"></i>moderate</span>
+      <span><i class="legend-dot" style="background:var(--risk-4)"></i>high</span>
+    </div>
+  </section>
+
+  {% if !combined.ranked_rows.is_empty() %}
+  <section aria-label="Ranked workspace risk">
+    <h2>Workspace ranking <span class="muted">· by risk band, then CRAP/threshold ratio</span></h2>
+    <p class="ranked-note">
+      Combined ordering uses risk level (per-adapter calibrated) then
+      CRAP/threshold ratio. Raw CRAP scores are not dimensionally
+      equivalent across adapters with different complexity metrics;
+      per-language tabs above show within-adapter raw rankings.
+    </p>
+    <table class="ranked-table">
+      <thead><tr>
+        <th>Adapter</th>
+        <th>Function</th>
+        <th>File</th>
+        <th class="num">Complexity</th>
+        <th class="num">Coverage</th>
+        <th class="num">CRAP</th>
+        <th class="num">Ratio</th>
+        <th>Risk</th>
+      </tr></thead>
+      <tbody>
+        {% for row in combined.ranked_rows %}
+        <tr data-lang="{{ row.language }}"{% if row.exceeds %} data-exceeds="1"{% endif %}>
+          <td>
+            <span class="adapter-badge" title="{{ row.adapter_display }} adapter" aria-label="{{ row.adapter_display }} adapter">{{ row.badge_glyph }}</span>
+            <span class="sr-only">{{ row.adapter_display }}</span>
+          </td>
+          <td><span class="fn-name">{{ row.qualified_name }}</span></td>
+          <td><span class="fn-path">{{ row.file_path }} L{{ row.start_line }}–{{ row.end_line }}</span></td>
+          <td class="num">{{ row.complexity }}</td>
+          <td class="num">{{ row.coverage_percent }}%</td>
+          <td class="num">{{ row.crap }}</td>
+          <td class="num">{{ row.ratio_display }}</td>
+          <td><span class="risk-pill" data-risk="{{ row.risk_data }}">{{ row.risk_label }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% else %}
+  <div class="empty-state">No functions analyzed across any language.</div>
+  {% endif %}
+</div>
+
+<!-- ── Per-language panels ─────────────────────────────────────────── -->
+{% for panel in language_panels %}
+<div class="lang-panel" data-lang="{{ panel.language }}">
+  <section class="scope-banner" aria-label="{{ panel.display_name }} scope">
+    <p>
+      <strong>{{ panel.exceeding_threshold }} of {{ panel.total_functions }}</strong>
+      {% if panel.exceeding_threshold == 1 -%}
+      function exceeds threshold.
+      {%- else -%}
+      functions exceed threshold.
+      {%- endif %}
+      {% if panel.has_max_crap %}
+      Worst offender scores <code>{{ panel.max_crap }}</code>.
+      {% endif %}
+      <span class="meta">{{ panel.total_files }} {% if panel.total_files == 1 %}file{% else %}files{% endif %} · {{ panel.display_name }} adapter</span>
+    </p>
+  </section>
+
+  <section class="kpi-grid" aria-label="{{ panel.display_name }} summary">
+    <div class="kpi">
+      <span class="kpi-label">Exceeding threshold</span>
+      <span class="kpi-value">{{ panel.exceeding_threshold }}<span class="kpi-unit">/ {{ panel.total_functions }} · {{ panel.exceeding_pct }}%</span></span>
+      <span class="kpi-foot">{{ panel.exceeding_threshold }} {% if panel.exceeding_threshold == 1 %}function{% else %}functions{% endif %} over CRAP {{ panel.threshold_display }}</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Average CRAP</span>
+      <span class="kpi-value">{{ panel.crap_avg }}</span>
+      <span class="kpi-foot">median <code>{{ panel.crap_med }}</code> · max <code>{{ panel.max_crap }}</code></span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Avg line coverage</span>
+      <span class="kpi-value">{{ panel.cov_avg }}<span class="kpi-unit">%</span></span>
+      <div class="bar is-thick" aria-hidden="true"><span class="is-{{ panel.cov_avg_risk }}" style="width:{{ panel.cov_avg }}%"></span></div>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Avg complexity</span>
+      <span class="kpi-value">{{ panel.cx_avg }}</span>
+      <span class="kpi-foot">median <code>{{ panel.cx_med }}</code> · max <code>{{ panel.cx_max }}</code> {{ panel.metric_label }}</span>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="{{ panel.display_name }} risk distribution">
+    <div class="panel-header"><h2>Risk distribution</h2></div>
+    <div class="dist-bar">
+      <span class="dist-seg" data-risk="1" style="flex:{{ panel.dist_low }}" title="low: {{ panel.dist_low }} functions">
+        <span class="dist-count">{{ panel.dist_low }}</span><span class="dist-label">low</span>
+      </span>
+      <span class="dist-seg" data-risk="2" style="flex:{{ panel.dist_acceptable }}" title="acceptable: {{ panel.dist_acceptable }} functions">
+        <span class="dist-count">{{ panel.dist_acceptable }}</span><span class="dist-label">acceptable</span>
+      </span>
+      <span class="dist-seg" data-risk="3" style="flex:{{ panel.dist_moderate }}" title="moderate: {{ panel.dist_moderate }} functions">
+        <span class="dist-count">{{ panel.dist_moderate }}</span><span class="dist-label">moderate</span>
+      </span>
+      <span class="dist-seg" data-risk="4" style="flex:{{ panel.dist_high }}" title="high: {{ panel.dist_high }} functions">
+        <span class="dist-count">{{ panel.dist_high }}</span><span class="dist-label">high</span>
+      </span>
+    </div>
+  </section>
+
+  {% if !panel.files.is_empty() %}
+  <section aria-label="Functions by file ({{ panel.display_name }})">
+    <h2>Functions by file <span class="muted">· {{ panel.display_name }}</span></h2>
+    <div class="file-list">
+      {% for f in panel.files %}
+      <details class="severity-card file-card" data-risk="{{ f.risk_data }}" data-exceeds="{{ f.exceeds_count }}"{% if f.open %} open{% endif %}>
+        <summary>
+          <span class="stripe"></span>
+          <span class="caret">›</span>
+          <span class="sev-path">{{ f.path }}</span>
+          <span class="sev-meta">
+            <span><b>{{ f.fn_count }}</b> fn</span>
+            <span>max CRAP <b>{{ f.max_crap }}</b></span>
+            {% if f.exceeds_count > 0 %}
+            <span class="over"><b>{{ f.exceeds_count }} over</b></span>
+            {% else %}
+            <span>0 over</span>
+            {% endif %}
+          </span>
+        </summary>
+        <div class="severity-card-body">
+          <table class="file-fns">
+            <thead><tr>
+              <th>Function</th><th>Lines</th><th>Complexity</th><th>Coverage</th><th class="num">CRAP</th>
+            </tr></thead>
+            <tbody>
+              {% for row in f.rows %}
+              <tr{% if row.exceeds %} class="is-exceeds"{% endif %}>
+                <td><span class="fn-name">{{ row.fn_name }}</span><span class="fn-loc">{{ row.loc }} LOC</span></td>
+                <td>{{ row.start_line }}–{{ row.end_line }}</td>
+                <td><div class="metric-cell"><div class="num-line"><span>{{ row.cc }}</span><span class="note">{{ panel.metric_label }}</span></div><div class="bar"><span class="is-{{ row.cc_risk }}" style="width:{{ row.cc_bar_pct }}%"></span></div></div></td>
+                <td><div class="metric-cell"><div class="num-line"><span>{{ row.cov }}%</span><span class="note">lines</span></div><div class="bar"><span class="is-{{ row.cov_risk }}" style="width:{{ row.cov }}%"></span></div></div></td>
+                <td class="num"><span class="crap-cell">{{ row.crap }} <span class="risk-pill" data-risk="{{ row.risk_data }}">{{ row.risk_label }}</span>{% if row.exceeds %}<span class="over-by">+{{ row.over_by }}</span>{% endif %}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <div class="empty-state">No functions analyzed by the {{ panel.display_name }} adapter.</div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<footer class="report-footer">
+  <span>Generated by crap-render</span>
+  <span class="footer-adapters">
+    <span class="label">Adapters</span>
+    {% for adapter in adapters_footer %}
+    <span class="adapter"><span class="ad-name">{{ adapter.display_name }}</span> <span class="ad-meta">· {{ adapter.metric_label }} complexity · line coverage · threshold <code>CRAP&nbsp;≤&nbsp;{{ adapter.threshold_display }}</code></span></span>
+    {% endfor %}
+  </span>
+</footer>
+
+<script>
+  // ── Dark mode (persisted) ──────────────────────────────────────────
+  (function () {
+    var root = document.documentElement;
+    var KEY = "crap-rs.theme";
+    var stored = localStorage.getItem(KEY);
+    if (stored === "dark") root.setAttribute("data-theme", "dark");
+  })();
+
+  // ── Language switcher (segmented) ──────────────────────────────────
+  // Switches which .lang-panel is visible. URL hash routes by
+  // `#lang:tab` per breadboard D7; for v0.7.0 only the language axis
+  // is wired (no Delta tab axis yet — folded in once cross-language
+  // delta support lands). Default on first load: `#combined`.
+  (function () {
+    var buttons = [].slice.call(document.querySelectorAll('[data-multi-lang] .lang-nav [data-lang]'));
+    var panels = [].slice.call(document.querySelectorAll('[data-multi-lang] .lang-panel[data-lang]'));
+    if (buttons.length === 0 || panels.length === 0) return;
+
+    function activate(name) {
+      var matched = false;
+      buttons.forEach(function (b) {
+        var on = b.dataset.lang === name;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", String(on));
+        if (on) matched = true;
+      });
+      if (!matched) return;
+      panels.forEach(function (p) {
+        if (p.dataset.lang === name) p.setAttribute("data-active", "");
+        else p.removeAttribute("data-active");
+      });
+      var hashTarget = "#" + name;
+      if (location.hash !== hashTarget) {
+        history.replaceState(null, "", hashTarget);
+      }
+    }
+
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () { activate(b.dataset.lang); });
+    });
+
+    var hash = (location.hash || "").replace(/^#/, "").split(":")[0];
+    if (hash) activate(hash);
+  })();
+</script>
+
+</body>
+</html>
