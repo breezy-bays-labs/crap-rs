@@ -1396,17 +1396,32 @@ runs:
         # `Run analysis` loop above (saved to
         # `$RUNNER_TEMP/${BIN}-envelope.json`). The unified renderer
         # composes both into one HTML document with a Language /
-        # Combined toggle.
+        # Combined toggle plus a Current/Delta View axis inside each
+        # panel when a baseline is supplied.
         RUST_ENV: ${{ runner.temp }}/crap4rs-envelope.json
         TS_ENV: ${{ runner.temp }}/crap4ts-envelope.json
+        # Baseline envelopes — already validated as paths to the
+        # per-language baseline JSONs by the caller's input. Either
+        # may be empty (analysis-only on that side); the render step
+        # gates each `--baseline` argument independently so a
+        # mismatched-baseline run still produces a unified report
+        # (with the missing side's Delta tab disabled).
+        RUST_BASELINE: ${{ inputs.baseline }}
+        TS_BASELINE: ${{ inputs.baseline-ts }}
         UNIFIED: ${{ runner.temp }}/crap-scorecard-unified.html
       run: |
         set -euo pipefail
-        crap-render \
-          --input "rust=${RUST_ENV}" \
-          --input "typescript=${TS_ENV}" \
-          --format html \
-          --output "${UNIFIED}"
+        args=(
+          --input "rust=${RUST_ENV}"
+          --input "typescript=${TS_ENV}"
+        )
+        if [[ -n "${RUST_BASELINE}" ]]; then
+          args+=(--baseline "rust=${RUST_BASELINE}")
+        fi
+        if [[ -n "${TS_BASELINE}" ]]; then
+          args+=(--baseline "typescript=${TS_BASELINE}")
+        fi
+        crap-render "${args[@]}" --format html --output "${UNIFIED}"
         echo "unified_path=${UNIFIED}" >> "$GITHUB_OUTPUT"
 
     - name: Upload unified HTML report
