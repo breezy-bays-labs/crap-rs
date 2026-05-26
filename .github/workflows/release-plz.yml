@@ -163,11 +163,14 @@ jobs:
           # short-lived OIDC token that crates.io verifies against
           # the trusted-publisher binding configured out-of-band on
           # crates.io's "Trusted Publishers" settings for each crate.
-          # The first auto-opened release PR can be inspected and
-          # `dry_run: true` toggled via a `RELEASE_PLZ_DRY_RUN` repo
-          # variable if a canary run is needed before the first
-          # real publish:
-          # dry_run: ${{ vars.RELEASE_PLZ_DRY_RUN }}
+          # `dry_run` is gated by an Actions variable so a canary
+          # run can be staged without editing this workflow: set
+          # repo var `RELEASE_PLZ_DRY_RUN=true` to have release-plz
+          # validate the publish path without actually pushing to
+          # crates.io. Unset the variable after the canary is green.
+          # An empty/unset value passes through as an empty string,
+          # which release-plz's `dry_run` input treats as falsy.
+          dry_run: ${{ vars.RELEASE_PLZ_DRY_RUN }}
 
   build-crap4ts-cdylib:
     name: Build crap4ts cdylib (${{ matrix.platform }})
