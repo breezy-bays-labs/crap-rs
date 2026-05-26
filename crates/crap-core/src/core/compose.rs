@@ -224,14 +224,20 @@ fn make_ranked_row(
     current: &FunctionVerdict,
     kind: RankedDeltaKind,
 ) -> RankedDeltaRow {
-    let ratio = safe_ratio(current.scored.crap.value, block.threshold);
+    // Ratio uses the per-function threshold (`current.threshold`)
+    // rather than `block.threshold` so per-function overrides are
+    // respected. Matches the Current-view's `compute_combined_summary`
+    // ranking, which keys off `verdict.threshold` for the same
+    // reason: the dimensionally-consistent comparand within a risk
+    // band is "how far over this row's own threshold."
+    let ratio = safe_ratio(current.scored.crap.value, current.threshold);
     RankedDeltaRow {
         language: block.language.clone(),
         adapter_display: block.display_name.clone(),
         kind,
         baseline: baseline.map(snapshot_from_verdict),
         current: snapshot_from_verdict(current),
-        threshold: block.threshold,
+        threshold: current.threshold,
         ratio,
     }
 }
