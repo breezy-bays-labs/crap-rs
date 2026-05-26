@@ -95,9 +95,9 @@ jobs:
 
       - name: Mint release-plz App token
         id: app-token
-        uses: breezy-bays-labs/.github/actions/release-plz-app-token@bdd828ba04ebe832c4a1da8efd1cc6853aae8302 # release-plz-app-token-v0.1.0
+        uses: breezy-bays-labs/.github/actions/release-plz-app-token@97eb083e81d600e08e0754adc2cb6debedebf020 # release-plz-app-token-v0.2.0
         with:
-          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          client-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
@@ -145,9 +145,9 @@ jobs:
 
       - name: Mint release-plz App token
         id: app-token
-        uses: breezy-bays-labs/.github/actions/release-plz-app-token@bdd828ba04ebe832c4a1da8efd1cc6853aae8302 # release-plz-app-token-v0.1.0
+        uses: breezy-bays-labs/.github/actions/release-plz-app-token@97eb083e81d600e08e0754adc2cb6debedebf020 # release-plz-app-token-v0.2.0
         with:
-          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          client-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: read
@@ -536,9 +536,9 @@ jobs:
 
       - name: Mint release-plz App token
         id: app-token
-        uses: breezy-bays-labs/.github/actions/release-plz-app-token@bdd828ba04ebe832c4a1da8efd1cc6853aae8302 # release-plz-app-token-v0.1.0
+        uses: breezy-bays-labs/.github/actions/release-plz-app-token@97eb083e81d600e08e0754adc2cb6debedebf020 # release-plz-app-token-v0.2.0
         with:
-          app-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
+          client-id: ${{ secrets.RELEASE_PLZ_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
           permission-contents: write
 
