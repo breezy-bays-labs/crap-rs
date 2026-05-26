@@ -65,11 +65,34 @@ pub fn format_html(
     meta: &AdapterMeta,
     effective_metric: ComplexityMetric,
 ) -> String {
+    // `AdapterMeta`'s `&'static str` fields originate from the adapter
+    // binaries' compile-time literals. `format_html_inner` takes
+    // borrowed `&str` so envelope-loaded callers (e.g. `crap-render`'s
+    // single-language passthrough) can pass owned strings sourced from
+    // `LanguageBlock` without leaking memory to satisfy a `'static`
+    // bound — see `format_html_multi` for the passthrough call site.
+    format_html_inner(
+        view,
+        delta,
+        threshold,
+        meta.tool_name,
+        meta.tool_version,
+        meta.display_name,
+        effective_metric,
+    )
+}
+
+fn format_html_inner(
+    view: &AnalysisView<'_>,
+    delta: Option<&DeltaView<'_>>,
+    threshold: f64,
+    tool_name: &str,
+    tool_version: &str,
+    display_name: &str,
+    effective_metric: ComplexityMetric,
+) -> String {
     let summary = &view.full.summary;
-    let title = format!(
-        "{} v{} — CRAP score analysis",
-        meta.tool_name, meta.tool_version
-    );
+    let title = format!("{} v{} — CRAP score analysis", tool_name, tool_version);
 
     let metric_label = metric_label(effective_metric);
 
@@ -118,9 +141,9 @@ pub fn format_html(
 
     let tmpl = HtmlReport {
         title,
-        tool_name: meta.tool_name,
-        tool_version: meta.tool_version,
-        adapter_display: meta.display_name,
+        tool_name,
+        tool_version,
+        adapter_display: display_name,
         metric_label,
         verdict_class,
         verdict_label,
@@ -672,81 +695,26 @@ pub fn format_html_multi(
 ) -> String {
     if multi.languages.len() == 1 {
         let block = &multi.languages[0];
-        return format_html(
+        // Single-language passthrough renders byte-identical HTML to
+        // the existing single-language `format_html` path. We route
+        // through `format_html_inner` (the borrowed-string variant)
+        // rather than `format_html` so the owned strings on
+        // `LanguageBlock` flow through without a `Box::leak`-style
+        // `&'static str` projection — the rendered template only
+        // needs the strings to live for the duration of the call,
+        // which `&block.tool_name` etc. already guarantee.
+        return format_html_inner(
             &block.view,
             block.delta.as_ref(),
             threshold,
-            // Construct an `AdapterMeta` borrow on the stack from the
-            // owned strings on `LanguageBlock`. The single-language
-            // passthrough is the one path where `AdapterMeta` (with
-            // `&'static str` fields) and `LanguageBlock` (with owned
-            // strings) intersect — for in-process callers this is a
-            // no-op because they already build the block from
-            // `AdapterMeta` literals; for envelope-loaded callers
-            // (crap-render) the strings are owned and the
-            // `Box::leak`-style trick is necessary, but only for the
-            // duration of the call.
-            //
-            // SAFETY-DEFERRED: the leak is bounded by the rendered
-            // string the caller holds — but to avoid the leak, we
-            // accept that the single-language passthrough cannot
-            // share the existing `format_html` signature without
-            // mediation. Instead, build a fresh AdapterMeta inline
-            // using string interning. See render_single_language
-            // below for the actual implementation.
-            &single_lang_adapter_meta(block),
+            &block.tool_name,
+            &block.tool_version,
+            &block.display_name,
             block.metric,
         );
     }
 
     render_multi_lang(multi, threshold)
-}
-
-/// Construct an `AdapterMeta` from a `LanguageBlock` for the
-/// single-language passthrough path.
-///
-/// `AdapterMeta`'s fields are `&'static str` (sized for compile-time
-/// adapter literals from `crap4rs`/`crap4ts` mains). For the
-/// passthrough we need to project owned-string envelope data into
-/// the same shape. We use `Box::leak` to obtain `&'static str`
-/// slices — the leaked memory is bounded by the single
-/// `format_html` call's output lifetime, and the leak set is small
-/// (one struct per render call, a handful of strings each).
-///
-/// The alternative (a parallel `format_html_with_owned_meta`
-/// signature) would mean carrying two near-duplicate functions
-/// forever. The bounded leak in this hot-path-rare call is the
-/// lesser evil; if memory pressure ever becomes a concern, the
-/// alternative is a future refactor.
-fn single_lang_adapter_meta(
-    block: &crate::domain::multi_lang::LanguageBlock<'_>,
-) -> crate::cli::AdapterMeta {
-    use crate::cli::AdapterMeta;
-    use crate::domain::types::ComplexityMetric;
-
-    fn leak(s: &str) -> &'static str {
-        Box::leak(s.to_string().into_boxed_str())
-    }
-    AdapterMeta {
-        tool_name: leak(&block.tool_name),
-        display_name: leak(&block.display_name),
-        tool_version: leak(&block.tool_version),
-        long_version: leak(&block.tool_version),
-        about: "",
-        long_about: "",
-        after_help: "",
-        coverage_hint: "",
-        extensions: &[],
-        tool_info_uri: "",
-        rule_help_uri: "",
-        config_file_name: "",
-        default_excludes: &[],
-        forced_excludes: &[],
-        default_metric: match block.metric {
-            ComplexityMetric::Cognitive => ComplexityMetric::Cognitive,
-            ComplexityMetric::Cyclomatic => ComplexityMetric::Cyclomatic,
-        },
-    }
 }
 
 fn render_multi_lang(
