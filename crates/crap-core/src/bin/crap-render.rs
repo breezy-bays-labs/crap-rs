@@ -1,14 +1,15 @@
 //! `crap-render` — multi-language CRAP HTML renderer.
 //!
 //! Composes per-adapter JSON envelopes into a unified HTML report
-//! with a Language/Combined toggle. Used by the composite scorecard
-//! action in multi-language mode; also invocable manually for
-//! debugging.
+//! with a Language/Combined toggle and a Current/Delta View axis.
+//! Used by the composite scorecard action in multi-language mode;
+//! also invocable manually for debugging.
 //!
 //! ## CLI shape
 //!
 //! ```text
 //! crap-render --input <LANG>=<FILE> [--input <LANG>=<FILE>...] \
+//!             [--baseline <LANG>=<FILE> ...]                   \
 //!             [--format html] [--output <PATH>] [--threshold <N>]
 //! ```
 //!
@@ -19,6 +20,15 @@
 //! hard-coded "rust" by every emitting binary (a pre-existing bug
 //! tracked elsewhere) — pairing the language at the CLI sidesteps
 //! the field and stays N-adapter agnostic for future adapters.
+//!
+//! `--baseline <LANG>=<FILE>` is the optional baseline counterpart.
+//! Each baseline envelope is composed against the matching `--input`
+//! envelope (same `<LANG>` key) to produce a per-language delta. When
+//! supplied, the rendered HTML carries the Current/Delta View axis
+//! within each language panel and a cross-adapter Combined Delta
+//! ranking; languages without a baseline render the Delta tab
+//! disabled, signalling the asymmetric state to reviewers without
+//! suppressing other languages' deltas.
 //!
 //! ## Schema-version validation
 //!
@@ -33,7 +43,7 @@
 //! Two envelopes with the same `(tool_name, language)` tuple are
 //! refused — accidentally passing two `crap4rs.json` would otherwise
 //! double-render the same data; the error message points at the
-//! collision.
+//! collision. The same guard applies to baseline envelopes.
 
 use std::fs::{self, File};
 use std::io::BufReader;
@@ -46,6 +56,7 @@ use serde::Deserialize;
 
 use crap_core::adapters::reporters::{HtmlMultiOptions, format_html_multi};
 use crap_core::core::compose::compose_multi_lang;
+use crap_core::domain::delta::{self, AnalysisDelta, DeltaViewSpec};
 use crap_core::domain::multi_lang::LanguageBlock;
 use crap_core::domain::types::{AnalysisResult, ComplexityMetric};
 use crap_core::domain::view::{self, ViewSpec};
@@ -72,6 +83,17 @@ struct Cli {
     /// HTML.
     #[arg(long = "input", action = ArgAction::Append, required = true)]
     inputs: Vec<String>,
+
+    /// Optional baseline envelope paired with its language key,
+    /// formatted as `<LANG>=<FILE>`. When supplied, the matching
+    /// language (by `<LANG>` key) gains a Current/Delta View axis in
+    /// its panel and contributes to the cross-adapter Combined Delta
+    /// ranking. A baseline whose language key has no matching
+    /// `--input` is an error. Languages without a baseline still
+    /// render normally; their Delta tab is disabled with a tooltip
+    /// pointing reviewers to supply one.
+    #[arg(long = "baseline", action = ArgAction::Append)]
+    baselines: Vec<String>,
 
     /// Output format. Only `html` is supported in v0.7.0; the option
     /// exists so future formats (markdown, json wrappers) extend the
@@ -137,7 +159,7 @@ fn run(cli: Cli) -> Result<()> {
 
     let mut parsed: Vec<ParsedEnvelope> = Vec::with_capacity(cli.inputs.len());
     for spec in &cli.inputs {
-        parsed.push(parse_input_spec(spec)?);
+        parsed.push(parse_input_spec(spec, "input")?);
     }
 
     // Duplicate-language guard: refuse two envelopes for the same
@@ -153,6 +175,29 @@ fn run(cli: Cli) -> Result<()> {
         }
     }
 
+    // Parse optional baselines. Each baseline pairs by `<LANG>` key
+    // with one of the `--input` envelopes; a baseline whose key has
+    // no matching input is an operator error (typo / wrong file).
+    let mut baselines: Vec<ParsedEnvelope> = Vec::with_capacity(cli.baselines.len());
+    for spec in &cli.baselines {
+        baselines.push(parse_input_spec(spec, "baseline")?);
+    }
+    let mut seen_baselines: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for env in &baselines {
+        if !seen_baselines.insert(env.language.as_str()) {
+            bail!(
+                "duplicate baseline for language '{}'. Each language key may appear at most once.",
+                env.language
+            );
+        }
+        if !parsed.iter().any(|e| e.language == env.language) {
+            bail!(
+                "--baseline for language '{}' has no matching --input. Each baseline must pair with an input by language key.",
+                env.language
+            );
+        }
+    }
+
     let threshold = cli.threshold.unwrap_or_else(|| {
         parsed
             .iter()
@@ -161,12 +206,29 @@ fn run(cli: Cli) -> Result<()> {
             .max(0.0)
     });
 
+    // Compose per-language `AnalysisDelta`s ahead of `LanguageBlock`
+    // construction so the rendered `DeltaView`s can borrow into
+    // owned storage that lives at least as long as the render call.
+    // The deltas vector is kept in 1:1 order alignment with
+    // `parsed`; `None` means this language has no baseline (Delta
+    // tab will render disabled in the report).
+    let analysis_deltas: Vec<Option<AnalysisDelta>> = parsed
+        .iter()
+        .map(|env| {
+            baselines
+                .iter()
+                .find(|b| b.language == env.language)
+                .map(|b| delta::compute(b.result.clone(), env.result.clone()))
+        })
+        .collect();
+
     // Build LanguageBlock list. The view + delta lifetimes borrow
     // from each ParsedEnvelope's result; we therefore keep `parsed`
-    // alive for the duration of rendering.
+    // and `analysis_deltas` alive for the duration of rendering.
     let blocks: Vec<LanguageBlock<'_>> = parsed
         .iter()
-        .map(|env| LanguageBlock {
+        .zip(analysis_deltas.iter())
+        .map(|(env, maybe_delta)| LanguageBlock {
             tool_name: tool_name_for_language(&env.language).to_string(),
             display_name: display_name_for_language(&env.language).to_string(),
             language: env.language.clone(),
@@ -174,7 +236,9 @@ fn run(cli: Cli) -> Result<()> {
             metric: env.metric,
             threshold: env.threshold,
             view: view::apply(&env.result, ViewSpec::default()),
-            delta: None,
+            delta: maybe_delta
+                .as_ref()
+                .map(|d| delta::apply(d, DeltaViewSpec::default())),
         })
         .collect();
 
@@ -193,18 +257,18 @@ fn run(cli: Cli) -> Result<()> {
     Ok(())
 }
 
-fn parse_input_spec(spec: &str) -> Result<ParsedEnvelope> {
+fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
     let (language, path_str) = spec
         .split_once('=')
-        .ok_or_else(|| anyhow!("invalid --input spec '{spec}': expected '<LANG>=<FILE>'"))?;
+        .ok_or_else(|| anyhow!("invalid --{kind} spec '{spec}': expected '<LANG>=<FILE>'"))?;
     let language = language.trim();
     let path = PathBuf::from(path_str.trim());
 
     if language.is_empty() {
-        bail!("invalid --input spec '{spec}': language key must not be empty");
+        bail!("invalid --{kind} spec '{spec}': language key must not be empty");
     }
     if path.as_os_str().is_empty() {
-        bail!("invalid --input spec '{spec}': file path must not be empty");
+        bail!("invalid --{kind} spec '{spec}': file path must not be empty");
     }
 
     // Stream the envelope via BufReader so very large analyses don't
@@ -267,20 +331,31 @@ mod tests {
 
     #[test]
     fn parse_input_spec_rejects_missing_equals() {
-        let err = parse_input_spec("crap4rs.json").unwrap_err();
+        let err = parse_input_spec("crap4rs.json", "input").unwrap_err();
         assert!(err.to_string().contains("expected '<LANG>=<FILE>'"));
     }
 
     #[test]
     fn parse_input_spec_rejects_empty_language() {
-        let err = parse_input_spec("=crap4rs.json").unwrap_err();
+        let err = parse_input_spec("=crap4rs.json", "input").unwrap_err();
         assert!(err.to_string().contains("language key must not be empty"));
     }
 
     #[test]
     fn parse_input_spec_rejects_empty_path() {
-        let err = parse_input_spec("rust=").unwrap_err();
+        let err = parse_input_spec("rust=", "input").unwrap_err();
         assert!(err.to_string().contains("file path must not be empty"));
+    }
+
+    /// Error messages use the supplied kind ("input" / "baseline")
+    /// so operators see the exact flag they need to fix.
+    #[test]
+    fn parse_input_spec_error_messages_reference_supplied_kind() {
+        let err = parse_input_spec("missing_equals", "baseline").unwrap_err();
+        assert!(
+            err.to_string().contains("--baseline"),
+            "error should reference the baseline flag, got: {err}"
+        );
     }
 
     #[test]

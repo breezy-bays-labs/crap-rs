@@ -8,6 +8,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `crap-core` is the language-agnostic foundation shared by the
 `crap4rs` (Rust) and `crap4ts` (TypeScript) adapters.
 
+## [0.8.0]
+
+### Added
+
+- View axis (Current / Delta tabs) on the multi-language unified HTML
+    report. Each per-language panel renders a Current/Delta tab pair
+    when its block carries a baseline; languages without a baseline
+    render the Delta tab disabled with a no-baseline tooltip so the
+    asymmetric state is visible without suppressing other languages'
+    deltas. The Combined panel exposes its own Current/Delta tabs;
+    Combined → Delta surfaces a cross-adapter ranked table of
+    regressions and new functions sorted by risk band desc then
+    CRAP/threshold ratio desc within band (matches the dimensional-
+    consistency rule that governs the Current-view Combined
+    ranking). (crap-rs#326)
+- New domain types in `crap_core::domain::multi_lang` to support the
+    Combined Delta aggregate: `CombinedDelta`,
+    `CombinedDeltaSummary`, `RankedDeltaRow`, `RankedDeltaKind`,
+    `DeltaRowSnapshot`. The types are N-adapter-agnostic — adding a
+    new adapter that supplies a baseline contributes to the
+    Combined Delta without code changes outside the calling site.
+    (crap-rs#326)
+- New library entry point
+    `crap_core::core::compose::compose_combined_delta(blocks) ->
+    Option<CombinedDelta>`. Returns `None` precisely when no
+    language supplied a baseline — the renderer reads this signal
+    to suppress the View axis nav entirely so the no-baseline
+    multi-language render path stays equivalent to the v0.7.0
+    output. (crap-rs#326)
+- `crap-render --baseline <LANG>=<FILE>` CLI flag (additive, fully
+    optional). Each baseline pairs by language key with one of the
+    `--input` envelopes; a baseline whose language key has no
+    matching input is an error. The flag is repeatable; same
+    duplicate-language guard as `--input`. (crap-rs#326)
+- Two-axis URL hash routing in the multi-language report's inline
+    `<script>`. URL hash format is `#<lang>:<view>` where `<lang>` is
+    one of the Language nav buttons and `<view>` is `current` or
+    `delta`. Default on first load with no hash: `#combined:current`.
+    Switching Language preserves View where possible (e.g. on
+    `#rust:delta`, clicking TypeScript navigates to
+    `#typescript:delta`, not `#typescript:current`). Navigating to a
+    disabled tab silently falls back to `current` and logs to the
+    browser console — no error toast. (crap-rs#326)
+
+### Changed
+
+- `format_html_multi` template context (`HtmlMultiReport`) gained
+    `has_view_axis: bool` and `combined_delta_panel:
+    Option<Box<CombinedDeltaPanel>>` fields; `LangPanel` gained
+    `has_delta: bool`, `current_tab_count`, `delta_tab_count`,
+    `delta_has_news`, and `delta_panel: Option<Box<DeltaPanel>>`.
+    These are internal template-context types — the public
+    `format_html_multi` signature is unchanged.
+- Single-language passthrough (`multi.languages.len() == 1`)
+    continues to delegate to `format_html` for byte-identical
+    output. The View axis plumbing in the multi-lang glue does not
+    leak into the n=1 short-circuit even when a baseline is supplied
+    — a new test (`multi_lang_single_language_passthrough_byte_identical_with_baseline`)
+    locks this invariant in addition to the existing
+    no-baseline passthrough test.
+
 ## [0.7.0]
 
 ### Added

@@ -1,6 +1,6 @@
 ---
 source: crates/crap-core/src/adapters/reporters/html.rs
-assertion_line: 2389
+assertion_line: 2936
 expression: out
 ---
 <!doctype html>
@@ -1424,8 +1424,9 @@ pre code { background: transparent; padding: 0; }
     <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
       Current run <span class="tab-count">4</span>
     </button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baselines provided — pass --baseline to enable cross-adapter delta">
-      Delta vs baseline <span class="tab-count">—</span>
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button">
+      Delta vs baseline <span class="tab-dot" aria-hidden="true"></span>
+      <span class="tab-count">4 changed</span>
     </button>
   </nav>
   <div class="tab-panel" data-tab="current" data-active role="tabpanel">
@@ -1434,9 +1435,9 @@ pre code { background: transparent; padding: 0; }
       <strong>3 of 4</strong>
       functions exceed their adapter thresholds across the workspace.
       
-      Worst offender at <code>5.65×</code> over threshold (complex_fn, Rust).
+      Worst offender at <code>2.75×</code> over threshold (rs::regressing, Rust).
       
-      <span class="meta">4 files · 2 adapters</span>
+      <span class="meta">3 files · 2 adapters</span>
     </p>
   </section>
 
@@ -1453,12 +1454,12 @@ pre code { background: transparent; padding: 0; }
     </div>
     <div class="kpi">
       <span class="kpi-label">Files analyzed</span>
-      <span class="kpi-value">4</span>
+      <span class="kpi-value">3</span>
       <span class="kpi-foot">disjoint source trees</span>
     </div>
     <div class="kpi">
       <span class="kpi-label">Worst CRAP/threshold ratio</span>
-      <span class="kpi-value">5.65×</span>
+      <span class="kpi-value">2.75×</span>
       <span class="kpi-foot">Rust adapter</span>
     </div>
   </section>
@@ -1466,17 +1467,17 @@ pre code { background: transparent; padding: 0; }
   <section class="panel" aria-label="Combined risk distribution">
     <div class="panel-header"><h2>Risk distribution</h2></div>
     <div class="dist-bar">
-      <span class="dist-seg" data-risk="1" style="flex:1" title="low: 1 functions">
-        <span class="dist-count">1</span><span class="dist-label">low</span>
+      <span class="dist-seg" data-risk="1" style="flex:0" title="low: 0 functions">
+        <span class="dist-count">0</span><span class="dist-label">low</span>
       </span>
-      <span class="dist-seg" data-risk="2" style="flex:0" title="acceptable: 0 functions">
-        <span class="dist-count">0</span><span class="dist-label">acceptable</span>
+      <span class="dist-seg" data-risk="2" style="flex:1" title="acceptable: 1 functions">
+        <span class="dist-count">1</span><span class="dist-label">acceptable</span>
       </span>
-      <span class="dist-seg" data-risk="3" style="flex:2" title="moderate: 2 functions">
-        <span class="dist-count">2</span><span class="dist-label">moderate</span>
+      <span class="dist-seg" data-risk="3" style="flex:3" title="moderate: 3 functions">
+        <span class="dist-count">3</span><span class="dist-label">moderate</span>
       </span>
-      <span class="dist-seg" data-risk="4" style="flex:1" title="high: 1 functions">
-        <span class="dist-count">1</span><span class="dist-label">high</span>
+      <span class="dist-seg" data-risk="4" style="flex:0" title="high: 0 functions">
+        <span class="dist-count">0</span><span class="dist-label">high</span>
       </span>
     </div>
     <div class="dist-legend">
@@ -1514,13 +1515,13 @@ pre code { background: transparent; padding: 0; }
             <span class="adapter-badge" title="Rust adapter" aria-label="Rust adapter">R</span>
             <span class="sr-only">Rust</span>
           </td>
-          <td><span class="fn-name">complex_fn</span></td>
-          <td><span class="fn-path">src/domain/crap.rs L1–10</span></td>
-          <td class="num">20</td>
-          <td class="num">30.0%</td>
-          <td class="num">45.20</td>
-          <td class="num">5.65</td>
-          <td><span class="risk-pill" data-risk="4">high</span></td>
+          <td><span class="fn-name">rs::regressing</span></td>
+          <td><span class="fn-path">src/lib.rs L1–10</span></td>
+          <td class="num">8</td>
+          <td class="num">55.0%</td>
+          <td class="num">22.00</td>
+          <td class="num">2.75</td>
+          <td><span class="risk-pill" data-risk="3">moderate</span></td>
         </tr>
         
         <tr data-lang="rust" data-exceeds="1">
@@ -1528,10 +1529,10 @@ pre code { background: transparent; padding: 0; }
             <span class="adapter-badge" title="Rust adapter" aria-label="Rust adapter">R</span>
             <span class="sr-only">Rust</span>
           </td>
-          <td><span class="fn-name">parse_record</span></td>
-          <td><span class="fn-path">src/adapters/coverage/mod.rs L1–10</span></td>
-          <td class="num">6</td>
-          <td class="num">72.5%</td>
+          <td><span class="fn-name">rs::brand_new</span></td>
+          <td><span class="fn-path">src/new.rs L1–10</span></td>
+          <td class="num">10</td>
+          <td class="num">40.0%</td>
           <td class="num">15.00</td>
           <td class="num">1.88</td>
           <td><span class="risk-pill" data-risk="3">moderate</span></td>
@@ -1542,12 +1543,12 @@ pre code { background: transparent; padding: 0; }
             <span class="adapter-badge" title="TypeScript adapter" aria-label="TypeScript adapter">T</span>
             <span class="sr-only">TypeScript</span>
           </td>
-          <td><span class="fn-name">parseInvoiceDraft</span></td>
-          <td><span class="fn-path">apps/web/src/composer.ts L1–10</span></td>
-          <td class="num">6</td>
-          <td class="num">55.0%</td>
-          <td class="num">12.00</td>
-          <td class="num">1.50</td>
+          <td><span class="fn-name">ts::parser</span></td>
+          <td><span class="fn-path">apps/web/src/parser.ts L1–10</span></td>
+          <td class="num">7</td>
+          <td class="num">60.0%</td>
+          <td class="num">13.00</td>
+          <td class="num">1.62</td>
           <td><span class="risk-pill" data-risk="3">moderate</span></td>
         </tr>
         
@@ -1556,19 +1557,115 @@ pre code { background: transparent; padding: 0; }
             <span class="adapter-badge" title="Rust adapter" aria-label="Rust adapter">R</span>
             <span class="sr-only">Rust</span>
           </td>
-          <td><span class="fn-name">simple_fn</span></td>
+          <td><span class="fn-name">rs::improving</span></td>
           <td><span class="fn-path">src/lib.rs L1–10</span></td>
-          <td class="num">2</td>
-          <td class="num">95.0%</td>
-          <td class="num">3.00</td>
-          <td class="num">0.38</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
+          <td class="num">4</td>
+          <td class="num">85.0%</td>
+          <td class="num">6.00</td>
+          <td class="num">0.75</td>
+          <td><span class="risk-pill" data-risk="2">acceptable</span></td>
         </tr>
         
       </tbody>
     </table>
   </section>
   
+  </div>
+  <div class="tab-panel" data-tab="delta" role="tabpanel">
+    <section class="scope-banner delta-hero" aria-label="Combined Delta scope">
+      <p>
+        <strong>Comparing</strong> current run vs baseline across
+        2 adapters
+        (Rust, TypeScript).
+        <span class="verdict is-fail" aria-label="Combined Delta verdict: REGRESSED">
+          <span class="verdict-glyph">▲</span>
+          REGRESSED
+        </span>
+        <span class="meta">
+          1 added · 0 removed · 3 modified ·
+          2 regressions ·
+          1 improvement ·
+          2 new violations
+        </span>
+      </p>
+    </section>
+    <section aria-label="Combined Delta ranking">
+      <h2>Workspace regressions &amp; new functions <span class="muted">· by risk band, then CRAP/threshold ratio</span></h2>
+      <p class="ranked-note">
+        Cross-adapter delta ordering uses risk level (per-adapter calibrated) then
+        CRAP/threshold ratio. Raw CRAP scores are not dimensionally equivalent
+        across adapters with different complexity metrics; the per-language Delta
+        tabs below show within-adapter rankings.
+      </p>
+      <table class="ranked-table">
+        <thead><tr>
+          <th>Adapter</th>
+          <th>Function</th>
+          <th>File</th>
+          <th>Kind</th>
+          <th class="num">Baseline</th>
+          <th class="num">Current</th>
+          <th class="num">Δ</th>
+          <th class="num">Ratio</th>
+          <th>Risk</th>
+        </tr></thead>
+        <tbody>
+          
+          <tr data-lang="rust" data-kind="regression" data-exceeds="1">
+            <td>
+              <span class="adapter-badge" title="Rust adapter" aria-label="Rust adapter">R</span>
+              <span class="sr-only">Rust</span>
+            </td>
+            <td><span class="fn-name">rs::regressing</span></td>
+            <td><span class="fn-path">src/lib.rs L1–10</span></td>
+            <td><span class="kind-pill" data-kind="regression">regression</span></td>
+            <td class="num">10.00</td>
+            <td class="num">22.00</td>
+            <td class="num"><span class="delta-chip" data-direction="up" data-regression="1"><span class="chip-glyph" aria-hidden="true">▲</span>
+                <span class="chip-value">+12.00</span>
+              </span>
+            </td>
+            <td class="num">2.75</td>
+            <td><span class="risk-pill" data-risk="3">moderate</span></td>
+          </tr>
+          
+          <tr data-lang="rust" data-kind="new" data-exceeds="1">
+            <td>
+              <span class="adapter-badge" title="Rust adapter" aria-label="Rust adapter">R</span>
+              <span class="sr-only">Rust</span>
+            </td>
+            <td><span class="fn-name">rs::brand_new</span></td>
+            <td><span class="fn-path">src/new.rs L1–10</span></td>
+            <td><span class="kind-pill" data-kind="new">new</span></td>
+            <td class="num">—</td>
+            <td class="num">15.00</td>
+            <td class="num">—
+            </td>
+            <td class="num">1.88</td>
+            <td><span class="risk-pill" data-risk="3">moderate</span></td>
+          </tr>
+          
+          <tr data-lang="typescript" data-kind="regression" data-exceeds="1">
+            <td>
+              <span class="adapter-badge" title="TypeScript adapter" aria-label="TypeScript adapter">T</span>
+              <span class="sr-only">TypeScript</span>
+            </td>
+            <td><span class="fn-name">ts::parser</span></td>
+            <td><span class="fn-path">apps/web/src/parser.ts L1–10</span></td>
+            <td><span class="kind-pill" data-kind="regression">regression</span></td>
+            <td class="num">7.00</td>
+            <td class="num">13.00</td>
+            <td class="num"><span class="delta-chip" data-direction="up" data-regression="1"><span class="chip-glyph" aria-hidden="true">▲</span>
+                <span class="chip-value">+6.00</span>
+              </span>
+            </td>
+            <td class="num">1.62</td>
+            <td><span class="risk-pill" data-risk="3">moderate</span></td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </section>
   </div>
 </div>
 
@@ -1579,8 +1676,8 @@ pre code { background: transparent; padding: 0; }
     <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
       Current run <span class="tab-count">3</span>
     </button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baseline available for Rust">
-      Delta vs baseline <span class="tab-count">—</span>
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button">Delta vs baseline <span class="tab-dot" aria-hidden="true"></span>
+      <span class="tab-count">3 changed</span>
     </button>
   </nav>
   <div class="tab-panel" data-tab="current" data-active role="tabpanel">
@@ -1589,9 +1686,9 @@ pre code { background: transparent; padding: 0; }
       <strong>2 of 3</strong>
       functions exceed threshold.
       
-      Worst offender scores <code>45.20</code>.
+      Worst offender scores <code>22.00</code>.
       
-      <span class="meta">3 files · Rust adapter</span>
+      <span class="meta">2 files · Rust adapter</span>
     </p>
   </section>
 
@@ -1603,35 +1700,35 @@ pre code { background: transparent; padding: 0; }
     </div>
     <div class="kpi">
       <span class="kpi-label">Average CRAP</span>
-      <span class="kpi-value">21.07</span>
-      <span class="kpi-foot">median <code>15.00</code> · max <code>45.20</code></span>
+      <span class="kpi-value">14.33</span>
+      <span class="kpi-foot">median <code>15.00</code> · max <code>22.00</code></span>
     </div>
     <div class="kpi">
       <span class="kpi-label">Avg line coverage</span>
-      <span class="kpi-value">65.8<span class="kpi-unit">%</span></span>
-      <div class="bar is-thick" aria-hidden="true"><span class="is-2" style="width:65.8%"></span></div>
+      <span class="kpi-value">0.0<span class="kpi-unit">%</span></span>
+      <div class="bar is-thick" aria-hidden="true"><span class="is-4" style="width:0.0%"></span></div>
     </div>
     <div class="kpi">
       <span class="kpi-label">Avg complexity</span>
-      <span class="kpi-value">9.3</span>
-      <span class="kpi-foot">median <code>6.0</code> · max <code>20</code> cognitive</span>
+      <span class="kpi-value">0.0</span>
+      <span class="kpi-foot">median <code>0.0</code> · max <code>0</code> cognitive</span>
     </div>
   </section>
 
   <section class="panel" aria-label="Rust risk distribution">
     <div class="panel-header"><h2>Risk distribution</h2></div>
     <div class="dist-bar">
-      <span class="dist-seg" data-risk="1" style="flex:1" title="low: 1 functions">
-        <span class="dist-count">1</span><span class="dist-label">low</span>
+      <span class="dist-seg" data-risk="1" style="flex:0" title="low: 0 functions">
+        <span class="dist-count">0</span><span class="dist-label">low</span>
       </span>
-      <span class="dist-seg" data-risk="2" style="flex:0" title="acceptable: 0 functions">
-        <span class="dist-count">0</span><span class="dist-label">acceptable</span>
+      <span class="dist-seg" data-risk="2" style="flex:1" title="acceptable: 1 functions">
+        <span class="dist-count">1</span><span class="dist-label">acceptable</span>
       </span>
-      <span class="dist-seg" data-risk="3" style="flex:1" title="moderate: 1 functions">
-        <span class="dist-count">1</span><span class="dist-label">moderate</span>
+      <span class="dist-seg" data-risk="3" style="flex:2" title="moderate: 2 functions">
+        <span class="dist-count">2</span><span class="dist-label">moderate</span>
       </span>
-      <span class="dist-seg" data-risk="4" style="flex:1" title="high: 1 functions">
-        <span class="dist-count">1</span><span class="dist-label">high</span>
+      <span class="dist-seg" data-risk="4" style="flex:0" title="high: 0 functions">
+        <span class="dist-count">0</span><span class="dist-label">high</span>
       </span>
     </div>
   </section>
@@ -1641,14 +1738,14 @@ pre code { background: transparent; padding: 0; }
     <h2>Functions by file <span class="muted">· Rust</span></h2>
     <div class="file-list">
       
-      <details class="severity-card file-card" data-risk="4" data-exceeds="1" open>
+      <details class="severity-card file-card" data-risk="3" data-exceeds="1" open>
         <summary>
           <span class="stripe"></span>
           <span class="caret">›</span>
-          <span class="sev-path">src/domain/crap.rs</span>
+          <span class="sev-path">src/lib.rs</span>
           <span class="sev-meta">
-            <span><b>1</b> fn</span>
-            <span>max CRAP <b>45.20</b></span>
+            <span><b>2</b> fn</span>
+            <span>max CRAP <b>22.00</b></span>
             
             <span class="over"><b>1 over</b></span>
             
@@ -1662,11 +1759,19 @@ pre code { background: transparent; padding: 0; }
             <tbody>
               
               <tr class="is-exceeds">
-                <td><span class="fn-name">complex_fn</span><span class="fn-loc">10 LOC</span></td>
+                <td><span class="fn-name">rs::regressing</span><span class="fn-loc">10 LOC</span></td>
                 <td>1–10</td>
-                <td><div class="metric-cell"><div class="num-line"><span>20</span><span class="note">cognitive</span></div><div class="bar"><span class="is-4" style="width:100%"></span></div></div></td>
-                <td><div class="metric-cell"><div class="num-line"><span>30.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-4" style="width:30.0%"></span></div></div></td>
-                <td class="num"><span class="crap-cell">45.20 <span class="risk-pill" data-risk="4">high</span><span class="over-by">+37.20</span></span></td>
+                <td><div class="metric-cell"><div class="num-line"><span>8</span><span class="note">cognitive</span></div><div class="bar"><span class="is-3" style="width:40%"></span></div></div></td>
+                <td><div class="metric-cell"><div class="num-line"><span>55.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-3" style="width:55.0%"></span></div></div></td>
+                <td class="num"><span class="crap-cell">22.00 <span class="risk-pill" data-risk="3">moderate</span><span class="over-by">+14.00</span></span></td>
+              </tr>
+              
+              <tr>
+                <td><span class="fn-name">rs::improving</span><span class="fn-loc">10 LOC</span></td>
+                <td>1–10</td>
+                <td><div class="metric-cell"><div class="num-line"><span>4</span><span class="note">cognitive</span></div><div class="bar"><span class="is-2" style="width:20%"></span></div></div></td>
+                <td><div class="metric-cell"><div class="num-line"><span>85.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:85.0%"></span></div></div></td>
+                <td class="num"><span class="crap-cell">6.00 <span class="risk-pill" data-risk="2">acceptable</span></span></td>
               </tr>
               
             </tbody>
@@ -1678,7 +1783,7 @@ pre code { background: transparent; padding: 0; }
         <summary>
           <span class="stripe"></span>
           <span class="caret">›</span>
-          <span class="sev-path">src/adapters/coverage/mod.rs</span>
+          <span class="sev-path">src/new.rs</span>
           <span class="sev-meta">
             <span><b>1</b> fn</span>
             <span>max CRAP <b>15.00</b></span>
@@ -1695,44 +1800,11 @@ pre code { background: transparent; padding: 0; }
             <tbody>
               
               <tr class="is-exceeds">
-                <td><span class="fn-name">parse_record</span><span class="fn-loc">10 LOC</span></td>
+                <td><span class="fn-name">rs::brand_new</span><span class="fn-loc">10 LOC</span></td>
                 <td>1–10</td>
-                <td><div class="metric-cell"><div class="num-line"><span>6</span><span class="note">cognitive</span></div><div class="bar"><span class="is-2" style="width:30%"></span></div></div></td>
-                <td><div class="metric-cell"><div class="num-line"><span>72.5%</span><span class="note">lines</span></div><div class="bar"><span class="is-2" style="width:72.5%"></span></div></div></td>
+                <td><div class="metric-cell"><div class="num-line"><span>10</span><span class="note">cognitive</span></div><div class="bar"><span class="is-3" style="width:50%"></span></div></div></td>
+                <td><div class="metric-cell"><div class="num-line"><span>40.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-3" style="width:40.0%"></span></div></div></td>
                 <td class="num"><span class="crap-cell">15.00 <span class="risk-pill" data-risk="3">moderate</span><span class="over-by">+7.00</span></span></td>
-              </tr>
-              
-            </tbody>
-          </table>
-        </div>
-      </details>
-      
-      <details class="severity-card file-card" data-risk="1" data-exceeds="0">
-        <summary>
-          <span class="stripe"></span>
-          <span class="caret">›</span>
-          <span class="sev-path">src/lib.rs</span>
-          <span class="sev-meta">
-            <span><b>1</b> fn</span>
-            <span>max CRAP <b>3.00</b></span>
-            
-            <span>0 over</span>
-            
-          </span>
-        </summary>
-        <div class="severity-card-body">
-          <table class="file-fns">
-            <thead><tr>
-              <th>Function</th><th>Lines</th><th>Complexity</th><th>Coverage</th><th class="num">CRAP</th>
-            </tr></thead>
-            <tbody>
-              
-              <tr>
-                <td><span class="fn-name">simple_fn</span><span class="fn-loc">10 LOC</span></td>
-                <td>1–10</td>
-                <td><div class="metric-cell"><div class="num-line"><span>2</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:10%"></span></div></div></td>
-                <td><div class="metric-cell"><div class="num-line"><span>95.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:95.0%"></span></div></div></td>
-                <td class="num"><span class="crap-cell">3.00 <span class="risk-pill" data-risk="1">low</span></span></td>
               </tr>
               
             </tbody>
@@ -1744,6 +1816,182 @@ pre code { background: transparent; padding: 0; }
   </section>
   
   </div>
+  <div class="tab-panel" data-tab="delta" role="tabpanel">
+    <section class="scope-banner delta-hero" aria-label="Rust Delta scope">
+      <p>
+        <strong>Comparing</strong> current run vs <code>baseline</code>.
+        <span class="verdict is-fail" aria-label="Delta verdict: REGRESSED">
+          <span class="verdict-glyph">▲</span>
+          REGRESSED
+        </span>
+        <span class="meta">
+          1 added · 0 removed · 2 modified ·
+          1 regression ·
+          1 improvement ·
+          1 new violation
+        </span>
+      </p>
+    </section>
+
+    <section class="delta-kpi-grid" aria-label="Rust Delta summary">
+      
+      <div class="delta-kpi" data-direction="up" data-regression="1">
+        <span class="delta-kpi-label">Exceeding threshold</span>
+        <div class="delta-kpi-ba">
+          <span class="before">1</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">2</span>
+        </div>
+        
+        <span class="delta-chip" data-direction="up" data-regression="1">
+          <span class="chip-glyph" aria-hidden="true">▲</span>
+          <span class="chip-value">+1</span>
+        </span>
+        
+        
+        <span class="delta-kpi-foot">1 new function broke the threshold.</span>
+        
+      </div>
+      
+      <div class="delta-kpi" data-direction="up" data-regression="1">
+        <span class="delta-kpi-label">Max CRAP</span>
+        <div class="delta-kpi-ba">
+          <span class="before">14.00</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">22.00</span>
+        </div>
+        
+        <span class="delta-chip" data-direction="up" data-regression="1">
+          <span class="chip-glyph" aria-hidden="true">▲</span>
+          <span class="chip-value">+8.00</span>
+        </span>
+        
+        
+      </div>
+      
+      <div class="delta-kpi" data-direction="up" data-regression="1">
+        <span class="delta-kpi-label">Average CRAP</span>
+        <div class="delta-kpi-ba">
+          <span class="before">12.00</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">14.33</span>
+        </div>
+        
+        <span class="delta-chip" data-direction="up" data-regression="1">
+          <span class="chip-glyph" aria-hidden="true">▲</span>
+          <span class="chip-value">+2.33</span>
+        </span>
+        
+        
+        <span class="delta-kpi-foot">1 added · 0 removed · 2 modified</span>
+        
+      </div>
+      
+      <div class="delta-kpi" data-direction="flat">
+        <span class="delta-kpi-label">Avg coverage</span>
+        <div class="delta-kpi-ba">
+          <span class="before">0.0%</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">0.0%</span>
+        </div>
+        
+        
+        <span class="delta-kpi-foot">Coverage unchanged.</span>
+        
+      </div>
+      
+    </section>
+
+    
+    <section aria-label="Rust regressions">
+      <h2>Regressions <span class="delta-section-count">1</span></h2>
+      <table class="delta-table regressions">
+        <thead><tr>
+          <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+        </tr></thead>
+        <tbody>
+          
+          <tr data-exceeds="1">
+            <td>
+              <span class="fn-name">rs::regressing</span>
+              <span class="fn-loc">src/lib.rs L1–10</span>
+            </td>
+            <td class="num">10.00</td>
+            <td class="num">22.00</td>
+            <td><span class="ba-cell"><span class="b">70.0%</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">55.0%</span></span></td>
+            <td>
+              <span class="transition-pill">
+                <span class="risk-pill" data-risk="2">acceptable</span>
+                <span class="arrow" aria-hidden="true">→</span>
+                <span class="risk-pill" data-risk="3">moderate</span>
+              </span>
+            </td>
+            <td class="num"><span class="delta-chip" data-direction="up" data-regression="1"><span class="chip-glyph" aria-hidden="true">▲</span> <span class="chip-value">+12.00</span></span></td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </section>
+    
+
+    
+    <section aria-label="Rust improvements">
+      <h2>Improvements <span class="delta-section-count">1</span></h2>
+      <table class="delta-table improvements">
+        <thead><tr>
+          <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+        </tr></thead>
+        <tbody>
+          
+          <tr>
+            <td>
+              <span class="fn-name">rs::improving</span>
+              <span class="fn-loc">src/lib.rs L1–10</span>
+            </td>
+            <td class="num">14.00</td>
+            <td class="num">6.00</td>
+            <td><span class="ba-cell"><span class="b">50.0%</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">85.0%</span></span></td>
+            <td>
+              <span class="transition-pill">
+                <span class="risk-pill" data-risk="3">moderate</span>
+                <span class="arrow" aria-hidden="true">→</span>
+                <span class="risk-pill" data-risk="2">acceptable</span>
+              </span>
+            </td>
+            <td class="num"><span class="delta-chip" data-direction="down"><span class="chip-glyph" aria-hidden="true">▼</span> <span class="chip-value">-8.00</span></span></td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </section>
+    
+
+    
+    <section aria-label="Rust new functions">
+      <h2>New functions <span class="delta-section-count">1</span></h2>
+      <table class="delta-table new-functions">
+        <thead><tr>
+          <th>Function</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk</th>
+        </tr></thead>
+        <tbody>
+          
+          <tr data-exceeds="1">
+            <td>
+              <span class="fn-name">rs::brand_new</span>
+              <span class="fn-loc">src/new.rs L1–10</span>
+            </td>
+            <td class="num">15.00</td>
+            <td class="num">40.0%</td>
+            <td><span class="risk-pill" data-risk="3">moderate</span></td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </section>
+    
+
+    
+  </div>
 </div>
 
 <div class="lang-panel" data-lang="typescript">
@@ -1751,8 +1999,8 @@ pre code { background: transparent; padding: 0; }
     <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
       Current run <span class="tab-count">1</span>
     </button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baseline available for TypeScript">
-      Delta vs baseline <span class="tab-count">—</span>
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button">Delta vs baseline <span class="tab-dot" aria-hidden="true"></span>
+      <span class="tab-count">1 changed</span>
     </button>
   </nav>
   <div class="tab-panel" data-tab="current" data-active role="tabpanel">
@@ -1761,7 +2009,7 @@ pre code { background: transparent; padding: 0; }
       <strong>1 of 1</strong>
       function exceeds threshold.
       
-      Worst offender scores <code>12.00</code>.
+      Worst offender scores <code>13.00</code>.
       
       <span class="meta">1 file · TypeScript adapter</span>
     </p>
@@ -1775,8 +2023,8 @@ pre code { background: transparent; padding: 0; }
     </div>
     <div class="kpi">
       <span class="kpi-label">Average CRAP</span>
-      <span class="kpi-value">12.00</span>
-      <span class="kpi-foot">median <code>12.00</code> · max <code>12.00</code></span>
+      <span class="kpi-value">13.00</span>
+      <span class="kpi-foot">median <code>13.00</code> · max <code>13.00</code></span>
     </div>
     <div class="kpi">
       <span class="kpi-label">Avg line coverage</span>
@@ -1817,10 +2065,10 @@ pre code { background: transparent; padding: 0; }
         <summary>
           <span class="stripe"></span>
           <span class="caret">›</span>
-          <span class="sev-path">apps/web/src/composer.ts</span>
+          <span class="sev-path">apps/web/src/parser.ts</span>
           <span class="sev-meta">
             <span><b>1</b> fn</span>
-            <span>max CRAP <b>12.00</b></span>
+            <span>max CRAP <b>13.00</b></span>
             
             <span class="over"><b>1 over</b></span>
             
@@ -1834,11 +2082,11 @@ pre code { background: transparent; padding: 0; }
             <tbody>
               
               <tr class="is-exceeds">
-                <td><span class="fn-name">parseInvoiceDraft</span><span class="fn-loc">10 LOC</span></td>
+                <td><span class="fn-name">ts::parser</span><span class="fn-loc">10 LOC</span></td>
                 <td>1–10</td>
-                <td><div class="metric-cell"><div class="num-line"><span>6</span><span class="note">cyclomatic</span></div><div class="bar"><span class="is-2" style="width:30%"></span></div></div></td>
-                <td><div class="metric-cell"><div class="num-line"><span>55.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-3" style="width:55.0%"></span></div></div></td>
-                <td class="num"><span class="crap-cell">12.00 <span class="risk-pill" data-risk="3">moderate</span><span class="over-by">+4.00</span></span></td>
+                <td><div class="metric-cell"><div class="num-line"><span>7</span><span class="note">cyclomatic</span></div><div class="bar"><span class="is-3" style="width:35%"></span></div></div></td>
+                <td><div class="metric-cell"><div class="num-line"><span>60.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-2" style="width:60.0%"></span></div></div></td>
+                <td class="num"><span class="crap-cell">13.00 <span class="risk-pill" data-risk="3">moderate</span><span class="over-by">+5.00</span></span></td>
               </tr>
               
             </tbody>
@@ -1849,6 +2097,130 @@ pre code { background: transparent; padding: 0; }
     </div>
   </section>
   
+  </div>
+  <div class="tab-panel" data-tab="delta" role="tabpanel">
+    <section class="scope-banner delta-hero" aria-label="TypeScript Delta scope">
+      <p>
+        <strong>Comparing</strong> current run vs <code>baseline</code>.
+        <span class="verdict is-fail" aria-label="Delta verdict: REGRESSED">
+          <span class="verdict-glyph">▲</span>
+          REGRESSED
+        </span>
+        <span class="meta">
+          0 added · 0 removed · 1 modified ·
+          1 regression ·
+          0 improvements ·
+          1 new violation
+        </span>
+      </p>
+    </section>
+
+    <section class="delta-kpi-grid" aria-label="TypeScript Delta summary">
+      
+      <div class="delta-kpi" data-direction="up" data-regression="1">
+        <span class="delta-kpi-label">Exceeding threshold</span>
+        <div class="delta-kpi-ba">
+          <span class="before">0</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">1</span>
+        </div>
+        
+        <span class="delta-chip" data-direction="up" data-regression="1">
+          <span class="chip-glyph" aria-hidden="true">▲</span>
+          <span class="chip-value">+1</span>
+        </span>
+        
+        
+        <span class="delta-kpi-foot">1 new function broke the threshold.</span>
+        
+      </div>
+      
+      <div class="delta-kpi" data-direction="up" data-regression="1">
+        <span class="delta-kpi-label">Max CRAP</span>
+        <div class="delta-kpi-ba">
+          <span class="before">7.00</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">13.00</span>
+        </div>
+        
+        <span class="delta-chip" data-direction="up" data-regression="1">
+          <span class="chip-glyph" aria-hidden="true">▲</span>
+          <span class="chip-value">+6.00</span>
+        </span>
+        
+        
+      </div>
+      
+      <div class="delta-kpi" data-direction="up" data-regression="1">
+        <span class="delta-kpi-label">Average CRAP</span>
+        <div class="delta-kpi-ba">
+          <span class="before">7.00</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">13.00</span>
+        </div>
+        
+        <span class="delta-chip" data-direction="up" data-regression="1">
+          <span class="chip-glyph" aria-hidden="true">▲</span>
+          <span class="chip-value">+6.00</span>
+        </span>
+        
+        
+        <span class="delta-kpi-foot">0 added · 0 removed · 1 modified</span>
+        
+      </div>
+      
+      <div class="delta-kpi" data-direction="flat">
+        <span class="delta-kpi-label">Avg coverage</span>
+        <div class="delta-kpi-ba">
+          <span class="before">0.0%</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="after">0.0%</span>
+        </div>
+        
+        
+        <span class="delta-kpi-foot">Coverage unchanged.</span>
+        
+      </div>
+      
+    </section>
+
+    
+    <section aria-label="TypeScript regressions">
+      <h2>Regressions <span class="delta-section-count">1</span></h2>
+      <table class="delta-table regressions">
+        <thead><tr>
+          <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+        </tr></thead>
+        <tbody>
+          
+          <tr data-exceeds="1">
+            <td>
+              <span class="fn-name">ts::parser</span>
+              <span class="fn-loc">apps/web/src/parser.ts L1–10</span>
+            </td>
+            <td class="num">7.00</td>
+            <td class="num">13.00</td>
+            <td><span class="ba-cell"><span class="b">75.0%</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">60.0%</span></span></td>
+            <td>
+              <span class="transition-pill">
+                <span class="risk-pill" data-risk="2">acceptable</span>
+                <span class="arrow" aria-hidden="true">→</span>
+                <span class="risk-pill" data-risk="3">moderate</span>
+              </span>
+            </td>
+            <td class="num"><span class="delta-chip" data-direction="up" data-regression="1"><span class="chip-glyph" aria-hidden="true">▲</span> <span class="chip-value">+6.00</span></span></td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </section>
+    
+
+    
+
+    
+
+    
   </div>
 </div>
 

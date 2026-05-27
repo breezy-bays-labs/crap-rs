@@ -276,10 +276,28 @@ self-contained, no external assets).
 
 When `languages: rust,typescript` (or `all`) is set alongside
 `html-report: true`, the action renders **one unified HTML
-document** carrying both adapters' analyses with a Language /
-Combined toggle at the top of the page. The sticky comment carries
-**one canonical link** plus two deep-link anchors so reviewers can
-land directly on a per-language panel:
+document** carrying both adapters' analyses with two
+navigation axes:
+
+- A **Language axis** (Sakura `.segmented` group at the top of the
+  page) — switch between Rust, TypeScript, and the cross-adapter
+  Combined view.
+- A **View axis** (Sakura `.tabs` group inside each panel) —
+  switch between **Current run** and **Delta vs baseline** within
+  the active language panel. The View axis only renders when at
+  least one adapter supplied a baseline. Languages without a
+  baseline render their Delta tab disabled with a tooltip
+  pointing at how to provide one.
+
+URL hash routing supports both axes via the
+`#<lang>:<view>` format — e.g. `#rust:delta` deep-links to the
+Rust panel's Delta tab, `#combined:current` is the default first-
+load target, and a deep-link to a disabled tab silently falls
+back to `current`.
+
+The sticky comment carries **one canonical link** plus two
+deep-link anchors so reviewers can land directly on a per-language
+panel:
 
 ```text
 📊 [Open report](<unified-url>) · [Rust panel](<unified-url>#rust) · [TypeScript panel](<unified-url>#typescript)

@@ -37,6 +37,9 @@ struct MultiLangWorld {
     /// Per-language envelope paths the scenario has produced. Keyed
     /// by language so duplicates can be intentionally tested.
     envelopes: Vec<(String, PathBuf)>,
+    /// Per-language baseline envelope paths (View axis scenarios).
+    /// Keyed by language; same dedup discipline as `envelopes`.
+    baselines: Vec<(String, PathBuf)>,
     /// Output of the last crap-render invocation. None until the
     /// scenario's When step has run.
     output: Option<Output>,
@@ -175,6 +178,16 @@ fn write_envelope(world: &mut MultiLangWorld, language: &str, filename: &str, bo
     world.envelopes.push((language.to_string(), path));
 }
 
+fn write_baseline(world: &mut MultiLangWorld, language: &str, filename: &str, body: &str) {
+    let dir = match world._tempdir.as_ref() {
+        Some(d) => d.path().to_path_buf(),
+        None => fresh_tempdir(world),
+    };
+    let path = dir.join(filename);
+    std::fs::write(&path, body).expect("write baseline envelope");
+    world.baselines.push((language.to_string(), path));
+}
+
 // ── Given steps ──────────────────────────────────────────────────────
 
 #[given("a crap4rs JSON envelope from a representative workspace")]
@@ -304,6 +317,171 @@ fn given_two_crap4rs_envelopes(world: &mut MultiLangWorld) {
     write_envelope(world, "rust", "b.json", &body);
 }
 
+#[given("a crap4rs envelope and a crap4ts envelope with matching baselines for each language")]
+fn given_two_lang_with_both_baselines(world: &mut MultiLangWorld) {
+    // Current envelopes — same shape as the existing two-language
+    // scenario so the rest of the structural assertions hold.
+    let rs_current = synth_envelope(
+        "rust",
+        "compute_crap",
+        "src/lib.rs",
+        "cognitive",
+        12.0,
+        8.0,
+        "moderate",
+        7,
+        65.0,
+    );
+    let ts_current = synth_envelope(
+        "typescript",
+        "parseInvoice",
+        "src/parse.ts",
+        "cyclomatic",
+        14.0,
+        8.0,
+        "moderate",
+        8,
+        55.0,
+    );
+    write_envelope(world, "rust", "crap4rs.json", &rs_current);
+    write_envelope(world, "typescript", "crap4ts.json", &ts_current);
+
+    // Baselines — earlier snapshots of the same identities so the
+    // delta computer pairs them as Modified rather than Added.
+    let rs_baseline = synth_envelope(
+        "rust",
+        "compute_crap",
+        "src/lib.rs",
+        "cognitive",
+        6.0,
+        8.0,
+        "acceptable",
+        4,
+        75.0,
+    );
+    let ts_baseline = synth_envelope(
+        "typescript",
+        "parseInvoice",
+        "src/parse.ts",
+        "cyclomatic",
+        8.0,
+        8.0,
+        "acceptable",
+        5,
+        70.0,
+    );
+    write_baseline(world, "rust", "crap4rs-baseline.json", &rs_baseline);
+    write_baseline(world, "typescript", "crap4ts-baseline.json", &ts_baseline);
+}
+
+#[given("a crap4rs envelope with a matching baseline and a crap4ts envelope without a baseline")]
+fn given_mismatched_baselines(world: &mut MultiLangWorld) {
+    let rs_current = synth_envelope(
+        "rust",
+        "compute_crap",
+        "src/lib.rs",
+        "cognitive",
+        10.0,
+        8.0,
+        "acceptable",
+        6,
+        70.0,
+    );
+    let ts_current = synth_envelope(
+        "typescript",
+        "parseInvoice",
+        "src/parse.ts",
+        "cyclomatic",
+        12.0,
+        8.0,
+        "moderate",
+        7,
+        65.0,
+    );
+    write_envelope(world, "rust", "crap4rs.json", &rs_current);
+    write_envelope(world, "typescript", "crap4ts.json", &ts_current);
+
+    let rs_baseline = synth_envelope(
+        "rust",
+        "compute_crap",
+        "src/lib.rs",
+        "cognitive",
+        5.0,
+        8.0,
+        "low",
+        3,
+        85.0,
+    );
+    write_baseline(world, "rust", "crap4rs-baseline.json", &rs_baseline);
+    // TypeScript: NO baseline supplied — the disabled-tab path under
+    // test.
+}
+
+#[given("a Rust baseline plus a Rust current with one High-risk regression at ratio 5.7")]
+fn given_rust_high_risk_regression(world: &mut MultiLangWorld) {
+    let rs_baseline = synth_envelope(
+        "rust",
+        "view::analyze_view",
+        "src/domain/view.rs",
+        "cognitive",
+        6.0,
+        8.0,
+        "acceptable",
+        4,
+        80.0,
+    );
+    let rs_current = synth_envelope(
+        "rust",
+        "view::analyze_view",
+        "src/domain/view.rs",
+        "cognitive",
+        45.6,
+        8.0,
+        "high",
+        20,
+        30.0,
+    );
+    write_baseline(world, "rust", "crap4rs-baseline.json", &rs_baseline);
+    write_envelope(world, "rust", "crap4rs.json", &rs_current);
+}
+
+#[given(
+    "a TypeScript baseline plus a TypeScript current with one Moderate-risk regression at ratio 2.5"
+)]
+fn given_typescript_moderate_regression(world: &mut MultiLangWorld) {
+    let ts_baseline = synth_envelope(
+        "typescript",
+        "parseInvoice",
+        "src/parse.ts",
+        "cyclomatic",
+        6.0,
+        8.0,
+        "acceptable",
+        4,
+        80.0,
+    );
+    let ts_current = synth_envelope(
+        "typescript",
+        "parseInvoice",
+        "src/parse.ts",
+        "cyclomatic",
+        20.0,
+        8.0,
+        "moderate",
+        10,
+        60.0,
+    );
+    write_baseline(world, "typescript", "crap4ts-baseline.json", &ts_baseline);
+    write_envelope(world, "typescript", "crap4ts.json", &ts_current);
+}
+
+#[given("two language envelopes with baselines")]
+fn given_two_language_envelopes_with_baselines(world: &mut MultiLangWorld) {
+    // Routed through the same helper as the explicit "matching
+    // baselines" Given so URL-hash scenarios share fixture data.
+    given_two_lang_with_both_baselines(world);
+}
+
 #[given("a workspace configured with a single language adapter")]
 fn given_workspace_single_language(world: &mut MultiLangWorld) {
     // Composite-action scenario: the contract under test is the
@@ -355,6 +533,41 @@ fn when_run_both_envelopes_default_format(world: &mut MultiLangWorld) {
     }
     let output = cmd.output().expect("run crap-render");
     world.output = Some(output);
+}
+
+#[when("crap-render is invoked with both current envelopes plus both baseline envelopes")]
+fn when_run_both_envelopes_with_both_baselines(world: &mut MultiLangWorld) {
+    let mut cmd = Command::cargo_bin("crap-render").expect("crap-render bin discoverable");
+    for (lang, path) in &world.envelopes {
+        cmd.arg("--input")
+            .arg(format!("{}={}", lang, path.display()));
+    }
+    for (lang, path) in &world.baselines {
+        cmd.arg("--baseline")
+            .arg(format!("{}={}", lang, path.display()));
+    }
+    cmd.arg("--format").arg("html");
+    let output = cmd.output().expect("run crap-render");
+    world.output = Some(output);
+}
+
+#[when("crap-render is invoked with both current envelopes and the Rust baseline only")]
+fn when_run_both_envelopes_with_rust_baseline_only(world: &mut MultiLangWorld) {
+    // The fixture Given step writes only the Rust baseline, so this
+    // is byte-identical in behavior to the "both baselines"
+    // invocation — but expressing it as a distinct step keeps the
+    // .feature file declarative about intent.
+    when_run_both_envelopes_with_both_baselines(world);
+}
+
+#[when("crap-render is invoked with both pairs of envelopes")]
+fn when_run_both_pairs_of_envelopes(world: &mut MultiLangWorld) {
+    when_run_both_envelopes_with_both_baselines(world);
+}
+
+#[when("crap-render renders the unified HTML report")]
+fn when_renders_unified_html(world: &mut MultiLangWorld) {
+    when_run_both_envelopes_with_both_baselines(world);
 }
 
 #[when("the composite scorecard action runs with html-report set true and one language")]
@@ -557,6 +770,225 @@ fn then_unified_render_skipped(world: &mut MultiLangWorld) {
         ),
         "Render unified HTML step must be gated on is_multi == 'true'"
     );
+}
+
+// ── View axis Then steps ────────────────────────────────────────────
+
+#[then("the HTML output contains a `<nav class=\"tabs\"` element inside the Combined panel")]
+fn then_combined_has_tabs_nav(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    assert!(
+        out.contains(r#"<nav class="tabs" role="tablist" aria-label="Combined views">"#),
+        "Combined panel must carry View axis tabs when at least one language has a baseline"
+    );
+}
+
+#[then(
+    "both per-language panels contain a `<nav class=\"tabs\"` element with Current and Delta tabs"
+)]
+fn then_both_lang_panels_have_tabs(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    assert!(
+        out.contains(r#"<nav class="tabs" role="tablist" aria-label="Rust views">"#),
+        "Rust panel must carry View axis tabs"
+    );
+    assert!(
+        out.contains(r#"<nav class="tabs" role="tablist" aria-label="TypeScript views">"#),
+        "TypeScript panel must carry View axis tabs"
+    );
+}
+
+#[then("no panel renders a disabled Delta tab when its language has a baseline")]
+fn then_no_disabled_delta_tab(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    assert!(
+        !out.contains(r#"title="no baseline available"#),
+        "no panel should render the no-baseline disabled tooltip when all languages have baselines"
+    );
+}
+
+#[then("the TypeScript panel renders the Delta tab with the disabled attribute")]
+fn then_ts_delta_tab_disabled(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let ts_nav_start = out
+        .find(r#"aria-label="TypeScript views""#)
+        .expect("TypeScript tabs nav present");
+    let next_close = out[ts_nav_start..].find("</nav>").unwrap();
+    let ts_nav = &out[ts_nav_start..ts_nav_start + next_close];
+    assert!(
+        ts_nav.contains("disabled"),
+        "TypeScript Delta tab must be disabled when TypeScript has no baseline; got: {ts_nav}"
+    );
+}
+
+#[then("the TypeScript Delta tab carries the no-baseline tooltip text")]
+fn then_ts_delta_tab_no_baseline_tooltip(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let ts_nav_start = out
+        .find(r#"aria-label="TypeScript views""#)
+        .expect("TypeScript tabs nav present");
+    let next_close = out[ts_nav_start..].find("</nav>").unwrap();
+    let ts_nav = &out[ts_nav_start..ts_nav_start + next_close];
+    assert!(
+        ts_nav.contains(r#"title="no baseline available for TypeScript""#),
+        "Disabled Delta tab must carry the no-baseline tooltip; got: {ts_nav}"
+    );
+}
+
+#[then("the Rust panel renders the Delta tab without the disabled attribute")]
+fn then_rust_delta_tab_enabled(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let rs_nav_start = out
+        .find(r#"aria-label="Rust views""#)
+        .expect("Rust tabs nav present");
+    let next_close = out[rs_nav_start..].find("</nav>").unwrap();
+    let rs_nav = &out[rs_nav_start..rs_nav_start + next_close];
+    assert!(
+        !rs_nav.contains("disabled"),
+        "Rust Delta tab must be enabled when Rust has a baseline; got: {rs_nav}"
+    );
+}
+
+#[then("the Combined Delta scope-banner names TypeScript as a language missing a baseline")]
+fn then_combined_delta_missing_baseline_note(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    assert!(
+        out.contains(r#"class="missing-baseline-note""#),
+        "Combined Delta hero must render the missing-baseline note"
+    );
+    assert!(
+        out.contains("<strong>TypeScript</strong>") && out.contains("has no baseline yet"),
+        "missing-baseline-note must name TypeScript: {out}"
+    );
+}
+
+#[then(
+    "the Combined Delta tab panel lists the Rust High-risk regression before the TypeScript Moderate-risk regression"
+)]
+fn then_combined_delta_ranks_rust_before_typescript(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let combined_delta_start = out
+        .find(r#"data-tab="delta" role="tabpanel""#)
+        .expect("Combined Delta tab-panel must render");
+    let combined_delta_section = &out[combined_delta_start..];
+    let rs_pos = combined_delta_section
+        .find("view::analyze_view")
+        .expect("Rust High-risk regression must surface in Combined Delta");
+    let ts_pos = combined_delta_section
+        .find("parseInvoice")
+        .expect("TypeScript Moderate-risk regression must surface in Combined Delta");
+    assert!(
+        rs_pos < ts_pos,
+        "Rust High-risk regression must rank ahead of TypeScript Moderate-risk regression in Combined Delta (D2d sort: risk band desc, ratio desc within band)"
+    );
+}
+
+#[then("each Combined Delta row carries an adapter badge identifying its source language")]
+fn then_combined_delta_rows_carry_badges(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let combined_delta_start = out
+        .find(r#"data-tab="delta" role="tabpanel""#)
+        .expect("Combined Delta tab-panel must render");
+    // Take everything between the opening of the Combined Delta tab
+    // panel and the next `</div>` that closes a tab-panel (which is
+    // our own).
+    let combined_delta_section = &out[combined_delta_start..];
+    assert!(
+        combined_delta_section.contains(r#"<span class="adapter-badge""#),
+        "Combined Delta rows must carry adapter-badge markup"
+    );
+}
+
+#[then("the rendered JS parses URL hashes of the shape `#<lang>:<view>`")]
+fn then_js_parses_two_axis_hash(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    // The JS does parts = rawHash.split(':') and reads parts[0] +
+    // parts[1] for lang and view. Verify the structural marker so
+    // we don't lock the exact JS text (which may evolve).
+    assert!(
+        out.contains("rawHash.split(':')"),
+        "rendered JS must split the URL hash on ':' to extract <lang> and <view> axes"
+    );
+}
+
+#[then("the rendered JS falls back to `#combined:current` when the URL carries no hash")]
+fn then_js_default_hash_is_combined_current(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    // Default fallback: `var lang = parts[0] || 'combined';` and
+    // `var view = parts[1] || 'current';`. Verify both literals so
+    // the default-target invariant is locked.
+    assert!(
+        out.contains("parts[0] || 'combined'"),
+        "rendered JS must default lang axis to 'combined' when URL hash is absent"
+    );
+    assert!(
+        out.contains("parts[1] || 'current'"),
+        "rendered JS must default view axis to 'current' when URL hash is absent"
+    );
+}
+
+// ── No-baseline View axis Then steps ────────────────────────────────
+
+#[then("the HTML output contains exactly three `<nav class=\"tabs\"` elements")]
+fn then_three_view_navs(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let count = out.matches(r#"<nav class="tabs""#).count();
+    assert_eq!(
+        count, 3,
+        "expected exactly 3 View navs in unified HTML (Combined + Rust + TypeScript); got {count}"
+    );
+}
+
+#[then("the Combined panel Delta tab is disabled with the cross-adapter no-baselines tooltip")]
+fn then_combined_delta_disabled_no_baselines(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let nav_start = out
+        .find(r#"aria-label="Combined views""#)
+        .expect("Combined tabs nav present");
+    let close_off = out[nav_start..]
+        .find("</nav>")
+        .expect("Combined nav has closing tag");
+    let nav = &out[nav_start..nav_start + close_off];
+    assert!(
+        nav.contains("disabled") && nav.contains(r#"aria-disabled="true""#),
+        "Combined Delta tab must be disabled when no language supplied a baseline; got: {nav}"
+    );
+    // The Combined tooltip uses distinctive plural wording so it
+    // cannot collide with the per-language `title="no baseline
+    // available for <lang>"` literal asserted elsewhere in this
+    // file. Drift between Combined and per-language wording is
+    // caught by the assertion below in
+    // `then_both_lang_delta_disabled_no_baseline_tooltip`.
+    assert!(
+        nav.contains(
+            r#"title="no baselines provided — pass --baseline to enable cross-adapter delta""#
+        ),
+        "Combined Delta disabled tooltip must name the no-baselines cause; got: {nav}"
+    );
+}
+
+#[then("both per-language Delta tabs are disabled with their per-language no-baseline tooltip")]
+fn then_both_lang_delta_disabled_no_baseline_tooltip(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    for lang_label in ["Rust", "TypeScript"] {
+        let aria = format!(r#"aria-label="{lang_label} views""#);
+        let nav_start = out
+            .find(&aria)
+            .unwrap_or_else(|| panic!("{lang_label} tabs nav present"));
+        let close_off = out[nav_start..]
+            .find("</nav>")
+            .expect("per-language nav has closing tag");
+        let nav = &out[nav_start..nav_start + close_off];
+        assert!(
+            nav.contains("disabled") && nav.contains(r#"aria-disabled="true""#),
+            "{lang_label} Delta tab must be disabled when {lang_label} has no baseline; got: {nav}"
+        );
+        let expected_tooltip = format!(r#"title="no baseline available for {lang_label}""#);
+        assert!(
+            nav.contains(&expected_tooltip),
+            "{lang_label} Delta disabled tooltip must name the language ({expected_tooltip}); got: {nav}"
+        );
+    }
 }
 
 fn action_yml_path() -> PathBuf {

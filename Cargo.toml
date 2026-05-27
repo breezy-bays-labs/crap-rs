@@ -23,7 +23,7 @@ authors = ["Christopher Bays <cmbays@breezybayslabs.com>"]
 # Rust adapter. Future siblings (`crap4ts`) inherit the same pins.
 [workspace.dependencies]
 # ── In-workspace crates ──
-crap-core = { path = "crates/crap-core", version = "0.7.0" }
+crap-core = { path = "crates/crap-core", version = "0.8.0" }
 
 # ── CLI (crap4rs only today) ──
 clap = { version = "4", features = ["derive", "string"] }
