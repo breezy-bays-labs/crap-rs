@@ -927,6 +927,70 @@ fn then_js_default_hash_is_combined_current(world: &mut MultiLangWorld) {
     );
 }
 
+// ── No-baseline View axis Then steps ────────────────────────────────
+
+#[then("the HTML output contains exactly three `<nav class=\"tabs\"` elements")]
+fn then_three_view_navs(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let count = out.matches(r#"<nav class="tabs""#).count();
+    assert_eq!(
+        count, 3,
+        "expected exactly 3 View navs in unified HTML (Combined + Rust + TypeScript); got {count}"
+    );
+}
+
+#[then("the Combined panel Delta tab is disabled with the cross-adapter no-baselines tooltip")]
+fn then_combined_delta_disabled_no_baselines(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    let nav_start = out
+        .find(r#"aria-label="Combined views""#)
+        .expect("Combined tabs nav present");
+    let close_off = out[nav_start..]
+        .find("</nav>")
+        .expect("Combined nav has closing tag");
+    let nav = &out[nav_start..nav_start + close_off];
+    assert!(
+        nav.contains("disabled") && nav.contains(r#"aria-disabled="true""#),
+        "Combined Delta tab must be disabled when no language supplied a baseline; got: {nav}"
+    );
+    // The Combined tooltip uses distinctive plural wording so it
+    // cannot collide with the per-language `title="no baseline
+    // available for <lang>"` literal asserted elsewhere in this
+    // file. Drift between Combined and per-language wording is
+    // caught by the assertion below in
+    // `then_both_lang_delta_disabled_no_baseline_tooltip`.
+    assert!(
+        nav.contains(
+            r#"title="no baselines provided — pass --baseline to enable cross-adapter delta""#
+        ),
+        "Combined Delta disabled tooltip must name the no-baselines cause; got: {nav}"
+    );
+}
+
+#[then("both per-language Delta tabs are disabled with their per-language no-baseline tooltip")]
+fn then_both_lang_delta_disabled_no_baseline_tooltip(world: &mut MultiLangWorld) {
+    let out = world.stdout();
+    for lang_label in ["Rust", "TypeScript"] {
+        let aria = format!(r#"aria-label="{lang_label} views""#);
+        let nav_start = out
+            .find(&aria)
+            .unwrap_or_else(|| panic!("{lang_label} tabs nav present"));
+        let close_off = out[nav_start..]
+            .find("</nav>")
+            .expect("per-language nav has closing tag");
+        let nav = &out[nav_start..nav_start + close_off];
+        assert!(
+            nav.contains("disabled") && nav.contains(r#"aria-disabled="true""#),
+            "{lang_label} Delta tab must be disabled when {lang_label} has no baseline; got: {nav}"
+        );
+        let expected_tooltip = format!(r#"title="no baseline available for {lang_label}""#);
+        assert!(
+            nav.contains(&expected_tooltip),
+            "{lang_label} Delta disabled tooltip must name the language ({expected_tooltip}); got: {nav}"
+        );
+    }
+}
+
 fn action_yml_path() -> PathBuf {
     // Walk up from CARGO_MANIFEST_DIR (= crates/crap4rs) to the
     // workspace root, then point at the composite action's yml.

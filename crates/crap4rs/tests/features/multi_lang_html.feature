@@ -84,6 +84,16 @@ Feature: Multi-language unified HTML report
     And both per-language panels contain a `<nav class="tabs"` element with Current and Delta tabs
     And no panel renders a disabled Delta tab when its language has a baseline
 
+  # ── View axis: no-baseline path keeps the affordance visible ───────
+
+  @wired
+  Scenario: No-baseline multi-language input renders View nav with disabled Delta tab in every panel
+    Given a crap4rs JSON envelope and a crap4ts JSON envelope from one workspace
+    When crap-render is invoked with both envelopes and --format html
+    Then the HTML output contains exactly three `<nav class="tabs"` elements
+    And the Combined panel Delta tab is disabled with the cross-adapter no-baselines tooltip
+    And both per-language Delta tabs are disabled with their per-language no-baseline tooltip
+
   # ── View axis: mismatched baselines disable the missing-side Delta tab ─
 
   @wired

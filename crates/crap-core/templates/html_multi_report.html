@@ -216,10 +216,12 @@
 
 <!-- ── Combined panel ──────────────────────────────────────────────── -->
 <div class="lang-panel" data-lang="combined" data-active>
-  {%- if has_view_axis %}
-  {# View axis only renders when at least one language supplied a
-     baseline; the no-baseline path matches the v0.7.0 multi-language
-     render byte-for-byte. -#}
+  {# View axis renders unconditionally. When no language supplied a
+     baseline the Delta tab is rendered DISABLED with a tooltip naming
+     the no-baseline cause, mirroring the per-language fallback below.
+     Discoverability comes from the visible affordance: a consumer
+     downloading the rendered HTML in the no-baseline case still sees
+     the Current/Delta vocabulary and learns the feature exists. -#}
   <nav class="tabs" role="tablist" aria-label="Combined views">
     <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
       Current run <span class="tab-count">{{ combined.total_functions }}</span>
@@ -230,10 +232,13 @@
       {%- if cd.summary.new_violations > 0 || cd.summary.regressions > 0 %} <span class="tab-dot" aria-hidden="true"></span>{% endif %}
       <span class="tab-count">{{ cd.summary.regressions + cd.summary.new_violations }} changed</span>
     </button>
+    {%- else %}
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baselines provided — pass --baseline to enable cross-adapter delta">
+      Delta vs baseline <span class="tab-count">—</span>
+    </button>
     {%- endif %}
   </nav>
   <div class="tab-panel" data-tab="current" data-active role="tabpanel">
-  {%- endif %}
   <section class="scope-banner" aria-label="Combined scope">
     <p>
       <strong>{{ combined.total_exceeding }} of {{ combined.total_functions }}</strong>
@@ -338,7 +343,6 @@
   {% else %}
   <div class="empty-state">No functions analyzed across any language.</div>
   {% endif %}
-  {%- if has_view_axis %}
   </div>{# /tab-panel[current] for Combined #}
   {%- if let Some(cd) = combined_delta_panel %}
   <div class="tab-panel" data-tab="delta" role="tabpanel">
@@ -429,18 +433,17 @@
     {%- endif %}
   </div>{# /tab-panel[delta] for Combined #}
   {%- endif %}
-  {%- endif %}
 </div>
 
 <!-- ── Per-language panels ─────────────────────────────────────────── -->
 {% for panel in language_panels %}
 <div class="lang-panel" data-lang="{{ panel.language }}">
-  {%- if has_view_axis %}
-  {# Per-language View axis. Languages with no baseline render the
-     Delta tab DISABLED so the layout stays symmetric across panels
-     (the absent-baseline asymmetry is communicated by the disabled
-     state itself plus the scope-banner note in the Combined Delta
-     view). -#}
+  {# Per-language View axis renders unconditionally. Languages with no
+     baseline render the Delta tab DISABLED with a no-baseline tooltip
+     so the layout stays symmetric across panels and the affordance
+     stays visible (the absent-baseline asymmetry is communicated by
+     the disabled state itself plus the scope-banner note in the
+     Combined Delta view). -#}
   <nav class="tabs" role="tablist" aria-label="{{ panel.display_name }} views">
     <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
       Current run <span class="tab-count">{{ panel.current_tab_count }}</span>
@@ -458,7 +461,6 @@
     {%- endif %}
   </nav>
   <div class="tab-panel" data-tab="current" data-active role="tabpanel">
-  {%- endif %}
   <section class="scope-banner" aria-label="{{ panel.display_name }} scope">
     <p>
       <strong>{{ panel.exceeding_threshold }} of {{ panel.total_functions }}</strong>
@@ -560,7 +562,6 @@
   {% else %}
   <div class="empty-state">No functions analyzed by the {{ panel.display_name }} adapter.</div>
   {% endif %}
-  {%- if has_view_axis %}
   </div>{# /tab-panel[current] for this language #}
   {%- if let Some(dp) = panel.delta_panel %}
   <div class="tab-panel" data-tab="delta" role="tabpanel">
@@ -703,7 +704,6 @@
     </p>
     {% endif %}
   </div>{# /tab-panel[delta] for this language #}
-  {%- endif %}
   {%- endif %}
 </div>
 {% endfor %}

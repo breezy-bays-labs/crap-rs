@@ -1,6 +1,6 @@
 ---
 source: crates/crap-core/src/adapters/reporters/html.rs
-assertion_line: 2397
+assertion_line: 2389
 expression: out
 ---
 <!doctype html>
@@ -1420,6 +1420,15 @@ pre code { background: transparent; padding: 0; }
 
 <!-- ── Combined panel ──────────────────────────────────────────────── -->
 <div class="lang-panel" data-lang="combined" data-active>
+  <nav class="tabs" role="tablist" aria-label="Combined views">
+    <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
+      Current run <span class="tab-count">4</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baselines provided — pass --baseline to enable cross-adapter delta">
+      Delta vs baseline <span class="tab-count">—</span>
+    </button>
+  </nav>
+  <div class="tab-panel" data-tab="current" data-active role="tabpanel">
   <section class="scope-banner" aria-label="Combined scope">
     <p>
       <strong>3 of 4</strong>
@@ -1560,11 +1569,21 @@ pre code { background: transparent; padding: 0; }
     </table>
   </section>
   
+  </div>
 </div>
 
 <!-- ── Per-language panels ─────────────────────────────────────────── -->
 
 <div class="lang-panel" data-lang="rust">
+  <nav class="tabs" role="tablist" aria-label="Rust views">
+    <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
+      Current run <span class="tab-count">3</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baseline available for Rust">
+      Delta vs baseline <span class="tab-count">—</span>
+    </button>
+  </nav>
+  <div class="tab-panel" data-tab="current" data-active role="tabpanel">
   <section class="scope-banner" aria-label="Rust scope">
     <p>
       <strong>2 of 3</strong>
@@ -1724,9 +1743,19 @@ pre code { background: transparent; padding: 0; }
     </div>
   </section>
   
+  </div>
 </div>
 
 <div class="lang-panel" data-lang="typescript">
+  <nav class="tabs" role="tablist" aria-label="TypeScript views">
+    <button class="tab" role="tab" aria-selected="true" data-tab="current" type="button">
+      Current run <span class="tab-count">1</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baseline available for TypeScript">
+      Delta vs baseline <span class="tab-count">—</span>
+    </button>
+  </nav>
+  <div class="tab-panel" data-tab="current" data-active role="tabpanel">
   <section class="scope-banner" aria-label="TypeScript scope">
     <p>
       <strong>1 of 1</strong>
@@ -1820,6 +1849,7 @@ pre code { background: transparent; padding: 0; }
     </div>
   </section>
   
+  </div>
 </div>
 
 

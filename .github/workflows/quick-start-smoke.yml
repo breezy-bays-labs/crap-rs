@@ -369,3 +369,50 @@ jobs:
             done
             echo "$bin --format scorecard-row = valid JSON with all required keys ok"
           done
+
+      # Gate (i) — View axis nav rendered in unified HTML artifact.
+      #
+      # The unified HTML report is the consumer-facing surface for the
+      # Current/Delta View axis. The smoke runs `run-mode: full` (no
+      # baseline produced), which exercises the no-baseline path
+      # consumers hit on first-touch. That path MUST still render the
+      # View nav with the Delta tab disabled — otherwise the feature
+      # is invisible to consumers in the dominant workflow.
+      #
+      # The action surfaces the on-disk path via the
+      # `unified-html-path` output so this assertion runs against the
+      # rendered HTML directly, without re-downloading the uploaded
+      # artifact via an authenticated `gh api .../artifacts` call
+      # (which would require an `actions: read` perm elevation + a
+      # zip round-trip). `unified-html-path` is sourced from the
+      # action's own `render-unified` step output — same trust
+      # boundary as every other `steps.crap.outputs.*` env binding in
+      # this file (per the workflow-injection guidance, untrusted
+      # event payloads stay behind env-var indirection — step outputs
+      # from a sibling step in the same repo don't qualify as
+      # untrusted).
+      - name: Gate (i) — View axis nav rendered in unified HTML
+        env:
+          HTML_PATH: ${{ steps.crap.outputs.unified-html-path }}
+        run: |
+          set -euo pipefail
+          if [ -z "$HTML_PATH" ]; then
+            echo "::error::unified-html-path output is empty — the action did not surface the rendered HTML path"
+            exit 1
+          fi
+          if [ ! -s "$HTML_PATH" ]; then
+            echo "::error::unified-html-path points at a missing or empty file: $HTML_PATH"
+            exit 1
+          fi
+          NAVS=$(grep -c '<nav class="tabs"' "$HTML_PATH" || true)
+          if [ "${NAVS:-0}" -lt 3 ]; then
+            echo "::error::expected at least 3 '<nav class=\"tabs\"' elements in unified HTML (Combined + 2 per-language panels); got ${NAVS:-0}"
+            echo "rendered file: $HTML_PATH ($(wc -c <"$HTML_PATH") bytes)"
+            exit 1
+          fi
+          DISABLED=$(grep -c 'data-tab="delta" type="button" disabled' "$HTML_PATH" || true)
+          if [ "${DISABLED:-0}" -lt 3 ]; then
+            echo "::error::expected at least 3 disabled Delta tabs in unified HTML (no-baseline smoke); got ${DISABLED:-0}"
+            exit 1
+          fi
+          echo "unified HTML carries ${NAVS} View navs and ${DISABLED} disabled Delta tabs ok"

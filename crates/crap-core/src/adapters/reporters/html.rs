@@ -739,9 +739,8 @@ fn render_multi_lang(
     let combined = build_combined_view(multi, threshold);
     let language_panels = build_language_panels(multi, threshold);
     let adapters_footer = build_adapters_footer(multi);
-    let combined_delta = crate::core::compose::compose_combined_delta(&multi.languages);
-    let has_view_axis = combined_delta.is_some();
-    let combined_delta_panel = combined_delta.map(|cd| Box::new(build_combined_delta_panel(cd)));
+    let combined_delta_panel = crate::core::compose::compose_combined_delta(&multi.languages)
+        .map(|cd| Box::new(build_combined_delta_panel(cd)));
 
     let title = if language_count == 0 {
         "CRAP scorecard — multi-language".to_string()
@@ -765,7 +764,6 @@ fn render_multi_lang(
         combined,
         language_panels,
         adapters_footer,
-        has_view_axis,
         combined_delta_panel,
     };
     tmpl.render()
@@ -788,17 +786,13 @@ struct HtmlMultiReport {
     combined: CombinedPanel,
     language_panels: Vec<LangPanel>,
     adapters_footer: Vec<AdapterFooterRow>,
-    /// True when at least one language supplied a baseline, so the
-    /// View axis nav (Current / Delta tabs) should be rendered
-    /// inside each `.lang-panel`. The whole no-baseline path stays
-    /// byte-for-byte equivalent to the v0.7.0 multi-language render
-    /// when this is `false`, mirroring `format_html`'s
-    /// `has_delta`-gated tabs pattern.
-    has_view_axis: bool,
     /// Combined Delta panel: cross-adapter aggregate + ranked
-    /// regressions/new violations. Boxed to keep the dominant
-    /// no-baseline arm cheap; same `large_enum_variant` rationale
-    /// as the single-language `delta_panel`.
+    /// regressions/new violations. `None` when no language supplied a
+    /// baseline; the template still renders the View nav, but the
+    /// Delta tab is rendered disabled with a no-baseline tooltip so
+    /// the affordance stays visible to consumers. Boxed to keep the
+    /// dominant no-baseline arm cheap; same `large_enum_variant`
+    /// rationale as the single-language `delta_panel`.
     combined_delta_panel: Option<Box<CombinedDeltaPanel>>,
 }
 
@@ -2715,6 +2709,124 @@ mod tests {
         assert!(
             out.contains("<strong>TypeScript</strong>") && out.contains("has no baseline yet"),
             "missing-baseline-note must name TypeScript"
+        );
+    }
+
+    /// No-baseline path: when neither language supplies a baseline,
+    /// the View axis nav must still render in every panel (Combined +
+    /// per-language) with the Delta tab in the disabled state. The
+    /// affordance must stay visible so consumers downloading the
+    /// rendered HTML in the dominant no-baseline case learn the
+    /// feature exists rather than being silently denied a tab nav
+    /// they can't see is gated.
+    #[test]
+    fn multi_lang_no_baselines_renders_view_nav_with_disabled_delta_in_every_panel() {
+        let rs_result = make_multi_function_result();
+        let ts_result = make_single_function_result(
+            "parseInvoiceDraft",
+            "apps/web/src/composer.ts",
+            6,
+            55.0,
+            12.0,
+            RiskLevel::Moderate,
+            8.0,
+        );
+        let blocks = vec![
+            build_block(
+                &rs_result,
+                "crap4rs",
+                "Rust",
+                "rust",
+                ComplexityMetric::Cognitive,
+                8.0,
+            ),
+            build_block(
+                &ts_result,
+                "crap4ts",
+                "TypeScript",
+                "typescript",
+                ComplexityMetric::Cyclomatic,
+                8.0,
+            ),
+        ];
+        let multi = crate::core::compose::compose_multi_lang(blocks);
+        let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
+
+        // All three View navs render even though no language supplied
+        // a baseline.
+        assert!(
+            out.contains(r#"<nav class="tabs" role="tablist" aria-label="Combined views">"#),
+            "Combined panel must carry View axis tabs even without baselines"
+        );
+        assert!(
+            out.contains(r#"<nav class="tabs" role="tablist" aria-label="Rust views">"#),
+            "Rust panel must carry View axis tabs even without a baseline"
+        );
+        assert!(
+            out.contains(r#"<nav class="tabs" role="tablist" aria-label="TypeScript views">"#),
+            "TypeScript panel must carry View axis tabs even without a baseline"
+        );
+
+        // Three navs total — one per panel.
+        let nav_count = out.matches(r#"<nav class="tabs""#).count();
+        assert_eq!(
+            nav_count, 3,
+            "expected exactly three View navs (Combined + Rust + TypeScript); got {nav_count}"
+        );
+
+        // The Combined Delta tab is disabled with the cross-adapter
+        // no-baseline tooltip.
+        let combined_nav_start = out
+            .find(r#"aria-label="Combined views""#)
+            .expect("Combined tabs nav present");
+        let next_close = out[combined_nav_start..]
+            .find("</nav>")
+            .expect("Combined nav has closing tag");
+        let combined_nav = &out[combined_nav_start..combined_nav_start + next_close];
+        assert!(
+            combined_nav.contains("disabled") && combined_nav.contains("aria-disabled=\"true\""),
+            "Combined Delta tab must be disabled when no language supplied a baseline; got: {combined_nav}"
+        );
+        assert!(
+            combined_nav.contains(
+                r#"title="no baselines provided — pass --baseline to enable cross-adapter delta""#
+            ),
+            "Combined Delta disabled tooltip must name the no-baselines cause; got: {combined_nav}"
+        );
+
+        // Both per-language Delta tabs are disabled with the per-language tooltip.
+        for lang_label in ["Rust", "TypeScript"] {
+            let nav_start = out
+                .find(&format!(r#"aria-label="{lang_label} views""#))
+                .unwrap_or_else(|| panic!("{lang_label} tabs nav present"));
+            let close_off = out[nav_start..]
+                .find("</nav>")
+                .expect("per-language nav has closing tag");
+            let nav = &out[nav_start..nav_start + close_off];
+            assert!(
+                nav.contains("disabled") && nav.contains("aria-disabled=\"true\""),
+                "{lang_label} Delta tab must be disabled when {lang_label} has no baseline; got: {nav}"
+            );
+            assert!(
+                nav.contains(&format!(
+                    r#"title="no baseline available for {lang_label}""#
+                )),
+                "{lang_label} Delta disabled tooltip must name the language; got: {nav}"
+            );
+        }
+
+        // No Delta tab-panel renders for any language; the Current
+        // panel is always the only `.tab-panel` per `.lang-panel`.
+        // The JS skips clicks on disabled buttons (early return at the
+        // tab handler), so the missing Delta panel never gets
+        // activated. Lock the absence so a regression that emits an
+        // orphan Delta panel without populating it surfaces here.
+        // `<div class="tab-panel" data-tab="delta"` is the panel
+        // marker; the disabled button uses `<button` so the panel
+        // assertion stays orthogonal to the button assertions above.
+        assert!(
+            !out.contains(r#"<div class="tab-panel" data-tab="delta""#),
+            "no-baseline render must not emit a Delta tab-panel for any language"
         );
     }
 

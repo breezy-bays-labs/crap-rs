@@ -372,6 +372,19 @@ outputs:
       TypeScript-only artifact, and no deprecation warning is
       emitted.
     value: ${{ steps.upload-unified.outputs.artifact-url != '' && format('{0}#typescript', steps.upload-unified.outputs.artifact-url) || steps.upload-typescript.outputs.artifact-url }}
+  unified-html-path:
+    description: |
+      Filesystem path on the runner to the rendered unified HTML
+      report when `html-report: true` AND `languages` resolves to
+      multi-language mode. Empty string otherwise.
+
+      Surfaced so callers can grep-assert the rendered consumer-
+      facing artifact in CI (Combined / per-language View nav, tab
+      counts, etc.) without re-downloading the uploaded artifact via
+      an authenticated `gh api artifacts` call. The path lives under
+      the runner's `$RUNNER_TEMP` and is preserved for the rest of
+      the job's steps.
+    value: ${{ steps.render-unified.outputs.unified_path }}
 
 runs:
   using: 'composite'
