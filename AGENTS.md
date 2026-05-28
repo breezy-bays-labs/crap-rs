@@ -572,3 +572,25 @@ The pattern is wired by two jobs in `.github/workflows/release-plz.yml`:
   That step's post-upload verification step would have failed
   loudly first; a warning here without an upload-job failure means
   the post-upload assertion is being silently skipped.
+
+### Coverage staleness guardrail
+
+The forcing function that keeps the committed `crap-examples` coverage
+fixtures in sync with the sample source lives in one place:
+`scripts/coverage-staleness-check.sh`. The `quick-start-smoke.yml`
+smoke job calls it; the script header carries the full rationale
+(drift → stale baseline envelope → silently-wrong consumer Delta tab)
+and the warn-not-fail / null-SHA / unreachable-base hardening.
+
+It **warns, never fails** — by design, so a transient base-ref glitch
+can't wedge the smoke. The logic is guarded on every PR by
+`crates/crap-core/tests/coverage_staleness_check.rs`, which exercises
+every branch (empty/all-zero ref, unreachable ref, no-merge-base ref,
+drift, clean) in a hermetic temp git repo. That regression test proves
+the *logic*;
+the *integration* layer — that GitHub's runtime actually supplies a
+null SHA on an orphan first-push, that a force-push leaves the base
+reachable on a PR, etc. — was validated empirically against live
+Actions runs (the synthetic-push validation). Keep the script as the
+single implementation: never re-inline the bash into the workflow, or
+the regression test stops guarding what CI runs.
