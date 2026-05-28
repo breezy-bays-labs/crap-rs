@@ -189,37 +189,18 @@ jobs:
           fi
 
       # ----------------------------------------------------------------
-      # Coverage staleness forcing function. Warns (does not fail) when
-      # a crap-examples source file changed without a corresponding
-      # fixture regen, naming the regen command. Hardened against:
-      #   1. Null SHA `0000…0` on first-push / orphan history
-      #   2. Shallow checkout missing the base ref
-      #   3. Force-push leaving `before` unreachable
-      # All three exit early with `::notice::` (not error) so the
-      # staleness check is decay-resistant — a temporarily-bad base
-      # ref never breaks the smoke.
+      # Coverage staleness forcing function. Warns (never fails) when a
+      # crap-examples source file changed without a matching fixture
+      # regen, which would otherwise publish a stale baseline envelope.
+      # The implementation — including the null-SHA / shallow-checkout /
+      # unreachable-base hardening and the warn-not-fail rationale —
+      # lives in the script, which is guarded on every PR by
+      # crates/crap-core/tests/coverage_staleness_check.rs.
       # ----------------------------------------------------------------
       - name: Coverage staleness check (warning only)
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          set -euo pipefail
-          if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ]; then
-            echo "::notice::coverage staleness check skipped (no valid base ref)"
-            exit 0
-          fi
-          if ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
-            git fetch --no-tags --depth=1 origin "$BASE_REF" 2>/dev/null || true
-          fi
-          if ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
-            echo "::notice::coverage staleness check skipped (base $BASE_REF unreachable)"
-            exit 0
-          fi
-          SRC_CHANGED=$(git diff --name-only "$BASE_REF"...HEAD | grep -E '^crates/crap-examples/(src|ts)/' || true)
-          COV_CHANGED=$(git diff --name-only "$BASE_REF"...HEAD | grep -E '^crates/crap-examples/(lcov\.info|coverage-final\.json)$' || true)
-          if [ -n "$SRC_CHANGED" ] && [ -z "$COV_CHANGED" ]; then
-            echo "::warning::crap-examples source changed without coverage regen. See crates/crap-examples/README.md § Regenerating the fixtures."
-          fi
+        run: scripts/coverage-staleness-check.sh
 
       # ----------------------------------------------------------------
       # Record wall-clock start BEFORE the action invocation. Gate (a)
