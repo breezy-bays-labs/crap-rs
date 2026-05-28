@@ -1,0 +1,33 @@
+[package]
+name = "crap-examples"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# Pedagogical sample crate. Intentionally NOT published to crates.io —
+# `publish = false` keeps release-plz from proposing version bumps and
+# stops the workspace publish flow from leaking the sample to consumers.
+publish = false
+
+[lib]
+name = "crap_examples"
+path = "src/lib.rs"
+
+[dependencies]
+# Each module isolates one term/scaling pattern of the CRAP formula
+# `c² × (1 - coverage)³ + c`. The dependency surface mirrors what a
+# small real-world Rust crate would carry — serde for structured
+# records, anyhow for error bubbling, toml for config file parsing.
+serde = { workspace = true }
+anyhow = { workspace = true }
+toml = { workspace = true }
+
+[lints.clippy]
+# This crate carries deliberately-over-engineered code so the rendered
+# CRAP scores span every risk band (Low → Critical). Clippy would
+# otherwise flag the same patterns the pedagogy demonstrates — turn
+# the whole group off at the crate boundary so the workspace gate
+# stays sharp on production code while the sample stays expressive.
+all = "allow"

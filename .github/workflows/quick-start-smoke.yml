@@ -98,7 +98,15 @@ jobs:
       # ergonomic signal.
       # ----------------------------------------------------------------
       - name: Generate Rust LCOV (workspace)
-        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
+        # `--exclude crap-examples` keeps the pedagogically-bad coverage
+        # of the polyglot sample crate out of the workspace aggregate.
+        # The sample's coverage (~63% on the worst function by design)
+        # would otherwise tank the overall workspace coverage signal
+        # that IDE extensions, coverage aggregators, and CI dashboards
+        # read from this lcov.info. The sample's own coverage fixture
+        # lives at crates/crap-examples/lcov.info and is consumed
+        # separately by the dogfood-loop action invocation below.
+        run: cargo llvm-cov nextest --workspace --exclude crap-examples --lcov --output-path lcov.info
 
       # ----------------------------------------------------------------
       # Prepare a TS Istanbul fixture under a stable workspace path so

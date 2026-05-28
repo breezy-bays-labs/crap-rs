@@ -1,0 +1,15 @@
+{
+  "name": "@crap-rs/crap-examples-ts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pedagogical TypeScript sample modules for crap4ts. Each module isolates one term of the CRAP formula c² × (1 - coverage)³ + c.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@vitest/coverage-istanbul": "^3.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -190,7 +190,14 @@ jobs:
       - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
         with:
           tool: cargo-llvm-cov@0.6
-      - run: cargo llvm-cov nextest --lcov --output-path lcov.info
+      - name: Generate workspace LCOV (excluding crap-examples)
+        # The crap-examples crate is the pedagogical sample whose
+        # deliberately-poor coverage feeds the release-plz envelope
+        # publication job. Letting it bleed into the workspace
+        # aggregate would tank the overall coverage signal that
+        # consumers and the self-crap-view downstream gate read off
+        # this artifact.
+        run: cargo llvm-cov nextest --workspace --exclude crap-examples --lcov --output-path lcov.info
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lcov

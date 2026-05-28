@@ -5,6 +5,10 @@
 # Coverage
 /coverage/
 lcov.info
+# Exception: the crap-examples pedagogical sample commits its own
+# coverage fixtures verbatim so the release-plz envelope publication
+# job and the dogfood smoke can read a deterministic snapshot.
+!crates/crap-examples/lcov.info
 
 # Mutation testing
 **/mutants.out*/
