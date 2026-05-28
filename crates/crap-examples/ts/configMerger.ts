@@ -37,20 +37,17 @@ export function mergeConfigs(
 
   for (const key of Object.keys(env)) {
     const value = env[key];
-    if (key in merged) {
-      const existing = merged[key];
-      if (isPlainObject(existing) && isPlainObject(value)) {
-        for (const subKey of Object.keys(value)) {
-          if (subKey in existing) {
-            existing[subKey] = value[subKey];
-          } else {
-            existing[subKey] = value[subKey];
-          }
-        }
-      } else {
-        merged[key] = value;
+    const existing = merged[key];
+    if (isPlainObject(existing) && isPlainObject(value)) {
+      // Nested merge — overwrite each sub-key. Uncovered when tests
+      // only exercise top-level merging, which is what keeps this
+      // function at the top of the heatmap.
+      for (const subKey of Object.keys(value)) {
+        existing[subKey] = value[subKey];
       }
     } else {
+      // New top-level key, OR existing key whose value isn't an
+      // object on one or both sides — env overwrites defaults.
       merged[key] = value;
     }
   }

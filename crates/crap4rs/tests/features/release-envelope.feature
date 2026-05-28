@@ -28,7 +28,7 @@ Feature: Wire-envelope publication to release assets
     # tracked: crap-rs#329 — verified mechanically by the release-time `jq -e '.schema_version, .language, .result.summary'` step
     Given the build-envelope job produced `crap4rs-envelope.json`
     When jq queries its top-level keys
-    Then `.schema_version` is `1`
+    Then `.schema_version` is `2`
     And `.language` is `"rust"`
     And `.result.summary` exists
 

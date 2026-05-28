@@ -18,33 +18,28 @@ pub struct Record {
 /// Parse one CSV record. Returns the record plus the number of input
 /// bytes consumed (so the caller can slice into the next record).
 pub fn parse_record(input: &str) -> Result<(Record, usize)> {
-    let bytes = input.as_bytes();
     let mut fields: Vec<String> = Vec::new();
     let mut current = String::new();
     let mut in_quotes = false;
-    let mut i = 0;
+    let mut consumed = 0;
 
-    while i < bytes.len() {
-        let b = bytes[i];
+    for (i, ch) in input.char_indices() {
+        consumed = i + ch.len_utf8();
         if in_quotes {
-            if b == b'"' {
+            if ch == '"' {
                 in_quotes = false;
             } else {
-                current.push(b as char);
+                current.push(ch);
             }
-            i += 1;
-        } else if b == b'"' {
+        } else if ch == '"' {
             in_quotes = true;
-            i += 1;
-        } else if b == b',' {
+        } else if ch == ',' {
             fields.push(std::mem::take(&mut current));
-            i += 1;
-        } else if b == b'\n' {
+        } else if ch == '\n' {
             fields.push(std::mem::take(&mut current));
-            return Ok((Record { fields }, i + 1));
+            return Ok((Record { fields }, consumed));
         } else {
-            current.push(b as char);
-            i += 1;
+            current.push(ch);
         }
     }
 
@@ -52,7 +47,7 @@ pub fn parse_record(input: &str) -> Result<(Record, usize)> {
         return Err(anyhow!("unterminated quoted field"));
     }
     fields.push(current);
-    Ok((Record { fields }, i))
+    Ok((Record { fields }, consumed))
 }
 
 /// Convenience wrapper: parse the whole input as a sequence of
@@ -122,5 +117,12 @@ mod tests {
     fn parse_all_handles_trailing_record_without_newline() {
         let records = parse_all("a,b\nc,d").unwrap();
         assert_eq!(records.len(), 2);
+    }
+
+    #[test]
+    fn multibyte_utf8_round_trips_intact() {
+        let (rec, n) = parse_record("café,naïve,日本語").unwrap();
+        assert_eq!(rec.fields, vec!["café", "naïve", "日本語"]);
+        assert_eq!(n, "café,naïve,日本語".len());
     }
 }

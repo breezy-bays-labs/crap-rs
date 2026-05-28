@@ -1440,12 +1440,13 @@ jobs:
           persist-credentials: false
 
       - name: Install yq
-        # `mikefarah/yq` is the Go binary the rest of the project
-        # uses (NOT the python `yq`). taiki-e/install-action resolves
-        # it via cargo-binstall's lookup, no extra setup.
-        uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
-        with:
-          tool: yq@4
+        # `mikefarah/yq` (Go binary) — the python `yq` does not handle
+        # the `(.jobs.*.steps[] | select ...)` syntax below. Installed
+        # via snap rather than `taiki-e/install-action` because the
+        # latter resolves `yq@4` through cargo-binstall, which can't
+        # find a Cargo package matching that requirement (the Go
+        # binary lives on a non-Rust release channel).
+        run: sudo snap install yq
 
       - name: Assert templated example uses run-mode:full + no baseline
         run: |

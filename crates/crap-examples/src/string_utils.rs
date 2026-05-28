@@ -30,18 +30,18 @@ pub fn slugify(input: &str) -> Result<String, String> {
             }
             last_was_hyphen = false;
         } else if ch.is_whitespace() || ch == '-' || ch == '_' {
+            // Soft separators — collapse runs into a single hyphen.
             if !last_was_hyphen && !out.is_empty() {
                 out.push('-');
                 last_was_hyphen = true;
             }
         } else {
-            // Punctuation / symbol — uncovered when input is
-            // ASCII-alphanumeric only. Treated as a soft separator so
-            // a slug never carries arbitrary punctuation.
-            if !last_was_hyphen && !out.is_empty() {
-                out.push('-');
-                last_was_hyphen = true;
-            }
+            // Punctuation / symbol — dropped outright so slugs never
+            // carry arbitrary glyphs. Distinct from the soft-separator
+            // branch above, which inserts a hyphen instead. Uncovered
+            // when inputs are ASCII-alphanumeric only, which maintains
+            // the pedagogical coverage gap.
+            last_was_hyphen = false;
         }
     }
 

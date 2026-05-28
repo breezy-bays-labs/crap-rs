@@ -30,17 +30,18 @@ export function slugify(input: string): string {
       out += ch.toLowerCase();
       lastWasHyphen = false;
     } else if (/\s|-|_/.test(ch)) {
+      // Soft separators — collapse runs into a single hyphen.
       if (!lastWasHyphen && out.length > 0) {
         out += "-";
         lastWasHyphen = true;
       }
     } else {
-      // Punctuation / symbol — uncovered when input is
-      // ASCII-alphanumeric only.
-      if (!lastWasHyphen && out.length > 0) {
-        out += "-";
-        lastWasHyphen = true;
-      }
+      // Punctuation / symbol — dropped outright so slugs never carry
+      // arbitrary glyphs. Distinct from the soft-separator branch
+      // above, which inserts a hyphen instead. Uncovered when inputs
+      // are ASCII-alphanumeric only, which maintains the pedagogical
+      // coverage gap.
+      lastWasHyphen = false;
     }
   }
 

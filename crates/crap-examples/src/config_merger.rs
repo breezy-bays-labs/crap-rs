@@ -40,19 +40,21 @@ pub fn merge_configs(defaults: &str, env: &str) -> Result<MergedConfig> {
     };
 
     for (key, value) in env_table {
-        if let Some(existing) = merged.get_mut(&key) {
-            if let (Value::Table(left), Value::Table(right)) = (existing, &value) {
+        let nested_handled = match (merged.get_mut(&key), &value) {
+            (Some(Value::Table(left)), Value::Table(right)) => {
+                // Nested merge — overwrite each sub-key. Uncovered when
+                // tests only exercise top-level merging, which is what
+                // keeps this function at the top of the heatmap.
                 for (k, v) in right {
-                    if let Some(sub_existing) = left.get_mut(k) {
-                        *sub_existing = v.clone();
-                    } else {
-                        left.insert(k.clone(), v.clone());
-                    }
+                    left.insert(k.clone(), v.clone());
                 }
-            } else {
-                merged.insert(key, value);
+                true
             }
-        } else {
+            _ => false,
+        };
+        if !nested_handled {
+            // New top-level key, OR existing key whose value isn't a
+            // table on one or both sides — env overwrites defaults.
             merged.insert(key, value);
         }
     }

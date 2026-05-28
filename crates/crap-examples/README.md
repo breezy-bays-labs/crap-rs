@@ -35,10 +35,11 @@ Rust adapter defaults to cognitive). Per-language complexity-count
 differences are expected — what stays constant across adapters is
 the cross-module ranking and the four-band distribution.
 
-The acceptance gate is "the four modules together span every risk
-band on a fresh run." When a contributor edits a module, the smoke
-job's coverage-staleness check warns if the committed fixtures
-weren't regenerated — see the regen recipe below.
+The acceptance gate is "the four modules together span the Low,
+Acceptable, and Moderate risk bands on a fresh run." When a
+contributor edits a module, the smoke job's coverage-staleness
+check warns if the committed fixtures weren't regenerated — see the
+regen recipe below.
 
 ## Worked example: c × cov heatmap
 
@@ -54,23 +55,24 @@ cov ↑
       │  truncate          (c²=121)
       │  (low band)        (acceptable band)
       │
- 80%  │       ·            ·          slugify              ·
+ 75%  │       ·            ·         merge_configs           ·
+      │                              (compound, moderate)
+      │
+ ~70% │       ·            ·          slugify                ·
       │                              (c²×(1-cov)³)
       │                              (moderate band)
       │
- 60%  │       ·            ·                ·       merge_configs
-      │                                              (compound)
-      │                                              (high band)
-      │
   0%  │  (unmapped — every module's headline fn has at least one test)
       └────────────────────────────────────────────────────────────→ c
-         1-2                  8-12              ~20            ~20
+         1-4                  8-12              ~13-16
 ```
 
 Reading the heatmap: the Y-axis collapses coverage gaps,
 contributing the cubic term; the X-axis multiplies the complexity
-squared. A module sitting in the bottom-right corner (high c + low
-cov) is the worst case — exactly what `config_merger` isolates.
+squared. The compound term — high c × low coverage — drives the
+score that puts `merge_configs` and `slugify` near the top of the
+Moderate band; the same compound term, applied to a function with
+both higher c AND lower coverage, would push it into the High band.
 
 ## Regenerating the fixtures
 
@@ -80,7 +82,7 @@ fail) when source-without-regen drift is detected.
 
 ### Rust (`lcov.info`)
 
-```
+```shell
 cargo llvm-cov nextest --package crap-examples \
   --lcov --output-path crates/crap-examples/lcov.info
 sed -i.bak 's|^SF:.*/crates/crap-examples/src/|SF:|' crates/crap-examples/lcov.info
@@ -97,7 +99,7 @@ CI lint rejects any committed `lcov.info` with absolute `SF:` lines
 
 ### TypeScript (`coverage-final.json`)
 
-```
+```shell
 cd crates/crap-examples/ts
 npm install
 npm test -- --coverage
@@ -120,7 +122,7 @@ above. The committed envelope uses file basenames as keys
 After regenerating the fixtures, you can preview the envelope shape
 the release publishes:
 
-```
+```shell
 cargo run --release --package crap4rs -- \
   --src ./crates/crap-examples/src \
   --coverage crates/crap-examples/lcov.info \
