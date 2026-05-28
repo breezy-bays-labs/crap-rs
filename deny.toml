@@ -67,11 +67,12 @@ deny = []
 # This `deny.toml` does NOT encode the per-crate transitive ban
 # via `bans.deny.wrappers`, because:
 #
-# - `crap-core` will legitimately use `serde` derive (and other
-#   proc-macro deps) once code lands in S2; cargo-deny treats
-#   proc-macros as graph nodes, so a naive `{ crate = "syn",
-#   wrappers = ["crap4rs"] }` would false-positive on the
-#   `serde_derive` chain.
+# - `crap-core` legitimately uses proc-macro-chain derives —
+#   `serde` (`serde_derive`), `thiserror` (`thiserror_impl`), and
+#   `askama` (the `Template` derive backing the HTML/markdown
+#   reporters). cargo-deny treats proc-macros as graph nodes, so a
+#   naive `{ crate = "syn", wrappers = ["crap4rs"] }` would
+#   false-positive on the `serde_derive` chain.
 # - Expanding `wrappers` to allow proc-macro chains
 #   (`serde_derive`, `thiserror_impl`, etc.) requires a fragile,
 #   ever-growing list — a new derive macro entering the workspace
@@ -92,9 +93,9 @@ deny = []
 #
 # Operator backstop: `cargo tree -p crap-core --invert syn` should
 # show only proc-macro chains (lines marked `(proc-macro)` like
-# `serde_derive`, `thiserror-impl`). Any non-proc-macro path from
-# `syn` back to `crap-core` is a real AST-library leak the two
-# mechanisms above missed.
+# `serde_derive`, `thiserror-impl`, and askama's `Template`-derive
+# chain). Any non-proc-macro path from `syn` back to `crap-core` is
+# a real AST-library leak the two mechanisms above missed.
 
 [sources]
 unknown-registry = "deny"
