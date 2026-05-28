@@ -431,6 +431,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crap-examples"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "crap4rs"
 version = "0.6.0"
 dependencies = [

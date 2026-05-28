@@ -190,7 +190,14 @@ jobs:
       - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
         with:
           tool: cargo-llvm-cov@0.6
-      - run: cargo llvm-cov nextest --lcov --output-path lcov.info
+      - name: Generate workspace LCOV (excluding crap-examples)
+        # The crap-examples crate is the pedagogical sample whose
+        # deliberately-poor coverage feeds the release-plz envelope
+        # publication job. Letting it bleed into the workspace
+        # aggregate would tank the overall coverage signal that
+        # consumers and the self-crap-view downstream gate read off
+        # this artifact.
+        run: cargo llvm-cov nextest --workspace --exclude crap-examples --lcov --output-path lcov.info
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lcov
@@ -1412,6 +1419,50 @@ jobs:
           persist-credentials: false
       - name: 'Lint `# tracked: crap-rs#<n>` comment coverage of @unwired/@wip scenarios'
         run: python3 scripts/bdd-tracked-lint.py
+
+  templated-example-lint:
+    # Mechanical structural lint for the consumer-facing templated
+    # example at `.github/workflows/examples/crap-scorecard.yml`.
+    # Asserts via `yq` that the action invocation uses `run-mode:
+    # full` AND does NOT include a `baseline:` input — the only
+    # combination the action accepts without "both/delta requires
+    # baseline" errors on first-touch copy-paste. Replaces a
+    # "verified manually by reading the file" gate with a CI-level
+    # assertion that can't drift.
+    name: templated-example-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install yq
+        # `mikefarah/yq` (Go binary) — the python `yq` does not handle
+        # the `(.jobs.*.steps[] | select ...)` syntax below. Installed
+        # via snap rather than `taiki-e/install-action` because the
+        # latter resolves `yq@4` through cargo-binstall, which can't
+        # find a Cargo package matching that requirement (the Go
+        # binary lives on a non-Rust release channel).
+        run: sudo snap install yq
+
+      - name: Assert templated example uses run-mode:full + no baseline
+        run: |
+          set -euo pipefail
+          FILE=.github/workflows/examples/crap-scorecard.yml
+          RUN_MODE=$(yq -r '.jobs.*.steps[] | select(.uses // "" | test("scorecard@<sha>$")) | .with["run-mode"]' "$FILE")
+          if [ "$RUN_MODE" != "full" ]; then
+            echo "::error::templated example must use run-mode: full (got '$RUN_MODE') so consumers can copy-paste without baseline-required errors"
+            exit 1
+          fi
+          HAS_BASELINE=$(yq -r '.jobs.*.steps[] | select(.uses // "" | test("scorecard@<sha>$")) | .with | has("baseline")' "$FILE")
+          if [ "$HAS_BASELINE" = "true" ]; then
+            echo "::error::templated example must NOT include 'baseline:' input — it's the upgrade-only path per Pattern 2b"
+            exit 1
+          fi
+          echo "OK: templated example carries run-mode: full with no baseline (consumer-safe)"
 
   docs:
     name: cargo doc (warnings as errors)

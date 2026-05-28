@@ -48,6 +48,12 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          # `fetch-depth: 0` so the coverage staleness check below
+          # (`git diff --name-only "$BASE_REF"...HEAD`) has access to
+          # the merge-base history. A shallow clone makes the diff
+          # silently return nothing and the staleness signal goes
+          # dead — same class of bug as a missing tool guard.
+          fetch-depth: 0
           persist-credentials: false
 
       # ----------------------------------------------------------------
@@ -98,7 +104,15 @@ jobs:
       # ergonomic signal.
       # ----------------------------------------------------------------
       - name: Generate Rust LCOV (workspace)
-        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
+        # `--exclude crap-examples` keeps the pedagogically-bad coverage
+        # of the polyglot sample crate out of the workspace aggregate.
+        # The sample's coverage (~63% on the worst function by design)
+        # would otherwise tank the overall workspace coverage signal
+        # that IDE extensions, coverage aggregators, and CI dashboards
+        # read from this lcov.info. The sample's own coverage fixture
+        # lives at crates/crap-examples/lcov.info and is consumed
+        # separately by the dogfood-loop action invocation below.
+        run: cargo llvm-cov nextest --workspace --exclude crap-examples --lcov --output-path lcov.info
 
       # ----------------------------------------------------------------
       # Prepare a TS Istanbul fixture under a stable workspace path so
@@ -125,6 +139,89 @@ jobs:
           echo "src=$SRC_ROOT" >> "$GITHUB_OUTPUT"
 
       # ----------------------------------------------------------------
+      # PR π (#314): fetch the latest envelope assets from the most
+      # recent crap-rs release so the action can render an enabled
+      # Delta tab against the analyzer's view of the fixed
+      # crates/crap-examples/ corpus. The two envelopes ride every
+      # release page produced by release-plz; this smoke fetches them
+      # via `gh release download --pattern` which resolves to the most
+      # recent release carrying the pattern.
+      #
+      # First-fire grace: `continue-on-error: true`. On bootstrap
+      # (no envelope-bearing release exists yet) the fetch fails and
+      # the smoke continues in `run-mode: full` against crap-examples
+      # with Delta tab disabled. The fallback-annotation step below
+      # makes that distinguishable from a steady-state regression.
+      #
+      # `--dir` (NOT `--output`) for pattern-mode downloads: `--output`
+      # is single-file and can misbehave when the pattern matches
+      # more than one asset across releases.
+      # ----------------------------------------------------------------
+      - name: Fetch envelope baselines from latest release
+        id: fetch-baseline
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download --pattern 'crap4rs-envelope.json' --dir "$RUNNER_TEMP"
+          gh release download --pattern 'crap4ts-envelope.json' --dir "$RUNNER_TEMP"
+
+      # ----------------------------------------------------------------
+      # Annotate the cause when the envelope fetch failed. Without
+      # this, a steady-state regression (release-plz envelope job
+      # silently broken) looks identical to a normal first-fire
+      # fallback in CI logs — invisible decay vector. Two warning
+      # branches: "no release exists yet" (bootstrap) vs "release
+      # exists but envelopes missing" (regression to investigate).
+      # ----------------------------------------------------------------
+      - name: Annotate fallback cause (CI-visible decay signal)
+        if: steps.fetch-baseline.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          LATEST_TAG=$(gh release view --json tagName --jq '.tagName' 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            echo "::warning::no crap-rs release exists yet; smoke will fall back to run-mode: full (bootstrap-window)"
+          else
+            echo "::warning::release $LATEST_TAG missing envelope assets — investigate release-plz upload-crap-examples-envelopes job. Smoke will fall back to run-mode: full."
+          fi
+
+      # ----------------------------------------------------------------
+      # Coverage staleness forcing function. Warns (does not fail) when
+      # a crap-examples source file changed without a corresponding
+      # fixture regen, naming the regen command. Hardened against:
+      #   1. Null SHA `0000…0` on first-push / orphan history
+      #   2. Shallow checkout missing the base ref
+      #   3. Force-push leaving `before` unreachable
+      # All three exit early with `::notice::` (not error) so the
+      # staleness check is decay-resistant — a temporarily-bad base
+      # ref never breaks the smoke.
+      # ----------------------------------------------------------------
+      - name: Coverage staleness check (warning only)
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ]; then
+            echo "::notice::coverage staleness check skipped (no valid base ref)"
+            exit 0
+          fi
+          if ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$BASE_REF" 2>/dev/null || true
+          fi
+          if ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
+            echo "::notice::coverage staleness check skipped (base $BASE_REF unreachable)"
+            exit 0
+          fi
+          SRC_CHANGED=$(git diff --name-only "$BASE_REF"...HEAD | grep -E '^crates/crap-examples/(src|ts)/' || true)
+          COV_CHANGED=$(git diff --name-only "$BASE_REF"...HEAD | grep -E '^crates/crap-examples/(lcov\.info|coverage-final\.json)$' || true)
+          if [ -n "$SRC_CHANGED" ] && [ -z "$COV_CHANGED" ]; then
+            echo "::warning::crap-examples source changed without coverage regen. See crates/crap-examples/README.md § Regenerating the fixtures."
+          fi
+
+      # ----------------------------------------------------------------
       # Record wall-clock start BEFORE the action invocation. Gate (a)
       # asserts (end - start) <= 900s after the action returns.
       # ----------------------------------------------------------------
@@ -133,38 +230,38 @@ jobs:
         run: echo "epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       # ----------------------------------------------------------------
-      # Invoke the action with the SAME inputs as the templated example
-      # (`.github/workflows/examples/crap-scorecard.yml`), PLUS:
-      #   - `languages: rust,typescript` (instead of `rust`) so the
-      #     multi-language section-headers assertion (gate c) has
-      #     something to check
-      #   - paired `coverage-ts:` + `src-ts:` for the TS side
-      #   - `comment-header: 'crap-scorecard-quickstart-smoke'` to
-      #     avoid sticky collision with `scorecard-smoke-rust`'s
-      #     `crap-scorecard-self`
-      # The templated example uses `languages: rust` because that's
-      # the simplest single-language happy path; this smoke exercises
-      # the multi-language path because it's the strictly-richer
-      # superset (multi-language emits everything single-language does
-      # PLUS the wrapper + per-lang headers + 2 artifacts).
+      # Invoke the action against the polyglot pedagogical sample at
+      # crates/crap-examples/ — the SAME corpus the release envelopes
+      # describe — so the rendered Delta tab compares the PR's analyzer
+      # output against the most recent published envelope. Pointing
+      # src/coverage at adapter source (the pre-π shape) would render
+      # every function as "added" against the crap-examples baseline,
+      # making the Delta tab structurally meaningless.
+      #
+      # `gate-mode: report-only` — crap-examples scores poorly by
+      # design (config_merger ~40 CRAP, slugify ~24); gating on its
+      # threshold would fail the smoke on the intended pedagogy. The
+      # bare-adapter gates (f)/(g)/(h) below still exercise gate
+      # posture against crap-core/src, which is production code.
+      #
+      # `run-mode` flips conditionally on the fetch outcome:
+      #   * success → `both` — analysis + delta; enabled Delta tab
+      #   * failure → `full` — analysis only; disabled Delta tab
+      # The two paths are visually distinguishable in Gate (i) below.
       # ----------------------------------------------------------------
-      - name: Invoke crap-scorecard (multi-language dogfood)
+      - name: Invoke crap-scorecard (multi-language dogfood against crap-examples)
         id: crap
         uses: ./.github/actions/scorecard
         with:
-          coverage:    lcov.info
-          coverage-ts: ${{ steps.ts-fixture.outputs.coverage }}
-          src:    crates/crap4rs/src
-          src-ts: ${{ steps.ts-fixture.outputs.src }}
+          coverage:    crates/crap-examples/lcov.info
+          coverage-ts: crates/crap-examples/coverage-final.json
+          src:    ./crates/crap-examples/src
+          src-ts: ./crates/crap-examples/ts
+          baseline:    ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/crap4rs-envelope.json', runner.temp) || '' }}
+          baseline-ts: ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/crap4ts-envelope.json', runner.temp) || '' }}
+          run-mode:    ${{ steps.fetch-baseline.outcome == 'success' && 'both' || 'full' }}
           threshold-preset: default
-          run-mode: full        # no baseline produced in this smoke
-          # PR delta #295 user-review: enable the analysis gate at
-          # threshold=15 so the project actually enforces what its
-          # templated example advocates. Today the workspace passes at
-          # threshold=15 (zero functions above); when crap-rs#273
-          # cleanup lands, both this gate and the templated example flip
-          # to `threshold-preset: strict` (=8) without further plumbing.
-          gate-mode: gate-on-analysis
+          gate-mode: report-only
           comment-mode: sticky
           comment-header: 'crap-scorecard-quickstart-smoke'
           html-report: true
@@ -373,27 +470,30 @@ jobs:
       # Gate (i) — View axis nav rendered in unified HTML artifact.
       #
       # The unified HTML report is the consumer-facing surface for the
-      # Current/Delta View axis. The smoke runs `run-mode: full` (no
-      # baseline produced), which exercises the no-baseline path
-      # consumers hit on first-touch. That path MUST still render the
-      # View nav with the Delta tab disabled — otherwise the feature
-      # is invisible to consumers in the dominant workflow.
+      # Current/Delta View axis. After PR π (#314) the smoke runs in
+      # one of two modes depending on whether the envelope fetch
+      # succeeded:
+      #
+      #   * fetch success → run-mode: both → ENABLED Delta tabs
+      #     (no `disabled` attribute on the per-panel Delta buttons)
+      #   * fetch failure → run-mode: full → DISABLED Delta tabs
+      #     (bootstrap-window fallback path; ::warning:: emitted)
+      #
+      # Both paths MUST render at least 3 `<nav class="tabs"`
+      # elements (Combined + Rust + TS panels). The assertion below
+      # branches on the fetch outcome so a regression in either path
+      # surfaces here — the disabled-Delta count is checked only on
+      # the fallback path, and the absence of `disabled` (i.e. enabled
+      # state) is checked only on the success path.
       #
       # The action surfaces the on-disk path via the
       # `unified-html-path` output so this assertion runs against the
       # rendered HTML directly, without re-downloading the uploaded
-      # artifact via an authenticated `gh api .../artifacts` call
-      # (which would require an `actions: read` perm elevation + a
-      # zip round-trip). `unified-html-path` is sourced from the
-      # action's own `render-unified` step output — same trust
-      # boundary as every other `steps.crap.outputs.*` env binding in
-      # this file (per the workflow-injection guidance, untrusted
-      # event payloads stay behind env-var indirection — step outputs
-      # from a sibling step in the same repo don't qualify as
-      # untrusted).
+      # artifact via an authenticated `gh api .../artifacts` call.
       - name: Gate (i) — View axis nav rendered in unified HTML
         env:
           HTML_PATH: ${{ steps.crap.outputs.unified-html-path }}
+          FETCH_OUTCOME: ${{ steps.fetch-baseline.outcome }}
         run: |
           set -euo pipefail
           if [ -z "$HTML_PATH" ]; then
@@ -410,9 +510,21 @@ jobs:
             echo "rendered file: $HTML_PATH ($(wc -c <"$HTML_PATH") bytes)"
             exit 1
           fi
-          DISABLED=$(grep -c 'data-tab="delta" type="button" disabled' "$HTML_PATH" || true)
-          if [ "${DISABLED:-0}" -lt 3 ]; then
-            echo "::error::expected at least 3 disabled Delta tabs in unified HTML (no-baseline smoke); got ${DISABLED:-0}"
-            exit 1
+          if [ "$FETCH_OUTCOME" = "success" ]; then
+            # Enabled-Delta path: every Delta tab button MUST NOT carry
+            # the `disabled` attribute. We count both shapes (with and
+            # without `disabled`) and assert the disabled count is 0.
+            DISABLED=$(grep -c 'data-tab="delta" type="button" disabled' "$HTML_PATH" || true)
+            if [ "${DISABLED:-0}" -ne 0 ]; then
+              echo "::error::expected 0 disabled Delta tabs in unified HTML (run-mode: both); got ${DISABLED:-0}"
+              exit 1
+            fi
+            echo "unified HTML carries ${NAVS} View navs with enabled Delta tabs ok"
+          else
+            DISABLED=$(grep -c 'data-tab="delta" type="button" disabled' "$HTML_PATH" || true)
+            if [ "${DISABLED:-0}" -lt 3 ]; then
+              echo "::error::expected at least 3 disabled Delta tabs in unified HTML (run-mode: full fallback); got ${DISABLED:-0}"
+              exit 1
+            fi
+            echo "unified HTML carries ${NAVS} View navs and ${DISABLED} disabled Delta tabs ok (bootstrap fallback)"
           fi
-          echo "unified HTML carries ${NAVS} View navs and ${DISABLED} disabled Delta tabs ok"

@@ -463,6 +463,71 @@ If you need fork-PR coverage, two well-trodden options:
 Most projects pick "no fork-PR sticky comments" until they have a concrete
 need — same-repo coverage is sufficient for internal review.
 
+### Pattern 2b — Cross-release envelope baseline
+
+**WARNING — semantics differ from Pattern 2.** Pattern 2 fetches a
+baseline that describes **your** code's prior state (typically the
+PR's merge base) so the Delta tab shows what your PR changed.
+Pattern 2b fetches a baseline that describes **crap-rs's** view of a
+fixed pedagogical sample, published as a release asset
+(`crap4rs-envelope.json` on every crap-rs release page). The Delta
+tab in Pattern 2b shows what changed in the analyzer's output across
+crap-rs versions — NOT what changed in your code.
+
+If you want main-vs-PR deltas in your own codebase, use Pattern 2.
+
+> [!WARNING]
+> Pattern 2b's baseline describes crap-rs's drift, not your code's.
+> Use Pattern 2 (`Capture baseline` step that runs crap4rs on the
+> PR base) when you want to see what your PR changed. Pattern 2b is
+> useful when (a) you're dogfooding the action against the
+> pedagogical sample at `crates/crap-examples/`, or (b) you want
+> the Delta tab to render in an enabled state on every run without
+> a per-PR baseline-capture step.
+
+```yaml
+# === WARNING — Pattern 2b semantics =================================
+# The baseline below describes crap-rs's analysis of the fixed
+# crates/crap-examples/ corpus, not your codebase. The Delta tab
+# renders cross-release drift in the analyzer, NOT your PR's
+# code-change delta. See README § Pattern 2b for the contrast with
+# Pattern 2 (per-PR baseline).
+# ====================================================================
+- name: Fetch crap-rs envelope baseline
+  id: fetch-baseline
+  continue-on-error: true   # bootstrap-window fallback (see below)
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    gh release download \
+      --repo breezy-bays-labs/crap-rs \
+      --pattern 'crap4rs-envelope.json' \
+      --dir "$RUNNER_TEMP"
+
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
+  with:
+    coverage: lcov.info
+    src: ./crates/crap-examples/src
+    baseline: ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/crap4rs-envelope.json', runner.temp) || '' }}
+    run-mode: ${{ steps.fetch-baseline.outcome == 'success' && 'both' || 'full' }}
+    gate-mode: report-only   # the sample scores poorly by design
+    comment-mode: sticky
+    html-report: true
+```
+
+**Bootstrap-window fallback.** `continue-on-error: true` on the
+fetch step + conditional `run-mode` keeps the smoke green when no
+envelope-bearing release exists yet (the first time a consumer
+wires this pattern, or after a release-plz outage). Add a
+`::warning::` annotation in the fetch-failure branch so a
+steady-state regression (publication silently broken) is
+distinguishable from a normal first-fire fallback in CI logs.
+
+**Multi-language variant.** Add `coverage-ts:`, `src-ts:`, and a
+second `gh release download` for `crap4ts-envelope.json` paired with
+`baseline-ts:`. Both envelopes attach to every crap-rs release page
+in one atomic upload, so they're always in sync.
+
 ### Pattern 3 — Aggregator (one row of a richer metrics comment)
 
 When a PR-metrics aggregator composes coverage + CRAP + mutation +

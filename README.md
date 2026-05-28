@@ -40,6 +40,30 @@ Every score lands in one of four risk levels:
 
 These boundaries also anchor the threshold presets: `--strict` fires at the Low → Acceptable boundary, the default fires at Acceptable → Moderate, and `--lenient` fires at Moderate → High — so every preset corresponds to "gate at the next risk tier up." See [Threshold (the gate)](#threshold-the-gate) for how the gate works and how the two views relate.
 
+## Try it locally
+
+Want a hands-on tour without setting up a real project? The repo ships a polyglot pedagogical sample at `crates/crap-examples/` carrying four Rust + four TypeScript modules picked to span every risk band on a single analysis. Each module isolates one term of the CRAP formula `c² × (1 − coverage)³ + c` — see `crates/crap-examples/README.md` for the worked-example heatmap.
+
+```bash
+# Install (pick one):
+cargo install crap4rs                  # Rust analyzer — published to crates.io
+npm install -g crap4ts                 # TypeScript analyzer — published to npm
+
+# Clone + analyze the sample
+git clone https://github.com/breezy-bays-labs/crap-rs.git
+cd crap-rs
+crap4rs --src ./crates/crap-examples/src --coverage crates/crap-examples/lcov.info
+# Expected: 4 risk bands hit (Low, Acceptable, Moderate, High);
+# worst function is config_merger::merge_configs in the High band.
+
+# Same shape for TypeScript:
+crap4ts --src ./crates/crap-examples/ts --coverage crates/crap-examples/coverage-final.json --exclude '*.test.ts'
+```
+
+The committed coverage fixtures use paths relative to each adapter's `--src` root. If you regen them yourself, follow `crates/crap-examples/README.md` § Regenerating the fixtures — the regen recipe normalizes paths so the analyzer's coverage matcher joins them cleanly.
+
+The same envelope shape ships as a release asset on every crap-rs release page (`crap4rs-envelope.json` + `crap4ts-envelope.json`); the composite `crap-scorecard` action's [Pattern 2b](.github/actions/scorecard/README.md#pattern-2b--cross-release-envelope-baseline) recipe fetches them as a `--baseline` so the Delta tab renders enabled against the analyzer's cross-release drift.
+
 ## crap4rs — the Rust analyzer
 
 Everything from here down documents the `crap4rs` Rust CLI. For TypeScript / JavaScript projects, see the [crap4ts package README](packages/crap4ts/README.md).
