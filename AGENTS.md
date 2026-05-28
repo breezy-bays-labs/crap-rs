@@ -585,8 +585,9 @@ and the warn-not-fail / null-SHA / unreachable-base hardening.
 It **warns, never fails** — by design, so a transient base-ref glitch
 can't wedge the smoke. The logic is guarded on every PR by
 `crates/crap-core/tests/coverage_staleness_check.rs`, which exercises
-all four branches (empty/all-zero ref, unreachable ref, drift, clean)
-in a hermetic temp git repo. That regression test proves the *logic*;
+every branch (empty/all-zero ref, unreachable ref, no-merge-base ref,
+drift, clean) in a hermetic temp git repo. That regression test proves
+the *logic*;
 the *integration* layer — that GitHub's runtime actually supplies a
 null SHA on an orphan first-push, that a force-push leaves the base
 reachable on a PR, etc. — was validated empirically against live

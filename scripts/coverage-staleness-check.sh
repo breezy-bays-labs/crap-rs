@@ -36,6 +36,8 @@
 # BRANCHES (each emits a GitHub Actions workflow command)
 #   * empty / all-zero SHA  -> ::notice:: skipped (no valid base ref)
 #   * base unreachable      -> ::notice:: skipped (base <ref> unreachable)
+#   * base has no merge base -> ::notice:: skipped (no merge base ...)
+#       (orphaned by a force-push, present but rootless)
 #   * sample src changed,
 #       fixture not regen'd  -> ::warning:: drift signal
 #   * otherwise             -> silent (exit 0)
@@ -61,8 +63,18 @@ if ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
   exit 0
 fi
 
-SRC_CHANGED=$(git diff --name-only "$BASE_REF"...HEAD | grep -E '^crates/crap-examples/(src|ts)/' || true)
-COV_CHANGED=$(git diff --name-only "$BASE_REF"...HEAD | grep -E '^crates/crap-examples/(lcov\.info|coverage-final\.json)$' || true)
+# The three-dot diff needs a merge base. A force-push that orphaned the
+# base can leave it present-but-rootless in the checkout — `cat-file -e`
+# above then succeeds (so the unreachable guard does not fire), yet the
+# diff fails with `fatal: no merge base`. Capture the diff once and
+# guard its failure explicitly: a bare `|| true` would swallow that
+# fatal into a silent no-op and drop a real drift signal.
+if ! CHANGED=$(git diff --name-only "$BASE_REF"...HEAD 2>/dev/null); then
+  echo "::notice::coverage staleness check skipped (no merge base with $BASE_REF)"
+  exit 0
+fi
+SRC_CHANGED=$(printf '%s\n' "$CHANGED" | grep -E '^crates/crap-examples/(src|ts)/' || true)
+COV_CHANGED=$(printf '%s\n' "$CHANGED" | grep -E '^crates/crap-examples/(lcov\.info|coverage-final\.json)$' || true)
 if [ -n "$SRC_CHANGED" ] && [ -z "$COV_CHANGED" ]; then
   echo "::warning::crap-examples source changed without coverage regen. See crates/crap-examples/README.md § Regenerating the fixtures."
 fi

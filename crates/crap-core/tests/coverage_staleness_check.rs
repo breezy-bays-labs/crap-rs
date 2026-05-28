@@ -185,6 +185,38 @@ fn source_and_fixture_both_changed_is_silent() {
 }
 
 #[test]
+fn disconnected_history_base_emits_notice_not_silent() {
+    // A force-push that orphans the prior tip can leave `before`
+    // present-but-rootless in the runner's checkout: `git cat-file -e`
+    // succeeds (so the unreachable guard does NOT fire), but the
+    // three-dot `git diff base...HEAD` then fails with `fatal: no merge
+    // base`. The script must surface that as a `::notice::` skip — NOT
+    // swallow it into a silent no-op (which would drop a real drift
+    // signal). Surfaced empirically by the crap-rs#330 force-push drill.
+    let (tmp, _base) = init_repo_with_base();
+    let path = tmp.path();
+    // Build a commit with NO common ancestor with HEAD.
+    git(path, &["checkout", "-q", "--orphan", "disconnected"]);
+    std::fs::write(path.join("orphan-marker.txt"), "rootless\n").unwrap();
+    git(path, &["add", "orphan-marker.txt"]);
+    git(path, &["commit", "-q", "-m", "orphan root"]);
+    let out = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(path)
+        .output()
+        .expect("git rev-parse runs");
+    let orphan_sha = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    git(path, &["checkout", "-q", "main"]);
+
+    let stdout = run_check(path, &orphan_sha);
+    assert!(
+        stdout.contains("::notice::") && stdout.contains("merge base"),
+        "expected a no-merge-base notice (not a silent swallow) for a \
+         disconnected base, got:\n{stdout}"
+    );
+}
+
+#[test]
 fn non_sample_change_is_silent() {
     let (tmp, base) = init_repo_with_base();
     commit_file(
