@@ -42,16 +42,90 @@ impl LcovParser {
         Self { root_path }
     }
 
+    /// Reduce an `SF:` path to the source-root-relative key the walker
+    /// uses to identify functions (`FunctionIdentity::file_path`).
+    ///
+    /// Three shapes reach this function, all of which must collapse to
+    /// the same key the syn walker emits via `strip_prefix(options.src)`:
+    ///
+    /// 1. **Absolute, same-machine** (`SF:/ws/crates/foo/src/bar.rs`) —
+    ///    the dominant `cargo llvm-cov` shape when `--src` is canonical.
+    ///    The lexical `strip_prefix(root)` resolves it directly.
+    /// 2. **Already src-relative** (`SF:bar.rs`) — strip is a no-op and
+    ///    the lexical result already names the file under the root.
+    /// 3. **Workspace-relative** (`SF:crates/foo/src/bar.rs`) — the
+    ///    natural shape `cargo llvm-cov` emits when run from the
+    ///    workspace root. The orchestrator hands this parser the
+    ///    *canonical absolute* root, which a relative path cannot
+    ///    lexically strip, so the lexical result keeps the full
+    ///    workspace-relative path. The walker keys by the src-relative
+    ///    basename, so the two never matched and coverage silently
+    ///    dropped to 0 (crap-rs#331). A filesystem-validated
+    ///    longest-suffix match rescues this case.
+    ///
+    /// The suffix match does bounded `.is_file()` I/O — this parser is
+    /// no longer pure strip-prefix; it now converges with crap4ts's
+    /// `IstanbulCoverage::normalize_path`, which made the same trade for
+    /// cross-form portability (#215/#216).
     fn normalize_path(&self, path: &str) -> String {
         let fwd = path.replace('\\', "/");
         let root_fwd = self.root_path.to_string_lossy().replace('\\', "/");
         let p = Path::new(&fwd);
         let root = Path::new(&root_fwd);
-        p.strip_prefix(root)
-            .unwrap_or(p)
-            .to_string_lossy()
-            .into_owned()
+        let lexical = p.strip_prefix(root).unwrap_or(p);
+
+        // Fast path: the lexical strip already names a real file under
+        // the source root (shapes 1 and 2 above). Keep it verbatim — no
+        // suffix scan needed.
+        if root.join(lexical).is_file() {
+            return lexical.to_string_lossy().replace('\\', "/");
+        }
+
+        // Rescue path (#331): a workspace-relative `SF:` line couldn't
+        // strip the canonical absolute root. Recover the walker's key
+        // as the longest path suffix that resolves to a real file.
+        if let Some(suffix) = suffix_match_under(root, p) {
+            return suffix;
+        }
+
+        // Cross-machine fixtures and the parser's fake-path unit tests
+        // have no on-disk file to anchor against; preserve the
+        // historical lexical output so those keys (and their
+        // diagnostics) stay byte-identical.
+        lexical.to_string_lossy().replace('\\', "/")
     }
+}
+
+/// Find the longest suffix of `path` whose components, joined under
+/// `root`, resolve to a real file. Returns the root-relative,
+/// forward-slash-normalised suffix, or `None` if no suffix is reachable.
+///
+/// Iterates longest → shortest so a leaf filename that exists in
+/// multiple directories is disambiguated by the longest shared path —
+/// the structural truth, not the machine-specific prefix. Mirrors
+/// `crap4ts`'s `IstanbulCoverage::suffix_match_under` (#215).
+///
+/// `.is_file()` (one syscall, not `.exists()`) avoids a directory
+/// false-positive. Any suffix containing a `..` component is skipped
+/// before the syscall: `SF:` records are user-supplied, so a `..` that
+/// lexically passes `starts_with(root)` would resolve a real file
+/// *outside* `root` (mirrors crap4ts's #216 traversal guard).
+fn suffix_match_under(root: &Path, path: &Path) -> Option<String> {
+    let components: Vec<_> = path.components().collect();
+    for start in 0..components.len() {
+        let candidate_rel: PathBuf = components[start..].iter().collect();
+        if candidate_rel
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+        {
+            continue;
+        }
+        let candidate_abs = root.join(&candidate_rel);
+        if candidate_abs.starts_with(root) && candidate_abs.is_file() {
+            return Some(candidate_rel.to_string_lossy().replace('\\', "/"));
+        }
+    }
+    None
 }
 
 impl LcovParser {
