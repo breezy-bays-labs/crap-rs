@@ -621,6 +621,169 @@ jobs:
           echo "uploading to $TAG"
           gh release upload "$TAG" --clobber artifacts/crap-render-*.tar.gz
 
+  # PR π (#314): each crap-rs release page in a release-plz tag run
+  # carries TWO new JSON envelope assets — `crap4rs-envelope.json`
+  # and `crap4ts-envelope.json` — describing each adapter's analysis
+  # of the fixed `crates/crap-examples/` corpus. The dogfood smoke
+  # in this repo (and any consumer who wires Pattern 2b in the
+  # action README) fetches the latest envelope via
+  # `gh release download` and passes it as `--baseline` to render an
+  # enabled Delta tab against the analyzer's own cross-release drift.
+  #
+  # The envelopes are platform-agnostic JSON, so this build job uses
+  # a single ubuntu-latest runner (NOT a 3-target matrix like the
+  # binary builds above). Matrix would be 3× cost for byte-identical
+  # output.
+  #
+  # This job fires on ANY release-plz tag event — single-crate
+  # (crap-core / crap4rs / crap4ts only) or multi-crate — because
+  # every release page in a tag run carries both envelopes. The
+  # `releases_created` gate keeps it quiescent on push events that
+  # didn't actually mint a release.
+  build-crap-examples-envelopes:
+    name: Build crap-examples envelopes
+    needs: release-plz-release
+    if: needs.release-plz-release.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # `persist-credentials: false` — this job never pushes; not
+      # persisting the checkout token keeps it out of the runner env.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # `enable-cache: false` — release-relevant workflow; a poisoned
+      # cache from a malicious push would otherwise become part of
+      # the published envelope. Closes the `cache-poisoning` zizmor
+      # audit. See https://docs.zizmor.sh/audits/#cache-poisoning.
+      - uses: ./.github/actions/setup-rust
+        with:
+          enable-cache: "false"
+
+      - run: cargo build --release --bin crap4rs --bin crap4ts
+
+      - name: Lint committed coverage fixtures for absolute paths
+        # Absolute SF: paths in committed lcov.info (or absolute path
+        # keys in coverage-final.json) diverge between contributors
+        # and CI runners, silently producing envelopes with empty
+        # coverage maps. Fail loudly here rather than ship a
+        # malformed envelope to a release page.
+        run: |
+          set -euo pipefail
+          if grep -E '^SF:/' crates/crap-examples/lcov.info; then
+            echo "::error::lcov.info contains absolute SF: paths — regen with the sed normalization step in crap-examples/README.md"
+            exit 1
+          fi
+          if jq -e 'to_entries | map(select(.key | startswith("/"))) | length > 0' crates/crap-examples/coverage-final.json >/dev/null; then
+            echo "::error::coverage-final.json contains absolute path keys — regen with the jq normalization step in crap-examples/README.md"
+            exit 1
+          fi
+          echo "OK: both fixtures use --src-relative paths"
+
+      - name: Generate crap4rs envelope (Rust modules)
+        # Leading `./` on --src — the adapter's coverage-key matcher
+        # joins SF: paths onto `--src` before lookup, and bare-relative
+        # `--src` produces 0% coverage for workspace-relative SF: paths
+        # in the committed fixture. Tracked: crap-rs#331.
+        run: |
+          set -euo pipefail
+          ./target/release/crap4rs \
+            --src ./crates/crap-examples/src \
+            --coverage crates/crap-examples/lcov.info \
+            --format json --no-fail \
+            > crap4rs-envelope.json
+          # Empty-file guard: a silent adapter failure could write
+          # an empty (or non-JSON) file; jq's raw parse-error would
+          # otherwise obscure the cause. Actionable CI errors over
+          # cryptic parse failures.
+          [ -s crap4rs-envelope.json ] || { echo "::error::crap4rs-envelope.json is empty — adapter produced no output"; exit 1; }
+          jq -e '.schema_version == 2 and .language == "rust" and (.result.summary.total_functions // 0) > 0' crap4rs-envelope.json
+
+      - name: Generate crap4ts envelope (TypeScript modules)
+        # --exclude '*.test.ts' so the pedagogy doesn't include the
+        # test files that share the ts/ directory. Leading `./` on
+        # --src for the same reason as the Rust step above.
+        run: |
+          set -euo pipefail
+          ./target/release/crap4ts \
+            --src ./crates/crap-examples/ts \
+            --coverage crates/crap-examples/coverage-final.json \
+            --format json --no-fail \
+            --exclude '*.test.ts' \
+            > crap4ts-envelope.json
+          [ -s crap4ts-envelope.json ] || { echo "::error::crap4ts-envelope.json is empty — adapter produced no output"; exit 1; }
+          jq -e '.schema_version == 2 and .language == "typescript" and (.result.summary.total_functions // 0) > 0' crap4ts-envelope.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: crap-examples-envelopes
+          path: |
+            crap4rs-envelope.json
+            crap4ts-envelope.json
+
+  # Single multi-asset upload job: `gh release upload "$TAG" file1
+  # file2 --clobber` is atomic per release page in one API call.
+  # Replaces a parallel 2-job shape (one job per envelope) that
+  # carried upload-side asymmetry risk — one job succeeds, the other
+  # fails mid-loop, partial state lands on the release page. The
+  # shared `needs:` with build-crap-examples-envelopes preserves
+  # build-side atomicity. A post-upload verification step below
+  # closes the manual-check gap with a `gh release view --json
+  # assets | jq -e contains([...])` assertion.
+  upload-crap-examples-envelopes:
+    name: Upload crap-examples envelopes to every release page
+    needs: [release-plz-release, build-crap-examples-envelopes]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: crap-examples-envelopes
+          path: artifacts
+
+      - name: Upload both envelopes to every release tag (atomic per tag)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES_JSON: ${{ needs.release-plz-release.outputs.releases }}
+        run: |
+          set -euo pipefail
+          # `gh release upload` accepts multiple files in one call →
+          # atomic per release page (either both land or neither).
+          for TAG in $(echo "$RELEASES_JSON" | jq -r '.[].tag'); do
+            echo "uploading both envelopes to $TAG"
+            gh release upload "$TAG" --clobber \
+              artifacts/crap4rs-envelope.json \
+              artifacts/crap4ts-envelope.json
+          done
+
+      - name: Verify both envelopes landed on every release tag
+        # Replaces the prior "verified manually post-merge via gh
+        # release view" gate with an in-job assertion. Fails the
+        # release if either envelope is missing from any release
+        # tag — visible in the Actions tab without a separate audit.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES_JSON: ${{ needs.release-plz-release.outputs.releases }}
+        run: |
+          set -euo pipefail
+          for TAG in $(echo "$RELEASES_JSON" | jq -r '.[].tag'); do
+            ASSETS=$(gh release view "$TAG" --json assets --jq '.assets | map(.name)')
+            for FILE in crap4rs-envelope.json crap4ts-envelope.json; do
+              if ! echo "$ASSETS" | jq -e --arg f "$FILE" 'contains([$f])' >/dev/null; then
+                echo "::error::asset $FILE missing from release tag $TAG (assets present: $ASSETS)"
+                exit 1
+              fi
+            done
+            echo "OK: $TAG carries both envelopes"
+          done
+
   sync-crap4ts-package-json:
     # Auto-sync packages/crap4ts/package.json from crates/crap4ts/Cargo.toml
     # on every release-plz-opened PR. The publish-crap4ts-npm job's
