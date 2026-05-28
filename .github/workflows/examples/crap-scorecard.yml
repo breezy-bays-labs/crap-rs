@@ -59,8 +59,43 @@ jobs:
         with:
           coverage: lcov.info
           threshold-preset: default       # 15 (cognitive); flip to `strict` (=8) when ready
-          run-mode: both                  # both = analysis-only + delta vs `baseline:` envelope
+          # `run-mode: full` is the consumer-safe shape — analysis
+          # only, no baseline expected. The action errors on
+          # `run-mode: both` (or `delta`) without a `baseline:` set,
+          # so this is the only run-mode that copy-pastes cleanly on
+          # first-touch. Upgrade to baseline mode by uncommenting the
+          # snippet below and pointing `baseline:` at a fetched
+          # envelope; see action README § "Pattern 2b — Cross-release
+          # envelope baseline" for the recipe.
+          run-mode: full
           gate-mode: gate-on-analysis     # fail the job on functions above threshold; swap to `report-only` to soft-launch
           comment-mode: sticky
           html-report: true
           languages: rust   # or `rust,typescript` (also add `coverage-ts:` + `src-ts:`)
+
+      # ── Optional: upgrade to baseline mode (Pattern 2b) ─────────
+      #
+      # Uncomment the steps below to fetch the latest crap-rs
+      # envelope as a `--baseline` and render an enabled Delta tab
+      # against the analyzer's cross-release drift on the polyglot
+      # crates/crap-examples/ sample. Pair with `run-mode: both` and
+      # `baseline:` above (delete the `run-mode: full` line first).
+      #
+      # See `.github/actions/scorecard/README.md` § Pattern 2b for
+      # the consumer-side caveats (fork-PR token, bootstrap-window
+      # fallback, staleness annotation).
+      #
+      # - name: Fetch envelope baseline
+      #   id: fetch-baseline
+      #   continue-on-error: true   # bootstrap-window fallback
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     gh release download \
+      #       --repo breezy-bays-labs/crap-rs \
+      #       --pattern 'crap4rs-envelope.json' \
+      #       --dir "$RUNNER_TEMP"
+      #
+      # Then in the action invocation above:
+      #   run-mode: ${{ steps.fetch-baseline.outcome == 'success' && 'both' || 'full' }}
+      #   baseline: ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/crap4rs-envelope.json', runner.temp) || '' }}
