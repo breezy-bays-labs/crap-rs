@@ -77,7 +77,19 @@ impl LcovParser {
         // Fast path: the lexical strip already names a real file under
         // the source root (shapes 1 and 2 above). Keep it verbatim — no
         // suffix scan needed.
-        if root.join(lexical).is_file() {
+        //
+        // Traversal guard (mirrors crap4ts #216, ported into the
+        // suffix-match below too): `strip_prefix` is lexical, so a
+        // user-supplied `SF:/root/../outside/secret.rs` strips to
+        // `../outside/secret.rs` and `root.join(..).is_file()` would
+        // resolve — and thus probe the existence of — a file *outside*
+        // the source root. Reject any `..` here so a `..`-bearing path
+        // falls through to the suffix match, which skips `..` suffixes
+        // and re-anchors the clean tail under the root.
+        let lexical_has_parentdir = lexical
+            .components()
+            .any(|c| c == std::path::Component::ParentDir);
+        if !lexical_has_parentdir && root.join(lexical).is_file() {
             return lexical.to_string_lossy().replace('\\', "/");
         }
 
@@ -572,6 +584,41 @@ mod tests {
     fn path_boundary_not_confused_by_prefix_substring() {
         let output = parse("SF:/project-old/src/main.rs\nDA:1,1\nend_of_record\n");
         assert!(output.coverage.contains_key("/project-old/src/main.rs"));
+    }
+
+    #[test]
+    fn parentdir_sf_path_does_not_take_fast_path_is_file_probe() {
+        // crap-rs#333 / mirrors crap4ts #216. `SF:` records are
+        // user-supplied; a `..` makes the lexical `strip_prefix` succeed
+        // with a `..`-bearing relative result that `root.join(..).is_file()`
+        // resolves OUTSIDE the root — a traversal-escape existence oracle
+        // on the fast path. The fast path must reject `..` and fall
+        // through to the guarded suffix match, which re-anchors the clean
+        // tail under the root. Needs real on-disk files so the `is_file()`
+        // behaviour is actually exercised.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let root = tmp.path().canonicalize().expect("canonicalize tempdir");
+        std::fs::write(root.join("secret.rs"), "fn x() {}").expect("write secret.rs");
+        let leaf = root.file_name().unwrap().to_string_lossy().into_owned();
+        let parser = LcovParser::new(root.clone());
+
+        // `<root>/../<leaf>/secret.rs` lexically strips to
+        // `../<leaf>/secret.rs`; the pre-#333 fast path resolved that and
+        // returned the unusable `..` key.
+        let sf = format!("{}/../{leaf}/secret.rs", root.display());
+        let output = parser.parse_str(&format!("SF:{sf}\nDA:1,1\nend_of_record\n"));
+
+        assert!(
+            output.coverage.keys().all(|k| !k.contains("..")),
+            "no coverage key may contain `..`: {:?}",
+            output.coverage.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            output.coverage.contains_key("secret.rs"),
+            "the `..` path must re-anchor to the in-tree `secret.rs` via the \
+             guarded suffix match; keys = {:?}",
+            output.coverage.keys().collect::<Vec<_>>()
+        );
     }
 
     #[test]
