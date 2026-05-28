@@ -477,3 +477,98 @@ fn name that an existing token already covers as a substring (cheap),
 or add a new token to `.cargo/mutants.toml` in the same PR (also
 cheap, just remember). The lint's failure message walks the
 contributor through the fix.
+
+## Release envelope publication
+
+Every release-plz tag run publishes two JSON envelope assets to
+every release page in the run — `crap4rs-envelope.json` and
+`crap4ts-envelope.json`. Each envelope describes its adapter's
+analysis of the fixed polyglot sample at `crates/crap-examples/`,
+so the same corpus is described across releases and consumers can
+diff envelope-vs-envelope to see how the analyzer's output drifts
+across crap-rs versions. The dogfood smoke
+(`.github/workflows/quick-start-smoke.yml`) and any consumer who
+wires the action's Pattern 2b recipe fetch the latest envelope via
+`gh release download` and pass it as `--baseline` to render an
+enabled Delta tab.
+
+The pattern is wired by two jobs in `.github/workflows/release-plz.yml`:
+
+| Job | Purpose | Cardinality |
+|-----|---------|-------------|
+| `build-crap-examples-envelopes` | Build adapter bins, lint committed fixtures for absolute paths, run each adapter against `crates/crap-examples/` to produce both envelopes | single ubuntu-latest runner (envelopes are platform-agnostic JSON) |
+| `upload-crap-examples-envelopes` | Iterate `jq -r '.[].tag'` over the release-plz `releases` output; upload BOTH envelopes per tag in one `gh release upload "$TAG" file1 file2 --clobber` call; then re-read each tag's assets and assert both envelopes landed | single ubuntu-latest runner; one atomic multi-asset upload per tag |
+
+### Rules
+
+1. **Collapsed-mirror pattern (one runner, not a matrix).** The
+   envelopes are platform-agnostic JSON — a 3-target matrix would be
+   3× cost for byte-identical output. The binary builds above stay
+   matrix-driven because their tarballs ARE per-platform; envelopes
+   don't have that property.
+
+2. **Every release page carries both envelopes.** The upload job
+   iterates `jq -r '.[].tag'` (not `select(.package_name=="X")`) so
+   every release page in a multi-package tag run gets both envelopes
+   — `crap-core-v*`, `crap4rs-v*`, `crap4ts-v*` tags are symmetric
+   from the consumer's point of view. A `--repo
+   breezy-bays-labs/crap-rs --pattern 'crap4rs-envelope.json'` fetch
+   resolves to the most recent release of any flavor.
+
+3. **Atomic publication per release page.** `gh release upload
+   "$TAG" file1 file2 --clobber` is one API call — either both
+   envelopes land on the release page or neither does. The earlier
+   shape (parallel one-job-per-envelope) carried upload-side
+   asymmetry risk; the single multi-asset upload closes it.
+
+4. **Post-upload verification.** A `gh release view "$TAG" --json
+   assets` step re-reads each release page's assets and asserts both
+   envelopes are present via `jq -e contains([...])`. Replaces the
+   "verified manually post-merge by reading the release page" gate
+   with an in-job assertion.
+
+5. **First-fire grace via `continue-on-error: true`.** The dogfood
+   smoke's envelope-fetch step continues on failure (no
+   envelope-bearing release exists yet during the bootstrap window).
+   The fallback path emits a `::warning::` naming the cause so a
+   steady-state regression is visually distinguishable from a normal
+   first-fire fallback.
+
+6. **Empty-file guard before every `jq` parse.** Every
+   `<adapter> ... > envelope.json && jq -e ...` shape in the
+   release-plz envelope-build steps carries an explicit
+   `[ -s envelope.json ] || { echo "::error::..."; exit 1; }` guard
+   between the adapter and the jq parse. Without it, a silent
+   adapter failure (empty file) surfaces as `jq: parse error:
+   Invalid numeric literal` — opaque. With it, the CI message names
+   the cause.
+
+7. **`gh release download --dir` over `--output` for pattern-mode.**
+   `--output` is single-file; pattern-mode downloads should use
+   `--dir` so multi-asset matches across releases don't collide on
+   the output filename.
+
+8. **CI lint blocks absolute paths in committed fixtures.** The
+   `build-crap-examples-envelopes` job lints
+   `crates/crap-examples/lcov.info` for `^SF:/` lines and
+   `crates/crap-examples/coverage-final.json` for absolute path keys.
+   Absolute paths in committed fixtures diverge between contributors
+   and CI runners and silently produce envelopes with empty
+   coverage maps — fail loudly here rather than ship a malformed
+   envelope.
+
+### When the rules bite
+
+- Adding a new analyzer or envelope shape → mirror the existing
+  build + upload pattern. Don't add a new matrix without confirming
+  the output is platform-dependent first (envelopes aren't).
+- Editing `crates/crap-examples/` source → regen fixtures
+  per `crates/crap-examples/README.md`. The smoke job's staleness
+  check warns (does not fail) on drift, but a CI-visible warning
+  beats a forgotten regen.
+- Triaging a smoke failure that says "::warning::release XYZ
+  missing envelope assets" → check the
+  `upload-crap-examples-envelopes` job log for the matching tag.
+  That step's post-upload verification step would have failed
+  loudly first; a warning here without an upload-job failure means
+  the post-upload assertion is being silently skipped.
