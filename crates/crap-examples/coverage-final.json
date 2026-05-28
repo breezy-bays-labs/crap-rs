@@ -1,6 +1,6 @@
 {
-  "configMerger.ts": {
-    "path": "configMerger.ts",
+  "crates/crap-examples/ts/configMerger.ts": {
+    "path": "crates/crap-examples/ts/configMerger.ts",
     "statementMap": {
       "0": {
         "start": {
@@ -300,8 +300,8 @@
       ]
     }
   },
-  "csvParser.ts": {
-    "path": "csvParser.ts",
+  "crates/crap-examples/ts/csvParser.ts": {
+    "path": "crates/crap-examples/ts/csvParser.ts",
     "statementMap": {
       "0": {
         "start": {
@@ -976,8 +976,8 @@
       ]
     }
   },
-  "eventLog.ts": {
-    "path": "eventLog.ts",
+  "crates/crap-examples/ts/eventLog.ts": {
+    "path": "crates/crap-examples/ts/eventLog.ts",
     "statementMap": {
       "0": {
         "start": {
@@ -1245,8 +1245,8 @@
     },
     "b": {}
   },
-  "stringUtils.ts": {
-    "path": "stringUtils.ts",
+  "crates/crap-examples/ts/stringUtils.ts": {
+    "path": "crates/crap-examples/ts/stringUtils.ts",
     "statementMap": {
       "0": {
         "start": {
