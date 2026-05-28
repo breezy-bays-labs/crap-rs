@@ -85,17 +85,21 @@ fail) when source-without-regen drift is detected.
 ```shell
 cargo llvm-cov nextest --package crap-examples \
   --lcov --output-path crates/crap-examples/lcov.info
-sed -i.bak 's|^SF:.*/crates/crap-examples/src/|SF:|' crates/crap-examples/lcov.info
+sed -i.bak "s|^SF:$PWD/||" crates/crap-examples/lcov.info
 rm -f crates/crap-examples/lcov.info.bak
 ```
 
-The `sed` step strips the absolute prefix that `cargo llvm-cov`
-emits by default. The adapters' coverage-to-function matcher joins
-the LCOV's `SF:` paths onto `--src` before lookup, so the committed
-fixture uses paths relative to `--src` (just the file basename in
-this single-directory case). The release-plz envelope build job's
-CI lint rejects any committed `lcov.info` with absolute `SF:` lines
-— stripping is mandatory.
+The `sed` step strips only the machine-specific absolute prefix that
+`cargo llvm-cov` emits by default, leaving **workspace-relative**
+`SF:` paths (`SF:crates/crap-examples/src/config_merger.rs`) — the
+natural shape coverage tooling produces when run from the workspace
+root. The adapters' coverage-to-function matcher resolves
+workspace-relative paths (and absolute and `--src`-relative ones)
+via a filesystem-validated longest-suffix match (crap-rs#331), so
+no further normalization is needed. The release-plz envelope build
+job's CI lint rejects any committed `lcov.info` with absolute `SF:`
+lines (machine-specific paths aren't portable) — stripping the
+`$PWD/` prefix is mandatory.
 
 ### TypeScript (`coverage-final.json`)
 
@@ -104,7 +108,7 @@ cd crates/crap-examples/ts
 npm install
 npm test -- --coverage
 cd ../../..
-jq --arg p "$PWD/crates/crap-examples/ts/" \
+jq --arg p "$PWD/" \
    'with_entries(.key |= ltrimstr($p) | .value.path |= ltrimstr($p))' \
    crates/crap-examples/ts/.vitest-coverage/coverage-final.json \
   > crates/crap-examples/coverage-final.json
@@ -112,10 +116,12 @@ jq --arg p "$PWD/crates/crap-examples/ts/" \
 
 The vitest config emits the Istanbul-shape coverage that `crap4ts`
 consumes (`v8` provider's JSON shape is incompatible — must be
-`@vitest/coverage-istanbul`). The `jq` step strips the absolute
-prefix vitest writes by default; same rationale as the LCOV step
-above. The committed envelope uses file basenames as keys
-(matching the structure the adapter resolves under `--src ts/`).
+`@vitest/coverage-istanbul`). The `jq` step strips only the
+machine-specific `$PWD/` prefix vitest writes by default, leaving
+**workspace-relative** `path` keys
+(`crates/crap-examples/ts/configMerger.ts`); same rationale as the
+LCOV step above. `crap4ts` resolves those to the walker's
+src-relative key via the same filesystem suffix match (crap-rs#331).
 
 ## Reading the envelope
 

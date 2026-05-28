@@ -112,38 +112,46 @@ impl IstanbulCoverage {
     /// Resolve `raw` to a workspace-relative path under
     /// `effective_src`, or `None` if it can't be resolved.
     ///
-    /// Two-arm strategy:
+    /// Two-arm strategy, dispatched on whether `raw` is absolute:
     ///
-    /// 1. **Strip-prefix fast path (pure, no I/O).** Join relative
-    ///    entries against `effective_src`, then strip the canonical
-    ///    `effective_src` prefix. This succeeds whenever the coverage
-    ///    payload was captured on the same machine/tree being analyzed
+    /// 1. **Strip-prefix fast path (absolute, same-machine — pure, no
+    ///    I/O).** Strip the canonical `effective_src` prefix from an
+    ///    absolute `raw`. This succeeds whenever the coverage payload
+    ///    was captured on the same machine/tree being analyzed
     ///    (jest/vitest/nyc on the local checkout). The orchestrator
     ///    pre-canonicalizes `effective_src`, so no `canonicalize()`
-    ///    walk is needed here.
+    ///    walk is needed here. **Relative `raw` skips this arm** — a
+    ///    lexical `effective_src.join(raw)` + `strip_prefix` round-trips
+    ///    a relative path to itself, which for a workspace-relative
+    ///    `path` (`crates/foo/ts/bar.ts`, the natural shape a coverage
+    ///    tool emits from the workspace root) is a *nonexistent* file.
+    ///    The old code accepted that invalid result and shadowed arm 2,
+    ///    so coverage silently dropped to 0 (crap-rs#331).
     /// 2. **Suffix-reachability fallback (bounded `.is_file()` I/O,
-    ///    #215).** When the coverage was captured on a *different*
-    ///    machine (a portable fixture: coverage produced on machine A,
-    ///    analyzed on machine B), the entry's absolute path shares no
-    ///    prefix with the local `effective_src` and arm 1 returns
-    ///    `None`. Arm 2 then walks the path's components longest →
-    ///    shortest, joining each suffix under `effective_src` and
-    ///    accepting the first suffix that resolves to a real file. The
-    ///    longest matching suffix wins, which deterministically
+    ///    #215).** Handles two cases: a *relative* `raw` (routed here
+    ///    directly per arm 1 above), and a cross-machine *absolute*
+    ///    `raw` (portable fixture: coverage produced on machine A,
+    ///    analyzed on machine B) whose path shares no prefix with the
+    ///    local `effective_src`. Arm 2 walks the path's components
+    ///    longest → shortest, joining each suffix under `effective_src`
+    ///    and accepting the first suffix that resolves to a real file.
+    ///    The longest matching suffix wins, which deterministically
     ///    disambiguates a leaf filename (e.g. `index.ts`) that exists
     ///    in multiple directories — the longer shared path is the
     ///    structural truth; the machine-specific absolute prefix is
     ///    noise. If two equal-length suffixes could both match (only
     ///    reachable via symlinks/odd trees), the first found wins.
     ///
-    /// This is *not* a pure function and no longer mirrors
-    /// `crap4rs::adapters::coverage::LcovParser::normalize_path` (which
-    /// remains pure strip-prefix): the fallback does bounded,
+    /// This is *not* a pure function: the fallback does bounded,
     /// OS-cached filesystem I/O (~components × `.is_file()` syscalls).
-    /// That trade buys cross-machine fixture portability. When even the
-    /// suffix match fails, this returns `None` and the caller emits
-    /// `PathUnresolved` as before — the diagnostic-and-skip contract
-    /// (D16) is preserved as the final arm.
+    /// That trade buys cross-machine fixture portability *and*
+    /// cross-form (`absolute` / `workspace-relative` / `src-relative`)
+    /// `path` resolution. `crap4rs`'s `LcovParser::normalize_path`
+    /// converged on the same filesystem-validated fallback in #331, so
+    /// the two adapters now resolve coverage paths identically. When
+    /// even the suffix match fails, this returns `None` and the caller
+    /// emits `PathUnresolved` as before — the diagnostic-and-skip
+    /// contract (D16) is preserved as the final arm.
     ///
     /// **Traversal guard (authoritative, #216).** The relative path
     /// returned from *either* arm is rejected (`None`) if it contains a
@@ -162,19 +170,25 @@ impl IstanbulCoverage {
     /// defect.)
     fn normalize_path(&self, raw: &str) -> Option<PathBuf> {
         let path = PathBuf::from(raw);
-        let joined = if path.is_absolute() {
-            path
+        let candidate = if path.is_absolute() {
+            // Arm 1: strip the canonical effective_src prefix (W2.4 fast
+            // path — same-machine absolute capture). Cross-machine
+            // absolute paths don't share a prefix — fall through to the
+            // suffix match (arm 2, #215).
+            if let Ok(stripped) = path.strip_prefix(&self.effective_src) {
+                stripped.to_path_buf()
+            } else {
+                self.suffix_match_under(&path)?
+            }
         } else {
-            self.effective_src.join(raw)
-        };
-        // Arm 1: strip the canonical effective_src prefix (W2.4 fast
-        // path — same-machine capture). Arm 2: cross-machine absolute
-        // paths don't share a prefix — find the longest path suffix
-        // that resolves to a real file under effective_src (#215).
-        let candidate = if let Ok(stripped) = joined.strip_prefix(&self.effective_src) {
-            stripped.to_path_buf()
-        } else {
-            self.suffix_match_under(&joined)?
+            // Relative `raw` (workspace-relative or already src-relative).
+            // A lexical `effective_src.join(raw)` + `strip_prefix` would
+            // round-trip to `raw` verbatim — a nonexistent file for the
+            // workspace-relative case — and shadow arm 2 (crap-rs#331).
+            // Route straight to the filesystem suffix match, which
+            // resolves both `crates/foo/ts/bar.ts` and bare `bar.ts` to
+            // the walker's src-relative key.
+            self.suffix_match_under(&path)?
         };
         // Authoritative traversal guard (#216): both `strip_prefix`
         // and `starts_with` are lexical, so a `..`-containing result

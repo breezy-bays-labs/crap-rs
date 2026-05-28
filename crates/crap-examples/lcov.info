@@ -1,4 +1,4 @@
-SF:config_merger.rs
+SF:crates/crap-examples/src/config_merger.rs
 FN:84,_RNvNtNtCs9n3ZUW95TYq_13crap_examples13config_merger5testss_28defaults_only_passes_through
 FN:100,_RNvNtNtCs9n3ZUW95TYq_13crap_examples13config_merger5testss_30merged_config_default_is_empty
 FN:94,_RNvNtNtCs9n3ZUW95TYq_13crap_examples13config_merger5testss_35env_overrides_defaults_at_top_level
@@ -61,7 +61,7 @@ BRH:0
 LF:45
 LH:36
 end_of_record
-SF:csv_parser.rs
+SF:crates/crap-examples/src/csv_parser.rs
 FN:78,_RNvNtNtCs9n3ZUW95TYq_13crap_examples10csv_parser5testss_21three_unquoted_fields
 FN:85,_RNvNtNtCs9n3ZUW95TYq_13crap_examples10csv_parser5testss_25newline_terminates_record
 FN:104,_RNvNtNtCs9n3ZUW95TYq_13crap_examples10csv_parser5testss_25unterminated_quote_errors
@@ -170,7 +170,7 @@ BRH:0
 LF:79
 LH:79
 end_of_record
-SF:event_log.rs
+SF:crates/crap-examples/src/event_log.rs
 FN:34,_RNvMNtCs9n3ZUW95TYq_13crap_examples9event_logNtB2_8EventLog3len
 FN:26,_RNvMNtCs9n3ZUW95TYq_13crap_examples9event_logNtB2_8EventLog3new
 FN:42,_RNvMNtCs9n3ZUW95TYq_13crap_examples9event_logNtB2_8EventLog4last
@@ -266,7 +266,7 @@ BRH:0
 LF:62
 LH:62
 end_of_record
-SF:string_utils.rs
+SF:crates/crap-examples/src/string_utils.rs
 FN:101,_RNvNtNtCs9n3ZUW95TYq_13crap_examples12string_utils5testss_24slugify_lowercases_ascii
 FN:135,_RNvNtNtCs9n3ZUW95TYq_13crap_examples12string_utils5testss_27pluralize_regular_appends_s
 FN:130,_RNvNtNtCs9n3ZUW95TYq_13crap_examples12string_utils5testss_29pluralize_empty_returns_empty
