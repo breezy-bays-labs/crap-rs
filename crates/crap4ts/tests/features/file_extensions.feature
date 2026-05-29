@@ -27,22 +27,22 @@ Feature: TypeScript file extension discovery and parsing
     # the AST walker. There is no opt-out: declaration files contribute zero
     # useful CRAP signal (ambient types only, no executable code).
     Given a source tree under `src/` containing `types.d.ts` and `app.ts`
-    And the operator's `crap4ts.toml` does NOT explicitly include `.d.ts`
+    And the operator's `crap.toml` does NOT explicitly include `.d.ts`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report includes functions from `app.ts`
     And the report does NOT include entries from `types.d.ts`
 
   @wired
-  Scenario: A .test.ts file is included unless excluded via crap4ts.toml
+  Scenario: A .test.ts file is included unless excluded via crap.toml
     Given a source tree under `src/` containing `app.ts` and `app.test.ts`
-    And the operator's `crap4ts.toml` has no exclusion for `.test.ts`
+    And the operator's `crap.toml` has no exclusion for `.test.ts`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report includes functions from both `app.ts` and `app.test.ts`
 
   @wired
-  Scenario: A .test.ts file is excluded when crap4ts.toml lists it in excludes
+  Scenario: A .test.ts file is excluded when crap.toml lists it in excludes
     Given a source tree under `src/` containing `app.ts` and `app.test.ts`
-    And the operator's `crap4ts.toml` has `exclude = ["**/*.test.ts"]`
+    And the operator's `crap.toml` has `exclude = ["**/*.test.ts"]`
     When the operator runs `crap4ts --coverage coverage-final.json --src src`
     Then the report includes functions from `app.ts`
     And the report does NOT include entries from `app.test.ts`

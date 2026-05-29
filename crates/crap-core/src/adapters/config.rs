@@ -1,6 +1,6 @@
-//! Config file adapter — loads the adapter's TOML config (file name
-//! supplied by the binary via `AdapterMeta::config_file_name`) and
-//! converts to domain types.
+//! Config file adapter — loads the adapter's TOML config (the ordered
+//! file names are supplied by the binary via
+//! `AdapterMeta::config_file_names`) and converts to domain types.
 //!
 //! Handles TOML parsing and config file discovery. All CLI-representable
 //! options are supported. Per-path threshold overrides use glob patterns.
@@ -122,25 +122,86 @@ struct RawViewPreset {
 
 // ── Public API ─────────────────────────────────────────────────────
 
-/// Discover the adapter's config file in the current working directory.
+/// Outcome of an ordered config-file discovery scan.
 ///
-/// `name` is the adapter-specific file name (e.g., `"crap4rs.toml"` for
-/// the Rust adapter; `"crap4ts.toml"` for the TS adapter). Supplied by
-/// the binary via `AdapterMeta.config_file_name`.
+/// Returned by [`discover_config`] when at least one candidate exists on
+/// disk. `path` is the winning file — the highest-priority candidate that
+/// exists. `used_index` is its position in the candidate list: index 0 is
+/// the canonical name the adapter writes and names in hints (`crap.toml`),
+/// and any higher index is a legacy per-adapter fallback the CLI surfaces
+/// as a deprecation nudge. `shadowed` lists lower-priority candidates that
+/// also exist on disk and were therefore ignored, so the CLI can tell the
+/// operator they are safe to remove.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigDiscovery {
+    /// The discovered config file (highest-priority existing candidate).
+    pub path: PathBuf,
+    /// Index of `path` within the candidate list (0 = canonical name).
+    pub used_index: usize,
+    /// Lower-priority candidates that also exist and were shadowed by
+    /// `path`. Only confirmed regular files appear here.
+    pub shadowed: Vec<PathBuf>,
+}
+
+/// Discover the adapter's config file by walking `candidates` in priority
+/// order; the first *existing* file wins.
 ///
-/// Returns `Ok(Some(path))` if the file exists, `Ok(None)` if absent.
-/// Returns `Err` on permission errors or other filesystem failures.
-pub fn discover_config(name: &str) -> Result<Option<PathBuf>> {
-    let path = PathBuf::from(name);
-    match std::fs::metadata(&path) {
-        Ok(m) if m.is_file() => Ok(Some(path)),
-        Ok(_) => Ok(None), // exists but not a file (directory, symlink to dir, etc.)
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => anyhow::bail!(
-            "cannot access config file {}: {e}\n  hint: check file permissions",
-            path.display()
-        ),
+/// Candidates may be relative or absolute paths; this function never
+/// touches the working directory itself, so it is CWD-agnostic. In
+/// production the CLI layer passes bare relative names
+/// (`PathBuf::from("crap.toml")`), which resolve CWD-relative when
+/// `metadata` is called; tests pass tempdir-qualified absolute paths to
+/// stay safe under parallel execution (no process-wide CWD mutation).
+/// Index 0 is the canonical name (`crap.toml`); later entries are legacy
+/// per-adapter fallbacks (`crap4rs.toml` / `crap4ts.toml`).
+///
+/// Discovery is by *existence*, not parseability: a present-but-malformed
+/// canonical file still wins, and surfaces its parse error downstream — it
+/// never silently falls through to a stale legacy file that happens to
+/// parse.
+///
+/// While searching for the winner, only `io::ErrorKind::NotFound` advances
+/// to the next candidate. Any other I/O error (e.g. `PermissionDenied` on
+/// a higher-priority file) short-circuits and returns `Err`: a permission
+/// problem on the canonical config must surface, never be masked by
+/// emitting a legacy-config deprecation warning for a file the operator
+/// cannot read.
+///
+/// Returns `Ok(Some(ConfigDiscovery))` when a candidate exists,
+/// `Ok(None)` when none do.
+pub fn discover_config(candidates: &[PathBuf]) -> Result<Option<ConfigDiscovery>> {
+    for (index, candidate) in candidates.iter().enumerate() {
+        match std::fs::metadata(candidate) {
+            Ok(m) if m.is_file() => {
+                // Winner found. Report any lower-priority candidates that
+                // also exist as `shadowed` so the operator can delete them.
+                // Best-effort and existence-confirmed: only paths that are
+                // genuinely files are recorded. A metadata error on a
+                // lower-priority candidate is irrelevant — we already hold a
+                // valid winner — and must never produce a spurious shadow
+                // warning for a phantom or inaccessible path.
+                let shadowed = candidates[index + 1..]
+                    .iter()
+                    .filter(|p| p.is_file())
+                    .cloned()
+                    .collect();
+                return Ok(Some(ConfigDiscovery {
+                    path: candidate.clone(),
+                    used_index: index,
+                    shadowed,
+                }));
+            }
+            // Exists but not a regular file (directory, etc.) — not a config
+            // we can load; advance to the next candidate.
+            Ok(_) => continue,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => anyhow::bail!(
+                "cannot access config file {}: {e}\n  hint: check file permissions",
+                candidate.display()
+            ),
+        }
     }
+    Ok(None)
 }
 
 /// Load and parse a config file from the given path.
@@ -822,37 +883,168 @@ nonsense_field = "x"
         );
     }
 
-    // ── discover_config parameterization (#161) ───────────────────
+    // ── discover_config ordered dual-discovery (4 back-compat cases) ──
+    //
+    // `discover_config` walks an ordered candidate list (full paths;
+    // the caller joins names to the working dir) and returns the
+    // highest-priority *existing* file. Index 0 is canonical (`crap.toml`),
+    // the rest are legacy fallbacks. These four cases pin the back-compat
+    // contract: a unified `crap.toml` wins; a lone legacy file is still
+    // discovered (and reported via `used_index > 0` so the CLI can nudge a
+    // rename); a co-present legacy file is reported as `shadowed`; an empty
+    // directory discovers nothing. Tempdir-qualified paths keep this safe
+    // under nextest's parallel execution model (no process-wide CWD).
 
     #[test]
-    fn discover_config_honors_caller_supplied_name() {
-        // Verifies the `name` parameter actually drives lookup — a
-        // regression would silently fall back to a hardcoded constant
-        // (e.g., the v0.4 `crap4rs.toml` literal) and make the second
-        // adapter (`crap4ts.toml`) invisible to discovery.
-        //
-        // `discover_config` interprets `name` as a path (it calls
-        // `PathBuf::from(name)` and feeds it to `std::fs::metadata`),
-        // so passing tempdir-qualified paths avoids any process-wide
-        // CWD mutation. This keeps the test safe under nextest's
-        // parallel execution model.
+    fn discover_config_canonical_only_wins_at_index_zero() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("crap4ts.toml"), "threshold = 7.0\n").unwrap();
+        let canonical = dir.path().join("crap.toml");
+        std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
 
-        let rust_path = dir.path().join("crap4rs.toml");
-        let ts_path = dir.path().join("crap4ts.toml");
-        let alt_path = dir.path().join("custom-tool.toml");
+        let candidates = vec![canonical.clone(), dir.path().join("crap4rs.toml")];
+        let disc = discover_config(&candidates).unwrap().unwrap();
 
-        let rust_lookup = discover_config(rust_path.to_str().unwrap()).unwrap();
-        let ts_lookup = discover_config(ts_path.to_str().unwrap()).unwrap();
-        let alt_lookup = discover_config(alt_path.to_str().unwrap()).unwrap();
-
-        assert_eq!(rust_lookup, None, "absent crap4rs.toml must return None");
-        assert_eq!(
-            ts_lookup,
-            Some(ts_path.clone()),
-            "present crap4ts.toml must be discovered by name"
+        assert_eq!(disc.path, canonical);
+        assert_eq!(disc.used_index, 0, "canonical crap.toml is index 0");
+        assert!(
+            disc.shadowed.is_empty(),
+            "no legacy file present, nothing shadowed"
         );
-        assert_eq!(alt_lookup, None, "absent custom name must return None");
+    }
+
+    #[test]
+    fn discover_config_legacy_only_falls_back_at_index_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let legacy = dir.path().join("crap4rs.toml");
+        std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
+
+        // crap.toml (index 0) is absent → discovery advances to the legacy
+        // fallback at index 1.
+        let candidates = vec![dir.path().join("crap.toml"), legacy.clone()];
+        let disc = discover_config(&candidates).unwrap().unwrap();
+
+        assert_eq!(disc.path, legacy);
+        assert_eq!(disc.used_index, 1, "legacy fallback is index 1");
+        assert!(
+            disc.shadowed.is_empty(),
+            "the winner cannot shadow itself; nothing lower-priority exists"
+        );
+    }
+
+    #[test]
+    fn discover_config_both_present_canonical_wins_legacy_shadowed() {
+        let dir = tempfile::tempdir().unwrap();
+        let canonical = dir.path().join("crap.toml");
+        let legacy = dir.path().join("crap4rs.toml");
+        std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
+        std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
+
+        let candidates = vec![canonical.clone(), legacy.clone()];
+        let disc = discover_config(&candidates).unwrap().unwrap();
+
+        assert_eq!(disc.path, canonical, "canonical wins by list order");
+        assert_eq!(disc.used_index, 0);
+        assert_eq!(
+            disc.shadowed,
+            vec![legacy],
+            "the co-present legacy file is reported as shadowed"
+        );
+    }
+
+    #[test]
+    fn discover_config_neither_present_returns_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let candidates = vec![
+            dir.path().join("crap.toml"),
+            dir.path().join("crap4rs.toml"),
+        ];
+
+        assert_eq!(
+            discover_config(&candidates).unwrap(),
+            None,
+            "no candidate exists → no config discovered"
+        );
+    }
+
+    #[test]
+    fn discover_config_non_file_at_canonical_advances_to_legacy() {
+        // A non-regular file at the canonical position (here a directory
+        // literally named `crap.toml`) is not a config we can load, so
+        // discovery advances to the legacy fallback rather than treating
+        // the directory as the winner or erroring. Pins the `Ok(_) =>
+        // continue` arm.
+        let dir = tempfile::tempdir().unwrap();
+        let canonical = dir.path().join("crap.toml");
+        std::fs::create_dir(&canonical).unwrap();
+        let legacy = dir.path().join("crap4rs.toml");
+        std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
+
+        let candidates = vec![canonical, legacy.clone()];
+        let disc = discover_config(&candidates).unwrap().unwrap();
+
+        assert_eq!(disc.path, legacy, "directory at index 0 is skipped");
+        assert_eq!(disc.used_index, 1);
+        assert!(disc.shadowed.is_empty());
+    }
+
+    #[test]
+    fn discover_config_non_file_shadow_candidate_is_not_recorded() {
+        // A lower-priority candidate that exists but is not a regular file
+        // (a directory named `crap4rs.toml`) must NOT appear in `shadowed`
+        // — the filter is `is_file()`, not `exists()`, so the operator is
+        // never told to "remove" a directory. Pins the shadow filter.
+        let dir = tempfile::tempdir().unwrap();
+        let canonical = dir.path().join("crap.toml");
+        std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
+        std::fs::create_dir(dir.path().join("crap4rs.toml")).unwrap();
+
+        let candidates = vec![canonical.clone(), dir.path().join("crap4rs.toml")];
+        let disc = discover_config(&candidates).unwrap().unwrap();
+
+        assert_eq!(disc.path, canonical);
+        assert_eq!(disc.used_index, 0);
+        assert!(
+            disc.shadowed.is_empty(),
+            "a directory at a lower-priority candidate must not be reported as shadowed"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn discover_config_permission_error_short_circuits_no_legacy_fallthrough() {
+        // The load-bearing contract: a non-`NotFound` I/O error (here
+        // `PermissionDenied`) on a higher-priority candidate must bail,
+        // never silently fall through to a co-present legacy file. Without
+        // this, an unreadable `crap.toml` would be masked by a stale
+        // `crap4rs.toml` and the operator would get a confusing legacy
+        // deprecation warning instead of a permissions error.
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let canonical = dir.path().join("crap.toml");
+        std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
+        let legacy = dir.path().join("crap4rs.toml");
+        std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
+
+        // Block traversal of the parent dir so `metadata(canonical)` yields
+        // PermissionDenied (chmod 000 on the file itself still permits
+        // `metadata`, which reads the inode, not contents).
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o000)).unwrap();
+
+        // If perms didn't actually take effect (e.g. running as root, which
+        // bypasses the check), this branch is untestable here — restore and
+        // skip rather than emit a false failure.
+        let still_readable = std::fs::metadata(&canonical).is_ok();
+        let result = discover_config(&[canonical, legacy]);
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        if still_readable {
+            return;
+        }
+        let err = result.expect_err("a permission error must surface, not fall through");
+        assert!(
+            err.to_string().contains("cannot access config file"),
+            "got: {err}"
+        );
     }
 }

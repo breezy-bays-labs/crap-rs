@@ -1,10 +1,11 @@
 Feature: crap4rs init subcommand
 
-  `crap4rs init` generates a starter `crap4rs.toml` in the current
+  `crap4rs init` generates a starter `crap.toml` in the current
   directory. Interactive by default (one prompt: threshold preset),
   `--non-interactive` for CI, `--force` to overwrite an existing
   config. crap4ts inherits the same behavior via `AdapterMeta`
-  (`config_file_name`, `extensions`) and writes `crap4ts.toml`.
+  (`config_file_names`, `extensions`) and writes the same canonical
+  `crap.toml` (the legacy per-adapter names are discovery fallbacks only).
 
   The generated config is self-documenting (inline comments explain
   each option) and round-trips through `load_file_config` without
@@ -17,7 +18,7 @@ Feature: crap4rs init subcommand
   Scenario: --non-interactive writes a default config in an empty directory
     Given an empty project directory
     When the operator runs `crap4rs init --non-interactive`
-    Then a file named "crap4rs.toml" exists in the project directory
+    Then a file named "crap.toml" exists in the project directory
     And the config file contains 'preset = "default"'
     And the config file contains 'src = "src"'
     And the exit code is 0
@@ -58,7 +59,7 @@ Feature: crap4rs init subcommand
   Scenario: generated config includes header comments explaining each option
     Given an empty project directory
     When the operator runs `crap4rs init --non-interactive`
-    Then the config file contains "# crap4rs.toml"
+    Then the config file contains "# crap.toml"
     And the config file contains "Threshold preset"
     And the config file contains "strict (8)"
     And the config file contains "default (15)"
@@ -76,16 +77,16 @@ Feature: crap4rs init subcommand
 
   @wired
   Scenario: refuses to overwrite an existing config without --force
-    Given a project directory with an existing "crap4rs.toml" containing 'preset = "lenient"'
+    Given a project directory with an existing "crap.toml" containing 'preset = "lenient"'
     When the operator runs `crap4rs init --non-interactive`
     Then the exit code is 2
-    And stderr contains "crap4rs.toml already exists"
+    And stderr contains "crap.toml already exists"
     And stderr contains "--force"
     And the config file still contains 'preset = "lenient"'
 
   @wired
   Scenario: --force overwrites an existing config
-    Given a project directory with an existing "crap4rs.toml" containing 'preset = "lenient"'
+    Given a project directory with an existing "crap.toml" containing 'preset = "lenient"'
     When the operator runs `crap4rs init --non-interactive --force`
     Then the exit code is 0
     And the config file contains 'preset = "default"'

@@ -1590,7 +1590,7 @@ mod tests {
             extensions: &["rs"],
             tool_info_uri: TEST_TOOL_INFO_URI,
             rule_help_uri: TEST_RULE_HELP_URI,
-            config_file_name: "test-adapter.toml",
+            config_file_names: &["test-adapter.toml"],
             default_excludes: &[],
             forced_excludes: &[],
             default_metric: ComplexityMetric::Cognitive,

@@ -15,7 +15,10 @@ fn setup_dir(dir: &Path, src_content: &str, lcov_content: &str, toml_content: Op
     std::fs::write(src.join("lib.rs"), src_content).expect("write lib.rs fixture");
     std::fs::write(dir.join("lcov.info"), lcov_content).expect("write lcov.info fixture");
     if let Some(toml) = toml_content {
-        std::fs::write(dir.join("crap4rs.toml"), toml).expect("write crap4rs.toml fixture");
+        // Canonical config name (crap-rs#345) — writing the legacy
+        // `crap4rs.toml` here would still be discovered via fallback but
+        // would emit a deprecation warning on every run.
+        std::fs::write(dir.join("crap.toml"), toml).expect("write crap.toml fixture");
     }
 }
 
@@ -250,7 +253,7 @@ fn unknown_preset_exits_2_with_available_list() {
 
 #[test]
 fn view_with_no_config_file_exits_2() {
-    // saved_view_presets.feature:73-78. No crap4rs.toml in the directory.
+    // saved_view_presets.feature:73-78. No config file in the directory.
     let dir = tempfile::tempdir().unwrap();
     setup_dir(dir.path(), FIXTURE_SRC, FIXTURE_LCOV, None);
 
@@ -274,7 +277,7 @@ fn view_with_no_config_file_exits_2() {
     let stderr = stderr_str(&output);
     assert!(stderr.contains("unknown view preset"));
     assert!(
-        stderr.contains("crap4rs.toml"),
+        stderr.contains("crap.toml"),
         "should mention adapter config file: {stderr}"
     );
 }

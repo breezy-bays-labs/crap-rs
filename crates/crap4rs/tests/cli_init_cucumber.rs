@@ -4,8 +4,8 @@
 //! Each scenario sets up a tempdir (potentially with a `src/` or
 //! `crates/` subdirectory to exercise auto-detect) and invokes the
 //! `crap4rs init` subcommand via `CARGO_BIN_EXE_crap4rs`. Cross-adapter
-//! parity (`crap4ts init` writing `crap4ts.toml`) is exercised by the
-//! plain integration test at `crates/crap4ts/tests/cli_init_integration.rs`
+//! parity (`crap4ts init` also writing the canonical `crap.toml`) is
+//! exercised by the plain integration test at `crates/crap4ts/tests/cli_init_integration.rs`
 //! — that env var is per-package and `CARGO_BIN_EXE_crap4ts` is not
 //! available inside crap4rs's harness.
 //!
@@ -184,7 +184,7 @@ fn then_still_contains(world: &mut InitWorld, needle: String) {
 }
 
 fn assert_config_contains(world: &InitWorld, needle: &str) {
-    let path = world.config_path("crap4rs.toml");
+    let path = world.config_path("crap.toml");
     let content =
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     assert!(
@@ -195,7 +195,7 @@ fn assert_config_contains(world: &InitWorld, needle: &str) {
 }
 
 fn assert_config_excludes(world: &InitWorld, needle: &str) {
-    let path = world.config_path("crap4rs.toml");
+    let path = world.config_path("crap.toml");
     let content =
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     assert!(
@@ -207,7 +207,7 @@ fn assert_config_excludes(world: &InitWorld, needle: &str) {
 
 #[then("the generated config file loads without error")]
 fn then_loads(world: &mut InitWorld) {
-    let path = world.config_path("crap4rs.toml");
+    let path = world.config_path("crap.toml");
     let content = std::fs::read_to_string(&path).expect("read config");
     // We don't have the loader in scope here, so smoke via the toml
     // crate directly — the loader does the same thing.
@@ -221,7 +221,7 @@ fn then_loads(world: &mut InitWorld) {
 
 #[then(regex = r#"^the loaded config has preset "([^"]+)"$"#)]
 fn then_loaded_preset(world: &mut InitWorld, expected: String) {
-    let path = world.config_path("crap4rs.toml");
+    let path = world.config_path("crap.toml");
     let content = std::fs::read_to_string(&path).expect("read config");
     let parsed: toml::Value = toml::from_str(&content).expect("parse config");
     let preset = parsed
@@ -233,7 +233,7 @@ fn then_loaded_preset(world: &mut InitWorld, expected: String) {
 
 #[then(regex = r#"^the loaded config has src "([^"]+)"$"#)]
 fn then_loaded_src(world: &mut InitWorld, expected: String) {
-    let path = world.config_path("crap4rs.toml");
+    let path = world.config_path("crap.toml");
     let content = std::fs::read_to_string(&path).expect("read config");
     let parsed: toml::Value = toml::from_str(&content).expect("parse config");
     let src = parsed

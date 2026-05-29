@@ -70,7 +70,7 @@ The risk tiers themselves:
 | ≤ 25 | Moderate |
 | > 25 | High |
 
-The presets correspond to "gate at the next risk tier up." Override with `--threshold <N>` for a custom value, or define presets per-codebase in `crap4ts.toml`.
+The presets correspond to "gate at the next risk tier up." Override with `--threshold <N>` for a custom value, or define presets per-codebase in `crap.toml` (the canonical config name, written by `crap4ts init`). The legacy name `crap4ts.toml` is still discovered as a deprecated alias when no `crap.toml` is present.
 
 ## What it looks like
 

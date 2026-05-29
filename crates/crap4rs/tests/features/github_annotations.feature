@@ -73,15 +73,15 @@ Feature: GitHub Actions inline annotations reporter (issue #276)
     Then ten `::warning` lines and one trailing `::notice::` line are emitted
 
   @wired
-  Scenario: --annotation-limit can be configured via crap4rs.toml
-    Given a `crap4rs.toml` with `[output] annotation_limit = 25`
+  Scenario: --annotation-limit can be configured via crap.toml
+    Given a `crap.toml` with `[output] annotation_limit = 25`
     And eleven exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations`
     Then all eleven `::warning` lines are emitted and no `::notice` line follows
 
   @wired
-  Scenario: CLI --annotation-limit overrides crap4rs.toml
-    Given a `crap4rs.toml` with `[output] annotation_limit = 25`
+  Scenario: CLI --annotation-limit overrides crap.toml
+    Given a `crap.toml` with `[output] annotation_limit = 25`
     And fifteen exceeding functions
     When the operator runs `crap4rs --coverage lcov.info --format github-annotations --annotation-limit 5`
     Then exactly five `::warning` lines are emitted (the CLI flag wins)
