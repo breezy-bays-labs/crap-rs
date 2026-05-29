@@ -302,13 +302,18 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
                 }
             }
         }
-        // Re-sort by identity key for deterministic output regardless of
-        // root order (the union must be order-independent).
-        source_files.sort_by(|a, b| {
-            let ka = self.options.identity_base.relativize(&a.path, &a.root);
-            let kb = self.options.identity_base.relativize(&b.path, &b.root);
-            ka.cmp(&kb)
-        });
+        // Sort by the discovered PATH (PathBuf order), NOT the
+        // relativized identity-key string. The walker's pre-multi-root
+        // `files.sort()` was PathBuf-Ord (component-wise); String-Ord on
+        // the slash-joined key diverges when a sibling file/dir pair
+        // straddles the separator (`foo.rs` vs `foo/…`: `.` 0x2E < `/`
+        // 0x2F flips them). Since nothing downstream re-sorts
+        // `result.functions`, discovery order reaches the JSON envelope —
+        // so PathBuf-Ord here is load-bearing for single-root
+        // byte-identity. Full paths are globally unique across roots, so
+        // PathBuf-Ord is also a deterministic, order-independent union
+        // key for multi-root.
+        source_files.sort_by(|a, b| a.path.cmp(&b.path));
 
         let files_found = source_files.len();
         ensure_source_files_found(&source_files, &self.options.src, &extensions)?;
