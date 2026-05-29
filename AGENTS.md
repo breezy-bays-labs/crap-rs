@@ -526,6 +526,11 @@ The wire-envelope snapshot tests
 `wire_envelope_crap4ts.rs`, test name `envelope`) shell out to the
 `crap4rs` / `crap4ts` binaries, which a scoped `cargo mutants --package
 crap-core` (or `--package crap4ts`) doesn't necessarily build. The
+cross-adapter RiskLevel canary
+(`crates/crap-core/tests/risk_level_cross_adapter.rs`, test fn
+`risk_level_envelope_parity`) shells both bins too; its fn name carries
+the `envelope` substring deliberately so the same `--skip envelope`
+token covers it without a new token. The
 skip lives in the **repo-global** `.cargo/mutants.toml`, so
 cargo-mutants applies it to **every** invocation in this workspace —
 both the `view.rs` step and the walker step inherit it automatically;
