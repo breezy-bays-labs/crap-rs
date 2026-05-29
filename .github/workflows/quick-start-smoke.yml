@@ -221,9 +221,18 @@ jobs:
       #
       # `gate-mode: report-only` — crap-examples scores poorly by
       # design (config_merger ~40 CRAP, slugify ~24); gating on its
-      # threshold would fail the smoke on the intended pedagogy. The
-      # bare-adapter gates (f)/(g)/(h) below still exercise gate
-      # posture against crap-core/src, which is production code.
+      # threshold would fail the smoke on the intended pedagogy.
+      #
+      # This scorecard is NOT a production gate — it is the labeled
+      # examples/teaching surface (see the `comment-preamble` below).
+      # The repo's production CRAP-threshold gate lives in ci.yml's
+      # `scorecard-production` job (crap-rs#336), which gates the real
+      # crap-core/crap4rs/crap4ts source. Gates (f)/(g)/(h) below are
+      # `--no-fail` FORMAT/INVARIANT checks (metric-default, table
+      # render, scorecard-row JSON shape) run against crap-core/src —
+      # NOT CRAP-threshold gates, and they assert nothing about CRAP
+      # scores. (Corrected crap-rs#336: the prior comment here wrongly
+      # claimed f/g/h "exercise gate posture against crap-core/src".)
       #
       # `run-mode` flips conditionally on the fetch outcome:
       #   * success → `both` — analysis + delta; enabled Delta tab
@@ -245,6 +254,12 @@ jobs:
           gate-mode: report-only
           comment-mode: sticky
           comment-header: 'crap-scorecard-quickstart-smoke'
+          comment-preamble: |
+            **Examples dogfood — intentionally spans risk bands; not
+            production code.** This scorecard analyzes `crap-examples`, a
+            teaching sample built to exercise every CRAP risk band. For
+            the production gate over real source, see the
+            _crap-scorecard-production_ comment (crap-rs#336).
           html-report: true
           languages: rust,typescript
 
