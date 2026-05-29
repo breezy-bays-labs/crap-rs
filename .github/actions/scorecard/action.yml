@@ -193,6 +193,19 @@ inputs:
       can post distinct sticky comments by varying this header.
     required: false
     default: 'crap-scorecard'
+  comment-preamble:
+    description: |
+      Markdown prepended to the composed sticky-comment body, above the
+      rendered scorecard. Use it to label a scorecard's scope so two
+      scorecards on the same PR are unambiguous — e.g. a production
+      scorecard naming the gated crates vs. an examples scorecard
+      marked "teaching sample; not production code" (crap-rs#336).
+      Honored in both single- and multi-language modes (it prepends to
+      the `Compose sticky message` step's body, which runs for both).
+      Empty default (`''`) produces a byte-identical comment to before
+      this input existed.
+    required: false
+    default: ''
   version:
     description: |
       `crap4rs` version to install. `latest` (default) resolves to the most
@@ -258,6 +271,17 @@ outputs:
   markdown:
     description: 'The rendered markdown scorecard. Consume directly in aggregator bots.'
     value: ${{ steps.run.outputs.markdown }}
+  sticky-message:
+    description: |
+      The composed sticky-comment body: the optional `comment-preamble`
+      prepended above the rendered scorecard, plus the optional HTML
+      download link (when `html-report: true`). This is the exact text
+      the `Post sticky PR comment` step would publish. Distinct from
+      `markdown` (which is the bare scorecard, preamble-free). Surfaced
+      so callers can spot-check the preamble wiring and so aggregator
+      bots that compose their own comment can reuse the assembled body
+      (crap-rs#336).
+    value: ${{ steps.compose.outputs.message }}
   row-json:
     description: |
       The `Row::CrapDelta` JSON object emitted by the dispatched
@@ -941,7 +965,17 @@ runs:
           envelope="$RUNNER_TEMP/${BIN}-envelope.json"
           markdown_file="$RUNNER_TEMP/${BIN}-scorecard.md"
           row_json_file="$RUNNER_TEMP/${BIN}-row.json"
-          common=(--coverage "$LANG_COVERAGE" --src "$LANG_SRC" --threshold "$THRESHOLD")
+          # Multi-root (crap-rs#336): `src`/`src-ts` accept a
+          # newline-separated list of roots (the GHA multiline-input
+          # convention); split into one `--src <root>` per non-blank
+          # line. A single-line value yields exactly one `--src` (byte-
+          # identical to before this PR); blank lines are skipped so a
+          # trailing newline never produces an empty `--src ""` (which
+          # would silently re-scope the walker to CWD).
+          common=(--coverage "$LANG_COVERAGE" --threshold "$THRESHOLD")
+          while IFS= read -r src_root; do
+            [ -n "$src_root" ] && common+=(--src "$src_root")
+          done <<<"$LANG_SRC"
           [ -n "$CONFIG" ] && common+=(--config "$CONFIG")
           if [ -n "$LANG_BASELINE" ]; then
             common+=(--baseline "$LANG_BASELINE")
@@ -1295,7 +1329,13 @@ runs:
               exit 1
               ;;
           esac
-          args=(--coverage "$LANG_COVERAGE" --src "$LANG_SRC" --threshold "$THRESHOLD" --no-fail --format github-annotations)
+          # Multi-root (crap-rs#336): same newline-split as the Run
+          # analysis loop, so annotations cover every root rather than
+          # silently only the first under multi-root.
+          args=(--coverage "$LANG_COVERAGE" --threshold "$THRESHOLD" --no-fail --format github-annotations)
+          while IFS= read -r src_root; do
+            [ -n "$src_root" ] && args+=(--src "$src_root")
+          done <<<"$LANG_SRC"
           [ -n "$CONFIG" ] && args+=(--config "$CONFIG")
           if [ -n "$per_lang_budget" ]; then
             # Multi-language: the shared GH per-step cap is the hard
@@ -1491,6 +1531,9 @@ runs:
         HTML_REPORT: ${{ inputs.html-report }}
         IS_MULTI: ${{ steps.presets.outputs.is_multi }}
         LANGUAGE: ${{ steps.lang.outputs.language }}
+        # Caller-supplied markdown prepended above the scorecard body
+        # (crap-rs#336). Empty → byte-identical to before this input.
+        COMMENT_PREAMBLE: ${{ inputs.comment-preamble }}
         HTML_URL_RUST: ${{ steps.upload-rust.outputs.artifact-url }}
         HTML_URL_TS: ${{ steps.upload-typescript.outputs.artifact-url }}
         # PR ζ (#315): unified artifact URL produced by the
@@ -1501,12 +1544,21 @@ runs:
       run: |
         set -euo pipefail
         composed_file="$RUNNER_TEMP/scorecard-sticky-message.md"
+        # Prepend the caller's preamble (crap-rs#336) above the body when
+        # non-empty, followed by a blank line so the markdown body starts
+        # a fresh block regardless of how the preamble ended. Empty
+        # preamble writes nothing → the body is byte-identical to before
+        # this input existed.
+        : > "$composed_file"
+        if [ -n "$COMMENT_PREAMBLE" ]; then
+          printf '%s\n\n' "$COMMENT_PREAMBLE" >> "$composed_file"
+        fi
         if [ "$LANGUAGE" = "multi" ]; then
-          cat "$RUNNER_TEMP/scorecard-combined.md" > "$composed_file"
+          cat "$RUNNER_TEMP/scorecard-combined.md" >> "$composed_file"
         elif [ "$LANGUAGE" = "rust" ]; then
-          cat "$RUNNER_TEMP/crap4rs-scorecard.md" > "$composed_file"
+          cat "$RUNNER_TEMP/crap4rs-scorecard.md" >> "$composed_file"
         else
-          cat "$RUNNER_TEMP/crap4ts-scorecard.md" > "$composed_file"
+          cat "$RUNNER_TEMP/crap4ts-scorecard.md" >> "$composed_file"
         fi
 
         if [ "$HTML_REPORT" = "true" ]; then

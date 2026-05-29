@@ -599,6 +599,62 @@ jobs:
           fi
           echo "default + threshold:$EXPECTED → threshold=$EXPECTED (no conflict, no warning) ✓"
 
+      # ----------------------------------------------------------------
+      # comment-preamble spot-check (crap-rs#336 acceptance gate).
+      #
+      # Invoke the action twice with identical inputs except
+      # `comment-preamble` (a sentinel vs empty), `comment-mode: none`,
+      # and assert on the new `sticky-message` output: the with-preamble
+      # body STARTS WITH the sentinel; the empty-preamble body does NOT
+      # contain it. Relational assertions (startswith + absence) through
+      # the real action.yml compose logic — robust against trailing-
+      # newline normalization across the $GITHUB_OUTPUT heredoc boundary
+      # that an exact-byte equality would trip on. All interpolations
+      # flow through env: (the sentinel is an action-author constant,
+      # not user input, but the indirection keeps the workflow uniform).
+      # ----------------------------------------------------------------
+      - name: Preamble spot-check — with sentinel
+        id: preamble-with
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-preamble: 'CRAP_PREAMBLE_SENTINEL — spot-check marker'
+          comment-mode: 'none'
+      - name: Preamble spot-check — empty
+        id: preamble-empty
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert preamble prepends and empty is preamble-free
+        env:
+          WITH_MSG: ${{ steps.preamble-with.outputs.sticky-message }}
+          EMPTY_MSG: ${{ steps.preamble-empty.outputs.sticky-message }}
+        run: |
+          set -euo pipefail
+          sentinel='CRAP_PREAMBLE_SENTINEL'
+          # 1. With-preamble body starts with the sentinel (preamble
+          #    prepended ABOVE the scorecard body).
+          case "$WITH_MSG" in
+            "$sentinel"*) ;;
+            *)
+              echo "::error::preamble-spot: sticky-message did not start with the preamble sentinel"
+              printf '%s\n' "$WITH_MSG" | head -3
+              exit 1
+              ;;
+          esac
+          # 2. Empty-preamble body does NOT contain the sentinel
+          #    (byte-identity preserved — preamble truly empty).
+          if printf '%s' "$EMPTY_MSG" | grep -q "$sentinel"; then
+            echo "::error::preamble-spot: empty-preamble sticky-message unexpectedly contains the sentinel"
+            exit 1
+          fi
+          echo "comment-preamble: prepend ✓, empty byte-identity ✓"
+
   scorecard-smoke-ts:
     # Sibling of `scorecard-smoke-rust` for the TypeScript dispatch
     # path. Build crap4ts from the PR, stage it on PATH (the only
