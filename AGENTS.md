@@ -320,6 +320,43 @@ schema fragment
 "Documentation rots; CI doesn't" — same pattern as
 `scripts/bdd-tracked-lint.py` and `scripts/mutants-skip-lint.py`.
 
+### Cross-adapter `RiskLevel` consistency canary
+
+`crap4rs` and `crap4ts` both derive every function's `RiskLevel`
+from one shared `crap_core::domain::crap::classify_risk` (score →
+band) and serialize it through one shared serde derive on
+`crap_core::domain::types::RiskLevel`. Cross-adapter consistency
+therefore holds by construction — there is no per-language
+risk-classification step. This is the dimensional-consistency
+invariant ζ's Combined-view ranking depends on (risk-level desc,
+then CRAP/threshold ratio desc within band).
+
+Two axes are deliberately kept distinct here, since #317's prose
+conflates them: `RiskLevel` **bands** are score-based, fixed in
+`classify_risk` (≤8 Low / ≤15 Acceptable / ≤25 Moderate / else High),
+metric-agnostic, and independent of `--threshold`; the per-adapter
+**calibrated thresholds** (cognitive 15/25/40 ⇄ cyclomatic 8/16/30)
+drive the `--threshold` GATE (`exceeds` / scorecard-row `status`),
+which is the separate axis the scorecard-row + default-gate canaries
+own. The RiskLevel canary pins the band axis only.
+
+**Mechanical enforcement**:
+`crates/crap-core/tests/risk_level_cross_adapter.rs` (test fn
+`risk_level_envelope_parity`) runs both bins' `--format json`
+envelopes and asserts, for every function in either envelope, that
+the serialized `risk_level` is (a) one of the four canonical
+`RiskLevel::as_wire_str` values and (b) the band the shared
+`classify_risk` oracle re-derives from the wire `crap.value`. Because
+`risk_level` and `crap.value` are serialized independently, the
+oracle is a genuine round-trip check, not a tautology; running the
+same shared oracle against both adapters is what makes it a
+cross-adapter consistency proof. A future per-adapter
+risk-classification step or a serde rename on one path fails the
+canary loudly. The fn name carries the `envelope` substring so the
+existing `--skip envelope` token in `.cargo/mutants.toml` covers it
+(see the Mutation testing section). "Documentation rots; CI doesn't"
+— same pattern as the scorecard-row parity + wire-envelope canaries.
+
 ### crap4ts install constraint
 
 Until crap4ts publishes a working binary release to crates.io

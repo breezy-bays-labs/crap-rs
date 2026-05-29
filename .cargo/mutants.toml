@@ -10,11 +10,17 @@
 # `assert_cmd::Command::cargo_bin(...)` finds `CARGO_BIN_EXE_<bin>`
 # unset and panics in the UNMUTATED baseline — which aborts the whole
 # run before a single mutant is tested (cargo-mutants exits 4,
-# "cargo test failed in an unmutated tree"). Three such tests exist:
+# "cargo test failed in an unmutated tree"). Such tests:
 #
 #   * `wire_envelope_crap4rs.rs` / `wire_envelope_crap4ts.rs` (test fn
 #     `envelope`) — exec the crap4rs / crap4ts bins to lock the JSON
 #     envelope shape. Unbuilt under `--package crap-core`.
+#   * `risk_level_cross_adapter.rs` (test fn `risk_level_envelope_parity`)
+#     — execs BOTH the crap4rs and crap4ts bins to pin cross-adapter
+#     `RiskLevel` consistency (canonical wire vocabulary + a shared
+#     `classify_risk` score→band oracle applied to both envelopes).
+#     Unbuilt under `--package crap-core`; the `envelope` substring in
+#     the fn name is covered by the `--skip envelope` token below.
 #   * `default_gate_threshold.rs` (test fns prefixed `default_gate_`) —
 #     exec an adapter bin to assert the no-explicit-`--threshold` gate
 #     resolves to the metric-calibrated cutoff. Unbuilt under
@@ -38,14 +44,18 @@
 #     view.rs gate targets), so keeping them in the gate would inflate
 #     per-mutant runtime without changing the mutant-killed set.
 #
-# All three are still fully exercised every PR by the `Test
+# All of these are still fully exercised every PR by the `Test
 # (linux-x86)` / `Test (macos-arm)` / `Test (macos-x86)` jobs, which
 # run `cargo nextest run --workspace --all-targets` and build every
 # bin first — so skipping them here loses zero mutant-killing power
-# (none of the three exercises the mutated files). The `--skip`
-# filters are libtest substring matches on the test-fn name; `envelope`,
-# `default_gate`, and `crap4rs_no_flag_default_cognitive_still_works`
-# are each collision-free workspace-wide. Scoped to mutants only.
+# (none of them exercises the mutated files). The `--skip`
+# filters are libtest substring matches on the test-fn name; the
+# `envelope` token covers both `wire_envelope_crap4{rs,ts}.rs`'s
+# `envelope` fn and `risk_level_cross_adapter.rs`'s
+# `risk_level_envelope_parity` fn (substring match — both names
+# contain `envelope`), while `default_gate` and
+# `crap4rs_no_flag_default_cognitive_still_works` match their own
+# fns. Scoped to mutants only.
 additional_cargo_test_args = [
     "--",
     "--skip",
