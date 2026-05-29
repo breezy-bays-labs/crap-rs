@@ -146,11 +146,14 @@ pub struct ConfigDiscovery {
 /// Discover the adapter's config file by walking `candidates` in priority
 /// order; the first *existing* file wins.
 ///
-/// Candidates are full paths — the caller (the CLI layer) joins the
-/// adapter's ordered config-file names to the working directory, which
-/// keeps this function CWD-agnostic and safe under parallel test
-/// execution. Index 0 is the canonical name (`crap.toml`); later entries
-/// are legacy per-adapter fallbacks (`crap4rs.toml` / `crap4ts.toml`).
+/// Candidates may be relative or absolute paths; this function never
+/// touches the working directory itself, so it is CWD-agnostic. In
+/// production the CLI layer passes bare relative names
+/// (`PathBuf::from("crap.toml")`), which resolve CWD-relative when
+/// `metadata` is called; tests pass tempdir-qualified absolute paths to
+/// stay safe under parallel execution (no process-wide CWD mutation).
+/// Index 0 is the canonical name (`crap.toml`); later entries are legacy
+/// per-adapter fallbacks (`crap4rs.toml` / `crap4ts.toml`).
 ///
 /// Discovery is by *existence*, not parseability: a present-but-malformed
 /// canonical file still wins, and surfaces its parse error downstream — it
