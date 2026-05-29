@@ -229,16 +229,15 @@ struct WireBand {
 fn collect_bands(value: &Value, path: &str, out: &mut Vec<WireBand>) {
     match value {
         Value::Object(map) => {
-            if let (Some(Value::Number(v)), Some(Value::String(rl))) =
-                (map.get("value"), map.get("risk_level"))
-            {
-                if let Some(v) = v.as_f64() {
-                    out.push(WireBand {
-                        location: path.to_string(),
-                        value: v,
-                        risk_level: rl.clone(),
-                    });
-                }
+            if let (Some(v), Some(Value::String(rl))) = (
+                map.get("value").and_then(Value::as_f64),
+                map.get("risk_level"),
+            ) {
+                out.push(WireBand {
+                    location: path.to_string(),
+                    value: v,
+                    risk_level: rl.clone(),
+                });
             }
             for (k, child) in map {
                 let child_path = if path.is_empty() {
@@ -279,6 +278,17 @@ fn assert_bands_consistent(bands: &[WireBand], adapter: &str) {
     );
     let canonical = canonical_wire_set();
     for band in bands {
+        assert!(
+            !band.location.is_empty(),
+            "{adapter}: a band carried an empty location breadcrumb — collect_bands path tracking regressed"
+        );
+        assert!(
+            band.value >= 1.0,
+            "{adapter}: CRAP value {} at {} is below the formula floor of 1.0 \
+             (crap(c, cov) >= 1.0 for all inputs) — a malformed wire value slipped through",
+            band.value,
+            band.location,
+        );
         assert!(
             canonical.contains(band.risk_level.as_str()),
             "{adapter}: risk_level {:?} at {} is not a canonical RiskLevel wire string \
