@@ -1,7 +1,7 @@
 Feature: --view saved presets (Bundle D, issue #80)
 
   CI users and investigators repeat the same flag combinations across
-  invocations. Saved view presets in `crap4rs.toml` let projects bake
+  invocations. Saved view presets in `crap.toml` let projects bake
   those combinations under named keys. `crap4rs --view ci` resolves the
   preset, folds its values into the CLI before validation, and proceeds
   through the existing pipeline. The gate keystone is preserved — a
@@ -9,7 +9,7 @@ Feature: --view saved presets (Bundle D, issue #80)
   shapeable.
 
   Background:
-    Given a project with `crap4rs.toml` containing:
+    Given a project with `crap.toml` containing:
       """
       [views.ci]
       top = 20
@@ -75,18 +75,18 @@ Feature: --view saved presets (Bundle D, issue #80)
     And stderr contains "investigate"
 
   @unwired
-  Scenario: --view with no crap4rs.toml exits 2 with hint
+  Scenario: --view with no crap.toml exits 2 with hint
     # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    Given no `crap4rs.toml` exists
+    Given no `crap.toml` exists
     When the operator runs `crap4rs --coverage lcov.info --view ci`
     Then the process exits 2
     And stderr contains "unknown view preset"
-    And stderr contains "crap4rs.toml"
+    And stderr contains "crap.toml"
 
   @unwired
   Scenario: Invalid preset field fails fast at config load
     # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    Given `crap4rs.toml` contains:
+    Given `crap.toml` contains:
       """
       [views.bad]
       max_coverage = 105

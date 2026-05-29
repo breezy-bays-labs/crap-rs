@@ -718,12 +718,17 @@ pub struct AdapterMeta {
     /// `runs[0].tool.driver.rules[0].helpUri`. Adapter-specific for
     /// the same reason as `tool_info_uri`.
     pub rule_help_uri: &'static str,
-    /// Conventional config file name the adapter binary auto-discovers
-    /// in the working directory (e.g., `"crap4rs.toml"` for the Rust
-    /// adapter; `"crap4ts.toml"` for the TS adapter). Threaded through
-    /// to `discover_config` and surfaced in `--view <preset>`
-    /// error hints so users see the right file name to create.
-    pub config_file_name: &'static str,
+    /// Ordered config file names the adapter binary auto-discovers in the
+    /// working directory, searched in priority order. The first entry is
+    /// the **canonical** name — what `init` writes and what `--view`
+    /// error hints tell the user to create — and the remaining entries are
+    /// **legacy fallbacks** kept working for back-compat. Both adapters
+    /// lead with the language-neutral `crap.toml`; crap4rs falls back to
+    /// `crap4rs.toml`, crap4ts to `crap4ts.toml`. Threaded through to
+    /// `discover_config`, which discovers the first existing file and flags
+    /// any legacy match so the CLI can nudge a rename. Must be non-empty,
+    /// and the canonical entry (`[0]`) must be a non-empty string.
+    pub config_file_names: &'static [&'static str],
     /// Commented-out exclude patterns emitted by `init` into the
     /// generated config (e.g., `&["tests/**", "benches/**", "examples/**"]`
     /// for Rust; `&["node_modules/**", "dist/**", "coverage/**"]` for
@@ -735,8 +740,9 @@ pub struct AdapterMeta {
     /// This field is **init-template only** — it does NOT affect the
     /// analyzer's effective exclude list at runtime. The runtime
     /// exclude list is built from `cli.filter.exclude` plus the user's
-    /// `crap4ts.toml`/`crap4rs.toml` `exclude` entries, with adapter-
-    /// mandated patterns prepended via `forced_excludes` (below).
+    /// `crap.toml` (or a legacy `crap4rs.toml`/`crap4ts.toml`) `exclude`
+    /// entries, with adapter-mandated patterns prepended via
+    /// `forced_excludes` (below).
     pub default_excludes: &'static [&'static str],
     /// Adapter-mandated exclude patterns prepended to every analysis
     /// run, regardless of CLI flags or user config. Use for files that
@@ -770,6 +776,18 @@ impl AdapterMeta {
     /// from the meta, decoupling analysis lifetime from CLI lifetime).
     pub fn extensions_owned(&self) -> Vec<String> {
         self.extensions.iter().map(|e| (*e).to_string()).collect()
+    }
+
+    /// The canonical config file name — the first entry in
+    /// `config_file_names`. This is what `init` writes and what `--view`
+    /// error hints name; later entries are legacy fallbacks honored only
+    /// during discovery. Call sites use this instead of indexing `[0]`
+    /// directly so the "first = canonical" convention lives in one place.
+    pub fn canonical_config_file_name(&self) -> &'static str {
+        self.config_file_names
+            .first()
+            .copied()
+            .expect("AdapterMeta.config_file_names must be non-empty")
     }
 
     /// Trip on construction with empty required strings. `extensions`
@@ -818,8 +836,12 @@ impl AdapterMeta {
             "AdapterMeta.rule_help_uri must not be empty"
         );
         debug_assert!(
-            !self.config_file_name.is_empty(),
-            "AdapterMeta.config_file_name must not be empty"
+            !self.config_file_names.is_empty(),
+            "AdapterMeta.config_file_names must not be empty"
+        );
+        debug_assert!(
+            !self.config_file_names[0].is_empty(),
+            "AdapterMeta.config_file_names[0] (canonical name) must not be empty"
         );
     }
 }
@@ -1356,7 +1378,7 @@ where
     // kept alongside the loaded config so downstream diagnostics
     // (e.g., unknown `--view` preset) can point the user at the
     // exact file to edit.
-    let (file_config, config_path) = load_file_config(cli, meta.config_file_name)?.unzip();
+    let (file_config, config_path) = load_file_config(cli, meta)?.unzip();
 
     // Resolve `--view <NAME>` before validate_view_args runs
     // so preset fields participate in the same validation pass as CLI
@@ -1366,7 +1388,7 @@ where
         cli,
         file_config.as_ref(),
         config_path.as_deref(),
-        meta.config_file_name,
+        meta.canonical_config_file_name(),
     )?;
     view_args::validate_view_args(cli)?;
 
@@ -1698,16 +1720,48 @@ fn format_arg_kebab(arg: FormatArg) -> String {
 /// sees the exact file to edit — not just the conventional name.
 fn load_file_config(
     cli: &Cli,
-    config_file_name: &str,
+    meta: &AdapterMeta,
 ) -> Result<Option<(FileConfig, std::path::PathBuf)>> {
     if let Some(path) = &cli.input.config {
+        // An explicit `--config <path>` is the operator's deliberate
+        // choice; the tool has no opinion on what they name it, so no
+        // deprecation/shadow notice is emitted here even if the path uses
+        // a legacy name. (Discovery notices only apply to auto-discovery.)
         let cfg = config::load_config(path)?;
         Ok(Some((cfg, path.clone())))
     } else {
-        match config::discover_config(config_file_name)? {
-            Some(path) => {
-                let cfg = config::load_config(&path)?;
-                Ok(Some((cfg, path)))
+        // Auto-discovery: search the adapter's ordered names (canonical
+        // first, legacy fallbacks after) relative to the working directory.
+        // Bare names resolve CWD-relative, identical to the previous
+        // single-name behavior.
+        let candidates: Vec<std::path::PathBuf> = meta
+            .config_file_names
+            .iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+        match config::discover_config(&candidates)? {
+            Some(disc) => {
+                // The rename target is the canonical name (the single
+                // source of truth for "first = canonical"); the shadower
+                // is the file that actually won (`disc.path`), which is
+                // robust if the ordered list ever grows past two names.
+                let canonical = meta.canonical_config_file_name();
+                if disc.used_index > 0 {
+                    eprintln!(
+                        "warning: using deprecated config name `{}`; rename it to `{}`",
+                        disc.path.display(),
+                        canonical
+                    );
+                }
+                for shadow in &disc.shadowed {
+                    eprintln!(
+                        "warning: `{}` is shadowed by `{}` and ignored; it is safe to remove",
+                        shadow.display(),
+                        disc.path.display(),
+                    );
+                }
+                let cfg = config::load_config(&disc.path)?;
+                Ok(Some((cfg, disc.path)))
             }
             None => Ok(None),
         }
@@ -3291,7 +3345,7 @@ mod tests {
             extensions: &["fake"],
             tool_info_uri: "https://example.invalid/fake-adapter",
             rule_help_uri: "https://example.invalid/fake-adapter#rules",
-            config_file_name: "fake-adapter.toml",
+            config_file_names: &["fake-adapter.toml"],
             default_excludes: &["fixtures/**"],
             // Empty in the shared fake so tests that don't care don't
             // see an unexpected prefix; the two `merge_exclude` tests
@@ -3344,10 +3398,23 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "config_file_name must not be empty")]
-    fn adapter_meta_debug_assert_trips_on_empty_config_file_name() {
+    #[should_panic(expected = "config_file_names must not be empty")]
+    fn adapter_meta_debug_assert_trips_on_empty_config_file_names() {
         let meta = AdapterMeta {
-            config_file_name: "",
+            config_file_names: &[],
+            ..fake_meta()
+        };
+        meta.debug_assert_required_fields();
+    }
+
+    #[test]
+    #[should_panic(expected = "canonical name) must not be empty")]
+    fn adapter_meta_debug_assert_trips_on_empty_canonical_config_file_name() {
+        // A non-empty list whose canonical (first) entry is empty is still
+        // invalid — that empty name is what `init` would write and what
+        // hints would tell the user to create.
+        let meta = AdapterMeta {
+            config_file_names: &[""],
             ..fake_meta()
         };
         meta.debug_assert_required_fields();

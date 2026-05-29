@@ -57,7 +57,7 @@ fn main() -> ExitCode {
         extensions: EXTENSIONS,
         tool_info_uri: "https://github.com/breezy-bays-labs/crap-rs",
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
-        config_file_name: "crap4ts.toml",
+        config_file_names: &["crap.toml", "crap4ts.toml"],
         default_excludes: DEFAULT_EXCLUDES,
         // `.d.ts` declaration files contain ambient types only (no
         // executable code); skip them at the discovery boundary so

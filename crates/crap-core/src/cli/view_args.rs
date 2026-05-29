@@ -94,9 +94,9 @@ fn resolve_coverage_bounds(cli: &Cli) -> Option<(f64, f64)> {
 ///
 /// `config_path` is the resolved on-disk location the config was loaded
 /// from (from `--config` or auto-discovery); when present, hints point
-/// the user at the exact file. `config_file_name` is the adapter
-/// convention (e.g., `"crap4rs.toml"`) used as the fallback when no
-/// config is loaded.
+/// the user at the exact file. `config_file_name` is the adapter's
+/// canonical config name (e.g., `"crap.toml"`) used as the fallback when
+/// no config is loaded.
 pub(super) fn resolve_view_preset(
     cli: &mut Cli,
     file_config: Option<&FileConfig>,

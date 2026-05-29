@@ -1,6 +1,6 @@
 //! Cucumber-rs runner for `tests/features/file_extensions.feature`.
 //!
-//! File discovery, `crap4ts.toml` `exclude` globs, unrecognized-
+//! File discovery, `crap.toml` `exclude` globs, unrecognized-
 //! extension skipping, and continue-on-parse-failure are all binary-
 //! level concerns (the filesystem walker + config loading + exit
 //! codes), so this harness shells the `crap4ts` binary with
@@ -84,7 +84,7 @@ fn write_coverage(root: &std::path::Path, files: &[&str]) -> PathBuf {
 }
 
 /// State for one scenario. The Given materializes the source tree +
-/// coverage file (and, for the exclude scenario, a `crap4ts.toml`); the
+/// coverage file (and, for the exclude scenario, a `crap.toml`); the
 /// When shells `crap4ts` and records the envelope, exit code, stderr.
 #[derive(Debug, Default, World)]
 struct FileExtWorld {
@@ -150,16 +150,16 @@ fn given_app_and_test(world: &mut FileExtWorld) {
     world.cov_path = Some(write_coverage(&root, &["app.ts", "app.test.ts"]));
 }
 
-#[given("the operator's `crap4ts.toml` has no exclusion for `.test.ts`")]
+#[given("the operator's `crap.toml` has no exclusion for `.test.ts`")]
 fn given_no_test_exclusion(_world: &mut FileExtWorld) {
     // No config file is written, so nothing excludes `.test.ts`.
 }
 
-#[given(r#"the operator's `crap4ts.toml` has `exclude = ["**/*.test.ts"]`"#)]
+#[given(r#"the operator's `crap.toml` has `exclude = ["**/*.test.ts"]`"#)]
 fn given_test_exclusion(world: &mut FileExtWorld) {
     let root = world.root();
-    let config = root.join("crap4ts.toml");
-    std::fs::write(&config, "exclude = [\"**/*.test.ts\"]\n").expect("write crap4ts.toml");
+    let config = root.join("crap.toml");
+    std::fs::write(&config, "exclude = [\"**/*.test.ts\"]\n").expect("write crap.toml");
     world.config = Some(config);
 }
 
@@ -189,9 +189,9 @@ fn given_dts_and_app(world: &mut FileExtWorld) {
     world.cov_path = Some(write_coverage(&root, &["app.ts"]));
 }
 
-#[given("the operator's `crap4ts.toml` does NOT explicitly include `.d.ts`")]
+#[given("the operator's `crap.toml` does NOT explicitly include `.d.ts`")]
 fn given_no_dts_include_in_config(_world: &mut FileExtWorld) {
-    // No `crap4ts.toml` is written; the default skip applies. There
+    // No `crap.toml` is written; the default skip applies. There
     // is no `include` flag for `.d.ts` today (crap-rs#253) — the skip
     // is unconditional. This Given is narration that pins the
     // contract for future readers.
@@ -286,7 +286,7 @@ fn then_includes_app(world: &mut FileExtWorld) {
 fn then_excludes_test(world: &mut FileExtWorld) {
     assert!(
         !world.files_with_functions().contains(&"app.test.ts"),
-        "app.test.ts should be excluded by the crap4ts.toml glob; got {:?}",
+        "app.test.ts should be excluded by the crap.toml glob; got {:?}",
         world.files_with_functions(),
     );
 }

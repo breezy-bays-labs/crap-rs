@@ -145,7 +145,7 @@ fn letter(i: usize) -> String {
 
 /// Set up (or extend) the scenario's synthetic project. If a Given
 /// step before this one already created `world.project_dir` (e.g. by
-/// dropping a `crap4rs.toml` into it), `setup_with` writes the
+/// dropping a `crap.toml` into it), `setup_with` writes the
 /// source plus LCOV into that same dir; otherwise it creates a fresh
 /// tempdir. Idempotent on the project dir but always overwrites
 /// `src/lib.rs` and `lcov.info` so callers in sequence stack cleanly.
@@ -291,19 +291,16 @@ fn given_three_exceeders(world: &mut GhaWorld) {
     setup_with(world, 3, 0);
 }
 
-#[given("a `crap4rs.toml` with `[output] annotation_limit = 25`")]
+#[given("a `crap.toml` with `[output] annotation_limit = 25`")]
 fn given_toml_annotation_limit_25(world: &mut GhaWorld) {
     // The project_dir doubles as the binary's CWD, so a config file
-    // here is discovered by `discover_config("crap4rs.toml")`. Created
+    // here is discovered by `discover_config("crap.toml")`. Created
     // before any source-writing Given step in the same scenario so
     // `setup_with` later reuses this dir (idempotent contract).
     let dir = tempfile::tempdir().expect("create tempdir");
     let path = dir.path().to_path_buf();
-    std::fs::write(
-        path.join("crap4rs.toml"),
-        "[output]\nannotation_limit = 25\n",
-    )
-    .expect("write crap4rs.toml");
+    std::fs::write(path.join("crap.toml"), "[output]\nannotation_limit = 25\n")
+        .expect("write crap.toml");
     world._tempdir = Some(dir);
     world.project_dir = Some(path);
 }

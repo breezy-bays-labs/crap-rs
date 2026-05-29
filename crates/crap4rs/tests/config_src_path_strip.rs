@@ -1,7 +1,7 @@
 //! Integration tests for issue #150 — LcovParser path-strip must honor
 //! the effective source root *after* CLI/config-file merge.
 //!
-//! The bug fixture sets `src` only in `crap4rs.toml` (not on the CLI).
+//! The bug fixture sets `src` only in `crap.toml` (not on the CLI).
 //! Pre-fix, `crates/crap4rs/src/main.rs` constructed `LcovParser::new`
 //! from `cli.input.src` *before* config merging, so the parser stripped
 //! the default `src/` prefix from absolute `SF:` records emitted by
@@ -27,12 +27,12 @@ pub fn passing_c() -> i32 { 3 }
 
 /// Custom source-directory name. NOT `src` — using a non-default name
 /// is what forces `cli.input.src` to be `None` and the effective `src`
-/// to come exclusively from `crap4rs.toml`.
+/// to come exclusively from `crap.toml`.
 const CUSTOM_SRC_DIR: &str = "myproject_source";
 
 /// Set up the fixture in `dir`:
 ///   - Create `<CUSTOM_SRC_DIR>/lib.rs` with `FIXTURE_SRC`.
-///   - Write `crap4rs.toml` with `src = "<CUSTOM_SRC_DIR>"`.
+///   - Write `crap.toml` with `src = "<CUSTOM_SRC_DIR>"`.
 ///   - Write `lcov.info` with **absolute** `SF:` paths pointing into
 ///     the canonicalized custom source dir — this is what
 ///     `cargo llvm-cov` emits in CI.
@@ -54,7 +54,7 @@ fn setup_dir(dir: &Path) -> std::path::PathBuf {
     std::fs::write(dir.join("lcov.info"), lcov).expect("write lcov.info fixture");
 
     let toml = format!("src = \"{CUSTOM_SRC_DIR}\"\n");
-    std::fs::write(dir.join("crap4rs.toml"), toml).expect("write crap4rs.toml fixture");
+    std::fs::write(dir.join("crap.toml"), toml).expect("write crap.toml fixture");
 
     src_canonical
 }
@@ -63,7 +63,7 @@ fn run_without_src_flag(dir: &Path) -> std::process::Output {
     Command::new(BINARY)
         .current_dir(dir)
         // Deliberately omit `--src` so the effective source root comes
-        // from `crap4rs.toml` alone (the path that triggered #150).
+        // from `crap.toml` alone (the path that triggered #150).
         .args([
             "--coverage",
             "lcov.info",
@@ -82,7 +82,7 @@ fn run_without_src_flag(dir: &Path) -> std::process::Output {
 fn config_only_src_strips_lcov_path_prefix() {
     // #150 acceptance criterion 2:
     //   "Add a config-file integration test where `[src] = ".../foo"`
-    //    only appears in `crap4rs.toml`; assert the LCOV parser strips
+    //    only appears in `crap.toml`; assert the LCOV parser strips
     //    that prefix."
     //
     // After the fix, the parser strips the canonical custom-src prefix

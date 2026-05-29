@@ -1,8 +1,9 @@
 //! Integration tests for `crap4ts init` (crap-rs#73).
 //!
-//! crap4ts inherits the `init` subcommand for free via `AdapterMeta`
-//! (`config_file_name = "crap4ts.toml"`, `default_excludes = ["node_modules/**", …]`).
-//! These tests live here (not in the crap4rs cucumber harness) because
+//! crap4ts inherits the `init` subcommand for free via `AdapterMeta`.
+//! `init` writes the canonical config name — the unified `crap.toml`
+//! shared by both adapters (crap-rs#345) — not a per-adapter file. These
+//! tests live here (not in the crap4rs cucumber harness) because
 //! `CARGO_BIN_EXE_<name>` is set per-package: from inside the crap4rs
 //! harness `CARGO_BIN_EXE_crap4ts` would be undefined.
 //!
@@ -14,7 +15,7 @@ use std::process::Command;
 const BINARY: &str = env!("CARGO_BIN_EXE_crap4ts");
 
 #[test]
-fn crap4ts_init_writes_crap4ts_toml_not_crap4rs_toml() {
+fn crap4ts_init_writes_canonical_crap_toml() {
     let tmp = tempfile::tempdir().expect("create tempdir");
     let output = Command::new(BINARY)
         .current_dir(tmp.path())
@@ -29,12 +30,18 @@ fn crap4ts_init_writes_crap4ts_toml_not_crap4rs_toml() {
         String::from_utf8_lossy(&output.stderr),
     );
     assert!(
-        tmp.path().join("crap4ts.toml").exists(),
-        "crap4ts.toml should exist after init",
+        tmp.path().join("crap.toml").exists(),
+        "init writes the canonical crap.toml",
+    );
+    // The legacy per-adapter names are discovery fallbacks only — `init`
+    // never writes them.
+    assert!(
+        !tmp.path().join("crap4ts.toml").exists(),
+        "legacy crap4ts.toml should NOT be written by init",
     );
     assert!(
         !tmp.path().join("crap4rs.toml").exists(),
-        "crap4rs.toml should NOT exist after `crap4ts init` (per-adapter file name)",
+        "the other adapter's legacy name should never appear",
     );
 }
 
@@ -47,8 +54,8 @@ fn crap4ts_init_emits_ts_specific_excludes() {
         .output()
         .expect("invoke crap4ts binary");
 
-    let content = std::fs::read_to_string(tmp.path().join("crap4ts.toml"))
-        .expect("read generated crap4ts.toml");
+    let content =
+        std::fs::read_to_string(tmp.path().join("crap.toml")).expect("read generated crap.toml");
     // The default excludes for TS come from AdapterMeta.default_excludes;
     // we assert the user-visible patterns the crap4ts main.rs declares.
     assert!(
@@ -62,14 +69,14 @@ fn crap4ts_init_emits_ts_specific_excludes() {
     // Negative: Rust-flavored defaults from crap4rs should NOT leak in.
     assert!(
         !content.contains("benches/**"),
-        "Rust-only exclude (benches/**) should not appear in crap4ts.toml:\n{content}",
+        "Rust-only exclude (benches/**) should not appear in crap.toml:\n{content}",
     );
 }
 
 #[test]
 fn crap4ts_init_refuses_to_overwrite_without_force() {
     let tmp = tempfile::tempdir().expect("create tempdir");
-    let cfg = tmp.path().join("crap4ts.toml");
+    let cfg = tmp.path().join("crap.toml");
     std::fs::write(&cfg, "preset = \"lenient\"\n").expect("seed existing config");
 
     let output = Command::new(BINARY)
@@ -81,7 +88,7 @@ fn crap4ts_init_refuses_to_overwrite_without_force() {
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("crap4ts.toml already exists"),
+        stderr.contains("crap.toml already exists"),
         "expected collision error in stderr; got:\n{stderr}",
     );
     let preserved = std::fs::read_to_string(&cfg).expect("read config");
@@ -91,7 +98,7 @@ fn crap4ts_init_refuses_to_overwrite_without_force() {
 #[test]
 fn crap4ts_init_force_overwrites() {
     let tmp = tempfile::tempdir().expect("create tempdir");
-    let cfg = tmp.path().join("crap4ts.toml");
+    let cfg = tmp.path().join("crap.toml");
     std::fs::write(&cfg, "preset = \"lenient\"\n").expect("seed existing config");
 
     let output = Command::new(BINARY)
