@@ -5,6 +5,7 @@
 
 use crap4rs::adapters::complexity::SynComplexityAdapter;
 use crap4rs::adapters::coverage::LcovParser;
+use crap4rs::core::identity::IdentityBase;
 use crap4rs::core::{AnalyzeOptions, analyze};
 use crap4rs::domain::threshold::ThresholdConfig;
 use crap4rs::domain::types::ComplexityMetric;
@@ -38,7 +39,8 @@ fn self_referential_analysis() {
     std::fs::write(&lcov_path, &lcov).unwrap();
 
     let opts = AnalyzeOptions {
-        src: src.clone(),
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src.clone()],
         coverage: lcov_path,
         threshold_config: ThresholdConfig {
             global: 30.0,
@@ -101,7 +103,8 @@ fn self_referential_with_cyclomatic() {
 
     let (cx, cov) = adapters(&src);
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: lcov_path,
         threshold_config: ThresholdConfig {
             global: 30.0,
@@ -137,7 +140,8 @@ fn self_referential_known_functions_present() {
 
     let (cx, cov) = adapters(&src);
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: lcov_path,
         threshold_config: ThresholdConfig {
             global: 30.0,
@@ -188,7 +192,8 @@ fn exclude_pattern_filters_correctly() {
 
     // Analyze all files
     let all_opts = AnalyzeOptions {
-        src: src.clone(),
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src.clone()],
         coverage: lcov_path.clone(),
         threshold_config: ThresholdConfig {
             global: 100.0,
@@ -204,7 +209,8 @@ fn exclude_pattern_filters_correctly() {
 
     // Analyze with adapter exclusion
     let filtered_opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: lcov_path,
         threshold_config: ThresholdConfig {
             global: 100.0,

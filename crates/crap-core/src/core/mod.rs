@@ -12,6 +12,7 @@
 //! (mixed-dispatch-strategy).
 
 pub mod compose;
+pub mod identity;
 pub mod walker;
 
 use std::path::{Path, PathBuf};
@@ -35,8 +36,19 @@ use crate::ports::{ComplexityPort, CoveragePort, DiffPort, ParseDiagnostic, Pars
 /// Options for running a CRAP analysis.
 #[derive(Debug)]
 pub struct AnalyzeOptions {
-    /// Root directory of source files to analyze.
-    pub src: PathBuf,
+    /// Source roots to analyze. A single root is the back-compat case
+    /// (byte-identical to the pre-multi-root `PathBuf` field); multiple
+    /// roots union their discovered functions into one report (#336).
+    /// Empty defers to the config/default `["src"]` upstream in the CLI
+    /// merge layer — by the time options reach `analyze`, this is
+    /// non-empty.
+    pub src: Vec<PathBuf>,
+    /// The path-space function identity and coverage SF records are
+    /// relativized against (#336). Decided ONCE from `src.len()` in the
+    /// CLI layer: single root ⇒ src-relative (byte-identical
+    /// back-compat); multiple roots ⇒ git-toplevel-relative
+    /// (collision-free + bleed-free). See [`identity::IdentityBase`].
+    pub identity_base: identity::IdentityBase,
     /// Path to the coverage file (adapter-specific format: LCOV for
     /// crap4rs, Istanbul JSON for crap4ts, etc.).
     pub coverage: PathBuf,
@@ -83,8 +95,20 @@ pub struct AnalysisOutput<P: ParseDiagnostic> {
     pub diagnostics: AnalysisDiagnostics<P>,
 }
 
+/// A discovered source file paired with the `--src` root it was found
+/// under. The originating root is what `IdentityBase::relativize` strips
+/// against, so a file's identity key is unambiguous even when several
+/// roots share crate-internal relative names (`adapters/mod.rs`).
+#[derive(Debug, Clone)]
+struct DiscoveredFile {
+    /// The `--src` root this file was discovered under.
+    root: PathBuf,
+    /// The full discovered path (relative to CWD, as the walker emits).
+    path: PathBuf,
+}
+
 struct DiscoveredSources {
-    source_files: Vec<PathBuf>,
+    source_files: Vec<DiscoveredFile>,
     files_found: usize,
 }
 
@@ -96,7 +120,8 @@ struct ExtractedComplexities {
 impl Default for AnalyzeOptions {
     fn default() -> Self {
         Self {
-            src: PathBuf::from("src"),
+            src: vec![PathBuf::from("src")],
+            identity_base: identity::IdentityBase::default(),
             coverage: PathBuf::from("lcov.info"),
             threshold_config: ThresholdConfig::default(),
             metric: ComplexityMetric::default(),
@@ -147,6 +172,11 @@ struct AnalysisContext<'a, P: ParseDiagnostic> {
     options: &'a AnalyzeOptions,
     complexity: &'a dyn ComplexityPort,
     coverage: &'a dyn CoveragePort<Diagnostic = P>,
+    /// Canonicalized first `--src` root. Used only by the `--diff` path
+    /// (`compute_diff_regions`) to locate the git work tree. Single-root
+    /// runs canonicalize the only root (byte-identical to before
+    /// multi-root); multi-root runs share the git toplevel via
+    /// `options.identity_base`, so this is just the diff anchor.
     src_canonical: PathBuf,
 }
 
@@ -160,7 +190,15 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
             options,
             complexity,
             coverage,
-            src_canonical: canonicalize_src(&options.src),
+            // The diff anchor is the first root. Single-root: the only
+            // root (byte-identical). Multi-root: any root resolves the
+            // same git work tree, so the first is a fine anchor; the
+            // identity base carries the toplevel for relativization.
+            src_canonical: options
+                .src
+                .first()
+                .map(|first| canonicalize_src(first))
+                .unwrap_or_else(|| PathBuf::from("src")),
         }
     }
 
@@ -239,12 +277,44 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
 
     fn discover_sources(&self) -> Result<DiscoveredSources> {
         let extensions: Vec<&str> = self.options.extensions.iter().map(String::as_str).collect();
-        let source_files = discover_source_files(
-            &self.options.src,
-            &self.options.exclude,
-            self.options.respect_gitignore,
-            &extensions,
-        )?;
+
+        // Discover under every `--src` root, tagging each file with the
+        // root it was found under so `IdentityBase::relativize` strips
+        // against the right base. Union + dedup on the global identity
+        // key: an overlapping root must not double-count a function's
+        // file (the union semantics #336 promises).
+        let mut source_files: Vec<DiscoveredFile> = Vec::new();
+        let mut seen_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for root in &self.options.src {
+            let found = discover_source_files(
+                root,
+                &self.options.exclude,
+                self.options.respect_gitignore,
+                &extensions,
+            )?;
+            for path in found {
+                let key = self.options.identity_base.relativize(&path, root);
+                if seen_keys.insert(key) {
+                    source_files.push(DiscoveredFile {
+                        root: root.clone(),
+                        path,
+                    });
+                }
+            }
+        }
+        // Sort by the discovered PATH (PathBuf order), NOT the
+        // relativized identity-key string. The walker's pre-multi-root
+        // `files.sort()` was PathBuf-Ord (component-wise); String-Ord on
+        // the slash-joined key diverges when a sibling file/dir pair
+        // straddles the separator (`foo.rs` vs `foo/…`: `.` 0x2E < `/`
+        // 0x2F flips them). Since nothing downstream re-sorts
+        // `result.functions`, discovery order reaches the JSON envelope —
+        // so PathBuf-Ord here is load-bearing for single-root
+        // byte-identity. Full paths are globally unique across roots, so
+        // PathBuf-Ord is also a deterministic, order-independent union
+        // key for multi-root.
+        source_files.sort_by(|a, b| a.path.cmp(&b.path));
+
         let files_found = source_files.len();
         ensure_source_files_found(&source_files, &self.options.src, &extensions)?;
 
@@ -256,7 +326,7 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
 
     fn load_diff_data(
         &self,
-        source_files: &[PathBuf],
+        source_files: &[DiscoveredFile],
     ) -> Result<Option<std::collections::HashMap<String, FileChangeKind>>> {
         self.options
             .diff_ref
@@ -265,7 +335,7 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
                 compute_diff_regions(
                     diff_ref,
                     &self.src_canonical,
-                    &self.options.src,
+                    &self.options.identity_base,
                     source_files,
                 )
             })
@@ -305,14 +375,21 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
             })
     }
 
-    fn extract_complexities(&self, source_files: &[PathBuf]) -> Result<ExtractedComplexities> {
+    fn extract_complexities(
+        &self,
+        source_files: &[DiscoveredFile],
+    ) -> Result<ExtractedComplexities> {
         let mut all_complexities = Vec::new();
         let mut files_unparseable = 0usize;
 
-        for file_path in source_files {
-            let source = std::fs::read_to_string(file_path)
-                .with_context(|| format!("failed to read source file: {}", file_path.display()))?;
-            let relative = src_relative_path(file_path, &self.options.src);
+        for DiscoveredFile { root, path } in source_files {
+            let source = std::fs::read_to_string(path)
+                .with_context(|| format!("failed to read source file: {}", path.display()))?;
+            // Relativize via the run identity base, stripping against the
+            // root this file was discovered under (#336). Single-root
+            // mode reproduces the historical `src_relative_path` strip
+            // byte-for-byte.
+            let relative = self.options.identity_base.relativize(path, root);
 
             match self
                 .complexity
@@ -352,7 +429,11 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
         diff_data: Option<&std::collections::HashMap<String, FileChangeKind>>,
     ) -> Option<AnalysisOutput<P>> {
         let diff_result = diff_data?;
-        retain_changed_source_files(&mut discovered.source_files, &self.options.src, diff_result);
+        retain_changed_source_files(
+            &mut discovered.source_files,
+            &self.options.identity_base,
+            diff_result,
+        );
         if !discovered.source_files.is_empty() {
             return None;
         }
@@ -415,8 +496,8 @@ pub(crate) fn canonicalize_src(src: &Path) -> PathBuf {
 }
 
 fn ensure_source_files_found(
-    source_files: &[PathBuf],
-    src: &Path,
+    source_files: &[DiscoveredFile],
+    src: &[PathBuf],
     extensions: &[&str],
 ) -> Result<()> {
     if source_files.is_empty() {
@@ -441,20 +522,31 @@ fn ensure_source_files_found(
         bail!(
             "no source files found in {}\n  \
              hint: check that --src points to a directory containing {} files",
-            src.display(),
+            display_roots(src),
             pretty,
         );
     }
     Ok(())
 }
 
+/// Render one-or-more `--src` roots for an error message: a single root
+/// prints as its bare path (back-compat with the pre-multi-root
+/// wording); multiple roots print as a comma-separated list.
+fn display_roots(roots: &[PathBuf]) -> String {
+    roots
+        .iter()
+        .map(|r| r.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn retain_changed_source_files(
-    source_files: &mut Vec<PathBuf>,
-    src_root: &Path,
+    source_files: &mut Vec<DiscoveredFile>,
+    identity_base: &identity::IdentityBase,
     diff_result: &std::collections::HashMap<String, FileChangeKind>,
 ) {
-    source_files.retain(|path| {
-        let rel = src_relative_path(path, src_root);
+    source_files.retain(|DiscoveredFile { root, path }| {
+        let rel = identity_base.relativize(path, root);
         diff_result.contains_key(&rel)
     });
 }
@@ -470,12 +562,15 @@ fn retain_changed_functions(
     });
 }
 
-fn ensure_functions_extracted(all_complexities: &[FunctionComplexity], src: &Path) -> Result<()> {
+fn ensure_functions_extracted(
+    all_complexities: &[FunctionComplexity],
+    src: &[PathBuf],
+) -> Result<()> {
     if all_complexities.is_empty() {
         bail!(
             "no functions extracted from source files in {}\n  \
              hint: check that source files contain valid function definitions for the selected adapter",
-            src.display()
+            display_roots(src)
         );
     }
     Ok(())
@@ -650,70 +745,91 @@ fn src_relative_path(path: &Path, src_root: &Path) -> String {
         .replace('\\', "/")
 }
 
-/// Compute diff regions for the given ref, reconciling repo-root-relative paths
-/// from `git diff` with src-relative paths used by the complexity adapter.
+/// Compute diff regions for the given ref, reconciling repo-root-relative
+/// paths from `git diff` with the run's identity keys.
+///
+/// `git diff` emits repo-relative paths; the analyzer keys functions on
+/// the run identity base (src-relative single-root, toplevel-relative
+/// multi-root). This bridges the two by mapping each discovered file's
+/// repo-relative path to its identity key, querying git with the
+/// repo-relative paths, then re-keying the result to identity keys so
+/// the diff filter compares like with like.
+///
+/// Single-root: the repo-relative→identity-key map reproduces the old
+/// `src_prefix` strip exactly (byte-identical). Multi-root: identity
+/// keys ARE toplevel-relative, so the map is the identity (no prefix
+/// juggling) — Q5 collapses for free under the common base.
 fn compute_diff_regions(
     diff_ref: &str,
     src_canonical: &Path,
-    src_original: &Path,
-    source_files: &[PathBuf],
+    identity_base: &identity::IdentityBase,
+    source_files: &[DiscoveredFile],
 ) -> Result<std::collections::HashMap<String, FileChangeKind>> {
     let diff_adapter = GitDiffAdapter::new();
 
-    // Git diff outputs paths relative to repo root, but the complexity
-    // adapter uses paths relative to options.src. We bridge via src_prefix.
+    // Any `--src` root resolves the same work tree; the first root's
+    // canonical path is the diff anchor.
     let repo_root = git_toplevel(src_canonical)?;
-    let src_prefix = src_canonical
-        .strip_prefix(&repo_root)
-        .with_context(|| {
-            format!(
-                "--src directory {} is not inside the git repository at {}\n  \
-                 hint: --diff requires --src to be within the git work tree",
-                src_canonical.display(),
-                repo_root.display(),
-            )
-        })?
-        .to_string_lossy()
-        .replace('\\', "/");
 
-    // Paths passed to `git diff -- <paths>` must be repo-relative.
-    // source_files use the original (possibly symlinked) src path.
-    let repo_relative_paths: Vec<String> = source_files
-        .iter()
-        .map(|p| {
-            let src_rel = src_relative_path(p, src_original);
-            if src_prefix.is_empty() {
-                src_rel
-            } else {
-                format!("{src_prefix}/{src_rel}")
-            }
-        })
-        .collect();
+    // Build the bridge: for each discovered file, its repo-relative
+    // path (what `git diff -- <paths>` expects) ↔ its identity key
+    // (what the analyzer keys functions on).
+    let mut repo_to_identity: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let mut repo_relative_paths: Vec<String> = Vec::with_capacity(source_files.len());
+    for DiscoveredFile { root, path } in source_files {
+        let identity_key = identity_base.relativize(path, root);
+        let repo_rel = repo_relative_path(path, root, &repo_root)?;
+        repo_relative_paths.push(repo_rel.clone());
+        repo_to_identity.insert(repo_rel, identity_key);
+    }
 
     let raw_diff = diff_adapter
         .changed_regions(diff_ref, &repo_root, &repo_relative_paths)
         .map_err(|e| anyhow::anyhow!(e))?;
 
-    // Strip src_prefix from diff result keys to get src-relative paths
-    let prefix_with_slash = if src_prefix.is_empty() {
-        String::new()
-    } else {
-        format!("{src_prefix}/")
-    };
+    // Re-key git's repo-relative output to identity keys via the bridge.
+    // Entries with no discovered-file match are dropped (the diff only
+    // matters for files we're analyzing).
     Ok(raw_diff
         .into_iter()
-        .filter_map(|(path, kind)| {
-            if prefix_with_slash.is_empty() {
-                Some((path, kind))
-            } else {
-                path.strip_prefix(&prefix_with_slash)
-                    .map(|stripped| (stripped.to_string(), kind))
-            }
+        .filter_map(|(repo_path, kind)| {
+            repo_to_identity
+                .get(&repo_path)
+                .map(|identity_key| (identity_key.clone(), kind))
         })
         .collect())
 }
 
-fn git_toplevel(from_dir: &Path) -> Result<PathBuf> {
+/// Repo-relative path of a discovered file: canonicalize the originating
+/// root, strip the git toplevel to get the root's repo prefix, then
+/// append the file's path relative to that root.
+fn repo_relative_path(file: &Path, root: &Path, repo_root: &Path) -> Result<String> {
+    let root_canonical = canonicalize_src(root);
+    let root_prefix = root_canonical
+        .strip_prefix(repo_root)
+        .with_context(|| {
+            format!(
+                "--src directory {} is not inside the git repository at {}\n  \
+                 hint: --diff requires --src to be within the git work tree",
+                root_canonical.display(),
+                repo_root.display(),
+            )
+        })?
+        .to_string_lossy()
+        .replace('\\', "/");
+    let file_rel = src_relative_path(file, root);
+    Ok(if root_prefix.is_empty() {
+        file_rel
+    } else {
+        format!("{root_prefix}/{file_rel}")
+    })
+}
+
+/// Resolve the git work-tree root from `from_dir`. `pub(crate)` so the
+/// CLI's `resolve_identity_base` can anchor the multi-root identity base
+/// on the same toplevel the diff path uses.
+pub(crate) fn git_toplevel(from_dir: &Path) -> Result<PathBuf> {
     let output = std::process::Command::new("git")
         .current_dir(from_dir)
         .args(["rev-parse", "--show-toplevel"])

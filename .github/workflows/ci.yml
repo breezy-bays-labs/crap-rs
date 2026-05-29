@@ -599,6 +599,138 @@ jobs:
           fi
           echo "default + threshold:$EXPECTED → threshold=$EXPECTED (no conflict, no warning) ✓"
 
+      # ----------------------------------------------------------------
+      # comment-preamble spot-check (crap-rs#336 acceptance gate).
+      #
+      # Invoke the action twice with identical inputs except
+      # `comment-preamble` (a sentinel vs empty), `comment-mode: none`,
+      # and assert on the new `sticky-message` output: the with-preamble
+      # body STARTS WITH the sentinel; the empty-preamble body does NOT
+      # contain it. Relational assertions (startswith + absence) through
+      # the real action.yml compose logic — robust against trailing-
+      # newline normalization across the $GITHUB_OUTPUT heredoc boundary
+      # that an exact-byte equality would trip on. All interpolations
+      # flow through env: (the sentinel is an action-author constant,
+      # not user input, but the indirection keeps the workflow uniform).
+      # ----------------------------------------------------------------
+      - name: Preamble spot-check — with sentinel
+        id: preamble-with
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-preamble: 'CRAP_PREAMBLE_SENTINEL — spot-check marker'
+          comment-mode: 'none'
+      - name: Preamble spot-check — empty
+        id: preamble-empty
+        uses: ./.github/actions/scorecard
+        with:
+          coverage: lcov.info
+          src: crates/crap4rs/src
+          threshold: ${{ env.CRAP_SMOKE_THRESHOLD }}
+          comment-mode: 'none'
+      - name: Assert preamble prepends and empty is preamble-free
+        env:
+          WITH_MSG: ${{ steps.preamble-with.outputs.sticky-message }}
+          EMPTY_MSG: ${{ steps.preamble-empty.outputs.sticky-message }}
+        run: |
+          set -euo pipefail
+          sentinel='CRAP_PREAMBLE_SENTINEL'
+          # 1. With-preamble body starts with the sentinel (preamble
+          #    prepended ABOVE the scorecard body).
+          case "$WITH_MSG" in
+            "$sentinel"*) ;;
+            *)
+              echo "::error::preamble-spot: sticky-message did not start with the preamble sentinel"
+              printf '%s\n' "$WITH_MSG" | head -3
+              exit 1
+              ;;
+          esac
+          # 2. Empty-preamble body does NOT contain the sentinel
+          #    (byte-identity preserved — preamble truly empty).
+          if printf '%s' "$EMPTY_MSG" | grep -q "$sentinel"; then
+            echo "::error::preamble-spot: empty-preamble sticky-message unexpectedly contains the sentinel"
+            exit 1
+          fi
+          echo "comment-preamble: prepend ✓, empty byte-identity ✓"
+
+  scorecard-production:
+    # ----------------------------------------------------------------
+    # Production CRAP scorecard — the repo's FIRST CRAP-threshold gate
+    # on production source (crap-rs#336). PURELY ADDITIVE: it removes
+    # no existing gate. #295 created the production scorecard analyzing
+    # crap-core/src; #314 repointed that slot to crap-examples/src, so
+    # production lost its gate. This restores it across the full prod
+    # crate set — crap-core + crap4rs + crap4ts src — via multi-root
+    # `--src` (the examples scorecard stays in quick-start-smoke.yml).
+    #
+    # Binary provenance is load-bearing: the published crap4rs predates
+    # the repeatable-`--src` capability this PR ships, so the gate MUST
+    # run THIS PR's binary (built + staged below). `version` is left
+    # unset (default `latest`) so the action's pre-installed-detection
+    # short-circuits its binstall and uses the staged binary. Gating
+    # this PR's source with this PR's analyzer is the whole point.
+    # ----------------------------------------------------------------
+    name: Scorecard — production crates (gated)
+    runs-on: ubuntu-latest
+    needs: [coverage]
+    permissions:
+      # contents: read for checkout; pull-requests: write for the
+      # distinct `crap-scorecard-production` sticky comment on PRs.
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lcov
+
+      - name: Build PR binary
+        run: cargo build --release --package crap4rs
+
+      - name: Stage PR binary as pre-installed adapter
+        run: |
+          set -euo pipefail
+          # The public scorecard action short-circuits its binstall when
+          # `crap4rs --version` resolves on PATH AND `version: latest`.
+          # $HOME/.cargo/bin is pre-pended to PATH on ubuntu-latest, so
+          # staging the PR-built binary there makes the action dogfood
+          # THIS PR's repeatable-`--src` capability instead of the
+          # published binary (which lacks it). Same shape as the
+          # multi-language smoke job's staging step.
+          mkdir -p "$HOME/.cargo/bin"
+          install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
+          crap4rs --version
+
+      - name: Production scorecard (gate-on-analysis)
+        uses: ./.github/actions/scorecard
+        with:
+          languages: rust
+          # Multi-root: the full production crate set, one root per line
+          # (newline-split into repeated `--src` by the action). Excludes
+          # crap-examples by construction — boundary-safe per-crate roots,
+          # never the recursive workspace root.
+          src: |
+            crates/crap-core/src
+            crates/crap4rs/src
+            crates/crap4ts/src
+          coverage: lcov.info
+          gate-mode: gate-on-analysis
+          threshold-preset: default
+          comment-mode: sticky
+          comment-header: crap-scorecard-production
+          comment-preamble: |
+            **Production CRAP scorecard** — gates `crap-core`, `crap4rs`,
+            and `crap4ts` source. This is real production code held to the
+            threshold; the separate _quickstart-smoke_ scorecard analyzes
+            `crap-examples` (an intentionally bad teaching sample), not
+            production.
+
   scorecard-smoke-ts:
     # Sibling of `scorecard-smoke-rust` for the TypeScript dispatch
     # path. Build crap4ts from the PR, stage it on PATH (the only

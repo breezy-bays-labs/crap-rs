@@ -260,6 +260,44 @@ input's file extension (`.info` / `.lcov` → crap4rs, `.json`
 Callers may override detection by setting `inputs.language` to
 `rust` or `typescript` explicitly.
 
+### Multi-root `--src` + the two-scorecard model (crap-rs#336)
+
+`--src` is **repeatable** (`Vec<PathBuf>`): a single run can analyze
+several source roots and union their functions into one scorecard,
+joined against a single shared `--coverage`. The action's `src:` /
+`src-ts:` inputs accept a newline-separated list (YAML `|` block scalar)
+and split it into repeated `--src`. A single root stays byte-identical
+to before multi-root existed.
+
+**`IdentityBase` (one-liner):** function `file_path` (and coverage-SF
+normalization) is relativized to a run identity base decided ONCE from
+the root count — `len()==1 ⇒ src-relative` (byte-identical back-compat;
+load-bearing for #334's config `src=[...]`), `len()>1 ⇒
+git-toplevel-relative` (globally-unique keys across crates sharing
+internal names like `adapters/mod.rs`; no coverage bleed). Multi-root
+outside a git work tree is a HARD ERROR, never a silent basename strip.
+Resolved in `cli::prepare_pipeline` between input validation and the
+coverage-factory call, threaded to BOTH consumers (identity +
+coverage). ADR: `adr-multi-root-identity-base.md`.
+
+**Two scorecards, two surfaces:** the repo runs a **production** CRAP
+gate and an **examples** dogfood as distinct sticky comments.
+- *Production* — `scorecard-production` job in `.github/workflows/ci.yml`,
+  `gate-mode: gate-on-analysis`, multi-root over the three prod crate
+  src roots (`crap-core` + `crap4rs` + `crap4ts`),
+  `comment-header: crap-scorecard-production`. Builds + stages THIS PR's
+  binary on PATH (the published binary lacks repeatable `--src`), so the
+  gate dogfoods the PR's own analyzer.
+- *Examples* — the invocation in `.github/workflows/quick-start-smoke.yml`,
+  `gate-mode: report-only`, multi-language over `crap-examples`,
+  `comment-header: crap-scorecard-quickstart-smoke`.
+
+Each carries a `comment-preamble` labeling its scope (production-crates
+vs intentionally-bad teaching sample). The preamble is the stopgap
+disambiguator until #334 lands `[output].title`; it prepends to the
+sticky body and leaves an empty preamble byte-identical. The composed
+body is also exposed on the action's `sticky-message` output.
+
 ### Cross-adapter `--format scorecard-row` parity
 
 `crap4rs` and `crap4ts` both route `--format scorecard-row` through

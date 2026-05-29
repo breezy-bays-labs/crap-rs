@@ -406,3 +406,65 @@ fn crap_render_accepts_schema_version_1_for_legacy_envelopes() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+#[test]
+fn crap_render_rejects_baseline_without_matching_input() {
+    // Characterization (crap-rs#336): a `--baseline` whose language key
+    // has no matching `--input` is an operator error. Asserts the
+    // validation stays actionable now that `run`'s checks live in an
+    // extracted helper.
+    let tmp = TempDir::new().unwrap();
+    let rs_path = tmp.path().join("rs.json");
+    let ts_baseline = tmp.path().join("ts-baseline.json");
+    fs::write(&rs_path, MINIMAL_ENVELOPE_V2).unwrap();
+    fs::write(&ts_baseline, MINIMAL_ENVELOPE_TS_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", rs_path.display()))
+        .arg("--baseline")
+        .arg(format!("typescript={}", ts_baseline.display()))
+        .output()
+        .unwrap();
+    assert!(
+        !out.status.success(),
+        "baseline with no matching input → non-zero exit"
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        stderr.contains("has no matching --input"),
+        "stderr should name the unmatched baseline; got: {stderr}"
+    );
+}
+
+#[test]
+fn crap_render_rejects_duplicate_baseline() {
+    // Characterization (crap-rs#336): two `--baseline` for the same
+    // language key is an operator error. Asserts this stays an operator
+    // error now that `run`'s validation lives in an extracted helper.
+    let tmp = TempDir::new().unwrap();
+    let rs_path = tmp.path().join("rs.json");
+    let base_a = tmp.path().join("base-a.json");
+    let base_b = tmp.path().join("base-b.json");
+    fs::write(&rs_path, MINIMAL_ENVELOPE_V2).unwrap();
+    fs::write(&base_a, MINIMAL_ENVELOPE_V2).unwrap();
+    fs::write(&base_b, MINIMAL_ENVELOPE_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", rs_path.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", base_a.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", base_b.display()))
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "duplicate baseline → non-zero exit");
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        stderr.contains("duplicate baseline for language 'rust'"),
+        "stderr should name the duplicate baseline; got: {stderr}"
+    );
+}

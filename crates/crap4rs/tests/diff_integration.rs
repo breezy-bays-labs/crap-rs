@@ -5,6 +5,7 @@
 
 use crap4rs::adapters::complexity::SynComplexityAdapter;
 use crap4rs::adapters::coverage::LcovParser;
+use crap4rs::core::identity::IdentityBase;
 use crap4rs::core::{AnalysisOutput, AnalyzeOptions, analyze};
 use crap4rs::domain::threshold::ThresholdConfig;
 use crap4rs::domain::types::ComplexityMetric;
@@ -17,7 +18,8 @@ use std::process::Command;
 /// constructs adapters internally.
 fn analyze_with_adapters(opts: &AnalyzeOptions) -> anyhow::Result<AnalysisOutput> {
     let cx = SynComplexityAdapter::new();
-    let cov = LcovParser::new(opts.src.clone());
+    // Single-root diff tests: anchor the LCOV parser on the only root.
+    let cov = LcovParser::new(opts.src[0].clone());
     analyze(opts, &cx, &cov)
 }
 
@@ -57,7 +59,8 @@ fn write_lcov(dir: &Path, files: &[(&str, &[(usize, u64)])]) {
 
 fn make_opts(dir: &Path, diff_ref: Option<&str>) -> AnalyzeOptions {
     AnalyzeOptions {
-        src: dir.join("src"),
+        identity_base: IdentityBase::SrcRelative(dir.join("src")),
+        src: vec![dir.join("src")],
         coverage: dir.join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: 30.0,
