@@ -1234,15 +1234,23 @@ jobs:
       - name: Install ripgrep
         # `ubuntu-latest` runner images do not ship ripgrep on every
         # generation (empirically observed via #261's `command -v rg`
-        # guard tripping on this PR's run). Three steps in this job
+        # guard tripping on PR #286's run). Three steps in this job
         # shell `rg` — the L2 grouped-import check, the L3.5 adapter-
         # name literal check (#161), and the L4 adapter-vocabulary
-        # check (#261). The L2 and L3.5 steps use the
-        # `if rg ...; then`/`|| true` patterns that silently treat a
-        # missing `rg` as "no matches found" and exit 0; the L4 step
-        # added in #261 surfaces this loudly via `command -v rg`.
-        # Explicit install closes the gap so all three layers
-        # actually execute. ~10-15s wall-clock overhead per CI run.
+        # check (#261). Explicit install guarantees presence so all
+        # three layers actually execute. ~10-15s wall-clock overhead
+        # per CI run.
+        #
+        # Defence in depth (#287): the explicit install is the
+        # empirical fix, but all three rg-shelling steps below ALSO
+        # carry an up-front `command -v rg` guard so that if this
+        # install ever regresses (or a future runner image drops
+        # ripgrep again), the gates fail loudly with `::error::`
+        # rather than silently treating a missing `rg` as "no matches
+        # found" and exiting 0. Prior to #287 only L4 carried the
+        # guard; L2 and L3.5 used the `if rg ...; then` / `|| true`
+        # silent-pass shapes, so they had been no-ops in CI on any
+        # ripgrep-less image since they shipped.
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Reject AST-library imports in crap-core (leading-token form)
         # Scope: crap-core ONLY. oxc/swc imports are legitimate in
@@ -1271,14 +1279,29 @@ jobs:
         # `use {\n    syn::Item,\n};` which the leading-token regex
         # above misses (since the first token after `use` is `{`, not
         # the banned crate). Uses ripgrep's multiline mode (-U) +
-        # PCRE2 for `\b` word boundaries. ripgrep ships on
-        # ubuntu-latest's default toolchain.
+        # PCRE2 for `\b` word boundaries.
         #
         # The pattern bounds the match to a single `use { … }` block
         # via `[^}]*`, so nested braces inside a different scope
         # cannot drag a false-positive across statements.
+        #
+        # Tool-presence guard (same rationale as the layer-4 step
+        # below, #287): this step shells `rg`, and the
+        # `if rg ...; then` form treats a missing `rg` identically to
+        # "no matches found" — the lint would silently pass and exit
+        # 0. `ubuntu-latest` runner images do NOT ship ripgrep on
+        # every generation (empirically observed via #261's
+        # `command -v rg` guard tripping on PR #286's run), so the
+        # `Install ripgrep` step above guarantees presence; this
+        # up-front guard fails loudly if that install ever regresses
+        # or rg drops off the image, rather than letting the gate go
+        # silently dead.
         run: |
           set -euo pipefail
+          if ! command -v rg >/dev/null 2>&1; then
+            echo "::error::ripgrep (rg) is required by the ast-purity grouped-import lint but is not on PATH"
+            exit 1
+          fi
           if rg -nU --pcre2 'use\s*\{[^}]*\b(syn|quote|proc_macro2?|tree_sitter|swc|oxc)\b' crates/crap-core/src/; then
             echo "::error::crap-core must not import AST libraries (grouped-import form, e.g. \`use { syn::Foo };\`) — see CLAUDE.md and shaping.md"
             exit 1
@@ -1341,11 +1364,37 @@ jobs:
         # whose content (after optional whitespace) does NOT start
         # with a comment marker.
         #
+        # Comment-skip filter shape (#287): the filter skips lines
+        # whose content starts with `//`, `/*`, `* ` (space after the
+        # asterisk), or a bare `*` at end of line — covering `///`,
+        # `//!`, `/* … */` openers, and ` * ` / ` *` block-comment
+        # continuation lines. The bare `*` form (no trailing space, not
+        # at EOL) is intentionally NOT skipped: Rust deref-assignment
+        # idioms like `*p = "crap4rs";` start with `*` followed by a
+        # variable, so an over-broad `^\*` skip would let a real
+        # re-coupling leak slip through silently. This is the same
+        # `^(\/\/|\/\*|\* |\*$)` filter the layer-4 step below uses —
+        # the two adapter-string gates now share one comment-skip
+        # convention (the original `^(\/\/|\/\*|\*)` here was too
+        # aggressive on the bare `*` line-start; #286's layer-4 step
+        # hardened it first, #287 propagates the tightening here).
+        #
+        # Tool-presence guard (#287): this step shells `rg`, and the
+        # `rg ... 2>/dev/null || true` form treats a missing `rg`
+        # identically to "no matches found" — the lint would silently
+        # pass and exit 0. The `Install ripgrep` step above guarantees
+        # presence on `ubuntu-latest`; this up-front guard fails loudly
+        # if that install ever regresses or rg drops off the image.
+        #
         # No untrusted-input interpolation: literals and patterns are
         # static; rg/awk invocations contain no event-context
         # references and process only checked-in source files.
         run: |
           set -euo pipefail
+          if ! command -v rg >/dev/null 2>&1; then
+            echo "::error::ripgrep (rg) is required by the ast-purity adapter-name lint but is not on PATH"
+            exit 1
+          fi
           # Pre-pass: enumerate files that hit the patterns (excluding
           # src/bin/**), then for each file emit `path:lineno:content`
           # only for lines BEFORE its first `#[cfg(test)]` marker.
@@ -1375,7 +1424,7 @@ jobs:
               content = ""
               for (i = 3; i <= NF; i++) content = content (i > 3 ? ":" : "") $i
               gsub(/^[ \t]+/, "", content)
-              if (content !~ /^(\/\/|\/\*|\*)/) print
+              if (content !~ /^(\/\/|\/\*|\* |\*$)/) print
             }
           ')
           if [ -n "$non_comment_hits" ]; then
