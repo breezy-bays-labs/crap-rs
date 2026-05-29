@@ -974,6 +974,10 @@ runs:
           # would silently re-scope the walker to CWD).
           common=(--coverage "$LANG_COVERAGE" --threshold "$THRESHOLD")
           while IFS= read -r src_root; do
+            # Strip a trailing CR so a CRLF-checkout / Windows-runner
+            # consumer doesn't emit `--src "crates/foo/src\r"`, which
+            # fails the directory check (gemini PR #344).
+            src_root="${src_root%$'\r'}"
             [ -n "$src_root" ] && common+=(--src "$src_root")
           done <<<"$LANG_SRC"
           [ -n "$CONFIG" ] && common+=(--config "$CONFIG")
@@ -1334,6 +1338,9 @@ runs:
           # silently only the first under multi-root.
           args=(--coverage "$LANG_COVERAGE" --threshold "$THRESHOLD" --no-fail --format github-annotations)
           while IFS= read -r src_root; do
+            # Strip a trailing CR (CRLF-checkout / Windows-runner) so the
+            # annotations loop doesn't emit `--src "…\r"` (gemini PR #344).
+            src_root="${src_root%$'\r'}"
             [ -n "$src_root" ] && args+=(--src "$src_root")
           done <<<"$LANG_SRC"
           [ -n "$CONFIG" ] && args+=(--config "$CONFIG")

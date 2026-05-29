@@ -409,9 +409,10 @@ fn crap_render_accepts_schema_version_1_for_legacy_envelopes() {
 
 #[test]
 fn crap_render_rejects_baseline_without_matching_input() {
-    // Characterization (crap-rs#336, Commit 2): a `--baseline` whose
-    // language key has no matching `--input` is an operator error. Pins
-    // the branch before `run`'s validation is extracted to a helper.
+    // Characterization (crap-rs#336): a `--baseline` whose language key
+    // has no matching `--input` is an operator error. Asserts the
+    // validation stays actionable now that `run`'s checks live in an
+    // extracted helper.
     let tmp = TempDir::new().unwrap();
     let rs_path = tmp.path().join("rs.json");
     let ts_baseline = tmp.path().join("ts-baseline.json");
@@ -439,9 +440,9 @@ fn crap_render_rejects_baseline_without_matching_input() {
 
 #[test]
 fn crap_render_rejects_duplicate_baseline() {
-    // Characterization (crap-rs#336, Commit 2): two `--baseline` for the
-    // same language key is an operator error. Pins the branch before
-    // `run`'s validation is extracted.
+    // Characterization (crap-rs#336): two `--baseline` for the same
+    // language key is an operator error. Asserts this stays an operator
+    // error now that `run`'s validation lives in an extracted helper.
     let tmp = TempDir::new().unwrap();
     let rs_path = tmp.path().join("rs.json");
     let base_a = tmp.path().join("base-a.json");

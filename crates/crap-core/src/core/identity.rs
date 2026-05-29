@@ -105,11 +105,18 @@ impl IdentityBase {
         match self {
             IdentityBase::SrcRelative(base) => strip_to_slashed(file, base),
             IdentityBase::RepoRelative { root_prefixes, .. } => {
+                // A missing originating_root is a multi-root invariant
+                // violation (root_prefixes is built from the same root
+                // set), so fail loud rather than silently keying with an
+                // empty prefix — a wrong key reintroduces the cross-crate
+                // collision α' exists to prevent. A legitimately-empty
+                // prefix (a root that IS the toplevel) is the `Some("")`
+                // case, handled by the `is_empty()` branch below.
                 let prefix = root_prefixes
                     .iter()
                     .find(|(root, _)| root == originating_root)
                     .map(|(_, prefix)| prefix.as_str())
-                    .unwrap_or("");
+                    .expect("multi-root invariant: a discovered file's originating root must be present in root_prefixes");
                 let rel = strip_to_slashed(file, originating_root);
                 if prefix.is_empty() {
                     rel
