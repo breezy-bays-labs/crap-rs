@@ -83,7 +83,7 @@ crap4rs --src src/ --coverage lcov.info
 | Command | Purpose |
 |---------|---------|
 | `crap4rs` (no subcommand) | Run the analyzer. Requires `--coverage <FILE>`. |
-| `crap4rs init` | Generate a starter `crap4rs.toml` in the current directory. Interactive (pick a preset); pair with `--force` to overwrite. |
+| `crap4rs init` | Generate a starter `crap.toml` in the current directory. Interactive (pick a preset); pair with `--force` to overwrite. |
 | `crap4rs completions <SHELL>` | Print a shell completion script to stdout. See [Shell completions](#shell-completions). |
 | `crap4rs help [SUBCOMMAND]` | Long-form help for the binary or a subcommand. |
 
@@ -98,7 +98,7 @@ Run `crap4rs --help` for the canonical full reference. Grouped here as in `--hel
 | `--coverage <FILE>` | required for analysis | Path to the LCOV coverage file. Not required for `completions`/`init`. |
 | `--src <DIR>` | `src` | Root directory of source files to analyze. **Repeatable** — pass `--src` more than once (`--src crates/a/src --src crates/b/src`) to union several roots into one report against a single `--coverage`. A single `--src` is unchanged; multiple roots key function paths relative to the git toplevel (requires a git work tree). |
 | `--metric <METRIC>` | `cognitive` | `cognitive` (default) or `cyclomatic`. |
-| `--config <FILE>` | auto-discovered | Explicit config file path; bypasses `crap4rs.toml` auto-discovery. |
+| `--config <FILE>` | auto-discovered | Explicit config file path; bypasses `crap.toml` auto-discovery. |
 | `--view <NAME>` | — | Resolve a saved view preset from the config (see [Saved view presets](#saved-view-presets---view-name)). |
 | `--baseline <FILE>` | — | Compare against a previously-emitted JSON envelope (see [Comparing two analyses](#comparing-two-analyses---baseline-file)). |
 
@@ -144,6 +144,12 @@ Run `crap4rs --help` for the canonical full reference. Grouped here as in `--hel
 | `--explain` | — | With `--breakdown`, explain nested cognitive increments in table output. |
 | `--md-full-table` | — | Append the full per-function table to markdown output (default markdown is a compact top-N summary). |
 | `--md-top <N>` | `10` | Number of rows in the markdown top-N table. |
+
+### Config file
+
+The canonical config file name is **`crap.toml`** — a single language-neutral file shared by both `crap4rs` and `crap4ts`, auto-discovered in the working directory. `crap4rs init` writes it, and `--config <FILE>` overrides discovery with an explicit path.
+
+For back-compat, the legacy per-adapter names **`crap4rs.toml`** (and `crap4ts.toml` for crap4ts) are still discovered when no `crap.toml` is present, but are **deprecated aliases**: the tool prints a one-line warning nudging you to rename. A present `crap.toml` always takes precedence over a co-present legacy file (the legacy file is then reported as safe to remove). The config examples below use `crap4rs.toml`; they apply identically to `crap.toml`.
 
 ### Threshold (the gate)
 
