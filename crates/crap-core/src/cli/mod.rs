@@ -3001,6 +3001,109 @@ mod tests {
         );
     }
 
+    // ── resolve_identity_base tests (crap-rs#336 α' base gating) ────────
+
+    /// Minimal `EffectiveInputs` carrying only the `src` roots the base
+    /// resolver reads; the rest are filler.
+    fn inputs_with_roots(roots: Vec<PathBuf>) -> EffectiveInputs {
+        EffectiveInputs {
+            src: roots,
+            metric: ComplexityMetric::Cognitive,
+            threshold_config: crate::domain::threshold::ThresholdConfig::default(),
+            threshold: 15.0,
+            exclude: Vec::new(),
+            annotation_limit: 10,
+        }
+    }
+
+    /// Lay out a temp git repo with a `crate-x/src` directory and return
+    /// the canonicalized repo root.
+    fn temp_git_repo() -> tempfile::TempDir {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join("crate-x/src")).unwrap();
+        std::fs::create_dir_all(tmp.path().join("crate-y/src")).unwrap();
+        for args in [
+            ["init", "-q"].as_slice(),
+            ["config", "user.email", "t@t.t"].as_slice(),
+            ["config", "user.name", "t"].as_slice(),
+        ] {
+            assert!(
+                std::process::Command::new("git")
+                    .current_dir(tmp.path())
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        tmp
+    }
+
+    #[test]
+    fn resolve_identity_base_single_root_is_src_relative() {
+        let inputs = inputs_with_roots(vec![PathBuf::from("crates/crap-core/src")]);
+        let base = resolve_identity_base(&inputs).unwrap();
+        assert_eq!(
+            base,
+            crate::core::identity::IdentityBase::SrcRelative(PathBuf::from("crates/crap-core/src"))
+        );
+    }
+
+    #[test]
+    fn resolve_identity_base_multi_root_is_git_toplevel_relative() {
+        let tmp = temp_git_repo();
+        let top = tmp.path().canonicalize().unwrap();
+        let a = top.join("crate-x/src");
+        let b = top.join("crate-y/src");
+        let inputs = inputs_with_roots(vec![a.clone(), b.clone()]);
+
+        let base = resolve_identity_base(&inputs).unwrap();
+        match base {
+            crate::core::identity::IdentityBase::RepoRelative {
+                toplevel,
+                root_prefixes,
+            } => {
+                assert_eq!(toplevel, top);
+                assert_eq!(
+                    root_prefixes,
+                    vec![
+                        (a, "crate-x/src".to_string()),
+                        (b, "crate-y/src".to_string()),
+                    ]
+                );
+            }
+            other => panic!("expected RepoRelative, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_identity_base_multi_root_outside_git_is_hard_error() {
+        // The anti-basename-strip guard: multiple roots with no
+        // resolvable git toplevel must ERROR (naming the offending
+        // root), NOT silently degrade to a basename strip — which would
+        // reintroduce the cross-crate coverage bleed the dual regime
+        // exists to prevent.
+        let tmp = tempfile::tempdir().unwrap();
+        // No `git init` — this dir is outside any work tree. Use two
+        // distinct subdirs so it's genuinely a multi-root request.
+        std::fs::create_dir_all(tmp.path().join("a")).unwrap();
+        std::fs::create_dir_all(tmp.path().join("b")).unwrap();
+        let a = tmp.path().join("a");
+        let b = tmp.path().join("b");
+        let inputs = inputs_with_roots(vec![a.clone(), b]);
+
+        let err = resolve_identity_base(&inputs).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("git work tree") || msg.contains("git toplevel"),
+            "error should name the unresolvable git toplevel; got: {msg}"
+        );
+        assert!(
+            msg.contains(&a.display().to_string()),
+            "error should name the offending root; got: {msg}"
+        );
+    }
+
     #[test]
     fn merge_effective_inputs_uses_adapter_default_metric_cognitive() {
         // Replaces the pre-W2.5 `merge_effective_inputs_default_metric_is_cognitive`

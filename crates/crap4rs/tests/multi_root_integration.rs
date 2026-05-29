@@ -260,6 +260,47 @@ fn multi_root_no_coverage_bleed_on_shared_relative_path() {
     );
 }
 
+/// CI emits git-toplevel-RELATIVE `SF:` paths (`crates/crap-core/src/...`),
+/// NOT the absolute paths local `cargo llvm-cov` produces. The α'
+/// "both sides share the git-toplevel base natively" claim is what makes
+/// the production scorecard green in CI — exercise it explicitly so a
+/// `normalize_path` regression that breaks relative-SF anchoring can't
+/// slip past the absolute-SF fixtures above.
+#[test]
+fn multi_root_joins_relative_sf_paths_no_bleed() {
+    let tmp = scaffold_two_roots();
+    let top = tmp.path().canonicalize().unwrap();
+    let a = top.join("crate-a/src");
+    let b = top.join("crate-b/src");
+
+    // Toplevel-RELATIVE SF keys, mirroring CI's workspace lcov shape.
+    let lcov = "SF:crate-a/src/adapters/mod.rs\nDA:1,1\nend_of_record\n\
+                SF:crate-b/src/adapters/mod.rs\nDA:1,0\nend_of_record\n\
+                SF:crate-a/src/lib.rs\nDA:1,1\nend_of_record\n\
+                SF:crate-b/src/lib.rs\nDA:1,1\nend_of_record\n";
+    let lcov_path = top.join("rel.info");
+    std::fs::write(&lcov_path, lcov).unwrap();
+
+    let base = repo_relative_base(&top, &[a.clone(), b.clone()]);
+    let cx = SynComplexityAdapter::new();
+    let cov = LcovParser::new(top.clone());
+    let opts = multi_root_options(vec![a, b], lcov_path, base);
+
+    let result = analyze(&opts, &cx, &cov).unwrap().result;
+    let cov_of = |key: &str| {
+        result
+            .functions
+            .iter()
+            .find(|v| v.scored.identity.file_path == key)
+            .unwrap_or_else(|| panic!("function not found: {key}"))
+            .scored
+            .coverage_percent
+    };
+    // Relative-SF join lands on the right toplevel-relative key, no bleed.
+    assert_eq!(cov_of("crate-a/src/adapters/mod.rs"), 100.0);
+    assert_eq!(cov_of("crate-b/src/adapters/mod.rs"), 0.0);
+}
+
 #[test]
 fn single_root_yields_src_relative_identity() {
     // Back-compat: a single root via the Vec API + SrcRelative base
