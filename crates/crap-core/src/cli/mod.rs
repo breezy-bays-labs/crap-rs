@@ -1163,10 +1163,23 @@ fn validate_runtime_inputs<'a>(
         );
     };
 
-    // Validate every `--src` root (crap-rs#336). `validate_inputs`
-    // gates the coverage file once (first root) plus each root's
-    // existence; the threshold check is root-independent so it runs on
-    // the first call only.
+    validate_src_roots(coverage_path, inputs, meta)?;
+    validate_diff_preflight(cli, inputs)?;
+
+    Ok(coverage_path)
+}
+
+/// Validate the coverage file, the threshold, and every `--src` root
+/// (crap-rs#336). `validate_inputs` gates the coverage file + threshold
+/// once (on the first root) plus that root's existence; the 2nd..Nth
+/// roots get the directory-only `validate_src_root` check. Extracted
+/// from `validate_runtime_inputs` so the multi-root loop's branches
+/// don't inflate the orchestrator's complexity.
+fn validate_src_roots(
+    coverage_path: &Path,
+    inputs: &EffectiveInputs,
+    meta: &AdapterMeta,
+) -> Result<()> {
     for (idx, root) in inputs.src.iter().enumerate() {
         if idx == 0 {
             validate_inputs(coverage_path, root, inputs.threshold, meta.coverage_hint)?;
@@ -1174,16 +1187,21 @@ fn validate_runtime_inputs<'a>(
             validate_src_root(root)?;
         }
     }
+    Ok(())
+}
 
-    if let Some(diff_ref) = cli.filter.diff.as_deref() {
-        validate_diff_ref(diff_ref)?;
-        // Any root resolves the same work tree; preflight the first.
-        if let Some(first) = inputs.src.first() {
-            preflight_git_worktree(first)?;
-        }
+/// When `--diff` is set, validate the ref and pre-flight the git work
+/// tree. Any `--src` root resolves the same work tree, so the first
+/// root anchors the pre-flight. No-op when `--diff` is absent.
+fn validate_diff_preflight(cli: &Cli, inputs: &EffectiveInputs) -> Result<()> {
+    let Some(diff_ref) = cli.filter.diff.as_deref() else {
+        return Ok(());
+    };
+    validate_diff_ref(diff_ref)?;
+    if let Some(first) = inputs.src.first() {
+        preflight_git_worktree(first)?;
     }
-
-    Ok(coverage_path)
+    Ok(())
 }
 
 /// Resolve the run [`IdentityBase`] from the `--src` root count

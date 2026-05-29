@@ -153,50 +153,11 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<()> {
-    if cli.inputs.is_empty() {
-        bail!("at least one --input <LANG>=<FILE> argument is required");
-    }
-
-    let mut parsed: Vec<ParsedEnvelope> = Vec::with_capacity(cli.inputs.len());
-    for spec in &cli.inputs {
-        parsed.push(parse_input_spec(spec, "input")?);
-    }
-
-    // Duplicate-language guard: refuse two envelopes for the same
-    // language key. This catches the common operator mistake of
-    // passing two crap4rs.json by accident.
-    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
-    for env in &parsed {
-        if !seen.insert(env.language.as_str()) {
-            bail!(
-                "duplicate input for language '{}'. Each language key may appear at most once.",
-                env.language
-            );
-        }
-    }
-
-    // Parse optional baselines. Each baseline pairs by `<LANG>` key
-    // with one of the `--input` envelopes; a baseline whose key has
-    // no matching input is an operator error (typo / wrong file).
-    let mut baselines: Vec<ParsedEnvelope> = Vec::with_capacity(cli.baselines.len());
-    for spec in &cli.baselines {
-        baselines.push(parse_input_spec(spec, "baseline")?);
-    }
-    let mut seen_baselines: std::collections::HashSet<&str> = std::collections::HashSet::new();
-    for env in &baselines {
-        if !seen_baselines.insert(env.language.as_str()) {
-            bail!(
-                "duplicate baseline for language '{}'. Each language key may appear at most once.",
-                env.language
-            );
-        }
-        if !parsed.iter().any(|e| e.language == env.language) {
-            bail!(
-                "--baseline for language '{}' has no matching --input. Each baseline must pair with an input by language key.",
-                env.language
-            );
-        }
-    }
+    // Parse + validate every `--input` and `--baseline` spec up front.
+    // Extracted so `run` itself stays a flat compose-and-render
+    // pipeline (the validation loops carried the bulk of its cognitive
+    // complexity).
+    let (parsed, baselines) = parse_and_validate_envelopes(&cli)?;
 
     let threshold = cli.threshold.unwrap_or_else(|| {
         parsed
@@ -254,6 +215,63 @@ fn run(cli: Cli) -> Result<()> {
         None => print!("{rendered}"),
     }
 
+    Ok(())
+}
+
+/// Parse and validate every `--input` / `--baseline` spec.
+///
+/// Returns the parsed input envelopes and baseline envelopes. Enforces,
+/// in order: at least one `--input`; no duplicate input language key;
+/// no duplicate baseline language key; every baseline pairs with an
+/// input by language key. Extracted from `run` (crap-rs#336, Commit 2)
+/// so the orchestrator stays a flat pipeline — behavior-preserving;
+/// the error strings are unchanged (pinned by the `crap_render_cli`
+/// characterization tests).
+fn parse_and_validate_envelopes(cli: &Cli) -> Result<(Vec<ParsedEnvelope>, Vec<ParsedEnvelope>)> {
+    if cli.inputs.is_empty() {
+        bail!("at least one --input <LANG>=<FILE> argument is required");
+    }
+
+    let mut parsed: Vec<ParsedEnvelope> = Vec::with_capacity(cli.inputs.len());
+    for spec in &cli.inputs {
+        parsed.push(parse_input_spec(spec, "input")?);
+    }
+    guard_unique_languages(&parsed, "input")?;
+
+    // Parse optional baselines. Each baseline pairs by `<LANG>` key
+    // with one of the `--input` envelopes; a baseline whose key has
+    // no matching input is an operator error (typo / wrong file).
+    let mut baselines: Vec<ParsedEnvelope> = Vec::with_capacity(cli.baselines.len());
+    for spec in &cli.baselines {
+        baselines.push(parse_input_spec(spec, "baseline")?);
+    }
+    guard_unique_languages(&baselines, "baseline")?;
+    for env in &baselines {
+        if !parsed.iter().any(|e| e.language == env.language) {
+            bail!(
+                "--baseline for language '{}' has no matching --input. Each baseline must pair with an input by language key.",
+                env.language
+            );
+        }
+    }
+
+    Ok((parsed, baselines))
+}
+
+/// Refuse two envelopes for the same language key. `kind` is `"input"`
+/// or `"baseline"`, naming the offending stream in the error so the
+/// operator knows which flag to fix (this catches the common mistake of
+/// passing two crap4rs.json by accident).
+fn guard_unique_languages(envelopes: &[ParsedEnvelope], kind: &str) -> Result<()> {
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for env in envelopes {
+        if !seen.insert(env.language.as_str()) {
+            bail!(
+                "duplicate {kind} for language '{}'. Each language key may appear at most once.",
+                env.language
+            );
+        }
+    }
     Ok(())
 }
 
