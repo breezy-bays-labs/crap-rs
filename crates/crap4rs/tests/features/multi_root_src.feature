@@ -29,7 +29,7 @@ Feature: Multi-root source analysis — one scorecard across several source root
 
   @unwired
   Scenario: Multiple --src roots union their functions into one report
-    # tracked: crap-rs#336 — multi_root_src harness wiring lands with the feature
+    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
     When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --src crate-b/src --format json`
     Then the JSON envelope includes every function discovered under `crate-a/src`
     And the JSON envelope includes every function discovered under `crate-b/src`
@@ -37,7 +37,7 @@ Feature: Multi-root source analysis — one scorecard across several source root
 
   @unwired
   Scenario: Union is order-independent and deduplicates overlapping roots
-    # tracked: crap-rs#336 — multi_root_src harness wiring lands with the feature
+    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
     When the operator analyzes roots `[A, B]` and separately `[B, A]`
     Then both runs report the identical function set
     And a function discovered under two overlapping roots appears exactly once
@@ -46,14 +46,14 @@ Feature: Multi-root source analysis — one scorecard across several source root
 
   @unwired
   Scenario: A single --src root yields src-relative identity (byte-identical back-compat)
-    # tracked: crap-rs#336 — multi_root_src harness wiring lands with the feature
+    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
     When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --format json`
     Then each function `file_path` is relative to `crate-a/src` (e.g. `lib.rs`)
     And the JSON envelope is byte-identical to the pre-multi-root single-root output
 
   @unwired
   Scenario: Multiple --src roots yield git-toplevel-relative identity
-    # tracked: crap-rs#336 — multi_root_src harness wiring lands with the feature
+    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
     When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --src crate-b/src --format json`
     Then each function `file_path` is relative to the git toplevel (e.g. `crate-a/src/lib.rs`)
     And two same-named files in different roots have distinct `file_path` keys
@@ -62,7 +62,7 @@ Feature: Multi-root source analysis — one scorecard across several source root
 
   @unwired
   Scenario: Same-named files in different roots do not bleed coverage
-    # tracked: crap-rs#336 — multi_root_src harness wiring lands with the feature
+    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
     Given `crate-a/src/adapters/mod.rs` and `crate-b/src/adapters/mod.rs` both exist
     And the shared coverage file covers both with different hit counts
     When the operator analyzes both roots in one run
@@ -71,7 +71,7 @@ Feature: Multi-root source analysis — one scorecard across several source root
 
   @unwired
   Scenario: Multi-root with an unresolvable git toplevel is a hard error
-    # tracked: crap-rs#336 — multi_root_src harness wiring lands with the feature
+    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
     Given the operator runs outside any git working tree
     When the operator passes more than one --src root
     Then crap4rs exits with an actionable error naming the unresolvable toplevel
@@ -81,7 +81,7 @@ Feature: Multi-root source analysis — one scorecard across several source root
 
   @unwired
   Scenario: comment-preamble prepends caller markdown to the sticky comment
-    # tracked: crap-rs#336 — action-integration scenarios wire at the CI layer, not the cli harness
+    # tracked: crap-rs#169 — action-integration scenarios wire at the CI layer (BDD umbrella), not the cli harness
     Given the scorecard action is invoked with a non-empty `comment-preamble`
     When the action composes the sticky comment
     Then the preamble markdown appears above the rendered scorecard body
@@ -89,7 +89,7 @@ Feature: Multi-root source analysis — one scorecard across several source root
 
   @unwired
   Scenario: Production and examples scorecards post distinct, non-colliding comments
-    # tracked: crap-rs#336 — action-integration scenarios wire at the CI layer, not the cli harness
+    # tracked: crap-rs#169 — action-integration scenarios wire at the CI layer (BDD umbrella), not the cli harness
     Given the production scorecard uses `comment-header: crap-scorecard-production`
     And the examples scorecard uses `comment-header: crap-scorecard-quickstart-smoke`
     When both run on the same pull request
