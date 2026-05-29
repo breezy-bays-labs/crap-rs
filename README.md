@@ -96,7 +96,7 @@ Run `crap4rs --help` for the canonical full reference. Grouped here as in `--hel
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--coverage <FILE>` | required for analysis | Path to the LCOV coverage file. Not required for `completions`/`init`. |
-| `--src <DIR>` | `src` | Root directory of source files to analyze. |
+| `--src <DIR>` | `src` | Root directory of source files to analyze. **Repeatable** — pass `--src` more than once (`--src crates/a/src --src crates/b/src`) to union several roots into one report against a single `--coverage`. A single `--src` is unchanged; multiple roots key function paths relative to the git toplevel (requires a git work tree). |
 | `--metric <METRIC>` | `cognitive` | `cognitive` (default) or `cyclomatic`. |
 | `--config <FILE>` | auto-discovered | Explicit config file path; bypasses `crap4rs.toml` auto-discovery. |
 | `--view <NAME>` | — | Resolve a saved view preset from the config (see [Saved view presets](#saved-view-presets---view-name)). |

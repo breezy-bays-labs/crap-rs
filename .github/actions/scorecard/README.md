@@ -216,6 +216,90 @@ containing the combined `markdown` output (both per-language sections
 stacked). Aggregator workflows reading the split outputs and
 re-rendering elsewhere should still set `comment-mode: 'none'`.
 
+## Multi-root source
+
+A project split across several source roots — a Cargo workspace with
+multiple crates, a monorepo with several packages — can be analyzed in
+one invocation by passing `src:` as a newline-separated list (the YAML
+`|` block-scalar convention). The action splits it into one `--src`
+flag per non-blank line; the analyzer discovers functions under every
+root and unions them into a single scorecard, joined against the one
+shared `coverage:` file.
+
+```yaml
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@v1
+  with:
+    languages: rust
+    src: |
+      crates/crap-core/src
+      crates/crap4rs/src
+      crates/crap4ts/src
+    coverage: lcov.info
+    gate-mode: gate-on-analysis
+```
+
+Notes:
+
+- **Single-line `src:` is byte-identical** to before multi-root
+  existed — the common case is untouched.
+- **Keep each line free of leading whitespace.** A space-indented line
+  becomes `--src "  path"`, which the walker can't resolve ("no source
+  files found").
+- **Identity base is decided by root count.** A single root keys
+  function `file_path` relative to that root (`lib.rs`); multiple roots
+  key relative to the git toplevel (`crates/crap-core/src/lib.rs`) so
+  same-named files in different crates stay globally unique and never
+  bleed coverage into one another. Multi-root therefore requires a git
+  work tree — outside one, the action errors rather than silently
+  mis-joining. (Background: ADR `adr-multi-root-identity-base`.)
+- **Prefer explicit per-crate roots over the workspace root.** Listing
+  `crates/a/src`, `crates/b/src` is boundary-safe; pointing `src:` at
+  the repository root pulls in build artifacts and vendored code.
+- `src-ts:` accepts the same multi-root list for the TypeScript side in
+  multi-language mode.
+
+## Two distinct scorecards on one PR
+
+Run two scorecards on the same PR — e.g. a gated production scorecard
+plus a report-only examples/teaching one — by giving each its own
+`comment-header` (so the sticky comments don't collide) AND its own
+`comment-preamble` (so a reader can tell them apart at a glance):
+
+```yaml
+# Production gate
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@v1
+  with:
+    languages: rust
+    src: |
+      crates/crap-core/src
+      crates/crap4rs/src
+    coverage: lcov.info
+    gate-mode: gate-on-analysis
+    comment-mode: sticky
+    comment-header: crap-scorecard-production
+    comment-preamble: |
+      **Production CRAP scorecard** — gates real source against the
+      threshold.
+
+# Examples dogfood (report-only)
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@v1
+  with:
+    languages: rust
+    src: crates/examples/src
+    coverage: examples-lcov.info
+    gate-mode: report-only
+    comment-mode: sticky
+    comment-header: crap-scorecard-examples
+    comment-preamble: |
+      **Examples dogfood — intentionally spans risk bands; not
+      production code.**
+```
+
+The preamble prepends above the rendered scorecard body in the sticky
+comment; an empty `comment-preamble` (the default) leaves the body
+byte-identical to before the input existed. The composed body is also
+exposed verbatim on the `sticky-message` output for aggregator reuse.
+
 ## HTML report
 
 For PR reviews that benefit from the full file-by-file scorecard (KPI
@@ -566,8 +650,8 @@ row; the aggregator owns the comment.
 | `language` | `auto` | `rust`, `typescript`, or `auto` (infer from coverage extension). Superseded by `languages` (preset) when both are set |
 | `coverage` | (required) | Path to LCOV (`.info`) for Rust, Istanbul JSON for TS. In multi-language mode, carries the Rust LCOV (paired with `coverage-ts:`) |
 | `coverage-ts` | `''` | (paired) TypeScript Istanbul JSON path. Required in multi-language mode; ignored in single-language mode. See [Multi-language](#multi-language) |
-| `src` | `.` | Source root passed to the analyzer. In multi-language mode, carries the Rust source root |
-| `src-ts` | `''` | (paired) TypeScript source root. Required in multi-language mode; ignored in single-language mode. See [Multi-language](#multi-language) |
+| `src` | `.` | Source root passed to the analyzer. In multi-language mode, carries the Rust source root. **Multi-root (crap-rs#336):** accepts a newline-separated list of roots (YAML `\|` block scalar) — the action splits it into one `--src` per non-blank line, unioning their functions into one scorecard against a single `coverage:` file. A single-line value is byte-identical to before. See [Multi-root source](#multi-root-source) |
+| `src-ts` | `''` | (paired) TypeScript source root. Required in multi-language mode; ignored in single-language mode. Accepts the same newline-separated multi-root list as `src:`. See [Multi-language](#multi-language) |
 | `baseline` | `''` | Path to a previously-captured CRAP JSON envelope. Empty = no delta. In multi-language mode, carries the Rust baseline |
 | `baseline-ts` | `''` | (paired) TypeScript baseline JSON envelope. Optional even in multi-language mode (per-language); a language without a baseline contributes neutrally to AND/SUM aggregation. See [Multi-language](#multi-language) |
 | `threshold` | `15` | Threshold for violations (user-visible default; the action.yml default is empty so the preset resolver can tell explicit from default — see [Presets — Raw wins on conflict](#raw-wins-on-conflict)) |
@@ -576,6 +660,7 @@ row; the aggregator owns the comment.
 | `analysis-gate` | `false` | Exit non-zero if the analysis itself fails. User-visible default; empty internally — see [Presets](#presets) |
 | `comment-mode` | `none` | `none` (outputs only) or `sticky` (post/update sticky comment) |
 | `comment-header` | `crap-scorecard` | Sticky-comment identifier |
+| `comment-preamble` | `''` | Markdown prepended above the rendered scorecard in the sticky-comment body. Use it to label a scorecard's scope — e.g. a production scorecard naming the gated crates vs. an examples one marked "teaching sample". Empty = byte-identical to before. Honored in single- and multi-language modes. See [Two distinct scorecards on one PR](#two-distinct-scorecards-on-one-pr) |
 | `version` | `latest` | crap4rs version to install (`latest` or pinned tag) |
 | `annotations` | `false` | When `true`, emit `::warning` workflow commands so findings render inline on the PR Files Changed tab (see [Inline annotations](#inline-annotations)) |
 | `annotation-limit` | `''` | Cap on emitted annotations when `annotations: true`. Empty defers to the adapter's default (10) or `[output] annotation_limit` from `config`. Range 1..=100 |
@@ -590,7 +675,8 @@ row; the aggregator owns the comment.
 
 | Name | Notes |
 |---|---|
-| `markdown` | The rendered scorecard — drop into aggregator comments verbatim. Multi-language: combined under `## CRAP scorecard` wrapper with per-language `### Rust (crap4rs)` / `### TypeScript (crap4ts)` H3 sections. Single-language: raw adapter markdown (back-compat) |
+| `markdown` | The rendered scorecard — drop into aggregator comments verbatim. Multi-language: combined under `## CRAP scorecard` wrapper with per-language `### Rust (crap4rs)` / `### TypeScript (crap4ts)` H3 sections. Single-language: raw adapter markdown (back-compat). Preamble-free (the bare scorecard) |
+| `sticky-message` | The composed sticky-comment body: `comment-preamble` prepended above the scorecard, plus the optional HTML download link (when `html-report: true`). The exact text the sticky step publishes. Distinct from `markdown` (which is preamble-free). Surfaced for spot-checks + aggregator reuse (crap-rs#336) |
 | `row-json` | `Row::CrapDelta` JSON object — for aggregators that re-render with full layout control. See [Structured row output](#structured-row-output-outputsrow-json). **Empty in multi-language mode** + `::warning::` directing consumers to `row-json-rust` / `row-json-typescript` |
 | `row-json-rust` | (multi-language split) `Row::CrapDelta` JSON for the Rust dispatch when Rust is in the resolved language set. Populated in both single-language `rust` and multi-language modes; empty otherwise. See [Multi-language — Split outputs](#split-outputs) |
 | `row-json-typescript` | (multi-language split) `Row::CrapDelta` JSON for the TypeScript dispatch when TypeScript is in the resolved language set. Populated in both single-language `typescript` and multi-language modes; empty otherwise. See [Multi-language — Split outputs](#split-outputs) |
