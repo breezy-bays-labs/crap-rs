@@ -80,6 +80,13 @@ pub mod core {
     pub use crap_core::core::AnalyzeOptions;
     pub use crap_core::core::analyze;
 
+    /// Multi-root run identity base (crap-rs#336). Re-exported so
+    /// library consumers (and crap4rs integration tests) can construct
+    /// `AnalyzeOptions { identity_base, .. }` for multi-root analysis.
+    pub mod identity {
+        pub use crap_core::core::identity::IdentityBase;
+    }
+
     /// v0.4 alias of `crap_core::core::AnalysisOutput<P>`,
     /// concretized to the LCOV adapter's diagnostic shape.
     pub type AnalysisOutput =

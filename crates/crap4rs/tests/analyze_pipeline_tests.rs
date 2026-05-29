@@ -16,6 +16,7 @@ use std::path::Path;
 
 use crap4rs::adapters::complexity::SynComplexityAdapter;
 use crap4rs::adapters::coverage::LcovParser;
+use crap4rs::core::identity::IdentityBase;
 use crap4rs::core::{AnalyzeOptions, analyze};
 use crap4rs::domain::threshold::{DEFAULT_THRESHOLD, ThresholdConfig, ThresholdOverride};
 use crap4rs::domain::types::{ComplexityMetric, CoverageMetric};
@@ -74,7 +75,8 @@ fn analyze_returns_results_for_simple_project() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: DEFAULT_THRESHOLD,
@@ -102,7 +104,8 @@ fn analyze_simple_fn_fully_covered_has_low_crap() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: DEFAULT_THRESHOLD,
@@ -134,7 +137,8 @@ fn analyze_branching_fn_partial_coverage_higher_crap() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: DEFAULT_THRESHOLD,
@@ -166,7 +170,8 @@ fn analyze_pass_when_all_below_threshold() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: 100.0,
@@ -194,7 +199,8 @@ fn analyze_at_exact_threshold_does_not_exceed() {
     // simple() has CC=1, 100% coverage → CRAP=1.0
     // Set threshold to exactly 1.0 — should NOT exceed
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: 1.0,
@@ -226,7 +232,8 @@ fn analyze_fail_when_above_threshold() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: 0.5,
@@ -258,7 +265,8 @@ fn analyze_no_functions_extracted_errors() {
 
     let (cx, cov) = adapters(&src_dir);
     let opts = AnalyzeOptions {
-        src: src_dir,
+        identity_base: IdentityBase::SrcRelative(src_dir.clone()),
+        src: vec![src_dir],
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
         extensions: vec!["rs".to_string()],
@@ -282,7 +290,8 @@ fn analyze_empty_src_dir_errors() {
 
     let (cx, cov) = adapters(&src_dir);
     let opts = AnalyzeOptions {
-        src: src_dir,
+        identity_base: IdentityBase::SrcRelative(src_dir.clone()),
+        src: vec![src_dir],
         coverage: dir.path().join("lcov.info"),
         extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
@@ -301,7 +310,8 @@ fn analyze_missing_coverage_file_errors() {
 
     let (cx, cov) = adapters(&src_dir);
     let opts = AnalyzeOptions {
-        src: src_dir,
+        identity_base: IdentityBase::SrcRelative(src_dir.clone()),
+        src: vec![src_dir],
         coverage: dir.path().join("nonexistent.info"),
         extensions: vec!["rs".to_string()],
         ..AnalyzeOptions::default()
@@ -334,7 +344,8 @@ fn analyze_exclude_pattern_filters_files() {
 
     let (cx, cov) = adapters(&src_dir);
     let opts = AnalyzeOptions {
-        src: src_dir,
+        identity_base: IdentityBase::SrcRelative(src_dir.clone()),
+        src: vec![src_dir],
         coverage: dir.path().join("lcov.info"),
         exclude: vec!["tests/**".to_string()],
         respect_gitignore: false,
@@ -360,7 +371,8 @@ fn analyze_with_cyclomatic_metric() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         metric: ComplexityMetric::Cyclomatic,
         extensions: vec!["rs".to_string()],
@@ -381,7 +393,8 @@ fn summary_computed_correctly() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: DEFAULT_THRESHOLD,
@@ -410,7 +423,8 @@ fn analyze_diff_ref_none_is_backward_compat() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         diff_ref: None,
         respect_gitignore: false,
@@ -431,7 +445,8 @@ fn analyze_returns_diagnostics() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: DEFAULT_THRESHOLD,
@@ -475,7 +490,8 @@ fn analyze_diagnostics_counts_no_coverage_functions() {
 
     let (cx, cov) = adapters(&src_dir);
     let opts = AnalyzeOptions {
-        src: src_dir,
+        identity_base: IdentityBase::SrcRelative(src_dir.clone()),
+        src: vec![src_dir],
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
         extensions: vec!["rs".to_string()],
@@ -506,7 +522,8 @@ fn analyze_diagnostics_surfaces_parse_diagnostics() {
 
     let (cx, cov) = adapters(&src_dir);
     let opts = AnalyzeOptions {
-        src: src_dir,
+        identity_base: IdentityBase::SrcRelative(src_dir.clone()),
+        src: vec![src_dir],
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
         extensions: vec!["rs".to_string()],
@@ -525,7 +542,8 @@ fn analyze_with_per_path_overrides() {
     let (cx, cov) = adapters(&src);
 
     let opts = AnalyzeOptions {
-        src,
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src],
         coverage: dir.path().join("lcov.info"),
         threshold_config: ThresholdConfig {
             global: 100.0,
@@ -590,7 +608,8 @@ pub fn with_branch(x: i32) -> &'static str {
 
     let (cx, cov) = adapters(&src_dir);
     let opts = AnalyzeOptions {
-        src: src_dir,
+        identity_base: IdentityBase::SrcRelative(src_dir.clone()),
+        src: vec![src_dir],
         coverage: dir.path().join("lcov.info"),
         respect_gitignore: false,
         extensions: vec!["rs".to_string()],

@@ -20,6 +20,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use crap_core::core::identity::IdentityBase;
 use crap_core::core::{AnalyzeOptions, analyze};
 use crap_core::domain::threshold::{ThresholdConfig, ThresholdPreset};
 use crap_core::domain::types::{AnalysisDiagnostics, AnalysisResult, ComplexityMetric};
@@ -132,7 +133,12 @@ pub fn analyze_to_json(
     let global_threshold = threshold.unwrap_or_else(|| ThresholdPreset::Default.threshold(metric));
 
     let options = AnalyzeOptions {
-        src: src.clone(),
+        // Single-root TypeScript analysis: src-relative identity,
+        // byte-identical to before multi-root (crap-rs#336). The base
+        // holds the canonicalized `src` so the strip matches both the
+        // discovery root and `IstanbulCoverage::new(src)`'s anchor.
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src.clone()],
         coverage,
         threshold_config: ThresholdConfig {
             global: global_threshold,

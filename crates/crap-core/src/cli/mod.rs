@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum, ValueHint};
 use clap_complete::Shell as ClapShell;
 
@@ -292,9 +292,17 @@ pub struct InputArgs {
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
     pub coverage: Option<PathBuf>,
 
-    /// Root directory of source files to analyze [default: src]
+    /// Root directory of source files to analyze [default: src].
+    ///
+    /// Repeatable: pass `--src` more than once to analyze several roots
+    /// in a single run (e.g. `--src crates/a/src --src crates/b/src`).
+    /// The functions discovered under every root are unioned into one
+    /// report, joined against a single shared `--coverage` file. A
+    /// single `--src` is byte-identical to the pre-multi-root behavior;
+    /// when omitted, falls back to the config TOML's `src` then `src`
+    /// (crap-rs#336).
     #[arg(long, value_name = "DIR", value_hint = ValueHint::DirPath)]
-    pub src: Option<PathBuf>,
+    pub src: Vec<PathBuf>,
 
     /// Complexity metric to use
     #[arg(long, value_enum)]
@@ -1065,7 +1073,11 @@ where
 /// needs except the coverage path (which is validated separately and
 /// may be borrowed from `cli`).
 struct EffectiveInputs {
-    src: PathBuf,
+    /// Source roots after CLI / config / default merging. Always
+    /// non-empty (empty CLI Vec falls back to config `src` then the
+    /// `["src"]` default). Single-root runs hold one entry — the
+    /// byte-identical back-compat case (crap-rs#336).
+    src: Vec<PathBuf>,
     metric: ComplexityMetric,
     threshold_config: ThresholdConfig,
     threshold: f64,
@@ -1099,12 +1111,20 @@ fn merge_effective_inputs(
     file_config: &Option<FileConfig>,
     meta: &AdapterMeta,
 ) -> EffectiveInputs {
-    let src = cli
-        .input
-        .src
-        .clone()
-        .or_else(|| file_config.as_ref().and_then(|c| c.src.clone()))
-        .unwrap_or_else(|| PathBuf::from("src"));
+    // `--src` is repeatable (crap-rs#336). An empty CLI Vec defers to
+    // the config TOML's single `src` (wrapped to one root), then to the
+    // `["src"]` default — preserving the pre-multi-root precedence. A
+    // non-empty CLI Vec wins over config wholesale (CLI overrides config,
+    // same as every other field).
+    let src = if cli.input.src.is_empty() {
+        file_config
+            .as_ref()
+            .and_then(|c| c.src.clone())
+            .map(|s| vec![s])
+            .unwrap_or_else(|| vec![PathBuf::from("src")])
+    } else {
+        cli.input.src.clone()
+    };
     let metric: ComplexityMetric = cli
         .input
         .metric
@@ -1143,29 +1163,128 @@ fn validate_runtime_inputs<'a>(
         );
     };
 
-    validate_inputs(
-        coverage_path,
-        &inputs.src,
-        inputs.threshold,
-        meta.coverage_hint,
-    )?;
+    // Validate every `--src` root (crap-rs#336). `validate_inputs`
+    // gates the coverage file once (first root) plus each root's
+    // existence; the threshold check is root-independent so it runs on
+    // the first call only.
+    for (idx, root) in inputs.src.iter().enumerate() {
+        if idx == 0 {
+            validate_inputs(coverage_path, root, inputs.threshold, meta.coverage_hint)?;
+        } else {
+            validate_src_root(root)?;
+        }
+    }
 
     if let Some(diff_ref) = cli.filter.diff.as_deref() {
         validate_diff_ref(diff_ref)?;
-        preflight_git_worktree(&inputs.src)?;
+        // Any root resolves the same work tree; preflight the first.
+        if let Some(first) = inputs.src.first() {
+            preflight_git_worktree(first)?;
+        }
     }
 
     Ok(coverage_path)
+}
+
+/// Resolve the run [`IdentityBase`] from the `--src` root count
+/// (crap-rs#336). This is the **fallible** step the α' design mandates
+/// between input validation and the coverage-factory call: a single
+/// root yields src-relative identity (byte-identical back-compat);
+/// multiple roots yield git-toplevel-relative identity (collision-free
+/// across crates that share crate-internal names).
+///
+/// Multi-root with an unresolvable git toplevel is a HARD ERROR naming
+/// the offending root — never a silent basename strip, which would
+/// reintroduce the cross-crate coverage bleed the dual regime exists to
+/// prevent.
+fn resolve_identity_base(inputs: &EffectiveInputs) -> Result<crate::core::identity::IdentityBase> {
+    use crate::core::identity::IdentityBase;
+
+    let roots = &inputs.src;
+    if roots.len() <= 1 {
+        // Single root (or the impossible empty case, which merge already
+        // backfilled to `["src"]`): src-relative identity, holding the
+        // original root so the strip base matches the discovery root.
+        let root = roots
+            .first()
+            .cloned()
+            .unwrap_or_else(|| PathBuf::from("src"));
+        return Ok(IdentityBase::SrcRelative(root));
+    }
+
+    // Multi-root: anchor on the git toplevel. Any root resolves the same
+    // work tree; resolve from the first and compute each root's
+    // toplevel-relative prefix.
+    let first_canonical = crate::core::canonicalize_src(&roots[0]);
+    let toplevel = crate::core::git_toplevel(&first_canonical).with_context(|| {
+        format!(
+            "multi-root analysis requires a git work tree, but the git toplevel could not be \
+             resolved from {}\n  \
+             hint: multiple --src roots are keyed git-toplevel-relative to stay globally unique; \
+             run inside a git repository, or pass a single --src for src-relative analysis",
+            roots[0].display()
+        )
+    })?;
+
+    let mut root_prefixes = Vec::with_capacity(roots.len());
+    for root in roots {
+        let canonical = crate::core::canonicalize_src(root);
+        let prefix = canonical
+            .strip_prefix(&toplevel)
+            .with_context(|| {
+                format!(
+                    "--src directory {} is not inside the git repository at {}\n  \
+                     hint: every --src root must live within the same git work tree",
+                    canonical.display(),
+                    toplevel.display(),
+                )
+            })?
+            .to_string_lossy()
+            .replace('\\', "/");
+        root_prefixes.push((root.clone(), prefix));
+    }
+
+    Ok(IdentityBase::RepoRelative {
+        toplevel,
+        root_prefixes,
+    })
+}
+
+/// Validate that a `--src` root exists and is a directory. The
+/// per-root counterpart to `validate_inputs`'s src check, used for the
+/// 2nd..Nth roots in a multi-root run (the coverage + threshold checks
+/// run once, on the first root).
+fn validate_src_root(src: &Path) -> Result<()> {
+    match std::fs::metadata(src) {
+        Ok(m) if m.is_dir() => Ok(()),
+        Ok(_) => bail!(
+            "source path is not a directory: {}\n  \
+             hint: pass --src <DIR> pointing to your source root",
+            src.display()
+        ),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
+            "source directory not found: {}\n  \
+             hint: pass --src <DIR> pointing to your source root",
+            src.display()
+        ),
+        Err(e) => bail!(
+            "cannot access source directory: {}: {e}\n  \
+             hint: check directory permissions",
+            src.display()
+        ),
+    }
 }
 
 fn build_analyze_options(
     cli: &Cli,
     inputs: &EffectiveInputs,
     coverage: &Path,
+    identity_base: crate::core::identity::IdentityBase,
     meta: &AdapterMeta,
 ) -> AnalyzeOptions {
     AnalyzeOptions {
         src: inputs.src.clone(),
+        identity_base,
         coverage: coverage.to_path_buf(),
         threshold_config: inputs.threshold_config.clone(),
         metric: inputs.metric,
@@ -1236,14 +1355,33 @@ where
     let inputs = merge_effective_inputs(cli, &file_config, meta);
     let coverage_path = validate_runtime_inputs(cli, &inputs, meta)?;
 
-    // Canonicalize the effective `src` (post-config-merge) and hand
-    // it to the adapter's factory closure. `validate_runtime_inputs`
-    // already gated on existence; `canonicalize_src`'s fallback path
-    // is purely defensive against TOCTOU between the two `metadata`
-    // calls and emits a warning on the error arm so the regression is
-    // observable instead of silent.
-    let src_canonical = crate::core::canonicalize_src(&inputs.src);
-    let coverage = coverage_factory(&src_canonical);
+    // Resolve the run identity base ONCE, in this fallible step between
+    // validation and the coverage-factory call (crap-rs#336, CEng F-2):
+    // single root ⇒ src-relative (byte-identical back-compat); multiple
+    // roots ⇒ git-toplevel-relative (hard error if the toplevel is
+    // unresolvable). The same base is threaded to BOTH consumers —
+    // function identity (`AnalyzeOptions.identity_base`) AND coverage-SF
+    // normalization (the factory path below) — so they never diverge.
+    let identity_base = resolve_identity_base(&inputs)?;
+
+    // Canonicalize the first `--src` root (post-config-merge).
+    // `validate_runtime_inputs` already gated on existence;
+    // `canonicalize_src`'s fallback path is purely defensive against
+    // TOCTOU between the two `metadata` calls and emits a warning on the
+    // error arm so the regression is observable instead of silent.
+    let src_canonical = inputs
+        .src
+        .first()
+        .map(|first| crate::core::canonicalize_src(first))
+        .unwrap_or_else(|| PathBuf::from("src"));
+
+    // Hand the factory the identity base's coverage root: `src_canonical`
+    // in single-root mode (byte-identical to before multi-root), the git
+    // toplevel in multi-root mode. The closure stays `FnOnce(&Path)`
+    // (CEng F-3) — `LcovParser::new(root)` + `normalize_path`'s
+    // suffix-match rescue re-anchor SF records to whatever base it's
+    // handed, so the join key shares the identity base.
+    let coverage = coverage_factory(&identity_base.coverage_root(&src_canonical));
 
     // Adapter-aware pre-flight runs after construction so
     // `CoveragePort::validate` can apply its own structural check
@@ -1251,7 +1389,7 @@ where
     // before the full parse pass. See ADR D-coverage-validate.
     preflight_checks(coverage_path, &*coverage, meta)?;
 
-    let options = build_analyze_options(cli, &inputs, coverage_path, meta);
+    let options = build_analyze_options(cli, &inputs, coverage_path, identity_base, meta);
 
     let analysis = crate::core::analyze(&options, complexity, &*coverage)?;
     apply_diagnostics(cli, &analysis.diagnostics);
@@ -1926,7 +2064,9 @@ mod tests {
     fn minimal_valid_args() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         assert_eq!(cli.input.coverage.as_deref(), Some(Path::new("lcov.info")));
-        assert_eq!(cli.input.src, None);
+        // `--src` is repeatable (crap-rs#336); absent → empty Vec, which
+        // `merge_effective_inputs` backfills to the config/default root.
+        assert_eq!(cli.input.src, Vec::<PathBuf>::new());
     }
 
     #[test]
@@ -2075,7 +2215,26 @@ mod tests {
     #[test]
     fn custom_src() {
         let cli = parse(&["--coverage", "lcov.info", "--src", "crates/"]).unwrap();
-        assert_eq!(cli.input.src, Some(PathBuf::from("crates/")));
+        assert_eq!(cli.input.src, vec![PathBuf::from("crates/")]);
+    }
+
+    #[test]
+    fn repeated_src_collects_all_roots() {
+        // `--src` is repeatable (crap-rs#336): clap auto-appends each
+        // occurrence into the `Vec<PathBuf>`, preserving order.
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--src",
+            "crates/a/src",
+            "--src",
+            "crates/b/src",
+        ])
+        .unwrap();
+        assert_eq!(
+            cli.input.src,
+            vec![PathBuf::from("crates/a/src"), PathBuf::from("crates/b/src"),]
+        );
     }
 
     #[test]
@@ -2775,7 +2934,7 @@ mod tests {
     fn merge_effective_inputs_default_src() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         let inputs = merge_effective_inputs(&cli, &None, &fake_meta());
-        assert_eq!(inputs.src, PathBuf::from("src"));
+        assert_eq!(inputs.src, vec![PathBuf::from("src")]);
     }
 
     #[test]
@@ -2786,7 +2945,7 @@ mod tests {
             ..FileConfig::default()
         });
         let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
-        assert_eq!(inputs.src, PathBuf::from("crates/"));
+        assert_eq!(inputs.src, vec![PathBuf::from("crates/")]);
     }
 
     #[test]
@@ -2797,7 +2956,31 @@ mod tests {
             ..FileConfig::default()
         });
         let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
-        assert_eq!(inputs.src, PathBuf::from("from-config/"));
+        assert_eq!(inputs.src, vec![PathBuf::from("from-config/")]);
+    }
+
+    #[test]
+    fn merge_effective_inputs_repeated_cli_src_collects_roots() {
+        // Multi-root (crap-rs#336): repeated `--src` flows through to a
+        // multi-entry `EffectiveInputs.src`, CLI winning over config.
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--src",
+            "crates/a/src",
+            "--src",
+            "crates/b/src",
+        ])
+        .unwrap();
+        let file_config = Some(FileConfig {
+            src: Some(PathBuf::from("from-config/")),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
+        assert_eq!(
+            inputs.src,
+            vec![PathBuf::from("crates/a/src"), PathBuf::from("crates/b/src"),]
+        );
     }
 
     #[test]
