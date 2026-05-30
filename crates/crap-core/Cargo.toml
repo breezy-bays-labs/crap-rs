@@ -62,6 +62,12 @@ toml = { workspace = true }
 # `crap.schema.json` (the editor `$schema` target), with each field's
 # `///` doc auto-rendered as the property `description`.
 schemars = { workspace = true }
+# Annotated `crap.example.toml` emission (adapters/config
+# `render_example_config`): `documented` exposes each `ConfigSchema`
+# field's `///` doc as an associated constant, `toml_edit` attaches it
+# as a leading TOML comment. Same prose source as the schema + docs.rs.
+documented = { workspace = true }
+toml_edit = { workspace = true }
 
 # Error tagging on `CrapError`, `view::CoverageRangeError`, and the
 # adapter error families. Pure typed errors, no I/O.

@@ -9,8 +9,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use documented::DocumentedFields;
 use schemars::JsonSchema;
 use serde::Deserialize;
+
+use crate::cli::AdapterMeta;
 
 use crate::domain::threshold::{ThresholdOverride, ThresholdPreset, is_valid_threshold};
 use crate::domain::types::ComplexityMetric;
@@ -153,7 +156,7 @@ pub struct ViewPreset {
 /// `description`, and the same text surfaces on docs.rs. Deserializes
 /// with `deny_unknown_fields` so a typo or a stale key fails loudly at
 /// load time rather than being silently ignored.
-#[derive(Debug, Deserialize, JsonSchema)]
+#[derive(Debug, Deserialize, JsonSchema, DocumentedFields)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigSchema {
     /// Custom numeric CRAP cutoff. Functions scoring above this fail the
@@ -217,7 +220,7 @@ impl SrcSpec {
 }
 
 /// Output-shaping settings (the `[output]` table) on the wire type.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[derive(Debug, Default, Deserialize, JsonSchema, DocumentedFields)]
 #[serde(deny_unknown_fields)]
 pub struct OutputSchema {
     /// Cap on the number of warning annotations emitted by the GitHub
@@ -231,7 +234,7 @@ pub struct OutputSchema {
 }
 
 /// A single per-path threshold override (a `[[overrides]]` block).
-#[derive(Debug, Deserialize, JsonSchema)]
+#[derive(Debug, Deserialize, JsonSchema, DocumentedFields)]
 #[serde(deny_unknown_fields)]
 pub struct OverrideSchema {
     /// Glob pattern matched against project-relative file paths.
@@ -241,7 +244,7 @@ pub struct OverrideSchema {
 }
 
 /// A saved view preset (a `[views.<name>]` block) on the wire type.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[derive(Debug, Default, Deserialize, JsonSchema, DocumentedFields)]
 #[serde(deny_unknown_fields)]
 pub struct ViewPresetSchema {
     /// Limit the report to the N highest-CRAP functions.
@@ -264,7 +267,7 @@ pub struct ViewPresetSchema {
 
 /// A per-language override section (a `[language.<name>]` block) on the
 /// wire type. May assert any subset of the shared per-language knobs.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[derive(Debug, Default, Deserialize, JsonSchema, DocumentedFields)]
 #[serde(deny_unknown_fields)]
 pub struct LangSchema {
     /// Per-language numeric CRAP cutoff. Mutually exclusive with the
@@ -587,6 +590,480 @@ pub fn config_json_schema() -> String {
     serde_json::to_string_pretty(&schema).expect("ConfigSchema JSON Schema serializes")
 }
 
+// ── Annotated example artifact ─────────────────────────────────────
+
+/// Turn a `documented` field doc (the raw `///` text, possibly multiple
+/// lines) into a leading TOML comment block (`# line\n…`), with a
+/// trailing newline so it sits directly above the key.
+fn doc_comment(doc: &str) -> String {
+    let mut out = String::new();
+    for line in doc.trim_end().lines() {
+        out.push_str("# ");
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+/// Look up a schema struct field's `///` doc by field name. Panics if the
+/// name is absent — that can only happen if a field was renamed without
+/// updating the emitter, which the no-`..` destructure makes a compile
+/// error first, so this is an internal invariant, not a runtime path.
+fn field_doc<T: DocumentedFields>(field: &str) -> &'static str {
+    T::get_field_docs(field).unwrap_or_else(|_| {
+        panic!(
+            "schema field `{field}` has no documented `///` doc — every field must be documented"
+        )
+    })
+}
+
+/// Attach `doc` as the leading comment above `key` in `table`
+/// (key-decor prefix; see the `toml_edit` decor model). `blank_before`
+/// inserts a separating blank line above the comment block.
+fn comment_key(table: &mut toml_edit::Table, key: &str, doc: &str, blank_before: bool) {
+    if let Some(mut k) = table.key_mut(key) {
+        let prefix = if blank_before {
+            format!("\n{}", doc_comment(doc))
+        } else {
+            doc_comment(doc)
+        };
+        k.leaf_decor_mut().set_prefix(prefix);
+    }
+}
+
+/// Render the exhaustive annotated `crap.example.toml`.
+///
+/// This is the single generator behind the committed `crap.example.toml`
+/// reference AND `crap4rs init` / `crap4ts init` — `init` writes this
+/// output verbatim, and the committed example **is** this function's
+/// output (a byte-identical sync test guards it). NOT loaded by the tool;
+/// purely the canonical option reference.
+///
+/// The example exercises **every** field. `threshold` is live and
+/// `preset` is shown as a commented alternative because the two are
+/// mutually exclusive — the loader rejects a config that sets both.
+/// The same carve-out applies recursively to each `[language.<name>]`
+/// section. Maps (`views`, `language`) are emitted by sorted key so the
+/// output is deterministic (the sync test is byte-identical).
+///
+/// The compile-time completeness guard is the exhaustive `let
+/// ConfigSchema { .. } = ..` destructure below with **no `..`**: adding a
+/// field to `ConfigSchema` fails to compile until it is wired into this
+/// emitter, so a new option can never silently ship undocumented.
+pub fn render_example_config(meta: &AdapterMeta) -> String {
+    use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table, value};
+
+    // Exhaustive destructure — NO `..`. The compile guard: a new
+    // ConfigSchema field breaks this line until it is emitted below.
+    let example = exhaustive_example(meta);
+    let ConfigSchema {
+        threshold,
+        preset,
+        metric,
+        src,
+        exclude,
+        overrides,
+        views,
+        language,
+        output,
+    } = example;
+
+    // `preset` is the commented mutually-exclusive alternative to the live
+    // `threshold` (Gate E), so the value never carries it — it is rendered
+    // as a `#`-comment below. Binding it (rather than `..`) keeps the
+    // exhaustive-destructure compile guard intact; asserting None documents
+    // the invariant and consumes the binding.
+    debug_assert!(
+        preset.is_none(),
+        "the exhaustive example must leave `preset` unset (threshold is live; preset is the commented alternative)"
+    );
+
+    let mut doc = DocumentMut::new();
+    let root = doc.as_table_mut();
+    root.set_implicit(false);
+
+    // Header banner.
+    root.decor_mut().set_prefix(format!(
+        "# {name} — exhaustive annotated config reference (every supported option).\n\
+         # Generated by `{tool} init`; regenerate with `{tool} init --force`.\n\
+         # This file documents every field — your real {name} is a trimmed subset.\n\n",
+        name = meta.canonical_config_file_name(),
+        tool = meta.tool_name,
+    ));
+
+    // ── top-level scalars ──
+    // threshold is live; preset is the commented mutually-exclusive
+    // alternative (emitted as a comment so the example round-trips).
+    let threshold_val = threshold.expect("exhaustive example sets threshold");
+    root.insert("threshold", value(threshold_val));
+    comment_key(
+        root,
+        "threshold",
+        field_doc::<ConfigSchema>("threshold"),
+        false,
+    );
+
+    // preset: commented alternative. `preset` is None in the value (so
+    // round-trip parses threshold), shown here as a `#`-commented line
+    // carrying its own doc so the field stays documented.
+    let preset_example = preset_alternative();
+    let preset_block = format!(
+        "{doc}# preset = \"{val}\"\n",
+        doc = doc_comment(field_doc::<ConfigSchema>("preset")),
+        val = preset_example,
+    );
+    // Attach the preset block as a suffix on the threshold key's value so
+    // it renders directly below the live `threshold = N` line.
+    if let Some(v) = root.get_mut("threshold").and_then(|i| i.as_value_mut()) {
+        v.decor_mut().set_suffix(format!("\n\n{preset_block}"));
+    }
+
+    root.insert("metric", value(metric.expect("metric set")));
+    comment_key(root, "metric", field_doc::<ConfigSchema>("metric"), true);
+
+    // src: emit the multi-root array form (the exhaustive shape).
+    let mut src_arr = Array::new();
+    for p in src_to_strings(&src.expect("exhaustive example sets src")) {
+        src_arr.push(p);
+    }
+    root.insert("src", value(src_arr));
+    comment_key(root, "src", field_doc::<ConfigSchema>("src"), true);
+
+    // exclude: non-empty array.
+    let mut excl_arr = Array::new();
+    for p in exclude.expect("exclude set") {
+        excl_arr.push(p);
+    }
+    root.insert("exclude", value(excl_arr));
+    comment_key(root, "exclude", field_doc::<ConfigSchema>("exclude"), true);
+
+    // ── [[overrides]] array-of-tables ──
+    let mut overrides_aot = ArrayOfTables::new();
+    for o in overrides {
+        // Exhaustive destructure (no `..`) — extends the compile guard to
+        // OverrideSchema: a new field breaks this until it is emitted.
+        let OverrideSchema { pattern, threshold } = o;
+        let mut t = Table::new();
+        t.insert("pattern", value(pattern));
+        comment_key(
+            &mut t,
+            "pattern",
+            field_doc::<OverrideSchema>("pattern"),
+            false,
+        );
+        t.insert("threshold", value(threshold));
+        comment_key(
+            &mut t,
+            "threshold",
+            field_doc::<OverrideSchema>("threshold"),
+            false,
+        );
+        overrides_aot.push(t);
+    }
+    // Header doc for the overrides array.
+    if let Some(first) = overrides_aot.get_mut(0) {
+        first.decor_mut().set_prefix(format!(
+            "\n{}",
+            doc_comment(field_doc::<ConfigSchema>("overrides"))
+        ));
+    }
+    root.insert("overrides", Item::ArrayOfTables(overrides_aot));
+
+    // ── [views.<name>] tables (sorted by name) ──
+    {
+        // One sub-table per preset; emit the `views` doc above the first.
+        let mut views_sorted: Vec<_> = views.into_iter().collect();
+        views_sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut views_tbl = Table::new();
+        views_tbl.set_implicit(true);
+        let mut first = true;
+        for (name, vp) in views_sorted {
+            let mut t = Table::new();
+            insert_view_preset(&mut t, vp);
+            if first {
+                t.decor_mut().set_prefix(format!(
+                    "\n{}",
+                    doc_comment(field_doc::<ConfigSchema>("views"))
+                ));
+                first = false;
+            }
+            views_tbl.insert(&name, Item::Table(t));
+        }
+        root.insert("views", Item::Table(views_tbl));
+    }
+
+    // ── [language.<name>] tables (sorted by name) ──
+    {
+        let mut lang_sorted: Vec<_> = language.into_iter().collect();
+        lang_sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut lang_tbl = Table::new();
+        lang_tbl.set_implicit(true);
+        let mut first = true;
+        for (name, ls) in lang_sorted {
+            let mut t = Table::new();
+            insert_lang_section(&mut t, ls);
+            if first {
+                t.decor_mut().set_prefix(format!(
+                    "\n{}",
+                    doc_comment(field_doc::<ConfigSchema>("language"))
+                ));
+                first = false;
+            }
+            lang_tbl.insert(&name, Item::Table(t));
+        }
+        root.insert("language", Item::Table(lang_tbl));
+    }
+
+    // ── [output] table ──
+    {
+        // Exhaustive destructure (no `..`) — extends the compile guard to
+        // OutputSchema: a new field breaks this until it is emitted.
+        let OutputSchema {
+            annotation_limit,
+            title,
+            subtitle,
+        } = output;
+        let mut t = Table::new();
+        t.insert(
+            "annotation_limit",
+            value(i64::from(annotation_limit.expect("annotation_limit"))),
+        );
+        comment_key(
+            &mut t,
+            "annotation_limit",
+            field_doc::<OutputSchema>("annotation_limit"),
+            false,
+        );
+        t.insert("title", value(title.expect("title")));
+        comment_key(&mut t, "title", field_doc::<OutputSchema>("title"), false);
+        t.insert("subtitle", value(subtitle.expect("subtitle")));
+        comment_key(
+            &mut t,
+            "subtitle",
+            field_doc::<OutputSchema>("subtitle"),
+            false,
+        );
+        t.decor_mut().set_prefix(format!(
+            "\n{}",
+            doc_comment(field_doc::<ConfigSchema>("output"))
+        ));
+        root.insert("output", Item::Table(t));
+    }
+
+    doc.to_string()
+}
+
+/// Insert every field of a [`ViewPresetSchema`] into `table`, each with
+/// its `///` doc as a leading comment. Exhaustive (no `..`) so a new
+/// view-preset field fails to compile until it is emitted here.
+fn insert_view_preset(table: &mut toml_edit::Table, vp: ViewPresetSchema) {
+    use toml_edit::value;
+    let ViewPresetSchema {
+        top,
+        min_coverage,
+        max_coverage,
+        sort,
+        only_failing,
+        no_fail,
+        group_by,
+        minimal_view,
+    } = vp;
+    table.insert("top", value(i64::from(top.expect("top"))));
+    comment_key(table, "top", field_doc::<ViewPresetSchema>("top"), false);
+    table.insert("min_coverage", value(min_coverage.expect("min_coverage")));
+    comment_key(
+        table,
+        "min_coverage",
+        field_doc::<ViewPresetSchema>("min_coverage"),
+        false,
+    );
+    table.insert("max_coverage", value(max_coverage.expect("max_coverage")));
+    comment_key(
+        table,
+        "max_coverage",
+        field_doc::<ViewPresetSchema>("max_coverage"),
+        false,
+    );
+    table.insert("sort", value(sort.expect("sort")));
+    comment_key(table, "sort", field_doc::<ViewPresetSchema>("sort"), false);
+    table.insert("only_failing", value(only_failing.expect("only_failing")));
+    comment_key(
+        table,
+        "only_failing",
+        field_doc::<ViewPresetSchema>("only_failing"),
+        false,
+    );
+    table.insert("no_fail", value(no_fail.expect("no_fail")));
+    comment_key(
+        table,
+        "no_fail",
+        field_doc::<ViewPresetSchema>("no_fail"),
+        false,
+    );
+    table.insert("group_by", value(group_by.expect("group_by")));
+    comment_key(
+        table,
+        "group_by",
+        field_doc::<ViewPresetSchema>("group_by"),
+        false,
+    );
+    table.insert("minimal_view", value(minimal_view.expect("minimal_view")));
+    comment_key(
+        table,
+        "minimal_view",
+        field_doc::<ViewPresetSchema>("minimal_view"),
+        false,
+    );
+}
+
+/// Insert every field of a [`LangSchema`] into `table`. `threshold` is
+/// live; `preset` is the commented mutually-exclusive alternative (same
+/// carve-out as the top level). Exhaustive (no `..`).
+fn insert_lang_section(table: &mut toml_edit::Table, ls: LangSchema) {
+    use toml_edit::value;
+    let LangSchema {
+        threshold,
+        preset,
+        metric,
+        exclude,
+    } = ls;
+    // threshold live; preset is the commented mutually-exclusive
+    // alternative (rendered as a `#`-comment below). Asserting None
+    // documents the per-section carve-out and consumes the binding while
+    // keeping the exhaustive-destructure compile guard intact.
+    debug_assert!(
+        preset.is_none(),
+        "each [language.*] section must leave `preset` unset (threshold is live; preset is the commented alternative)"
+    );
+    table.insert("threshold", value(threshold.expect("language threshold")));
+    comment_key(
+        table,
+        "threshold",
+        field_doc::<LangSchema>("threshold"),
+        false,
+    );
+    if let Some(v) = table.get_mut("threshold").and_then(|i| i.as_value_mut()) {
+        v.decor_mut().set_suffix(format!(
+            "\n{doc}# preset = \"{val}\"\n",
+            doc = doc_comment(field_doc::<LangSchema>("preset")),
+            val = preset_alternative(),
+        ));
+    }
+    table.insert("metric", value(metric.expect("language metric")));
+    comment_key(table, "metric", field_doc::<LangSchema>("metric"), false);
+    let mut excl = toml_edit::Array::new();
+    for p in exclude.expect("language exclude") {
+        excl.push(p);
+    }
+    table.insert("exclude", value(excl));
+    comment_key(table, "exclude", field_doc::<LangSchema>("exclude"), false);
+}
+
+/// The preset string shown as the commented alternative to `threshold`.
+fn preset_alternative() -> &'static str {
+    "default"
+}
+
+/// Project the example's `SrcSpec` into the string roots it renders as.
+fn src_to_strings(src: &SrcSpec) -> Vec<String> {
+    match src {
+        SrcSpec::One(s) => vec![s.clone()],
+        SrcSpec::Many(v) => v.clone(),
+    }
+}
+
+/// Build the exhaustive `ConfigSchema` value the example renders from.
+///
+/// Every `Option` is `Some` **except `preset`** (the commented
+/// alternative to the live `threshold` — they are mutually exclusive),
+/// and every collection is non-empty. Per-language sections set
+/// `threshold` (live) and leave `preset` `None` for the same reason.
+/// The value passes `validate_raw_config` + the per-view / per-language
+/// validators (the round-trip test asserts this).
+fn exhaustive_example(meta: &AdapterMeta) -> ConfigSchema {
+    let mut views = HashMap::new();
+    views.insert(
+        "ci".to_string(),
+        ViewPresetSchema {
+            top: Some(20),
+            min_coverage: Some(0.0),
+            max_coverage: Some(90.0),
+            sort: Some("coverage".to_string()),
+            only_failing: Some(true),
+            no_fail: Some(false),
+            group_by: Some("file".to_string()),
+            minimal_view: Some(true),
+        },
+    );
+
+    // Enumerate BOTH known language sections so the example is a complete
+    // reference (not just the running adapter's). The section-name strings
+    // are example data here, never crap-core code literals.
+    let mut language = HashMap::new();
+    for key in ["rust", "typescript"] {
+        language.insert(
+            key.to_string(),
+            LangSchema {
+                threshold: Some(8.0),
+                preset: None,
+                metric: Some("cyclomatic".to_string()),
+                exclude: Some(vec!["generated/**".to_string()]),
+            },
+        );
+    }
+
+    ConfigSchema {
+        threshold: Some(15.0),
+        preset: None,
+        metric: Some("cognitive".to_string()),
+        src: Some(SrcSpec::Many(vec![
+            "crates/core/src".to_string(),
+            "crates/cli/src".to_string(),
+        ])),
+        exclude: Some(
+            meta.default_excludes
+                .iter()
+                .map(|s| (*s).to_string())
+                .chain(std::iter::once("generated/**".to_string()))
+                .collect(),
+        ),
+        overrides: vec![OverrideSchema {
+            pattern: "src/domain/**".to_string(),
+            threshold: 8.0,
+        }],
+        views,
+        language,
+        output: OutputSchema {
+            annotation_limit: Some(10),
+            title: Some("My Project CRAP Report".to_string()),
+            subtitle: Some("coverage + complexity gate".to_string()),
+        },
+    }
+}
+
+/// Every documented config-schema field, as `(label, doc)` pairs across
+/// all schema structs (`ConfigSchema`, `OutputSchema`, `OverrideSchema`,
+/// `ViewPresetSchema`, `LangSchema`). The doc-completeness test asserts
+/// each `doc` reaches `render_example_config`'s output, so a field can
+/// never render without its annotation. `label` is `"<Struct>.<field>"`
+/// for diagnostics.
+pub fn all_schema_field_docs() -> Vec<(String, &'static str)> {
+    fn docs<T: DocumentedFields>(struct_name: &'static str) -> Vec<(String, &'static str)> {
+        T::FIELD_NAMES
+            .iter()
+            .zip(T::FIELD_DOCS.iter())
+            .map(|(name, doc)| (format!("{struct_name}.{name}"), *doc))
+            .collect()
+    }
+    let mut out = Vec::new();
+    out.extend(docs::<ConfigSchema>("ConfigSchema"));
+    out.extend(docs::<OutputSchema>("OutputSchema"));
+    out.extend(docs::<OverrideSchema>("OverrideSchema"));
+    out.extend(docs::<ViewPresetSchema>("ViewPresetSchema"));
+    out.extend(docs::<LangSchema>("LangSchema"));
+    out
+}
+
 // ── Tests ──────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -617,6 +1094,33 @@ mod tests {
         assert!(
             json.contains("The probe's documented field."),
             "schemars must render the `///` doc as the property description; got: {json}"
+        );
+    }
+
+    // ── Tooling spike: documented 0.9.2 field-doc access ─────────────
+    //
+    // Proves the `documented` API `render_example_config` relies on works
+    // on MSRV: `#[derive(DocumentedFields)]` exposes each field's `///`
+    // text via `get_field_docs(name)`. Permanent regression guard against
+    // a `documented` upgrade silently changing the accessor the example
+    // emitter depends on.
+    #[test]
+    fn documented_exposes_field_docs_by_name() {
+        use documented::DocumentedFields;
+
+        #[derive(DocumentedFields)]
+        #[allow(dead_code)]
+        struct SpikeDoc {
+            /// The documented spike field.
+            spike_field: u32,
+        }
+
+        let doc = SpikeDoc::get_field_docs("spike_field")
+            .expect("documented exposes the field's `///` doc by name");
+        assert_eq!(doc, "The documented spike field.");
+        assert!(
+            SpikeDoc::get_field_docs("missing").is_err(),
+            "unknown field name must error, not panic"
         );
     }
 
