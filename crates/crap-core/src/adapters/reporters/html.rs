@@ -1717,6 +1717,24 @@ mod tests {
     }
 
     #[test]
+    fn subtitle_without_title_keeps_default_html_heading() {
+        let result = make_multi_function_result();
+        let out = html_labeled(&make_view_default(&result), None, Some("nightly build"));
+        // A subtitle set without a title keeps the default `<tool>
+        // report` H1 (no title to replace it) and still renders the
+        // subtitle span beneath. Exercises the default-h1 + subtitle
+        // combination.
+        assert!(
+            out.contains(&format!("<h1>{TEST_TOOL_NAME} report</h1>")),
+            "expected the default tool H1 when only a subtitle is set",
+        );
+        assert!(
+            out.contains(r#"<span class="subtitle">nightly build</span>"#),
+            "expected the subtitle span even without a title",
+        );
+    }
+
+    #[test]
     fn html_title_subtitle_are_escaped() {
         let result = make_multi_function_result();
         let out = html_labeled(

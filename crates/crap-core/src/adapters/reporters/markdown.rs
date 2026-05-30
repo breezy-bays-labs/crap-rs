@@ -614,6 +614,23 @@ mod tests {
     }
 
     #[test]
+    fn subtitle_without_title_renders_above_markdown_tool_line() {
+        let result = make_multi_function_result();
+        let out = md_labeled(&make_view_default(&result), None, Some("nightly build"));
+        // A subtitle set without a title renders as a plain line above
+        // the tool/version line, which stays the `#` H1 (no title to
+        // demote it). Exercises the template's `{%- else -%}` branch's
+        // inner subtitle arm.
+        assert!(
+            out.starts_with("nightly build\n\n# "),
+            "expected the subtitle above the tool H1; got:\n{out}",
+        );
+        assert!(out.contains(&format!(
+            "# {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
+        )));
+    }
+
+    #[test]
     fn absent_markdown_title_subtitle_is_byte_identical() {
         let result = make_multi_function_result();
         // Absent title/subtitle must be byte-identical to the default —
