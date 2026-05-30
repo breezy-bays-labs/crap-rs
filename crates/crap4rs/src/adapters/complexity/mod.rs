@@ -71,27 +71,45 @@ impl FunctionFinder {
     /// orthogonal (Rust forbids `mod` inside `impl`), so they never
     /// interleave — the path is always `<mods>::<Type?>::<name>`.
     fn qualify(&self, name: &str) -> String {
-        let mut segments: Vec<&str> = self.mod_path.iter().map(String::as_str).collect();
-        if let Some(ty) = &self.current_impl_type {
-            segments.push(ty);
+        // Fast paths for the two overwhelmingly common shapes avoid the
+        // Vec<&str> allocation that the general join needs:
+        //   - top-level free fn  → bare name
+        //   - top-level method   → `Type::name`
+        // The nested-mod cases (rare) fall through to the Vec+join.
+        match (self.mod_path.is_empty(), &self.current_impl_type) {
+            (true, None) => name.to_string(),
+            (true, Some(ty)) => format!("{ty}::{name}"),
+            _ => {
+                let mut segments: Vec<&str> = self.mod_path.iter().map(String::as_str).collect();
+                if let Some(ty) = &self.current_impl_type {
+                    segments.push(ty);
+                }
+                segments.push(name);
+                segments.join("::")
+            }
         }
-        segments.push(name);
-        segments.join("::")
     }
 }
 
 impl<'ast> Visit<'ast> for FunctionFinder {
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
         // Track inline module nesting so functions inside `mod a { mod b
-        // { fn f } }` are qualified `a::b::f`. Modules declared as `mod
-        // foo;` (file-backed, `content == None`) have no inline body to
-        // walk, so the push/pop is a no-op for them. `#[cfg(test)]` and
-        // other attributed modules are NOT special-cased — the walker is
-        // a generic Rust analyzer and `tests::some_fn` is the genuinely
+        // { fn f } }` are qualified `a::b::f`. `#[cfg(test)]` and other
+        // attributed modules are NOT special-cased — the walker is a
+        // generic Rust analyzer and `tests::some_fn` is the genuinely
         // correct qualified name.
-        self.mod_path.push(node.ident.to_string());
-        syn::visit::visit_item_mod(self, node);
-        self.mod_path.pop();
+        //
+        // Modules declared as `mod foo;` (file-backed, `content == None`)
+        // have no inline body to walk, so pushing/popping the ident would
+        // be wasted allocation — skip the stack mutation entirely and
+        // just default-walk.
+        if node.content.is_some() {
+            self.mod_path.push(node.ident.to_string());
+            syn::visit::visit_item_mod(self, node);
+            self.mod_path.pop();
+        } else {
+            syn::visit::visit_item_mod(self, node);
+        }
     }
 
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
