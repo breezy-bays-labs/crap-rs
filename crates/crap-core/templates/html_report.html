@@ -382,9 +382,9 @@ footer.report-footer {
 
 <!-- ── Header ───────────────────────────────────────────────────────── -->
 <header class="report-header">
-  <h1>{% if report_title.is_some() %}{{ report_title.as_ref().unwrap() }}{% else %}{{ tool_name }} report{% endif %}</h1>
-{%- if subtitle.is_some() %}
-  <span class="subtitle">{{ subtitle.as_ref().unwrap() }}</span>
+  <h1>{% if let Some(report_title) = report_title %}{{ report_title }}{% else %}{{ tool_name }} report{% endif %}</h1>
+{%- if let Some(subtitle) = subtitle %}
+  <span class="subtitle">{{ subtitle }}</span>
 {%- endif %}
   <span class="ver">v{{ tool_version }}</span>
   <span class="grow"></span>

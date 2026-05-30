@@ -24,15 +24,15 @@
    offset the scorecard composite action applies (`# `→`#### `, `## `→
    `##### `) is content-agnostic, so the title/tool levels nest cleanly
    under the action's `### Rust (crap4rs)` wrapper either way. -#}
-{%- if title.is_some() -%}
-# {{ title.as_ref().unwrap() }}
-{% if subtitle.is_some() %}
-{{ subtitle.as_ref().unwrap() }}
+{%- if let Some(title) = title -%}
+# {{ title }}
+{% if let Some(subtitle) = subtitle %}
+{{ subtitle }}
 {% endif %}
 ## {{ tool_name }} v{{ tool_version }} — CRAP Score Analysis
 {%- else -%}
-{%- if subtitle.is_some() -%}
-{{ subtitle.as_ref().unwrap() }}
+{%- if let Some(subtitle) = subtitle -%}
+{{ subtitle }}
 
 {% endif -%}
 # {{ tool_name }} v{{ tool_version }} — CRAP Score Analysis
