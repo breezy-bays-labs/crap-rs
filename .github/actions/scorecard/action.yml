@@ -357,10 +357,19 @@ outputs:
   threshold-resolved:
     description: |
       The threshold value the action's `Resolve presets` step resolved
-      for this invocation (preset-derived or raw passthrough). Surfaces
-      the single source-of-truth threshold so consumers can verify the
+      from its INPUTS (preset-derived or raw passthrough). Surfaces the
+      single source-of-truth threshold so consumers can verify the
       preset-to-raw mapping (e.g. `threshold-preset: strict` resolved
       to 8 on the cognitive scale).
+
+      NOTE (crap-rs#346): this reflects the action's resolved *input*, not
+      necessarily the threshold the analyzer actually gated at. When the
+      caller omits both `threshold` and `threshold-preset`, the action
+      does NOT forward `--threshold` (so the analyzer's own `crap.toml`
+      threshold/preset, else its built-in default, owns the gate), yet
+      this output still reports the action's historical `15` fallback.
+      Consumers that let config own the threshold should read the
+      effective value from the analyzer envelope, not this output.
     value: ${{ steps.presets.outputs.threshold }}
   html-artifact-url:
     description: |
