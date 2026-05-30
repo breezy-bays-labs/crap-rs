@@ -94,6 +94,10 @@ fn main() -> ExitCode {
         tool_info_uri: "https://github.com/breezy-bays-labs/crap-rs",
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_names: &["crap.toml", "crap4rs.toml"],
+        // Key this adapter reads in the shared config's `[language.*]`
+        // map; the lowercase data string lives here in the binary, never
+        // in crap-core (which selects generically by this key).
+        config_lang_key: "rust",
         default_excludes: DEFAULT_EXCLUDES,
         // No Rust file suffix is "structurally never source" the way
         // TypeScript's `.d.ts` is (crap-rs#253) — `mod.rs`, `lib.rs`,

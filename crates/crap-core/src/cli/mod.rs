@@ -18,7 +18,7 @@ use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum, 
 use clap_complete::Shell as ClapShell;
 
 use crate::adapters::baseline::{self, BaselineSnapshot};
-use crate::adapters::config::{self, FileConfig};
+use crate::adapters::config::{self, FileConfig, LangConfig};
 use crate::adapters::reporters;
 use crate::adapters::reporters::json::DeltaContext;
 use crate::core::{AnalysisOutput, AnalyzeOptions};
@@ -729,6 +729,15 @@ pub struct AdapterMeta {
     /// any legacy match so the CLI can nudge a rename. Must be non-empty,
     /// and the canonical entry (`[0]`) must be a non-empty string.
     pub config_file_names: &'static [&'static str],
+    /// The key this adapter looks up in the config's `[language.<name>]`
+    /// map (`"rust"` for crap4rs, `"typescript"` for crap4ts). crap-core
+    /// reads only `config.language.get(meta.config_lang_key)` and never
+    /// enumerates language names itself, so the per-language section
+    /// mechanism stays language-agnostic in the library — the only
+    /// language literal lives in each adapter binary's `AdapterMeta`.
+    /// Lowercase by convention to match the TOML section key the user
+    /// authors (`[language.rust]`).
+    pub config_lang_key: &'static str,
     /// Commented-out exclude patterns emitted by `init` into the
     /// generated config (e.g., `&["tests/**", "benches/**", "examples/**"]`
     /// for Rust; `&["node_modules/**", "dist/**", "coverage/**"]` for
@@ -1133,16 +1142,28 @@ fn merge_effective_inputs(
     file_config: &Option<FileConfig>,
     meta: &AdapterMeta,
 ) -> EffectiveInputs {
+    // Resolve the running adapter's `[language.<name>]` overrides (if
+    // any). Each adapter reads only its own section, keyed by
+    // `meta.config_lang_key` — crap-core never enumerates language
+    // names. A `Some` field here wins over the shared top-level value
+    // (per-language overrides shared defaults, #348 AC3).
+    let lang = file_config
+        .as_ref()
+        .and_then(|c| c.language.get(meta.config_lang_key));
+
     // `--src` is repeatable (crap-rs#336). An empty CLI Vec defers to
-    // the config TOML's single `src` (wrapped to one root), then to the
-    // `["src"]` default — preserving the pre-multi-root precedence. A
-    // non-empty CLI Vec wins over config wholesale (CLI overrides config,
-    // same as every other field).
+    // the config TOML's `src` list (already a `Vec<PathBuf>`: one entry
+    // for `src = "string"`, N for `src = [...]`), then to the `["src"]`
+    // default — preserving the pre-multi-root precedence. A non-empty
+    // CLI Vec wins over config wholesale (CLI overrides config, same as
+    // every other field). `src` is shared-only — no per-language
+    // override (a language section's roots would overlap top-level
+    // multi-root + D18 identity).
     let src = if cli.input.src.is_empty() {
         file_config
             .as_ref()
-            .and_then(|c| c.src.clone())
-            .map(|s| vec![s])
+            .map(|c| c.src.clone())
+            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| vec![PathBuf::from("src")])
     } else {
         cli.input.src.clone()
@@ -1151,10 +1172,11 @@ fn merge_effective_inputs(
         .input
         .metric
         .map(Into::into)
+        .or_else(|| lang.and_then(|l| l.metric))
         .or_else(|| file_config.as_ref().and_then(|c| c.metric))
         .unwrap_or(meta.default_metric);
-    let (threshold_config, threshold) = merge_threshold(cli, file_config, metric);
-    let exclude = merge_exclude(cli, file_config, meta);
+    let (threshold_config, threshold) = merge_threshold(cli, file_config, lang, metric);
+    let exclude = merge_exclude(cli, file_config, lang, meta);
     let annotation_limit = cli
         .output
         .annotation_limit
@@ -1792,6 +1814,7 @@ fn load_file_config(
 fn merge_threshold(
     cli: &Cli,
     file_config: &Option<FileConfig>,
+    lang: Option<&LangConfig>,
     metric: ComplexityMetric,
 ) -> (ThresholdConfig, f64) {
     let global = cli
@@ -1807,6 +1830,13 @@ fn merge_threshold(
                 .lenient
                 .then(|| ThresholdPreset::Lenient.threshold(metric))
         })
+        // Per-language overrides (#348) sit just below the CLI flags and
+        // above the shared top-level config. `threshold` and `preset`
+        // are mutually exclusive within a section, so at most one of the
+        // next two `or_else` arms fires for the language layer before
+        // falling through to the shared config layer.
+        .or_else(|| lang.and_then(|l| l.threshold))
+        .or_else(|| lang.and_then(|l| l.preset).map(|p| p.threshold(metric)))
         .or_else(|| file_config.as_ref().and_then(|c| c.threshold))
         .or_else(|| {
             file_config
@@ -1833,26 +1863,41 @@ fn merge_threshold(
 /// the same pattern twice. Order matters because `ignore::overrides`
 /// is order-sensitive on shadowed patterns; forced excludes lead so a
 /// user can't accidentally re-include a structurally-skipped file.
-fn merge_exclude(cli: &Cli, file_config: &Option<FileConfig>, meta: &AdapterMeta) -> Vec<String> {
+fn merge_exclude(
+    cli: &Cli,
+    file_config: &Option<FileConfig>,
+    lang: Option<&LangConfig>,
+    meta: &AdapterMeta,
+) -> Vec<String> {
+    // Append patterns not already seen, preserving order (the override
+    // builder is order-sensitive on shadowed patterns).
+    fn extend_deduped(
+        patterns: &[String],
+        exclude: &mut Vec<String>,
+        seen: &mut std::collections::HashSet<String>,
+    ) {
+        for pattern in patterns {
+            if seen.insert(pattern.clone()) {
+                exclude.push(pattern.clone());
+            }
+        }
+    }
+
     let mut exclude: Vec<String> = meta
         .forced_excludes
         .iter()
         .map(|s| (*s).to_string())
         .collect();
     let mut seen: std::collections::HashSet<String> = exclude.iter().cloned().collect();
-    for pattern in &cli.filter.exclude {
-        if seen.insert(pattern.clone()) {
-            exclude.push(pattern.clone());
-        }
+    extend_deduped(&cli.filter.exclude, &mut exclude, &mut seen);
+    // Per-language excludes (#348) layer over the shared config's
+    // excludes — both are additive (union of globs), so a language
+    // section adds its patterns to (not replaces) the shared set.
+    if let Some(lang_exclude) = lang.and_then(|l| l.exclude.as_deref()) {
+        extend_deduped(lang_exclude, &mut exclude, &mut seen);
     }
-    if let Some(fc) = file_config
-        && let Some(fc_exclude) = &fc.exclude
-    {
-        for pattern in fc_exclude {
-            if seen.insert(pattern.clone()) {
-                exclude.push(pattern.clone());
-            }
-        }
+    if let Some(fc_exclude) = file_config.as_ref().and_then(|c| c.exclude.as_deref()) {
+        extend_deduped(fc_exclude, &mut exclude, &mut seen);
     }
     exclude
 }
@@ -2532,7 +2577,8 @@ mod tests {
             threshold: Some(10.0),
             ..FileConfig::default()
         });
-        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        let (config, display) =
+            merge_threshold(&cli, &file_config, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 15.0);
         assert_eq!(display, 15.0);
     }
@@ -2544,7 +2590,8 @@ mod tests {
             threshold: Some(12.0),
             ..FileConfig::default()
         });
-        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        let (config, display) =
+            merge_threshold(&cli, &file_config, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 12.0);
         assert_eq!(display, 12.0);
     }
@@ -2561,7 +2608,7 @@ mod tests {
             }],
             ..FileConfig::default()
         });
-        let (config, _) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        let (config, _) = merge_threshold(&cli, &file_config, None, ComplexityMetric::Cognitive);
         assert_eq!(config.overrides.len(), 1);
         assert_eq!(config.overrides[0].pattern, "domain/**");
     }
@@ -2569,7 +2616,7 @@ mod tests {
     #[test]
     fn merge_threshold_no_config() {
         let cli = parse(&["--coverage", "lcov.info", "--threshold", "20.0"]).unwrap();
-        let (config, display) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
+        let (config, display) = merge_threshold(&cli, &None, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 20.0);
         assert!(config.overrides.is_empty());
         assert_eq!(display, 20.0);
@@ -2584,7 +2631,8 @@ mod tests {
             threshold: Some(12.0),
             ..FileConfig::default()
         });
-        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        let (config, display) =
+            merge_threshold(&cli, &file_config, None, ComplexityMetric::Cognitive);
         assert_eq!(
             config.global, 15.0,
             "explicit CLI default must override config"
@@ -2599,10 +2647,10 @@ mod tests {
         // (post-#272 alignment); the metric-keyed routing path is
         // exercised so a future per-metric divergence surfaces here.
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
-        let (cog, cog_disp) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
+        let (cog, cog_disp) = merge_threshold(&cli, &None, None, ComplexityMetric::Cognitive);
         assert_eq!(cog.global, 15.0);
         assert_eq!(cog_disp, 15.0);
-        let (cyc, cyc_disp) = merge_threshold(&cli, &None, ComplexityMetric::Cyclomatic);
+        let (cyc, cyc_disp) = merge_threshold(&cli, &None, None, ComplexityMetric::Cyclomatic);
         assert_eq!(cyc.global, 15.0);
         assert_eq!(cyc_disp, 15.0);
     }
@@ -2614,20 +2662,20 @@ mod tests {
         // exercised so a future per-metric divergence surfaces here.
         let strict = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
         assert_eq!(
-            merge_threshold(&strict, &None, ComplexityMetric::Cognitive).1,
+            merge_threshold(&strict, &None, None, ComplexityMetric::Cognitive).1,
             8.0
         );
         assert_eq!(
-            merge_threshold(&strict, &None, ComplexityMetric::Cyclomatic).1,
+            merge_threshold(&strict, &None, None, ComplexityMetric::Cyclomatic).1,
             8.0
         );
         let lenient = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
         assert_eq!(
-            merge_threshold(&lenient, &None, ComplexityMetric::Cognitive).1,
+            merge_threshold(&lenient, &None, None, ComplexityMetric::Cognitive).1,
             25.0
         );
         assert_eq!(
-            merge_threshold(&lenient, &None, ComplexityMetric::Cyclomatic).1,
+            merge_threshold(&lenient, &None, None, ComplexityMetric::Cyclomatic).1,
             25.0
         );
     }
@@ -2639,7 +2687,7 @@ mod tests {
             exclude: Some(vec!["benches/**".to_string()]),
             ..FileConfig::default()
         });
-        let exclude = merge_exclude(&cli, &file_config, &fake_meta());
+        let exclude = merge_exclude(&cli, &file_config, None, &fake_meta());
         assert_eq!(exclude, vec!["tests/**", "benches/**"]);
     }
 
@@ -2650,7 +2698,7 @@ mod tests {
             exclude: Some(vec!["tests/**".to_string()]),
             ..FileConfig::default()
         });
-        let exclude = merge_exclude(&cli, &file_config, &fake_meta());
+        let exclude = merge_exclude(&cli, &file_config, None, &fake_meta());
         assert_eq!(exclude, vec!["tests/**"]);
     }
 
@@ -2670,7 +2718,7 @@ mod tests {
             forced_excludes: &["**/*.d.ts"],
             ..fake_meta()
         };
-        let exclude = merge_exclude(&cli, &file_config, &meta);
+        let exclude = merge_exclude(&cli, &file_config, None, &meta);
         assert_eq!(exclude, vec!["**/*.d.ts", "tests/**", "benches/**"]);
     }
 
@@ -2688,7 +2736,7 @@ mod tests {
             forced_excludes: &[],
             ..fake_meta()
         };
-        let exclude = merge_exclude(&cli, &file_config, &meta);
+        let exclude = merge_exclude(&cli, &file_config, None, &meta);
         assert_eq!(exclude, vec!["tests/**", "benches/**"]);
     }
 
@@ -2705,7 +2753,7 @@ mod tests {
             forced_excludes: &["**/*.d.ts"],
             ..fake_meta()
         };
-        let exclude = merge_exclude(&cli, &file_config, &meta);
+        let exclude = merge_exclude(&cli, &file_config, None, &meta);
         assert_eq!(exclude, vec!["**/*.d.ts", "benches/**"]);
     }
 
@@ -2923,7 +2971,7 @@ mod tests {
     fn merge_threshold_strict_flag() {
         use crate::domain::threshold::STRICT_THRESHOLD;
         let cli = parse(&["--coverage", "lcov.info", "--strict"]).unwrap();
-        let (config, display) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
+        let (config, display) = merge_threshold(&cli, &None, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, STRICT_THRESHOLD);
         assert_eq!(display, STRICT_THRESHOLD);
     }
@@ -2932,7 +2980,7 @@ mod tests {
     fn merge_threshold_lenient_flag() {
         use crate::domain::threshold::LENIENT_THRESHOLD;
         let cli = parse(&["--coverage", "lcov.info", "--lenient"]).unwrap();
-        let (config, display) = merge_threshold(&cli, &None, ComplexityMetric::Cognitive);
+        let (config, display) = merge_threshold(&cli, &None, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, LENIENT_THRESHOLD);
         assert_eq!(display, LENIENT_THRESHOLD);
     }
@@ -2945,7 +2993,7 @@ mod tests {
             preset: Some(ThresholdPreset::Strict),
             ..FileConfig::default()
         });
-        let (config, _) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        let (config, _) = merge_threshold(&cli, &file_config, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, STRICT_THRESHOLD);
     }
 
@@ -2963,7 +3011,8 @@ mod tests {
             threshold: Some(99.0),
             ..FileConfig::default()
         });
-        let (config, display) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        let (config, display) =
+            merge_threshold(&cli, &file_config, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 99.0);
         assert_eq!(display, 99.0);
     }
@@ -2976,7 +3025,7 @@ mod tests {
             preset: Some(ThresholdPreset::Strict),
             ..FileConfig::default()
         });
-        let (config, _) = merge_threshold(&cli, &file_config, ComplexityMetric::Cognitive);
+        let (config, _) = merge_threshold(&cli, &file_config, None, ComplexityMetric::Cognitive);
         assert_eq!(config.global, 50.0);
     }
 
@@ -3013,7 +3062,7 @@ mod tests {
     fn merge_effective_inputs_cli_src_wins_over_config() {
         let cli = parse(&["--coverage", "lcov.info", "--src", "crates/"]).unwrap();
         let file_config = Some(FileConfig {
-            src: Some(PathBuf::from("from-config/")),
+            src: vec![PathBuf::from("from-config/")],
             ..FileConfig::default()
         });
         let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
@@ -3024,7 +3073,7 @@ mod tests {
     fn merge_effective_inputs_config_src_when_cli_absent() {
         let cli = parse(&["--coverage", "lcov.info"]).unwrap();
         let file_config = Some(FileConfig {
-            src: Some(PathBuf::from("from-config/")),
+            src: vec![PathBuf::from("from-config/")],
             ..FileConfig::default()
         });
         let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
@@ -3045,7 +3094,7 @@ mod tests {
         ])
         .unwrap();
         let file_config = Some(FileConfig {
-            src: Some(PathBuf::from("from-config/")),
+            src: vec![PathBuf::from("from-config/")],
             ..FileConfig::default()
         });
         let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
@@ -3053,6 +3102,170 @@ mod tests {
             inputs.src,
             vec![PathBuf::from("crates/a/src"), PathBuf::from("crates/b/src"),]
         );
+    }
+
+    // ── per-language section merge (#348 AC2/AC3) ──────────────────────
+
+    /// `fake_meta()` keyed to a specific `config_lang_key` so the
+    /// per-language merge tests can target a named section.
+    fn meta_for_lang(key: &'static str) -> AdapterMeta {
+        AdapterMeta {
+            config_lang_key: key,
+            ..fake_meta()
+        }
+    }
+
+    /// A `FileConfig` with a shared top-level threshold plus the given
+    /// per-language sections.
+    fn config_with_languages(
+        shared_threshold: f64,
+        langs: &[(&str, LangConfig)],
+    ) -> Option<FileConfig> {
+        Some(FileConfig {
+            threshold: Some(shared_threshold),
+            language: langs
+                .iter()
+                .map(|(name, cfg)| (name.to_string(), cfg.clone()))
+                .collect(),
+            ..FileConfig::default()
+        })
+    }
+
+    #[test]
+    fn merge_effective_inputs_per_language_threshold_overrides_shared() {
+        // Shared top-level threshold = 20; [language.rust] threshold = 8.
+        // A rust-keyed adapter resolves the per-language value.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = config_with_languages(
+            20.0,
+            &[(
+                "rust",
+                LangConfig {
+                    threshold: Some(8.0),
+                    ..LangConfig::default()
+                },
+            )],
+        );
+        let inputs = merge_effective_inputs(&cli, &file_config, &meta_for_lang("rust"));
+        assert_eq!(
+            inputs.threshold, 8.0,
+            "per-language value must win over shared"
+        );
+    }
+
+    #[test]
+    fn merge_effective_inputs_other_language_section_is_ignored() {
+        // A rust-keyed adapter must ignore [language.typescript] and fall
+        // back to the shared top-level threshold.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = config_with_languages(
+            20.0,
+            &[(
+                "typescript",
+                LangConfig {
+                    threshold: Some(25.0),
+                    ..LangConfig::default()
+                },
+            )],
+        );
+        let inputs = merge_effective_inputs(&cli, &file_config, &meta_for_lang("rust"));
+        assert_eq!(
+            inputs.threshold, 20.0,
+            "the typescript section must be ignored by a rust-keyed adapter"
+        );
+    }
+
+    #[test]
+    fn merge_effective_inputs_shared_applies_when_language_omits_field() {
+        // [language.rust] exists but does not set threshold → inherit the
+        // shared top-level value.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = config_with_languages(
+            20.0,
+            &[(
+                "rust",
+                LangConfig {
+                    metric: Some(ComplexityMetric::Cyclomatic),
+                    ..LangConfig::default()
+                },
+            )],
+        );
+        let inputs = merge_effective_inputs(&cli, &file_config, &meta_for_lang("rust"));
+        assert_eq!(
+            inputs.threshold, 20.0,
+            "omitted per-language field inherits shared"
+        );
+        assert_eq!(
+            inputs.metric,
+            ComplexityMetric::Cyclomatic,
+            "the per-language metric override still applies"
+        );
+    }
+
+    #[test]
+    fn merge_effective_inputs_per_language_preset_overrides_shared_threshold() {
+        // Cross-boundary mutual-exclusion: shared sets `threshold`, the
+        // language section sets `preset`. The per-language preset wins.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = config_with_languages(
+            20.0,
+            &[(
+                "rust",
+                LangConfig {
+                    preset: Some(ThresholdPreset::Strict),
+                    ..LangConfig::default()
+                },
+            )],
+        );
+        let inputs = merge_effective_inputs(&cli, &file_config, &meta_for_lang("rust"));
+        assert_eq!(
+            inputs.threshold,
+            ThresholdPreset::Strict.threshold(ComplexityMetric::Cognitive),
+            "per-language preset must win over the inherited shared threshold"
+        );
+    }
+
+    #[test]
+    fn merge_effective_inputs_cli_threshold_beats_per_language() {
+        // CLI flags sit above per-language overrides.
+        let cli = parse(&["--coverage", "lcov.info", "--threshold", "12"]).unwrap();
+        let file_config = config_with_languages(
+            20.0,
+            &[(
+                "rust",
+                LangConfig {
+                    threshold: Some(8.0),
+                    ..LangConfig::default()
+                },
+            )],
+        );
+        let inputs = merge_effective_inputs(&cli, &file_config, &meta_for_lang("rust"));
+        assert_eq!(
+            inputs.threshold, 12.0,
+            "CLI --threshold must beat per-language"
+        );
+    }
+
+    #[test]
+    fn merge_effective_inputs_per_language_exclude_unions_with_shared() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            threshold: Some(20.0),
+            exclude: Some(vec!["shared/**".to_string()]),
+            language: [(
+                "rust".to_string(),
+                LangConfig {
+                    exclude: Some(vec!["rust-only/**".to_string()]),
+                    ..LangConfig::default()
+                },
+            )]
+            .into_iter()
+            .collect(),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config, &meta_for_lang("rust"));
+        assert!(inputs.exclude.contains(&"shared/**".to_string()));
+        assert!(inputs.exclude.contains(&"rust-only/**".to_string()));
     }
 
     // ── resolve_identity_base tests (crap-rs#336 α' base gating) ────────
@@ -3346,6 +3559,7 @@ mod tests {
             tool_info_uri: "https://example.invalid/fake-adapter",
             rule_help_uri: "https://example.invalid/fake-adapter#rules",
             config_file_names: &["fake-adapter.toml"],
+            config_lang_key: "fake",
             default_excludes: &["fixtures/**"],
             // Empty in the shared fake so tests that don't care don't
             // see an unexpected prefix; the two `merge_exclude` tests

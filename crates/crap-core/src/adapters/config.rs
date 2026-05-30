@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::domain::threshold::{ThresholdOverride, ThresholdPreset, is_valid_threshold};
@@ -21,12 +22,26 @@ use crate::domain::view::{CoverageRange, CoverageRangeError, GroupKey, SortKey};
 ///
 /// All fields are optional — missing fields mean "use CLI default."
 /// The CLI layer merges this with command-line flags.
+///
+/// This is the **parsed projection**: its fields are domain types
+/// (`ThresholdPreset`, `ComplexityMetric`, `PathBuf`, …), the shape the
+/// rest of crap-core consumes. It is deliberately distinct from
+/// [`ConfigSchema`] (the wire/documented type) — see the WHY note on
+/// `ConfigSchema`.
 #[derive(Debug, Clone, Default)]
 pub struct FileConfig {
     pub threshold: Option<f64>,
     pub preset: Option<ThresholdPreset>,
     pub metric: Option<ComplexityMetric>,
-    pub src: Option<PathBuf>,
+    /// Source roots the analyzer walks, in declaration order.
+    ///
+    /// Empty means "unset, defer to CLI / the `["src"]` default." A
+    /// single root keeps src-relative identity (byte-identical
+    /// back-compat); multiple roots key git-toplevel-relative (D18,
+    /// enforced downstream by `cli::resolve_identity_base`). The TOML
+    /// `src` key accepts either a bare string (`src = "crates"`) or an
+    /// array (`src = ["a", "b"]`) — both deserialize into this list.
+    pub src: Vec<PathBuf>,
     pub exclude: Option<Vec<String>>,
     pub overrides: Vec<ThresholdOverride>,
     /// Saved view presets keyed by preset name.
@@ -36,12 +51,20 @@ pub struct FileConfig {
     /// this map and folds preset values into `Cli` before
     /// `build_view_spec`.
     pub views: HashMap<String, ViewPreset>,
+    /// Per-language override sections keyed by language name.
+    ///
+    /// Each `[language.<name>]` block in TOML deserializes into a
+    /// [`LangConfig`]; the CLI layer selects the running adapter's
+    /// section via `AdapterMeta::config_lang_key` and overlays it over
+    /// the shared top-level defaults (per-language wins). Languages the
+    /// adapter doesn't recognize are simply never selected.
+    pub language: HashMap<String, LangConfig>,
     /// Output-shaping settings under `[output]`.
     ///
-    /// Reporter-specific knobs (today: `annotation_limit`) live here
-    /// so they share a single TOML namespace rather than polluting the
-    /// top-level table. Missing `[output]` blocks deserialize to
-    /// `OutputConfig::default()`.
+    /// Reporter-specific knobs (`annotation_limit`, `title`,
+    /// `subtitle`) live here so they share a single TOML namespace
+    /// rather than polluting the top-level table. Missing `[output]`
+    /// blocks deserialize to `OutputConfig::default()`.
     pub output: OutputConfig,
 }
 
@@ -55,6 +78,27 @@ pub struct OutputConfig {
     /// the CLI default (10); a CLI `--annotation-limit` flag always
     /// wins over this value when both are set.
     pub annotation_limit: Option<u32>,
+    /// Scorecard title — a single header label for the whole report.
+    /// `None` renders the default unlabeled header.
+    pub title: Option<String>,
+    /// Scorecard subtitle, rendered beneath the title. `None` emits no
+    /// subtitle line.
+    pub subtitle: Option<String>,
+}
+
+/// Per-language config overrides (TOML `[language.<name>]` table).
+///
+/// A language section may assert any subset of the shared top-level
+/// knobs that are meaningful per-language; the CLI layer overlays a
+/// `Some` here over the inherited shared value. `preset` and
+/// `threshold` remain mutually exclusive — a section asserting both is
+/// rejected at parse time, the same as the top level.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LangConfig {
+    pub threshold: Option<f64>,
+    pub preset: Option<ThresholdPreset>,
+    pub metric: Option<ComplexityMetric>,
+    pub exclude: Option<Vec<String>>,
 }
 
 /// Saved view preset.
@@ -76,48 +120,163 @@ pub struct ViewPreset {
     pub minimal_view: Option<bool>,
 }
 
-// ── TOML serde types (private) ─────────────────────────────────────
+// ── Config schema — the public, documented WIRE type ───────────────
+//
+// WHY two config types. crap-core carries a `ConfigSchema` family (the
+// wire/documented type, below) AND a `FileConfig` family (the parsed
+// projection, above). They look redundant but serve opposite ends:
+//
+//   - `ConfigSchema` holds the values *as the user types them in
+//     `crap.toml`* — `preset = "strict"` is a string, `src` is a
+//     string-or-array. This is the type the JSON Schema and the
+//     annotated example must describe, because that is what an editor
+//     validates and what a human reads. Its `///` docs are the single
+//     prose source: schemars renders them as property `description`s,
+//     docs.rs renders them as hovers, and the eventual annotated
+//     example (a later change) attaches them as TOML comments.
+//   - `FileConfig` holds the *parsed* values — `preset:
+//     Option<ThresholdPreset>`, `src: Vec<PathBuf>` — the shape the
+//     analyzer consumes after validation.
+//
+// Annotating the wire type rather than `FileConfig` is forced twice
+// over: putting `Serialize`/`JsonSchema` on `FileConfig` would emit a
+// schema describing parsed enums (`"Strict"`) that does NOT match what
+// the user writes (`"strict"`), and would leak serde onto the domain
+// enums, which crap-core's language-agnostic-core rule forbids. The
+// wire types are `String`-typed at the boundary and already live in the
+// adapters layer, so the derives are purely additive here.
 
-#[derive(Debug, Deserialize)]
+/// The crap config schema — the documented wire shape of `crap.toml`.
+///
+/// Every field carries a `///` doc that is the single prose location for
+/// that option; schemars renders each as the JSON Schema property
+/// `description`, and the same text surfaces on docs.rs. Deserializes
+/// with `deny_unknown_fields` so a typo or a stale key fails loudly at
+/// load time rather than being silently ignored.
+#[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct RawConfig {
-    threshold: Option<f64>,
-    preset: Option<String>,
-    metric: Option<String>,
-    src: Option<String>,
-    exclude: Option<Vec<String>>,
+pub struct ConfigSchema {
+    /// Custom numeric CRAP cutoff. Functions scoring above this fail the
+    /// run. Mutually exclusive with `preset` (set one, not both).
+    pub threshold: Option<f64>,
+    /// Named threshold preset: `"strict"`, `"default"`, or `"lenient"`.
+    /// Mutually exclusive with `threshold`.
+    pub preset: Option<String>,
+    /// Complexity metric: `"cognitive"` (default for the Rust adapter)
+    /// or `"cyclomatic"`.
+    pub metric: Option<String>,
+    /// Source root(s) the analyzer walks. Accepts a single string
+    /// (`src = "crates"`) or an array (`src = ["crate-a", "crate-b"]`).
+    /// A single root stays src-relative; multiple roots are keyed
+    /// git-toplevel-relative and require a git work tree.
+    pub src: Option<SrcSpec>,
+    /// Glob patterns matched against project-relative file paths;
+    /// matching files are excluded from analysis.
+    pub exclude: Option<Vec<String>>,
+    /// Per-path threshold overrides — an array of `[[overrides]]`
+    /// blocks, each pairing a glob `pattern` with its own `threshold`.
     #[serde(default)]
-    overrides: Vec<RawOverride>,
+    pub overrides: Vec<OverrideSchema>,
+    /// Saved view presets keyed by name (`[views.<name>]`), each a
+    /// reusable bundle of report-shaping flags selectable via `--view`.
     #[serde(default)]
-    views: HashMap<String, RawViewPreset>,
+    pub views: HashMap<String, ViewPresetSchema>,
+    /// Per-language override sections keyed by language name
+    /// (`[language.rust]`, `[language.typescript]`, …). Each adapter
+    /// reads only its own section and overlays it over the shared
+    /// top-level defaults.
     #[serde(default)]
-    output: RawOutputConfig,
+    pub language: HashMap<String, LangSchema>,
+    /// Output-shaping settings (`[output]`): annotation cap, scorecard
+    /// title, and subtitle.
+    #[serde(default)]
+    pub output: OutputSchema,
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawOutputConfig {
-    annotation_limit: Option<u32>,
+/// Source-root specification — a single path or a list of paths.
+///
+/// Accepts either form in TOML so the long-standing `src = "string"`
+/// form keeps working while multi-root configs use `src = [...]`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum SrcSpec {
+    /// A single source root: `src = "crates"`.
+    One(String),
+    /// Multiple source roots: `src = ["crate-a", "crate-b"]`.
+    Many(Vec<String>),
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawOverride {
-    pattern: String,
-    threshold: f64,
+impl SrcSpec {
+    /// Flatten to the parsed `Vec<PathBuf>` the analyzer consumes.
+    fn into_paths(self) -> Vec<PathBuf> {
+        match self {
+            SrcSpec::One(s) => vec![PathBuf::from(s)],
+            SrcSpec::Many(v) => v.into_iter().map(PathBuf::from).collect(),
+        }
+    }
 }
 
-#[derive(Debug, Default, Deserialize)]
+/// Output-shaping settings (the `[output]` table) on the wire type.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct RawViewPreset {
-    top: Option<u32>,
-    min_coverage: Option<f64>,
-    max_coverage: Option<f64>,
-    sort: Option<String>,
-    only_failing: Option<bool>,
-    no_fail: Option<bool>,
-    group_by: Option<String>,
-    minimal_view: Option<bool>,
+pub struct OutputSchema {
+    /// Cap on the number of warning annotations emitted by the GitHub
+    /// annotations reporter per run. Must be in `1..=100`. A CLI
+    /// `--annotation-limit` flag wins over this value.
+    pub annotation_limit: Option<u32>,
+    /// Scorecard title — a single header label for the whole report.
+    pub title: Option<String>,
+    /// Scorecard subtitle, rendered beneath the title.
+    pub subtitle: Option<String>,
+}
+
+/// A single per-path threshold override (a `[[overrides]]` block).
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OverrideSchema {
+    /// Glob pattern matched against project-relative file paths.
+    pub pattern: String,
+    /// CRAP cutoff applied to functions in files matching `pattern`.
+    pub threshold: f64,
+}
+
+/// A saved view preset (a `[views.<name>]` block) on the wire type.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ViewPresetSchema {
+    /// Limit the report to the N highest-CRAP functions.
+    pub top: Option<u32>,
+    /// Keep only functions with coverage at or above this percent.
+    pub min_coverage: Option<f64>,
+    /// Keep only functions with coverage at or below this percent.
+    pub max_coverage: Option<f64>,
+    /// Sort key: `"crap"`, `"coverage"`, `"complexity"`, or `"path"`.
+    pub sort: Option<String>,
+    /// Show only functions that exceed their threshold.
+    pub only_failing: Option<bool>,
+    /// Report without failing the process on threshold breaches.
+    pub no_fail: Option<bool>,
+    /// Group rows by `"file"`.
+    pub group_by: Option<String>,
+    /// Render the compact minimal view.
+    pub minimal_view: Option<bool>,
+}
+
+/// A per-language override section (a `[language.<name>]` block) on the
+/// wire type. May assert any subset of the shared per-language knobs.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LangSchema {
+    /// Per-language numeric CRAP cutoff. Mutually exclusive with the
+    /// section's `preset`.
+    pub threshold: Option<f64>,
+    /// Per-language threshold preset. Mutually exclusive with the
+    /// section's `threshold`.
+    pub preset: Option<String>,
+    /// Per-language complexity metric.
+    pub metric: Option<String>,
+    /// Per-language exclude globs.
+    pub exclude: Option<Vec<String>>,
 }
 
 // ── Public API ─────────────────────────────────────────────────────
@@ -214,7 +373,7 @@ pub fn load_config(path: &Path) -> Result<FileConfig> {
 
 /// Parse TOML content into a `FileConfig`.
 fn parse_config(content: &str) -> Result<FileConfig> {
-    let raw: RawConfig = toml::from_str(content)?;
+    let raw: ConfigSchema = toml::from_str(content)?;
     validate_raw_config(&raw)?;
 
     let metric = raw.metric.as_deref().map(parse_metric).transpose()?;
@@ -238,21 +397,55 @@ fn parse_config(content: &str) -> Result<FileConfig> {
         })
         .collect::<Result<HashMap<_, _>>>()?;
 
+    let language = raw
+        .language
+        .into_iter()
+        .map(|(name, raw_lang)| {
+            let lang = parse_lang_config(&name, raw_lang)?;
+            Ok::<_, anyhow::Error>((name, lang))
+        })
+        .collect::<Result<HashMap<_, _>>>()?;
+
     Ok(FileConfig {
         threshold: raw.threshold,
         preset,
         metric,
-        src: raw.src.map(PathBuf::from),
+        src: raw.src.map(SrcSpec::into_paths).unwrap_or_default(),
         exclude: raw.exclude,
         overrides,
         views,
+        language,
         output: OutputConfig {
             annotation_limit: raw.output.annotation_limit,
+            title: raw.output.title,
+            subtitle: raw.output.subtitle,
         },
     })
 }
 
-fn validate_raw_config(raw: &RawConfig) -> Result<()> {
+/// Project a per-language wire section into its parsed [`LangConfig`].
+/// Carries the same `preset`/`threshold` mutual-exclusion and metric
+/// validation the top level enforces, naming the offending section.
+fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig> {
+    if raw.preset.is_some() && raw.threshold.is_some() {
+        anyhow::bail!("[language.{name}]: preset and threshold are mutually exclusive in config");
+    }
+    if let Some(t) = raw.threshold
+        && !is_valid_threshold(t)
+    {
+        anyhow::bail!("[language.{name}]: threshold must be a finite positive number, got: {t}");
+    }
+    let metric = raw.metric.as_deref().map(parse_metric).transpose()?;
+    let preset = raw.preset.as_deref().map(parse_preset).transpose()?;
+    Ok(LangConfig {
+        threshold: raw.threshold,
+        preset,
+        metric,
+        exclude: raw.exclude,
+    })
+}
+
+fn validate_raw_config(raw: &ConfigSchema) -> Result<()> {
     if raw.preset.is_some() && raw.threshold.is_some() {
         anyhow::bail!("preset and threshold are mutually exclusive in config");
     }
@@ -286,7 +479,7 @@ fn validate_raw_config(raw: &RawConfig) -> Result<()> {
     Ok(())
 }
 
-fn parse_view_preset(name: &str, raw: RawViewPreset) -> Result<ViewPreset> {
+fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset> {
     let sort = raw
         .sort
         .as_deref()
@@ -379,11 +572,53 @@ fn parse_metric(s: &str) -> Result<ComplexityMetric> {
     }
 }
 
+// ── JSON Schema artifact ───────────────────────────────────────────
+
+/// Render the committed JSON Schema for [`ConfigSchema`] as pretty JSON.
+///
+/// This is the editor `$schema` target for `crap.toml`. The committed
+/// `crap.schema.json` at the repo root **is** this function's output;
+/// a sync test asserts they stay byte-identical. Each field's `///` doc
+/// surfaces as the schema property's `description`, so the schema and
+/// the docs.rs hovers share one prose source — there is no parallel
+/// hand-authored schema to drift.
+pub fn config_json_schema() -> String {
+    let schema = schemars::schema_for!(ConfigSchema);
+    serde_json::to_string_pretty(&schema).expect("ConfigSchema JSON Schema serializes")
+}
+
 // ── Tests ──────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Tooling spike (walking-skeleton step 1) ──────────────────────
+    //
+    // Proves the schemars 1.x API the config-schema design relies on
+    // works on the workspace MSRV: `#[derive(JsonSchema)]` emits a `///`
+    // doc comment as the property `description`, and `schema_for!`
+    // serializes to JSON. Kept as a permanent regression guard against a
+    // schemars upgrade silently dropping the doc-comment → description
+    // behavior the committed `crap.schema.json` depends on.
+    #[test]
+    fn schemars_renders_doc_comments_as_descriptions() {
+        use schemars::{JsonSchema, schema_for};
+
+        #[derive(JsonSchema)]
+        #[allow(dead_code)]
+        struct SpikeProbe {
+            /// The probe's documented field.
+            documented_field: u32,
+        }
+
+        let schema = schema_for!(SpikeProbe);
+        let json = serde_json::to_string(&schema).expect("schema serializes to JSON");
+        assert!(
+            json.contains("The probe's documented field."),
+            "schemars must render the `///` doc as the property description; got: {json}"
+        );
+    }
 
     #[test]
     fn parse_full_config() {
@@ -404,7 +639,9 @@ threshold = 15.0
         let config = parse_config(toml).unwrap();
         assert_eq!(config.threshold, Some(10.0));
         assert_eq!(config.metric, Some(ComplexityMetric::Cyclomatic));
-        assert_eq!(config.src, Some(PathBuf::from("crates")));
+        // Bare-string `src` form stays back-compatible: deserializes
+        // through `SrcSpec::One` into a single-element list.
+        assert_eq!(config.src, vec![PathBuf::from("crates")]);
         assert_eq!(
             config.exclude,
             Some(vec!["tests/**".to_string(), "benches/**".to_string()])
@@ -422,9 +659,199 @@ threshold = 15.0
         let config = parse_config(toml).unwrap();
         assert_eq!(config.threshold, None);
         assert_eq!(config.metric, None);
-        assert_eq!(config.src, None);
+        assert!(config.src.is_empty());
         assert_eq!(config.exclude, None);
         assert!(config.overrides.is_empty());
+        assert!(config.language.is_empty());
+    }
+
+    // ── src string-or-array back-compat (#348, Gate C) ────────────
+
+    #[test]
+    fn parse_src_bare_string_stays_single_root() {
+        // Back-compat: the long-standing `src = "string"` form must keep
+        // deserializing — into a single-element root list.
+        let config = parse_config(r#"src = "crates""#).unwrap();
+        assert_eq!(config.src, vec![PathBuf::from("crates")]);
+    }
+
+    #[test]
+    fn parse_src_array_collects_multi_roots() {
+        let toml = r#"src = ["crates/a/src", "crates/b/src"]"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(
+            config.src,
+            vec![PathBuf::from("crates/a/src"), PathBuf::from("crates/b/src")]
+        );
+    }
+
+    #[test]
+    fn parse_src_absent_yields_empty_list() {
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert!(config.src.is_empty());
+    }
+
+    // ── [output] title / subtitle (#348 AC4, Q3) ──────────────────
+
+    #[test]
+    fn parse_output_title_and_subtitle() {
+        let toml = r#"
+[output]
+title = "Acme Coverage Report"
+subtitle = "nightly build"
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.output.title.as_deref(), Some("Acme Coverage Report"));
+        assert_eq!(config.output.subtitle.as_deref(), Some("nightly build"));
+    }
+
+    #[test]
+    fn parse_output_title_subtitle_absent_by_default() {
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert_eq!(config.output.title, None);
+        assert_eq!(config.output.subtitle, None);
+    }
+
+    #[test]
+    fn parse_output_title_alongside_annotation_limit() {
+        let toml = r#"
+[output]
+annotation_limit = 7
+title = "My Report"
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.output.annotation_limit, Some(7));
+        assert_eq!(config.output.title.as_deref(), Some("My Report"));
+    }
+
+    // ── [language.<name>] map (#348 AC1/AC2) ──────────────────────
+
+    #[test]
+    fn parse_no_language_table_yields_empty_map() {
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert!(config.language.is_empty());
+    }
+
+    #[test]
+    fn parse_language_sections_keyed_by_name() {
+        let toml = r#"
+threshold = 20.0
+
+[language.rust]
+threshold = 8.0
+
+[language.typescript]
+threshold = 25.0
+"#;
+        let config = parse_config(toml).unwrap();
+        assert_eq!(config.threshold, Some(20.0));
+        assert_eq!(config.language.len(), 2);
+        assert_eq!(config.language["rust"].threshold, Some(8.0));
+        assert_eq!(config.language["typescript"].threshold, Some(25.0));
+    }
+
+    #[test]
+    fn parse_language_section_full_field_set() {
+        let toml = r#"
+[language.rust]
+preset = "strict"
+metric = "cyclomatic"
+exclude = ["generated/**"]
+"#;
+        let config = parse_config(toml).unwrap();
+        let rust = &config.language["rust"];
+        assert_eq!(rust.preset, Some(ThresholdPreset::Strict));
+        assert_eq!(rust.metric, Some(ComplexityMetric::Cyclomatic));
+        assert_eq!(
+            rust.exclude.as_deref(),
+            Some(&["generated/**".to_string()][..])
+        );
+        assert_eq!(rust.threshold, None);
+    }
+
+    #[test]
+    fn parse_language_section_preset_and_threshold_mutually_exclusive() {
+        let toml = r#"
+[language.rust]
+preset = "strict"
+threshold = 8.0
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("mutually exclusive"), "got: {msg}");
+        assert!(
+            msg.contains("language.rust"),
+            "error must name the section, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_language_section_bad_metric_rejected() {
+        let toml = r#"
+[language.rust]
+metric = "halstead"
+"#;
+        let err = parse_config(toml).unwrap_err();
+        assert!(err.to_string().contains("unknown metric"), "got: {err}");
+    }
+
+    #[test]
+    fn parse_language_section_unknown_field_rejected() {
+        let toml = r#"
+[language.rust]
+threshold = 8.0
+nonsense = true
+"#;
+        let err = parse_config(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("unknown") || msg.contains("nonsense"),
+            "expected deny_unknown_fields error, got: {msg}"
+        );
+    }
+
+    // ── JSON Schema artifact (#348) ────────────────────────────────
+
+    #[test]
+    fn config_json_schema_emits_field_descriptions() {
+        let schema = config_json_schema();
+        // The `///` docs on ConfigSchema fields must surface as the
+        // property descriptions schemars renders — this is what an
+        // editor honoring `$schema` shows on hover/autocomplete.
+        assert!(
+            schema.contains("Custom numeric CRAP cutoff."),
+            "threshold description missing from schema: {schema}"
+        );
+        assert!(
+            schema.contains("Per-language override sections"),
+            "language description missing from schema"
+        );
+        assert!(
+            schema.contains("Scorecard title"),
+            "output.title description missing from schema"
+        );
+    }
+
+    #[test]
+    fn config_json_schema_src_accepts_string_or_array() {
+        // The untagged `SrcSpec` enum must surface as an `anyOf` of a
+        // string and an array, so an editor accepts both `src = "x"` and
+        // `src = ["x", "y"]`.
+        let schema = config_json_schema();
+        assert!(
+            schema.contains("anyOf"),
+            "schema missing anyOf for src: {schema}"
+        );
+        assert!(
+            schema.contains("\"type\": \"array\""),
+            "schema missing array type"
+        );
+    }
+
+    #[test]
+    fn config_json_schema_is_deterministic() {
+        // The committed artifact + sync test rely on stable output.
+        assert_eq!(config_json_schema(), config_json_schema());
     }
 
     #[test]

@@ -289,6 +289,7 @@ mod tests {
             tool_info_uri: "https://example.invalid",
             rule_help_uri: "https://example.invalid",
             config_file_names: &["fake-adapter.toml"],
+            config_lang_key: "fake",
             default_excludes: &["tests/**", "benches/**", "examples/**"],
             // `init` doesn't render forced_excludes (they're load-bearing
             // at analysis time, not template scaffolding); empty here
@@ -503,6 +504,6 @@ mod tests {
             Some(ThresholdPreset::Default),
             "loaded preset should match"
         );
-        assert_eq!(config.src.as_deref(), Some(Path::new("src")));
+        assert_eq!(config.src, vec![std::path::PathBuf::from("src")]);
     }
 }

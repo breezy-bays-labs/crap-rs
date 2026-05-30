@@ -1591,6 +1591,7 @@ mod tests {
             tool_info_uri: TEST_TOOL_INFO_URI,
             rule_help_uri: TEST_RULE_HELP_URI,
             config_file_names: &["test-adapter.toml"],
+            config_lang_key: "test",
             default_excludes: &[],
             forced_excludes: &[],
             default_metric: ComplexityMetric::Cognitive,

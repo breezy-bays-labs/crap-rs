@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ConfigSchema",
+  "description": "The crap config schema — the documented wire shape of `crap.toml`.\n\nEvery field carries a `///` doc that is the single prose location for\nthat option; schemars renders each as the JSON Schema property\n`description`, and the same text surfaces on docs.rs. Deserializes\nwith `deny_unknown_fields` so a typo or a stale key fails loudly at\nload time rather than being silently ignored.",
+  "type": "object",
+  "properties": {
+    "exclude": {
+      "description": "Glob patterns matched against project-relative file paths;\nmatching files are excluded from analysis.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "language": {
+      "description": "Per-language override sections keyed by language name\n(`[language.rust]`, `[language.typescript]`, …). Each adapter\nreads only its own section and overlays it over the shared\ntop-level defaults.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/LangSchema"
+      }
+    },
+    "metric": {
+      "description": "Complexity metric: `\"cognitive\"` (default for the Rust adapter)\nor `\"cyclomatic\"`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "output": {
+      "description": "Output-shaping settings (`[output]`): annotation cap, scorecard\ntitle, and subtitle.",
+      "$ref": "#/$defs/OutputSchema"
+    },
+    "overrides": {
+      "description": "Per-path threshold overrides — an array of `[[overrides]]`\nblocks, each pairing a glob `pattern` with its own `threshold`.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/OverrideSchema"
+      }
+    },
+    "preset": {
+      "description": "Named threshold preset: `\"strict\"`, `\"default\"`, or `\"lenient\"`.\nMutually exclusive with `threshold`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "src": {
+      "description": "Source root(s) the analyzer walks. Accepts a single string\n(`src = \"crates\"`) or an array (`src = [\"crate-a\", \"crate-b\"]`).\nA single root stays src-relative; multiple roots are keyed\ngit-toplevel-relative and require a git work tree.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SrcSpec"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "threshold": {
+      "description": "Custom numeric CRAP cutoff. Functions scoring above this fail the\nrun. Mutually exclusive with `preset` (set one, not both).",
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "double"
+    },
+    "views": {
+      "description": "Saved view presets keyed by name (`[views.<name>]`), each a\nreusable bundle of report-shaping flags selectable via `--view`.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ViewPresetSchema"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "LangSchema": {
+      "description": "A per-language override section (a `[language.<name>]` block) on the\nwire type. May assert any subset of the shared per-language knobs.",
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "Per-language exclude globs.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "metric": {
+          "description": "Per-language complexity metric.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preset": {
+          "description": "Per-language threshold preset. Mutually exclusive with the\nsection's `threshold`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threshold": {
+          "description": "Per-language numeric CRAP cutoff. Mutually exclusive with the\nsection's `preset`.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OutputSchema": {
+      "description": "Output-shaping settings (the `[output]` table) on the wire type.",
+      "type": "object",
+      "properties": {
+        "annotation_limit": {
+          "description": "Cap on the number of warning annotations emitted by the GitHub\nannotations reporter per run. Must be in `1..=100`. A CLI\n`--annotation-limit` flag wins over this value.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "subtitle": {
+          "description": "Scorecard subtitle, rendered beneath the title.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "description": "Scorecard title — a single header label for the whole report.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "OverrideSchema": {
+      "description": "A single per-path threshold override (a `[[overrides]]` block).",
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "description": "Glob pattern matched against project-relative file paths.",
+          "type": "string"
+        },
+        "threshold": {
+          "description": "CRAP cutoff applied to functions in files matching `pattern`.",
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pattern",
+        "threshold"
+      ]
+    },
+    "SrcSpec": {
+      "description": "Source-root specification — a single path or a list of paths.\n\nAccepts either form in TOML so the long-standing `src = \"string\"`\nform keeps working while multi-root configs use `src = [...]`.",
+      "anyOf": [
+        {
+          "description": "A single source root: `src = \"crates\"`.",
+          "type": "string"
+        },
+        {
+          "description": "Multiple source roots: `src = [\"crate-a\", \"crate-b\"]`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "ViewPresetSchema": {
+      "description": "A saved view preset (a `[views.<name>]` block) on the wire type.",
+      "type": "object",
+      "properties": {
+        "group_by": {
+          "description": "Group rows by `\"file\"`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_coverage": {
+          "description": "Keep only functions with coverage at or below this percent.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "min_coverage": {
+          "description": "Keep only functions with coverage at or above this percent.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "minimal_view": {
+          "description": "Render the compact minimal view.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "no_fail": {
+          "description": "Report without failing the process on threshold breaches.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "only_failing": {
+          "description": "Show only functions that exceed their threshold.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sort": {
+          "description": "Sort key: `\"crap\"`, `\"coverage\"`, `\"complexity\"`, or `\"path\"`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "top": {
+          "description": "Limit the report to the N highest-CRAP functions.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
