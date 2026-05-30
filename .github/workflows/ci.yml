@@ -711,17 +711,25 @@ jobs:
         uses: ./.github/actions/scorecard
         with:
           languages: rust
-          # Multi-root: the full production crate set, one root per line
-          # (newline-split into repeated `--src` by the action). Excludes
-          # crap-examples by construction — boundary-safe per-crate roots,
-          # never the recursive workspace root.
-          src: |
-            crates/crap-core/src
-            crates/crap4rs/src
-            crates/crap4ts/src
+          # Analysis knobs (`src`, `threshold`/`preset`, `metric`,
+          # `exclude`, the `[views.ci]` preset) are NOT set here — they
+          # live in the repo-root `crap.toml`, which the action's bare
+          # `crap4rs` invocation auto-discovers in the checkout working
+          # directory (crap-rs#346, the config dogfood). `src` and
+          # `threshold-preset` are omitted so config owns them: the action
+          # forwards `--src` / `--threshold` only when the caller sets
+          # them, so config's `src = [3 prod crate roots]` and
+          # `preset = "default"` win. Behavior is identical to the prior
+          # inline knobs (preset `default` -> threshold 15, cognitive
+          # metric, the same three crate roots) — the values MOVED from
+          # YAML into `crap.toml`, they did not change.
+          #
+          # CI-presentation + per-run inputs STAY here: they are not
+          # analyzer config. `coverage` is per-run (the downloaded LCOV
+          # artifact); `gate-mode` / `comment-*` shape how the wrapper
+          # gates and renders the PR comment.
           coverage: lcov.info
           gate-mode: gate-on-analysis
-          threshold-preset: default
           comment-mode: sticky
           comment-header: crap-scorecard-production
           comment-preamble: |
