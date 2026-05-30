@@ -49,6 +49,14 @@ use askama::Template;
 /// for signature symmetry with `format_html`. `effective_metric` is
 /// the runtime-resolved metric (post-CLI/config merge); see
 /// `EffectiveInputs.metric`.
+///
+/// `title` and `subtitle` are the optional `[output] title` / `subtitle`
+/// config labels (crap-rs#352). When `title` is `Some`, it renders as a
+/// `## <title>` line above the tool/version H1; when `subtitle` is
+/// `Some`, it renders on the line beneath. Both default to `None`, in
+/// which case the output is byte-identical to the unlabeled default — no
+/// empty title/subtitle line is emitted (the template ws-strips the
+/// absent arms).
 #[allow(clippy::too_many_arguments)]
 pub fn format_markdown(
     view: &AnalysisView<'_>,
@@ -60,6 +68,8 @@ pub fn format_markdown(
     top_n: usize,
     meta: &AdapterMeta,
     _effective_metric: ComplexityMetric,
+    title: Option<&str>,
+    subtitle: Option<&str>,
 ) -> String {
     let body = if view.full.functions.is_empty() {
         MarkdownBody::Empty
@@ -80,6 +90,8 @@ pub fn format_markdown(
     let delta_block = delta.map(format_markdown_delta);
 
     let tmpl = MarkdownReport {
+        title,
+        subtitle,
         tool_name: meta.tool_name,
         tool_version: meta.tool_version,
         body,
@@ -107,6 +119,12 @@ pub fn format_markdown(
 #[derive(Template)]
 #[template(path = "markdown_report.txt", escape = "none")]
 struct MarkdownReport<'a> {
+    /// Configured scorecard title (`[output] title`), rendered as a
+    /// `## <title>` line above the tool/version H1. `None` emits nothing.
+    title: Option<&'a str>,
+    /// Configured scorecard subtitle (`[output] subtitle`), rendered
+    /// beneath the title. `None` emits nothing.
+    subtitle: Option<&'a str>,
     tool_name: &'a str,
     tool_version: &'a str,
     body: MarkdownBody,
@@ -533,7 +551,85 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         )
+    }
+
+    // ── [output] title / subtitle labeling (crap-rs#352) ────────────────
+
+    fn md_labeled(view: &AnalysisView<'_>, title: Option<&str>, subtitle: Option<&str>) -> String {
+        format_markdown(
+            view,
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            title,
+            subtitle,
+        )
+    }
+
+    #[test]
+    fn title_labels_the_markdown_header() {
+        let result = make_multi_function_result();
+        let out = md_labeled(
+            &make_view_default(&result),
+            Some("Acme Coverage Report"),
+            None,
+        );
+        // The configured title is the prominent headline — it takes the
+        // `#` H1, and the tool/version line demotes to `##` attribution
+        // (prominence consistent with the table + html reporters).
+        assert!(
+            out.starts_with("# Acme Coverage Report\n"),
+            "expected the title as the H1 headline at the top; got:\n{out}",
+        );
+        assert!(out.contains(&format!(
+            "## {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
+        )));
+        // The tool line must NOT remain a top-level `#` H1 when a title
+        // labels the scorecard.
+        assert!(!out.contains(&format!(
+            "\n# {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
+        )));
+    }
+
+    #[test]
+    fn subtitle_renders_beneath_the_markdown_title() {
+        let result = make_multi_function_result();
+        let out = md_labeled(
+            &make_view_default(&result),
+            Some("Acme Coverage Report"),
+            Some("nightly build"),
+        );
+        assert!(
+            out.starts_with("# Acme Coverage Report\n\nnightly build\n"),
+            "expected the subtitle on its own paragraph beneath the title; got:\n{out}",
+        );
+    }
+
+    #[test]
+    fn absent_markdown_title_subtitle_is_byte_identical() {
+        let result = make_multi_function_result();
+        // Absent title/subtitle must be byte-identical to the default —
+        // the template ws-strips the absent arms, so no empty line drift.
+        let labeled = md_labeled(&make_view_default(&result), None, None);
+        let default = md(&make_view_default(&result));
+        assert_eq!(
+            labeled, default,
+            "absent title/subtitle must produce the unlabeled markdown verbatim",
+        );
+        assert!(
+            default.starts_with(&format!(
+                "# {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
+            )),
+            "default header must lead with the tool/version H1, no empty line above",
+        );
     }
 
     #[test]
@@ -589,6 +685,8 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         assert!(out.contains("## Summary"));
         assert!(out.contains("## All functions"));
@@ -646,6 +744,8 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         assert!(out.contains("## All functions"));
         assert!(out.contains("L12 if-branch +1"));
@@ -700,6 +800,8 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         insta::assert_snapshot!(out);
     }
@@ -755,6 +857,8 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         assert!(out.contains("## CRAP Scorecard"));
         assert!(out.contains("- **Delta status:** FAIL"));
@@ -776,6 +880,8 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         assert!(out.contains("### Regressions"));
         assert!(out.contains("parse_record"));
@@ -796,6 +902,8 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         assert!(out.contains("### New violations"));
         assert!(out.contains("new_fn"));
@@ -823,6 +931,8 @@ mod tests {
             10,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         insta::assert_snapshot!(out);
     }
