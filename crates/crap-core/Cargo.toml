@@ -57,6 +57,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 # Config file parsing (adapters/config). Relocated from crap4rs in S3.
 toml = { workspace = true }
+# JSON Schema generation for the config wire type (`ConfigSchema`):
+# `#[derive(JsonSchema)]` + `schema_for!` emit the committed
+# `crap.schema.json` (the editor `$schema` target), with each field's
+# `///` doc auto-rendered as the property `description`.
+schemars = { workspace = true }
 
 # Error tagging on `CrapError`, `view::CoverageRangeError`, and the
 # adapter error families. Pure typed errors, no I/O.

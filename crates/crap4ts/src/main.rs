@@ -58,6 +58,10 @@ fn main() -> ExitCode {
         tool_info_uri: "https://github.com/breezy-bays-labs/crap-rs",
         rule_help_uri: "https://github.com/breezy-bays-labs/crap-rs#crap-formula",
         config_file_names: &["crap.toml", "crap4ts.toml"],
+        // Key this adapter reads in the shared config's `[language.*]`
+        // map; the lowercase data string lives here in the binary, never
+        // in crap-core (which selects generically by this key).
+        config_lang_key: "typescript",
         default_excludes: DEFAULT_EXCLUDES,
         // `.d.ts` declaration files contain ambient types only (no
         // executable code); skip them at the discovery boundary so

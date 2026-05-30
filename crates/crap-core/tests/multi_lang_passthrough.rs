@@ -41,6 +41,7 @@ fn test_meta() -> AdapterMeta {
         tool_info_uri: "https://example.com/test-adapter",
         rule_help_uri: "https://example.com/test-adapter#crap",
         config_file_names: &["test-adapter.toml"],
+        config_lang_key: "test",
         default_excludes: &[],
         forced_excludes: &[],
         default_metric: ComplexityMetric::Cognitive,

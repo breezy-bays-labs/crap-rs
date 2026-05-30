@@ -64,6 +64,14 @@ colored = "3"
 # ── Config file parsing ──
 toml = "0.8"
 
+# ── JSON Schema generation from the annotated config type ──
+# schemars 1.2.1 derives a JSON Schema from `ConfigSchema` (the config
+# wire type). Doc comments (`///`) on each field auto-become the
+# property's `description`, so the schema and the docs.rs hovers share
+# one prose source. MSRV 1.74 — comfortably below the workspace floor
+# of 1.93. The `derive` default feature backs `#[derive(JsonSchema)]`.
+schemars = "1"
+
 # ── Regex (hunk header parsing in diff adapter) ──
 regex = "1"
 
