@@ -3859,10 +3859,10 @@ expression: pretty
           "contributors": [
             {
               "column": 72,
-              "end_line": 198,
+              "end_line": 199,
               "increment": 1,
               "kind": "try",
-              "line": 198,
+              "line": 199,
               "nesting_depth": 0
             }
           ],
@@ -3876,7 +3876,7 @@ expression: pretty
             "qualified_name": "LcovParser::parse",
             "span": {
               "end_column": 5,
-              "end_line": 200,
+              "end_line": 201,
               "start_column": 5,
               "start_line": 167
             }
@@ -3892,58 +3892,58 @@ expression: pretty
           "contributors": [
             {
               "column": 73,
-              "end_line": 215,
+              "end_line": 218,
               "increment": 1,
               "kind": "try",
-              "line": 215,
-              "nesting_depth": 0
-            },
-            {
-              "column": 9,
-              "end_line": 232,
-              "increment": 1,
-              "kind": "for-loop",
               "line": 218,
               "nesting_depth": 0
             },
             {
-              "column": 68,
-              "end_line": 219,
+              "column": 9,
+              "end_line": 235,
               "increment": 1,
-              "kind": "try",
-              "line": 219,
-              "nesting_depth": 1
+              "kind": "for-loop",
+              "line": 221,
+              "nesting_depth": 0
             },
             {
-              "column": 13,
-              "end_line": 223,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 220,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
+              "column": 68,
               "end_line": 222,
               "increment": 1,
-              "kind": "continue",
+              "kind": "try",
               "line": 222,
-              "nesting_depth": 2
+              "nesting_depth": 1
             },
             {
               "column": 13,
-              "end_line": 231,
+              "end_line": 226,
               "increment": 2,
               "kind": "if-branch",
-              "line": 224,
+              "line": 223,
               "nesting_depth": 1
             },
             {
               "column": 17,
               "end_line": 225,
               "increment": 1,
-              "kind": "logical-operator",
+              "kind": "continue",
               "line": 225,
+              "nesting_depth": 2
+            },
+            {
+              "column": 13,
+              "end_line": 234,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 227,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 228,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 228,
               "nesting_depth": 1
             }
           ],
@@ -3957,9 +3957,9 @@ expression: pretty
             "qualified_name": "LcovParser::validate",
             "span": {
               "end_column": 5,
-              "end_line": 234,
+              "end_line": 237,
               "start_column": 5,
-              "start_line": 202
+              "start_line": 203
             }
           }
         },
@@ -3973,26 +3973,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 241,
+              "end_line": 244,
               "increment": 1,
               "kind": "if-branch",
-              "line": 238,
+              "line": 241,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 246,
+              "end_line": 249,
               "increment": 1,
               "kind": "if-branch",
-              "line": 243,
+              "line": 246,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 250,
+              "end_line": 253,
               "increment": 1,
               "kind": "if-branch",
-              "line": 248,
+              "line": 251,
               "nesting_depth": 0
             }
           ],
@@ -4006,9 +4006,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 251,
+              "end_line": 254,
               "start_column": 1,
-              "start_line": 237
+              "start_line": 240
             }
           }
         },
@@ -4022,14 +4022,14 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 263,
+              "end_line": 266,
               "increment": 1,
               "kind": "if-branch",
-              "line": 256,
+              "line": 259,
               "nesting_depth": 0
             }
           ],
-          "coverage_percent": 85.71428571428571,
+          "coverage_percent": 87.5,
           "crap": {
             "risk_level": "low",
             "value": 2.01
@@ -4039,9 +4039,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 264,
+              "end_line": 267,
               "start_column": 1,
-              "start_line": 253
+              "start_line": 256
             }
           }
         },
@@ -4055,18 +4055,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 269,
+              "end_line": 272,
               "increment": 1,
               "kind": "if-branch",
-              "line": 267,
+              "line": 270,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 274,
+              "end_line": 277,
               "increment": 1,
               "kind": "match",
-              "line": 271,
+              "line": 274,
               "nesting_depth": 0
             }
           ],
@@ -4080,9 +4080,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 275,
+              "end_line": 278,
               "start_column": 1,
-              "start_line": 266
+              "start_line": 269
             }
           }
         },
@@ -4096,18 +4096,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 280,
+              "end_line": 283,
               "increment": 1,
               "kind": "if-branch",
-              "line": 278,
+              "line": 281,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 287,
+              "end_line": 290,
               "increment": 1,
               "kind": "match",
-              "line": 282,
+              "line": 285,
               "nesting_depth": 0
             }
           ],
@@ -4121,9 +4121,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 288,
+              "end_line": 291,
               "start_column": 1,
-              "start_line": 277
+              "start_line": 280
             }
           }
         },
@@ -4145,9 +4145,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 297,
+              "end_line": 300,
               "start_column": 1,
-              "start_line": 290
+              "start_line": 293
             }
           }
         },
@@ -4161,22 +4161,6 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 302,
-              "increment": 1,
-              "kind": "try",
-              "line": 302,
-              "nesting_depth": 0
-            },
-            {
-              "column": 52,
-              "end_line": 304,
-              "increment": 1,
-              "kind": "try",
-              "line": 304,
-              "nesting_depth": 0
-            },
-            {
-              "column": 58,
               "end_line": 305,
               "increment": 1,
               "kind": "try",
@@ -4184,19 +4168,35 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 5,
+              "column": 52,
+              "end_line": 307,
+              "increment": 1,
+              "kind": "try",
+              "line": 307,
+              "nesting_depth": 0
+            },
+            {
+              "column": 58,
               "end_line": 308,
               "increment": 1,
+              "kind": "try",
+              "line": 308,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 311,
+              "increment": 1,
               "kind": "if-branch",
-              "line": 306,
+              "line": 309,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 309,
+              "end_line": 312,
               "increment": 1,
               "kind": "try",
-              "line": 309,
+              "line": 312,
               "nesting_depth": 0
             }
           ],
@@ -4210,9 +4210,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 311,
+              "end_line": 314,
               "start_column": 1,
-              "start_line": 299
+              "start_line": 302
             }
           }
         },
@@ -4226,30 +4226,6 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 318,
-              "increment": 1,
-              "kind": "try",
-              "line": 318,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 319,
-              "increment": 1,
-              "kind": "try",
-              "line": 319,
-              "nesting_depth": 0
-            },
-            {
-              "column": 44,
-              "end_line": 320,
-              "increment": 1,
-              "kind": "try",
-              "line": 320,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
               "end_line": 321,
               "increment": 1,
               "kind": "try",
@@ -4257,7 +4233,15 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 58,
+              "column": 43,
+              "end_line": 322,
+              "increment": 1,
+              "kind": "try",
+              "line": 322,
+              "nesting_depth": 0
+            },
+            {
+              "column": 44,
               "end_line": 323,
               "increment": 1,
               "kind": "try",
@@ -4265,43 +4249,59 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 5,
-              "end_line": 326,
+              "column": 43,
+              "end_line": 324,
               "increment": 1,
-              "kind": "if-branch",
+              "kind": "try",
               "line": 324,
               "nesting_depth": 0
             },
             {
-              "column": 55,
-              "end_line": 327,
+              "column": 58,
+              "end_line": 326,
               "increment": 1,
               "kind": "try",
+              "line": 326,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 329,
+              "increment": 1,
+              "kind": "if-branch",
               "line": 327,
               "nesting_depth": 0
             },
             {
-              "column": 57,
-              "end_line": 328,
+              "column": 55,
+              "end_line": 330,
               "increment": 1,
               "kind": "try",
-              "line": 328,
+              "line": 330,
+              "nesting_depth": 0
+            },
+            {
+              "column": 57,
+              "end_line": 331,
+              "increment": 1,
+              "kind": "try",
+              "line": 331,
               "nesting_depth": 0
             },
             {
               "column": 17,
-              "end_line": 333,
+              "end_line": 336,
               "increment": 1,
               "kind": "if-branch",
-              "line": 329,
+              "line": 332,
               "nesting_depth": 0
             },
             {
               "column": 54,
-              "end_line": 332,
+              "end_line": 335,
               "increment": 1,
               "kind": "try",
-              "line": 332,
+              "line": 335,
               "nesting_depth": 1
             }
           ],
@@ -4315,9 +4315,9 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 336,
+              "end_line": 339,
               "start_column": 1,
-              "start_line": 313
+              "start_line": 316
             }
           }
         },
@@ -4331,10 +4331,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 342,
+              "end_line": 345,
               "increment": 1,
               "kind": "let-else",
-              "line": 339,
+              "line": 342,
               "nesting_depth": 0
             }
           ],
@@ -4348,9 +4348,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 347,
+              "end_line": 350,
               "start_column": 1,
-              "start_line": 338
+              "start_line": 341
             }
           }
         },
@@ -4364,18 +4364,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 356,
+              "end_line": 359,
               "increment": 1,
               "kind": "if-branch",
-              "line": 354,
+              "line": 357,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 361,
+              "end_line": 364,
               "increment": 1,
               "kind": "for-loop",
-              "line": 359,
+              "line": 362,
               "nesting_depth": 0
             }
           ],
@@ -4389,9 +4389,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 362,
+              "end_line": 365,
               "start_column": 1,
-              "start_line": 349
+              "start_line": 352
             }
           }
         },
@@ -4405,18 +4405,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 371,
+              "end_line": 374,
               "increment": 1,
               "kind": "if-branch",
-              "line": 369,
+              "line": 372,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 376,
+              "end_line": 379,
               "increment": 1,
               "kind": "for-loop",
-              "line": 374,
+              "line": 377,
               "nesting_depth": 0
             }
           ],
@@ -4430,9 +4430,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 377,
+              "end_line": 380,
               "start_column": 1,
-              "start_line": 364
+              "start_line": 367
             }
           }
         },
@@ -4454,9 +4454,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 384,
+              "end_line": 387,
               "start_column": 1,
-              "start_line": 379
+              "start_line": 382
             }
           }
         },
@@ -4478,9 +4478,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 395,
+              "end_line": 398,
               "start_column": 1,
-              "start_line": 386
+              "start_line": 389
             }
           }
         },
@@ -4494,10 +4494,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 403,
+              "end_line": 406,
               "increment": 1,
               "kind": "match",
-              "line": 398,
+              "line": 401,
               "nesting_depth": 0
             }
           ],
@@ -4511,9 +4511,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 404,
+              "end_line": 407,
               "start_column": 1,
-              "start_line": 397
+              "start_line": 400
             }
           }
         },
@@ -4535,9 +4535,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 409,
+              "end_line": 412,
               "start_column": 1,
-              "start_line": 406
+              "start_line": 409
             }
           }
         },
@@ -4559,9 +4559,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 437,
+              "end_line": 440,
               "start_column": 1,
-              "start_line": 411
+              "start_line": 414
             }
           }
         },
@@ -4583,9 +4583,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 444,
+              "end_line": 447,
               "start_column": 1,
-              "start_line": 439
+              "start_line": 442
             }
           }
         },
@@ -4607,9 +4607,9 @@ expression: pretty
             "qualified_name": "tests::parser",
             "span": {
               "end_column": 5,
-              "end_line": 453,
+              "end_line": 456,
               "start_column": 5,
-              "start_line": 451
+              "start_line": 454
             }
           }
         },
@@ -4631,9 +4631,9 @@ expression: pretty
             "qualified_name": "tests::parse",
             "span": {
               "end_column": 5,
-              "end_line": 457,
+              "end_line": 460,
               "start_column": 5,
-              "start_line": 455
+              "start_line": 458
             }
           }
         },
@@ -4655,9 +4655,9 @@ expression: pretty
             "qualified_name": "tests::empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 464,
+              "end_line": 467,
               "start_column": 5,
-              "start_line": 459
+              "start_line": 462
             }
           }
         },
@@ -4679,9 +4679,9 @@ expression: pretty
             "qualified_name": "tests::validate_str",
             "span": {
               "end_column": 5,
-              "end_line": 478,
+              "end_line": 481,
               "start_column": 5,
-              "start_line": 468
+              "start_line": 471
             }
           }
         },
@@ -4703,9 +4703,9 @@ expression: pretty
             "qualified_name": "tests::validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 483,
+              "end_line": 486,
               "start_column": 5,
-              "start_line": 480
+              "start_line": 483
             }
           }
         },
@@ -4727,9 +4727,9 @@ expression: pretty
             "qualified_name": "tests::validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 488,
+              "end_line": 491,
               "start_column": 5,
-              "start_line": 485
+              "start_line": 488
             }
           }
         },
@@ -4751,9 +4751,9 @@ expression: pretty
             "qualified_name": "tests::validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 493,
+              "end_line": 496,
               "start_column": 5,
-              "start_line": 490
+              "start_line": 493
             }
           }
         },
@@ -4775,9 +4775,9 @@ expression: pretty
             "qualified_name": "tests::validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 498,
+              "end_line": 501,
               "start_column": 5,
-              "start_line": 495
+              "start_line": 498
             }
           }
         },
@@ -4799,9 +4799,9 @@ expression: pretty
             "qualified_name": "tests::validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 503,
+              "end_line": 506,
               "start_column": 5,
-              "start_line": 500
+              "start_line": 503
             }
           }
         },
@@ -4823,9 +4823,9 @@ expression: pretty
             "qualified_name": "tests::validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 513,
+              "end_line": 516,
               "start_column": 5,
-              "start_line": 505
+              "start_line": 508
             }
           }
         },
@@ -4847,9 +4847,9 @@ expression: pretty
             "qualified_name": "tests::validate_missing_path_returns_open_error",
             "span": {
               "end_column": 5,
-              "end_line": 525,
+              "end_line": 528,
               "start_column": 5,
-              "start_line": 515
+              "start_line": 518
             }
           }
         },
@@ -4871,9 +4871,9 @@ expression: pretty
             "qualified_name": "tests::single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 535,
+              "end_line": 538,
               "start_column": 5,
-              "start_line": 527
+              "start_line": 530
             }
           }
         },
@@ -4895,9 +4895,9 @@ expression: pretty
             "qualified_name": "tests::multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 545,
+              "end_line": 548,
               "start_column": 5,
-              "start_line": 537
+              "start_line": 540
             }
           }
         },
@@ -4919,9 +4919,9 @@ expression: pretty
             "qualified_name": "tests::multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 554,
+              "end_line": 557,
               "start_column": 5,
-              "start_line": 547
+              "start_line": 550
             }
           }
         },
@@ -4943,9 +4943,9 @@ expression: pretty
             "qualified_name": "tests::hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 562,
+              "end_line": 565,
               "start_column": 5,
-              "start_line": 556
+              "start_line": 559
             }
           }
         },
@@ -4967,9 +4967,9 @@ expression: pretty
             "qualified_name": "tests::path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 568,
+              "end_line": 571,
               "start_column": 5,
-              "start_line": 564
+              "start_line": 567
             }
           }
         },
@@ -4991,9 +4991,9 @@ expression: pretty
             "qualified_name": "tests::non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 574,
+              "end_line": 577,
               "start_column": 5,
-              "start_line": 570
+              "start_line": 573
             }
           }
         },
@@ -5015,9 +5015,9 @@ expression: pretty
             "qualified_name": "tests::backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 581,
+              "end_line": 584,
               "start_column": 5,
-              "start_line": 576
+              "start_line": 579
             }
           }
         },
@@ -5039,9 +5039,9 @@ expression: pretty
             "qualified_name": "tests::path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 587,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 583
+              "start_line": 586
             }
           }
         },
@@ -5063,9 +5063,9 @@ expression: pretty
             "qualified_name": "tests::parentdir_sf_path_does_not_take_fast_path_is_file_probe",
             "span": {
               "end_column": 5,
-              "end_line": 622,
+              "end_line": 625,
               "start_column": 5,
-              "start_line": 589
+              "start_line": 592
             }
           }
         },
@@ -5087,9 +5087,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 636,
+              "end_line": 639,
               "start_column": 5,
-              "start_line": 624
+              "start_line": 627
             }
           }
         },
@@ -5111,9 +5111,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 645,
+              "end_line": 648,
               "start_column": 5,
-              "start_line": 638
+              "start_line": 641
             }
           }
         },
@@ -5135,9 +5135,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 657,
+              "end_line": 660,
               "start_column": 5,
-              "start_line": 647
+              "start_line": 650
             }
           }
         },
@@ -5151,10 +5151,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 673,
+              "end_line": 676,
               "increment": 1,
               "kind": "match",
-              "line": 664,
+              "line": 667,
               "nesting_depth": 0
             }
           ],
@@ -5168,9 +5168,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 674,
+              "end_line": 677,
               "start_column": 5,
-              "start_line": 659
+              "start_line": 662
             }
           }
         },
@@ -5192,9 +5192,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 682,
+              "end_line": 685,
               "start_column": 5,
-              "start_line": 676
+              "start_line": 679
             }
           }
         },
@@ -5216,9 +5216,9 @@ expression: pretty
             "qualified_name": "tests::da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 692,
+              "end_line": 695,
               "start_column": 5,
-              "start_line": 684
+              "start_line": 687
             }
           }
         },
@@ -5240,9 +5240,9 @@ expression: pretty
             "qualified_name": "tests::da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 702,
+              "end_line": 705,
               "start_column": 5,
-              "start_line": 694
+              "start_line": 697
             }
           }
         },
@@ -5256,10 +5256,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 717,
+              "end_line": 720,
               "increment": 1,
               "kind": "match",
-              "line": 708,
+              "line": 711,
               "nesting_depth": 0
             }
           ],
@@ -5273,9 +5273,9 @@ expression: pretty
             "qualified_name": "tests::da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 718,
+              "end_line": 721,
               "start_column": 5,
-              "start_line": 704
+              "start_line": 707
             }
           }
         },
@@ -5297,9 +5297,9 @@ expression: pretty
             "qualified_name": "tests::end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 729,
+              "end_line": 732,
               "start_column": 5,
-              "start_line": 720
+              "start_line": 723
             }
           }
         },
@@ -5321,9 +5321,9 @@ expression: pretty
             "qualified_name": "tests::unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 736,
+              "end_line": 739,
               "start_column": 5,
-              "start_line": 731
+              "start_line": 734
             }
           }
         },
@@ -5345,9 +5345,9 @@ expression: pretty
             "qualified_name": "tests::empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 747,
+              "end_line": 750,
               "start_column": 5,
-              "start_line": 738
+              "start_line": 741
             }
           }
         },
@@ -5369,9 +5369,9 @@ expression: pretty
             "qualified_name": "tests::da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 756,
+              "end_line": 759,
               "start_column": 5,
-              "start_line": 749
+              "start_line": 752
             }
           }
         },
@@ -5393,9 +5393,9 @@ expression: pretty
             "qualified_name": "tests::non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 770,
+              "end_line": 773,
               "start_column": 5,
-              "start_line": 758
+              "start_line": 761
             }
           }
         },
@@ -5417,9 +5417,9 @@ expression: pretty
             "qualified_name": "tests::brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 782,
+              "end_line": 785,
               "start_column": 5,
-              "start_line": 774
+              "start_line": 777
             }
           }
         },
@@ -5441,9 +5441,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 789,
+              "end_line": 792,
               "start_column": 5,
-              "start_line": 784
+              "start_line": 787
             }
           }
         },
@@ -5465,9 +5465,9 @@ expression: pretty
             "qualified_name": "tests::brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 796,
+              "end_line": 799,
               "start_column": 5,
-              "start_line": 791
+              "start_line": 794
             }
           }
         },
@@ -5489,9 +5489,9 @@ expression: pretty
             "qualified_name": "tests::brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 803,
+              "end_line": 806,
               "start_column": 5,
-              "start_line": 798
+              "start_line": 801
             }
           }
         },
@@ -5513,9 +5513,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 813,
+              "end_line": 816,
               "start_column": 5,
-              "start_line": 805
+              "start_line": 808
             }
           }
         },
@@ -5537,9 +5537,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 821,
+              "end_line": 824,
               "start_column": 5,
-              "start_line": 815
+              "start_line": 818
             }
           }
         },
@@ -5553,10 +5553,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 836,
+              "end_line": 839,
               "increment": 1,
               "kind": "match",
-              "line": 827,
+              "line": 830,
               "nesting_depth": 0
             }
           ],
@@ -5570,9 +5570,9 @@ expression: pretty
             "qualified_name": "tests::malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 837,
+              "end_line": 840,
               "start_column": 5,
-              "start_line": 823
+              "start_line": 826
             }
           }
         },
@@ -5594,9 +5594,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 848,
+              "end_line": 851,
               "start_column": 5,
-              "start_line": 839
+              "start_line": 842
             }
           }
         },
@@ -5618,9 +5618,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 859,
+              "end_line": 862,
               "start_column": 5,
-              "start_line": 850
+              "start_line": 853
             }
           }
         },
@@ -5634,10 +5634,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 878,
+              "end_line": 881,
               "increment": 1,
               "kind": "for-loop",
-              "line": 876,
+              "line": 879,
               "nesting_depth": 0
             }
           ],
@@ -5651,9 +5651,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 888,
+              "end_line": 891,
               "start_column": 5,
-              "start_line": 861
+              "start_line": 864
             }
           }
         },
@@ -5675,9 +5675,9 @@ expression: pretty
             "qualified_name": "tests::brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 898,
+              "end_line": 901,
               "start_column": 5,
-              "start_line": 890
+              "start_line": 893
             }
           }
         },
@@ -5699,9 +5699,9 @@ expression: pretty
             "qualified_name": "tests::no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 904,
+              "end_line": 907,
               "start_column": 5,
-              "start_line": 900
+              "start_line": 903
             }
           }
         },
@@ -5723,9 +5723,9 @@ expression: pretty
             "qualified_name": "proptests::arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 914,
+              "end_line": 917,
               "start_column": 5,
-              "start_line": 912
+              "start_line": 915
             }
           }
         },
@@ -5739,10 +5739,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 922,
+              "end_line": 925,
               "increment": 2,
               "kind": "for-loop",
-              "line": 919,
+              "line": 922,
               "nesting_depth": 1
             }
           ],
@@ -5756,9 +5756,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 926,
+              "end_line": 929,
               "start_column": 5,
-              "start_line": 916
+              "start_line": 919
             }
           }
         },
@@ -5780,9 +5780,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 930,
+              "end_line": 933,
               "start_column": 5,
-              "start_line": 928
+              "start_line": 931
             }
           }
         },
@@ -5969,7 +5969,7 @@ expression: pretty
     "passed": false,
     "summary": {
       "average_complexity": 1.5492957746478873,
-      "average_coverage": 95.20976251582802,
+      "average_coverage": 95.21814615097222,
       "average_crap": 1.610093896713615,
       "distribution": {
         "acceptable": 2,
@@ -5994,9 +5994,9 @@ expression: pretty
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 336,
+          "end_line": 339,
           "start_column": 1,
-          "start_line": 313
+          "start_line": 316
         }
       }
     }
@@ -6017,30 +6017,6 @@ expression: pretty
           "contributors": [
             {
               "column": 42,
-              "end_line": 318,
-              "increment": 1,
-              "kind": "try",
-              "line": 318,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 319,
-              "increment": 1,
-              "kind": "try",
-              "line": 319,
-              "nesting_depth": 0
-            },
-            {
-              "column": 44,
-              "end_line": 320,
-              "increment": 1,
-              "kind": "try",
-              "line": 320,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
               "end_line": 321,
               "increment": 1,
               "kind": "try",
@@ -6048,7 +6024,15 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 58,
+              "column": 43,
+              "end_line": 322,
+              "increment": 1,
+              "kind": "try",
+              "line": 322,
+              "nesting_depth": 0
+            },
+            {
+              "column": 44,
               "end_line": 323,
               "increment": 1,
               "kind": "try",
@@ -6056,43 +6040,59 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 5,
-              "end_line": 326,
+              "column": 43,
+              "end_line": 324,
               "increment": 1,
-              "kind": "if-branch",
+              "kind": "try",
               "line": 324,
               "nesting_depth": 0
             },
             {
-              "column": 55,
-              "end_line": 327,
+              "column": 58,
+              "end_line": 326,
               "increment": 1,
               "kind": "try",
+              "line": 326,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 329,
+              "increment": 1,
+              "kind": "if-branch",
               "line": 327,
               "nesting_depth": 0
             },
             {
-              "column": 57,
-              "end_line": 328,
+              "column": 55,
+              "end_line": 330,
               "increment": 1,
               "kind": "try",
-              "line": 328,
+              "line": 330,
+              "nesting_depth": 0
+            },
+            {
+              "column": 57,
+              "end_line": 331,
+              "increment": 1,
+              "kind": "try",
+              "line": 331,
               "nesting_depth": 0
             },
             {
               "column": 17,
-              "end_line": 333,
+              "end_line": 336,
               "increment": 1,
               "kind": "if-branch",
-              "line": 329,
+              "line": 332,
               "nesting_depth": 0
             },
             {
               "column": 54,
-              "end_line": 332,
+              "end_line": 335,
               "increment": 1,
               "kind": "try",
-              "line": 332,
+              "line": 335,
               "nesting_depth": 1
             }
           ],
@@ -6106,9 +6106,9 @@ expression: pretty
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 336,
+              "end_line": 339,
               "start_column": 1,
-              "start_line": 313
+              "start_line": 316
             }
           }
         },
@@ -6122,58 +6122,58 @@ expression: pretty
           "contributors": [
             {
               "column": 73,
-              "end_line": 215,
+              "end_line": 218,
               "increment": 1,
               "kind": "try",
-              "line": 215,
-              "nesting_depth": 0
-            },
-            {
-              "column": 9,
-              "end_line": 232,
-              "increment": 1,
-              "kind": "for-loop",
               "line": 218,
               "nesting_depth": 0
             },
             {
-              "column": 68,
-              "end_line": 219,
+              "column": 9,
+              "end_line": 235,
               "increment": 1,
-              "kind": "try",
-              "line": 219,
-              "nesting_depth": 1
+              "kind": "for-loop",
+              "line": 221,
+              "nesting_depth": 0
             },
             {
-              "column": 13,
-              "end_line": 223,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 220,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
+              "column": 68,
               "end_line": 222,
               "increment": 1,
-              "kind": "continue",
+              "kind": "try",
               "line": 222,
-              "nesting_depth": 2
+              "nesting_depth": 1
             },
             {
               "column": 13,
-              "end_line": 231,
+              "end_line": 226,
               "increment": 2,
               "kind": "if-branch",
-              "line": 224,
+              "line": 223,
               "nesting_depth": 1
             },
             {
               "column": 17,
               "end_line": 225,
               "increment": 1,
-              "kind": "logical-operator",
+              "kind": "continue",
               "line": 225,
+              "nesting_depth": 2
+            },
+            {
+              "column": 13,
+              "end_line": 234,
+              "increment": 2,
+              "kind": "if-branch",
+              "line": 227,
+              "nesting_depth": 1
+            },
+            {
+              "column": 17,
+              "end_line": 228,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 228,
               "nesting_depth": 1
             }
           ],
@@ -6187,9 +6187,9 @@ expression: pretty
             "qualified_name": "LcovParser::validate",
             "span": {
               "end_column": 5,
-              "end_line": 234,
+              "end_line": 237,
               "start_column": 5,
-              "start_line": 202
+              "start_line": 203
             }
           }
         },
@@ -6423,22 +6423,6 @@ expression: pretty
           "contributors": [
             {
               "column": 56,
-              "end_line": 302,
-              "increment": 1,
-              "kind": "try",
-              "line": 302,
-              "nesting_depth": 0
-            },
-            {
-              "column": 52,
-              "end_line": 304,
-              "increment": 1,
-              "kind": "try",
-              "line": 304,
-              "nesting_depth": 0
-            },
-            {
-              "column": 58,
               "end_line": 305,
               "increment": 1,
               "kind": "try",
@@ -6446,19 +6430,35 @@ expression: pretty
               "nesting_depth": 0
             },
             {
-              "column": 5,
+              "column": 52,
+              "end_line": 307,
+              "increment": 1,
+              "kind": "try",
+              "line": 307,
+              "nesting_depth": 0
+            },
+            {
+              "column": 58,
               "end_line": 308,
               "increment": 1,
+              "kind": "try",
+              "line": 308,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 311,
+              "increment": 1,
               "kind": "if-branch",
-              "line": 306,
+              "line": 309,
               "nesting_depth": 0
             },
             {
               "column": 53,
-              "end_line": 309,
+              "end_line": 312,
               "increment": 1,
               "kind": "try",
-              "line": 309,
+              "line": 312,
               "nesting_depth": 0
             }
           ],
@@ -6472,9 +6472,9 @@ expression: pretty
             "qualified_name": "parse_da",
             "span": {
               "end_column": 1,
-              "end_line": 311,
+              "end_line": 314,
               "start_column": 1,
-              "start_line": 299
+              "start_line": 302
             }
           }
         },
@@ -6734,26 +6734,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 241,
+              "end_line": 244,
               "increment": 1,
               "kind": "if-branch",
-              "line": 238,
+              "line": 241,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 246,
+              "end_line": 249,
               "increment": 1,
               "kind": "if-branch",
-              "line": 243,
+              "line": 246,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 250,
+              "end_line": 253,
               "increment": 1,
               "kind": "if-branch",
-              "line": 248,
+              "line": 251,
               "nesting_depth": 0
             }
           ],
@@ -6767,9 +6767,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 251,
+              "end_line": 254,
               "start_column": 1,
-              "start_line": 237
+              "start_line": 240
             }
           }
         },
@@ -6980,18 +6980,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 269,
+              "end_line": 272,
               "increment": 1,
               "kind": "if-branch",
-              "line": 267,
+              "line": 270,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 274,
+              "end_line": 277,
               "increment": 1,
               "kind": "match",
-              "line": 271,
+              "line": 274,
               "nesting_depth": 0
             }
           ],
@@ -7005,9 +7005,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 275,
+              "end_line": 278,
               "start_column": 1,
-              "start_line": 266
+              "start_line": 269
             }
           }
         },
@@ -7021,18 +7021,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 280,
+              "end_line": 283,
               "increment": 1,
               "kind": "if-branch",
-              "line": 278,
+              "line": 281,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 287,
+              "end_line": 290,
               "increment": 1,
               "kind": "match",
-              "line": 282,
+              "line": 285,
               "nesting_depth": 0
             }
           ],
@@ -7046,9 +7046,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 288,
+              "end_line": 291,
               "start_column": 1,
-              "start_line": 277
+              "start_line": 280
             }
           }
         },
@@ -7062,18 +7062,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 356,
+              "end_line": 359,
               "increment": 1,
               "kind": "if-branch",
-              "line": 354,
+              "line": 357,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 361,
+              "end_line": 364,
               "increment": 1,
               "kind": "for-loop",
-              "line": 359,
+              "line": 362,
               "nesting_depth": 0
             }
           ],
@@ -7087,9 +7087,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 362,
+              "end_line": 365,
               "start_column": 1,
-              "start_line": 349
+              "start_line": 352
             }
           }
         },
@@ -7103,18 +7103,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 371,
+              "end_line": 374,
               "increment": 1,
               "kind": "if-branch",
-              "line": 369,
+              "line": 372,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 376,
+              "end_line": 379,
               "increment": 1,
               "kind": "for-loop",
-              "line": 374,
+              "line": 377,
               "nesting_depth": 0
             }
           ],
@@ -7128,9 +7128,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 377,
+              "end_line": 380,
               "start_column": 1,
-              "start_line": 364
+              "start_line": 367
             }
           }
         },
@@ -7144,10 +7144,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 922,
+              "end_line": 925,
               "increment": 2,
               "kind": "for-loop",
-              "line": 919,
+              "line": 922,
               "nesting_depth": 1
             }
           ],
@@ -7161,9 +7161,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 926,
+              "end_line": 929,
               "start_column": 5,
-              "start_line": 916
+              "start_line": 919
             }
           }
         },
@@ -7309,14 +7309,14 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 263,
+              "end_line": 266,
               "increment": 1,
               "kind": "if-branch",
-              "line": 256,
+              "line": 259,
               "nesting_depth": 0
             }
           ],
-          "coverage_percent": 85.71428571428571,
+          "coverage_percent": 87.5,
           "crap": {
             "risk_level": "low",
             "value": 2.01
@@ -7326,9 +7326,9 @@ expression: pretty
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 264,
+              "end_line": 267,
               "start_column": 1,
-              "start_line": 253
+              "start_line": 256
             }
           }
         },
@@ -7903,10 +7903,10 @@ expression: pretty
           "contributors": [
             {
               "column": 72,
-              "end_line": 198,
+              "end_line": 199,
               "increment": 1,
               "kind": "try",
-              "line": 198,
+              "line": 199,
               "nesting_depth": 0
             }
           ],
@@ -7920,7 +7920,7 @@ expression: pretty
             "qualified_name": "LcovParser::parse",
             "span": {
               "end_column": 5,
-              "end_line": 200,
+              "end_line": 201,
               "start_column": 5,
               "start_line": 167
             }
@@ -7936,10 +7936,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 342,
+              "end_line": 345,
               "increment": 1,
               "kind": "let-else",
-              "line": 339,
+              "line": 342,
               "nesting_depth": 0
             }
           ],
@@ -7953,9 +7953,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 347,
+              "end_line": 350,
               "start_column": 1,
-              "start_line": 338
+              "start_line": 341
             }
           }
         },
@@ -7969,10 +7969,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 403,
+              "end_line": 406,
               "increment": 1,
               "kind": "match",
-              "line": 398,
+              "line": 401,
               "nesting_depth": 0
             }
           ],
@@ -7986,9 +7986,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 404,
+              "end_line": 407,
               "start_column": 1,
-              "start_line": 397
+              "start_line": 400
             }
           }
         },
@@ -8002,10 +8002,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 673,
+              "end_line": 676,
               "increment": 1,
               "kind": "match",
-              "line": 664,
+              "line": 667,
               "nesting_depth": 0
             }
           ],
@@ -8019,9 +8019,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 674,
+              "end_line": 677,
               "start_column": 5,
-              "start_line": 659
+              "start_line": 662
             }
           }
         },
@@ -8035,10 +8035,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 717,
+              "end_line": 720,
               "increment": 1,
               "kind": "match",
-              "line": 708,
+              "line": 711,
               "nesting_depth": 0
             }
           ],
@@ -8052,9 +8052,9 @@ expression: pretty
             "qualified_name": "tests::da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 718,
+              "end_line": 721,
               "start_column": 5,
-              "start_line": 704
+              "start_line": 707
             }
           }
         },
@@ -8068,10 +8068,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 836,
+              "end_line": 839,
               "increment": 1,
               "kind": "match",
-              "line": 827,
+              "line": 830,
               "nesting_depth": 0
             }
           ],
@@ -8085,9 +8085,9 @@ expression: pretty
             "qualified_name": "tests::malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 837,
+              "end_line": 840,
               "start_column": 5,
-              "start_line": 823
+              "start_line": 826
             }
           }
         },
@@ -8101,10 +8101,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 878,
+              "end_line": 881,
               "increment": 1,
               "kind": "for-loop",
-              "line": 876,
+              "line": 879,
               "nesting_depth": 0
             }
           ],
@@ -8118,9 +8118,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 888,
+              "end_line": 891,
               "start_column": 5,
-              "start_line": 861
+              "start_line": 864
             }
           }
         },
@@ -10782,9 +10782,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 297,
+              "end_line": 300,
               "start_column": 1,
-              "start_line": 290
+              "start_line": 293
             }
           }
         },
@@ -10806,9 +10806,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 384,
+              "end_line": 387,
               "start_column": 1,
-              "start_line": 379
+              "start_line": 382
             }
           }
         },
@@ -10830,9 +10830,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 395,
+              "end_line": 398,
               "start_column": 1,
-              "start_line": 386
+              "start_line": 389
             }
           }
         },
@@ -10854,9 +10854,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 409,
+              "end_line": 412,
               "start_column": 1,
-              "start_line": 406
+              "start_line": 409
             }
           }
         },
@@ -10878,9 +10878,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 437,
+              "end_line": 440,
               "start_column": 1,
-              "start_line": 411
+              "start_line": 414
             }
           }
         },
@@ -10902,9 +10902,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 444,
+              "end_line": 447,
               "start_column": 1,
-              "start_line": 439
+              "start_line": 442
             }
           }
         },
@@ -10926,9 +10926,9 @@ expression: pretty
             "qualified_name": "tests::parser",
             "span": {
               "end_column": 5,
-              "end_line": 453,
+              "end_line": 456,
               "start_column": 5,
-              "start_line": 451
+              "start_line": 454
             }
           }
         },
@@ -10950,9 +10950,9 @@ expression: pretty
             "qualified_name": "tests::parse",
             "span": {
               "end_column": 5,
-              "end_line": 457,
+              "end_line": 460,
               "start_column": 5,
-              "start_line": 455
+              "start_line": 458
             }
           }
         },
@@ -10974,9 +10974,9 @@ expression: pretty
             "qualified_name": "tests::empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 464,
+              "end_line": 467,
               "start_column": 5,
-              "start_line": 459
+              "start_line": 462
             }
           }
         },
@@ -10998,9 +10998,9 @@ expression: pretty
             "qualified_name": "tests::validate_str",
             "span": {
               "end_column": 5,
-              "end_line": 478,
+              "end_line": 481,
               "start_column": 5,
-              "start_line": 468
+              "start_line": 471
             }
           }
         },
@@ -11022,9 +11022,9 @@ expression: pretty
             "qualified_name": "tests::validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 483,
+              "end_line": 486,
               "start_column": 5,
-              "start_line": 480
+              "start_line": 483
             }
           }
         },
@@ -11046,9 +11046,9 @@ expression: pretty
             "qualified_name": "tests::validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 488,
+              "end_line": 491,
               "start_column": 5,
-              "start_line": 485
+              "start_line": 488
             }
           }
         },
@@ -11070,9 +11070,9 @@ expression: pretty
             "qualified_name": "tests::validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 493,
+              "end_line": 496,
               "start_column": 5,
-              "start_line": 490
+              "start_line": 493
             }
           }
         },
@@ -11094,9 +11094,9 @@ expression: pretty
             "qualified_name": "tests::validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 498,
+              "end_line": 501,
               "start_column": 5,
-              "start_line": 495
+              "start_line": 498
             }
           }
         },
@@ -11118,9 +11118,9 @@ expression: pretty
             "qualified_name": "tests::validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 503,
+              "end_line": 506,
               "start_column": 5,
-              "start_line": 500
+              "start_line": 503
             }
           }
         },
@@ -11142,9 +11142,9 @@ expression: pretty
             "qualified_name": "tests::validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 513,
+              "end_line": 516,
               "start_column": 5,
-              "start_line": 505
+              "start_line": 508
             }
           }
         },
@@ -11166,9 +11166,9 @@ expression: pretty
             "qualified_name": "tests::validate_missing_path_returns_open_error",
             "span": {
               "end_column": 5,
-              "end_line": 525,
+              "end_line": 528,
               "start_column": 5,
-              "start_line": 515
+              "start_line": 518
             }
           }
         },
@@ -11190,9 +11190,9 @@ expression: pretty
             "qualified_name": "tests::single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 535,
+              "end_line": 538,
               "start_column": 5,
-              "start_line": 527
+              "start_line": 530
             }
           }
         },
@@ -11214,9 +11214,9 @@ expression: pretty
             "qualified_name": "tests::multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 545,
+              "end_line": 548,
               "start_column": 5,
-              "start_line": 537
+              "start_line": 540
             }
           }
         },
@@ -11238,9 +11238,9 @@ expression: pretty
             "qualified_name": "tests::multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 554,
+              "end_line": 557,
               "start_column": 5,
-              "start_line": 547
+              "start_line": 550
             }
           }
         },
@@ -11262,9 +11262,9 @@ expression: pretty
             "qualified_name": "tests::hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 562,
+              "end_line": 565,
               "start_column": 5,
-              "start_line": 556
+              "start_line": 559
             }
           }
         },
@@ -11286,9 +11286,9 @@ expression: pretty
             "qualified_name": "tests::path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 568,
+              "end_line": 571,
               "start_column": 5,
-              "start_line": 564
+              "start_line": 567
             }
           }
         },
@@ -11310,9 +11310,9 @@ expression: pretty
             "qualified_name": "tests::non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 574,
+              "end_line": 577,
               "start_column": 5,
-              "start_line": 570
+              "start_line": 573
             }
           }
         },
@@ -11334,9 +11334,9 @@ expression: pretty
             "qualified_name": "tests::backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 581,
+              "end_line": 584,
               "start_column": 5,
-              "start_line": 576
+              "start_line": 579
             }
           }
         },
@@ -11358,9 +11358,9 @@ expression: pretty
             "qualified_name": "tests::path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 587,
+              "end_line": 590,
               "start_column": 5,
-              "start_line": 583
+              "start_line": 586
             }
           }
         },
@@ -11382,9 +11382,9 @@ expression: pretty
             "qualified_name": "tests::parentdir_sf_path_does_not_take_fast_path_is_file_probe",
             "span": {
               "end_column": 5,
-              "end_line": 622,
+              "end_line": 625,
               "start_column": 5,
-              "start_line": 589
+              "start_line": 592
             }
           }
         },
@@ -11406,9 +11406,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 636,
+              "end_line": 639,
               "start_column": 5,
-              "start_line": 624
+              "start_line": 627
             }
           }
         },
@@ -11430,9 +11430,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 645,
+              "end_line": 648,
               "start_column": 5,
-              "start_line": 638
+              "start_line": 641
             }
           }
         },
@@ -11454,9 +11454,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 657,
+              "end_line": 660,
               "start_column": 5,
-              "start_line": 647
+              "start_line": 650
             }
           }
         },
@@ -11478,9 +11478,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 682,
+              "end_line": 685,
               "start_column": 5,
-              "start_line": 676
+              "start_line": 679
             }
           }
         },
@@ -11502,9 +11502,9 @@ expression: pretty
             "qualified_name": "tests::da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 692,
+              "end_line": 695,
               "start_column": 5,
-              "start_line": 684
+              "start_line": 687
             }
           }
         },
@@ -11526,9 +11526,9 @@ expression: pretty
             "qualified_name": "tests::da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 702,
+              "end_line": 705,
               "start_column": 5,
-              "start_line": 694
+              "start_line": 697
             }
           }
         },
@@ -11550,9 +11550,9 @@ expression: pretty
             "qualified_name": "tests::end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 729,
+              "end_line": 732,
               "start_column": 5,
-              "start_line": 720
+              "start_line": 723
             }
           }
         },
@@ -11574,9 +11574,9 @@ expression: pretty
             "qualified_name": "tests::unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 736,
+              "end_line": 739,
               "start_column": 5,
-              "start_line": 731
+              "start_line": 734
             }
           }
         },
@@ -11598,9 +11598,9 @@ expression: pretty
             "qualified_name": "tests::empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 747,
+              "end_line": 750,
               "start_column": 5,
-              "start_line": 738
+              "start_line": 741
             }
           }
         },
@@ -11622,9 +11622,9 @@ expression: pretty
             "qualified_name": "tests::da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 756,
+              "end_line": 759,
               "start_column": 5,
-              "start_line": 749
+              "start_line": 752
             }
           }
         },
@@ -11646,9 +11646,9 @@ expression: pretty
             "qualified_name": "tests::non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 770,
+              "end_line": 773,
               "start_column": 5,
-              "start_line": 758
+              "start_line": 761
             }
           }
         },
@@ -11670,9 +11670,9 @@ expression: pretty
             "qualified_name": "tests::brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 782,
+              "end_line": 785,
               "start_column": 5,
-              "start_line": 774
+              "start_line": 777
             }
           }
         },
@@ -11694,9 +11694,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 789,
+              "end_line": 792,
               "start_column": 5,
-              "start_line": 784
+              "start_line": 787
             }
           }
         },
@@ -11718,9 +11718,9 @@ expression: pretty
             "qualified_name": "tests::brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 796,
+              "end_line": 799,
               "start_column": 5,
-              "start_line": 791
+              "start_line": 794
             }
           }
         },
@@ -11742,9 +11742,9 @@ expression: pretty
             "qualified_name": "tests::brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 803,
+              "end_line": 806,
               "start_column": 5,
-              "start_line": 798
+              "start_line": 801
             }
           }
         },
@@ -11766,9 +11766,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 813,
+              "end_line": 816,
               "start_column": 5,
-              "start_line": 805
+              "start_line": 808
             }
           }
         },
@@ -11790,9 +11790,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 821,
+              "end_line": 824,
               "start_column": 5,
-              "start_line": 815
+              "start_line": 818
             }
           }
         },
@@ -11814,9 +11814,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 848,
+              "end_line": 851,
               "start_column": 5,
-              "start_line": 839
+              "start_line": 842
             }
           }
         },
@@ -11838,9 +11838,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 859,
+              "end_line": 862,
               "start_column": 5,
-              "start_line": 850
+              "start_line": 853
             }
           }
         },
@@ -11862,9 +11862,9 @@ expression: pretty
             "qualified_name": "tests::brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 898,
+              "end_line": 901,
               "start_column": 5,
-              "start_line": 890
+              "start_line": 893
             }
           }
         },
@@ -11886,9 +11886,9 @@ expression: pretty
             "qualified_name": "tests::no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 904,
+              "end_line": 907,
               "start_column": 5,
-              "start_line": 900
+              "start_line": 903
             }
           }
         },
@@ -11910,9 +11910,9 @@ expression: pretty
             "qualified_name": "proptests::arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 914,
+              "end_line": 917,
               "start_column": 5,
-              "start_line": 912
+              "start_line": 915
             }
           }
         },
@@ -11934,9 +11934,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 930,
+              "end_line": 933,
               "start_column": 5,
-              "start_line": 928
+              "start_line": 931
             }
           }
         },
@@ -11969,7 +11969,7 @@ expression: pretty
     ],
     "shown_summary": {
       "average_complexity": 1.5492957746478873,
-      "average_coverage": 95.20976251582802,
+      "average_coverage": 95.21814615097222,
       "average_crap": 1.610093896713615,
       "distribution": {
         "acceptable": 2,
@@ -11994,9 +11994,9 @@ expression: pretty
         "qualified_name": "parse_brda",
         "span": {
           "end_column": 1,
-          "end_line": 336,
+          "end_line": 339,
           "start_column": 1,
-          "start_line": 313
+          "start_line": 316
         }
       }
     },
