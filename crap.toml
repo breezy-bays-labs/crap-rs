@@ -14,14 +14,18 @@
 # Named threshold preset: gates production source at the `default` tier
 # (cognitive CRAP cutoff 15.0 — the Acceptable -> Moderate risk boundary).
 # Mutually exclusive with `threshold`; this is the tier the job previously
-# declared as `threshold-preset: default`.
+# declared as `threshold-preset: default`. Safe to keep at the shared top
+# level: a preset tier is metric-agnostic, so both adapters accept it.
 preset = "default"
 
-# Complexity metric. `cognitive` is the crap4rs default and the metric the
-# production gate has always used (the job set no `metric` input); declared
-# here so the config is self-contained rather than relying on the binary
-# default.
-metric = "cognitive"
+# NOTE: `metric` is NOT set at the shared top level. This file is discovered
+# by BOTH adapters (the name `crap.toml` is shared), and crap4ts only supports
+# the cyclomatic metric — a top-level `metric = "cognitive"` would make every
+# crap4ts invocation that discovers this file error out ("metric `cognitive`
+# is not yet supported"). The cognitive choice is crap4rs-specific, so it lives
+# in the `[language.rust]` section below (which only crap4rs reads); crap4ts
+# falls back to its own cyclomatic default. This is exactly the per-language
+# override mechanism the config schema provides.
 
 # Source roots the analyzer walks — the full production crate set, one root
 # per entry. Three roots (> 1) key git-toplevel-relative per the multi-root
@@ -29,6 +33,15 @@ metric = "cognitive"
 # Boundary-safe per-crate roots — never the recursive workspace root — so
 # `crap-examples` (the intentionally-bad teaching sample, gated separately in
 # quick-start-smoke.yml) is excluded by construction.
+#
+# CAVEAT: `src` has no per-language override (`[language.<name>]` sections
+# carry no `src` field — it is shared-only), so these Rust crate roots are
+# also visible to crap4ts when it discovers this file from the repo root. That
+# is harmless today because every crap4ts CI job passes an explicit `--src`
+# that overrides config `src`. A future crap4ts-from-root invocation that
+# omits `--src` would try to walk these Rust dirs as TypeScript — pass an
+# explicit `--src` (or a `[language.typescript]` src, if that field is ever
+# added) in that case.
 src = [
     "crates/crap-core/src",
     "crates/crap4rs/src",
@@ -45,6 +58,16 @@ src = [
 #     "**/tests/**",
 #     "**/benches/**",
 # ]
+
+# Per-language override for the Rust adapter. Only crap4rs reads this section
+# (keyed by its language name "rust"); a `Some` field here wins over the shared
+# top-level defaults. `metric = "cognitive"` lives here rather than top-level
+# because cognitive is crap4rs-specific (crap4ts rejects it) — see the NOTE
+# above. Cognitive is also crap4rs's own built-in default, so this is the
+# metric the production gate has always used; declaring it makes the config
+# self-documenting.
+[language.rust]
+metric = "cognitive"
 
 # Saved view preset for CI-shaped reports, selectable with `--view ci`. The
 # production scorecard job does NOT pass `--view`, so this preset does not gate
