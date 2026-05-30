@@ -166,34 +166,35 @@ impl CoveragePort for LcovParser {
 
     /// Slurp the LCOV file at `path` and parse it.
     ///
-    /// **Slurp choice (vs streaming via `BufReader`)**: deliberate
-    /// tradeoff. The slurp holds the file in memory once as a `String`,
-    /// then iterates `&str::lines()` which yields borrowed `&str`
-    /// slices with **zero per-line allocations**. A streaming
-    /// `BufReader::lines()` rewrite would bound peak memory at one line
-    /// — but each yielded `Result<String>` allocates a fresh `String`
-    /// per line. On the LCOV files this adapter sees (workspace
-    /// coverage from `cargo-llvm-cov --lcov`), files are line-oriented
-    /// text without expansion and stay well under any concerning
-    /// memory ceiling; a 1 M-line file would buy ~50 MB of avoided
-    /// peak RSS at the cost of 1 M small heap allocations, a trade
-    /// that's net-negative on every workload we measure. The
-    /// single-pass block accumulator (`flush_block` and its state
-    /// machine in this module) was also designed around `&str`
-    /// borrowing — refactoring to `impl BufRead` would force the
-    /// accumulator to own each line.
+    /// **Slurp choice (vs streaming via `BufReader`)**: deliberate, but
+    /// only because the memory bound doesn't matter yet — not because
+    /// streaming would be costly or awkward. A streaming rewrite is
+    /// viable and clean: `read_line(&mut buf)` + `buf.clear()` reuses a
+    /// single buffer across all lines (zero per-line allocation), and
+    /// the single-pass block accumulator wouldn't change at all —
+    /// `ParseState` already owns everything it keeps (`BTreeMap`, owned
+    /// path `String`s, the diagnostic `Vec`); each line `&str` is
+    /// borrowed only within one `handle_parse_line` call, never held
+    /// across reads. So streaming *would* drop the file-size term from
+    /// peak RSS, bounding it at roughly the parse-tree size.
     ///
-    /// [`Self::validate`] is a separate story and streams via
-    /// `BufReader` because it short-circuits on the first match —
-    /// for an early-exit gate, the per-line allocation cost is
-    /// dominated by the I/O-skipped tail, so streaming is the right
-    /// call there.
+    /// The reason to keep slurp is simply that peak RSS is trivial at
+    /// realistic LCOV sizes. Benchmarking `cargo-llvm-cov --lcov` output
+    /// (workspace coverage — line-oriented text, no expansion): a 45 MB
+    /// / 5 M-line file parses at ~58 MB peak RSS (file size + ~13 MB
+    /// parse tree) sub-second; 90 MB / 10 M lines at ~106 MB. Real files
+    /// — including large monorepos — sit in the low tens of MB. Slurp's
+    /// extra peak RSS is the file-size term, which is negligible there.
+    /// The multi-GB-file trigger that would make the file-size term
+    /// worth eliminating has not fired; until it does, the streaming
+    /// refactor is tracked separately rather than built speculatively
+    /// (the abstraction would take `impl BufRead` so production streams
+    /// and tests slice strings via `.as_bytes()`).
     ///
-    /// If a future workload surfaces a multi-GB LCOV file, the
-    /// streaming refactor is tracked separately rather than blanket-
-    /// applied here — see follow-up issue for the abstraction (taking
-    /// `impl BufRead` so production streams and tests slice strings
-    /// via `.as_bytes()`).
+    /// [`Self::validate`] streams via `BufReader` for a different
+    /// reason: it short-circuits on the first match, so the per-line
+    /// cost is dominated by the I/O it skips, and slurping there would
+    /// double peak RSS against the `parse` read that follows.
     fn parse(&self, path: &Path) -> Result<ParseOutput<LcovParseDiagnostic>, CrapError> {
         let data = std::fs::read_to_string(path).map_err(CrapError::Io)?;
         Ok(self.parse_str(&data))
@@ -205,10 +206,12 @@ impl CoveragePort for LcovParser {
     /// shape that `parse` consumes; orphan `DA:` records outside an
     /// `SF:` block and malformed line/hit pairs are rejected.
     ///
-    /// Streams (rather than slurping) because LCOV files easily exceed
-    /// 100 MB on large workspaces and `parse` will read the file again
-    /// shortly after — doubling peak RSS would be a regression from the
-    /// pre-D5 single-pass preflight.
+    /// Streams (rather than slurping) because this gate short-circuits
+    /// on the first well-formed record — it almost never reads the whole
+    /// file — and `parse` will read the file again shortly after.
+    /// Slurping here would hold the full file in memory only to discard
+    /// it after the first match, and the early-exit means the per-line
+    /// allocation cost is dominated by the I/O the gate skips.
     fn validate(&self, path: &Path) -> Result<(), String> {
         use std::io::{BufRead, BufReader};
         let file = std::fs::File::open(path)
