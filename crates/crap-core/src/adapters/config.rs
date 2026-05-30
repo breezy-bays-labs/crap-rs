@@ -641,10 +641,10 @@ fn comment_key(table: &mut toml_edit::Table, key: &str, doc: &str, blank_before:
 ///
 /// The example exercises **every** field. `threshold` is live and
 /// `preset` is shown as a commented alternative because the two are
-/// mutually exclusive ([`validate_raw_config`]); the same carve-out
-/// applies recursively to each `[language.<name>]` section. Maps
-/// (`views`, `language`) are emitted by sorted key so the output is
-/// deterministic (the sync test is byte-identical).
+/// mutually exclusive — the loader rejects a config that sets both.
+/// The same carve-out applies recursively to each `[language.<name>]`
+/// section. Maps (`views`, `language`) are emitted by sorted key so the
+/// output is deterministic (the sync test is byte-identical).
 ///
 /// The compile-time completeness guard is the exhaustive `let
 /// ConfigSchema { .. } = ..` destructure below with **no `..`**: adding a
@@ -1024,8 +1024,6 @@ fn exhaustive_example(meta: &AdapterMeta) -> ConfigSchema {
             meta.default_excludes
                 .iter()
                 .map(|s| (*s).to_string())
-                .collect::<Vec<_>>()
-                .into_iter()
                 .chain(std::iter::once("generated/**".to_string()))
                 .collect(),
         ),
@@ -1049,16 +1047,12 @@ fn exhaustive_example(meta: &AdapterMeta) -> ConfigSchema {
 /// each `doc` reaches `render_example_config`'s output, so a field can
 /// never render without its annotation. `label` is `"<Struct>.<field>"`
 /// for diagnostics.
-pub fn all_schema_field_docs() -> Vec<(&'static str, &'static str)> {
-    fn docs<T: DocumentedFields>(struct_name: &'static str) -> Vec<(&'static str, &'static str)> {
+pub fn all_schema_field_docs() -> Vec<(String, &'static str)> {
+    fn docs<T: DocumentedFields>(struct_name: &'static str) -> Vec<(String, &'static str)> {
         T::FIELD_NAMES
             .iter()
             .zip(T::FIELD_DOCS.iter())
-            .map(|(name, doc)| {
-                let label: &'static str =
-                    Box::leak(format!("{struct_name}.{name}").into_boxed_str());
-                (label, *doc)
-            })
+            .map(|(name, doc)| (format!("{struct_name}.{name}"), *doc))
             .collect()
     }
     let mut out = Vec::new();
