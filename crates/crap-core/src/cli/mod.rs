@@ -1855,22 +1855,34 @@ fn merge_threshold(
     (config, global)
 }
 
-/// Build the effective exclude list applied to the source walker:
-/// `meta.forced_excludes` first (adapter-mandated, structural skips
-/// like `**/*.d.ts` for crap4ts — see `AdapterMeta::forced_excludes`),
-/// then CLI `--exclude` flags, then patterns from the user's config
-/// file. Duplicates are dropped so the override builder doesn't see
-/// the same pattern twice. Order matters because `ignore::overrides`
-/// is order-sensitive on shadowed patterns; forced excludes lead so a
-/// user can't accidentally re-include a structurally-skipped file.
+/// Build the effective exclude list applied to the source walker, as
+/// the union of four sources: `meta.forced_excludes` (adapter-mandated
+/// structural skips like `**/*.d.ts` for crap4ts — see
+/// `AdapterMeta::forced_excludes`), CLI `--exclude` flags, the running
+/// adapter's per-language `[language.<name>].exclude`, and the shared
+/// top-level config `exclude`. Duplicates are dropped so the override
+/// builder doesn't see the same pattern twice.
+///
+/// The order in which patterns are appended is NOT load-bearing for the
+/// forced-excludes guarantee. `core::discover_source_files` adds every
+/// pattern to `ignore::overrides::OverrideBuilder` as `!{pattern}`, and
+/// that builder inverts `!` so a `!`-prefixed glob is an *ignore* (a
+/// bare glob would be a whitelist). Because this list only ever yields
+/// `!`-form ignores — never a bare/whitelist glob — the result is an
+/// order-independent union of ignores: a later config exclude cannot
+/// re-include a forced-excluded file (re-inclusion needs a whitelist
+/// glob, which is never emitted here). So `**/*.d.ts` stays excluded
+/// regardless of what the user's config adds. Dedup order is preserved
+/// only for stable, reproducible output.
 fn merge_exclude(
     cli: &Cli,
     file_config: &Option<FileConfig>,
     lang: Option<&LangConfig>,
     meta: &AdapterMeta,
 ) -> Vec<String> {
-    // Append patterns not already seen, preserving order (the override
-    // builder is order-sensitive on shadowed patterns).
+    // Append patterns not already seen. Order is preserved only for
+    // stable output — the walker adds each as a `!`-ignore override, so
+    // the effective set is an order-independent union (see the fn doc).
     fn extend_deduped(
         patterns: &[String],
         exclude: &mut Vec<String>,
