@@ -36,6 +36,7 @@ impl ComplexityPort for SynComplexityAdapter {
         let mut finder = FunctionFinder {
             file_path: file_path.to_string(),
             metric,
+            mod_path: Vec::new(),
             current_impl_type: None,
             functions: Vec::new(),
         };
@@ -50,13 +51,69 @@ impl ComplexityPort for SynComplexityAdapter {
 struct FunctionFinder {
     file_path: String,
     metric: ComplexityMetric,
+    /// Stack of enclosing inline `mod` idents, outermost first. A
+    /// function discovered while this stack is `["outer", "inner"]`
+    /// is qualified `outer::inner::<name>`. The walker runs per file,
+    /// so only *inline* module nesting is visible — the file's own
+    /// position in the crate module tree is not reconstructed.
+    mod_path: Vec<String>,
     current_impl_type: Option<String>,
     functions: Vec<FunctionComplexity>,
 }
 
+impl FunctionFinder {
+    /// Build a function's qualified name from the current `mod` path,
+    /// the optional enclosing impl/trait type, and the bare ident.
+    ///
+    /// The mod path is a pure prefix: a free fn becomes
+    /// `outer::inner::f`; a `Type::method` inside a mod becomes
+    /// `outer::Type::method`. `mod_path` and `current_impl_type` are
+    /// orthogonal (Rust forbids `mod` inside `impl`), so they never
+    /// interleave — the path is always `<mods>::<Type?>::<name>`.
+    fn qualify(&self, name: &str) -> String {
+        // Fast paths for the two overwhelmingly common shapes avoid the
+        // Vec<&str> allocation that the general join needs:
+        //   - top-level free fn  → bare name
+        //   - top-level method   → `Type::name`
+        // The nested-mod cases (rare) fall through to the Vec+join.
+        match (self.mod_path.is_empty(), &self.current_impl_type) {
+            (true, None) => name.to_string(),
+            (true, Some(ty)) => format!("{ty}::{name}"),
+            _ => {
+                let mut segments: Vec<&str> = self.mod_path.iter().map(String::as_str).collect();
+                if let Some(ty) = &self.current_impl_type {
+                    segments.push(ty);
+                }
+                segments.push(name);
+                segments.join("::")
+            }
+        }
+    }
+}
+
 impl<'ast> Visit<'ast> for FunctionFinder {
+    fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        // Track inline module nesting so functions inside `mod a { mod b
+        // { fn f } }` are qualified `a::b::f`. `#[cfg(test)]` and other
+        // attributed modules are NOT special-cased — the walker is a
+        // generic Rust analyzer and `tests::some_fn` is the genuinely
+        // correct qualified name.
+        //
+        // Modules declared as `mod foo;` (file-backed, `content == None`)
+        // have no inline body to walk, so pushing/popping the ident would
+        // be wasted allocation — skip the stack mutation entirely and
+        // just default-walk.
+        if node.content.is_some() {
+            self.mod_path.push(node.ident.to_string());
+            syn::visit::visit_item_mod(self, node);
+            self.mod_path.pop();
+        } else {
+            syn::visit::visit_item_mod(self, node);
+        }
+    }
+
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
-        let name = node.sig.ident.to_string();
+        let name = self.qualify(&node.sig.ident.to_string());
         let span = span_of(node);
         let mut contributors = Vec::new();
         let complexity = count_complexity(&node.block, self.metric, &mut contributors);
@@ -83,11 +140,7 @@ impl<'ast> Visit<'ast> for FunctionFinder {
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
-        let method_name = node.sig.ident.to_string();
-        let qualified = match &self.current_impl_type {
-            Some(ty) => format!("{ty}::{method_name}"),
-            None => method_name,
-        };
+        let qualified = self.qualify(&node.sig.ident.to_string());
         let span = span_of(node);
         let mut contributors = Vec::new();
         let complexity = count_complexity(&node.block, self.metric, &mut contributors);
@@ -106,11 +159,7 @@ impl<'ast> Visit<'ast> for FunctionFinder {
     fn visit_trait_item_fn(&mut self, node: &'ast syn::TraitItemFn) {
         // Only record trait methods that have a default body
         if let Some(block) = &node.default {
-            let method_name = node.sig.ident.to_string();
-            let qualified = match &self.current_impl_type {
-                Some(ty) => format!("{ty}::{method_name}"),
-                None => method_name,
-            };
+            let qualified = self.qualify(&node.sig.ident.to_string());
             let span = span_of(node);
             let mut contributors = Vec::new();
             let complexity = count_complexity(block, self.metric, &mut contributors);
@@ -949,6 +998,64 @@ mod tests {
         let _new = find_fn(&fns, "Calculator::new");
         let _add = find_fn(&fns, "Calculator::add");
         let _div = find_fn(&fns, "Calculator::divide");
+    }
+
+    // ── Nested-mod qualified names (crap-rs#283) ───────────────────────
+
+    #[test]
+    fn top_level_fn_in_nested_mods_fixture_is_unqualified() {
+        // A free function at file root carries no mod prefix — its
+        // qualified name is just its ident.
+        let fns = extract_fixture("nested_mods.rs", ComplexityMetric::Cognitive);
+        let _top = find_fn(&fns, "top_level");
+    }
+
+    #[test]
+    fn one_level_mod_qualified_name() {
+        let fns = extract_fixture("nested_mods.rs", ComplexityMetric::Cognitive);
+        let _f = find_fn(&fns, "outer::in_outer");
+    }
+
+    #[test]
+    fn multi_level_mod_qualified_name() {
+        let fns = extract_fixture("nested_mods.rs", ComplexityMetric::Cognitive);
+        let _f = find_fn(&fns, "outer::inner::deep");
+    }
+
+    #[test]
+    fn impl_method_inside_mod_prepends_mod_path() {
+        // The Discovery answer: `Type::method` inside `mod outer` is
+        // `outer::Type::method` — the mod path is a pure prefix on top
+        // of the existing impl-type qualification.
+        let fns = extract_fixture("nested_mods.rs", ComplexityMetric::Cognitive);
+        let _m = find_fn(&fns, "outer::Widget::render");
+    }
+
+    #[test]
+    fn nested_fn_inside_mod_is_mod_scoped_not_fn_scoped() {
+        // The walker threads `mod` nesting only, never `fn` nesting. A
+        // `fn helper` declared inside `outer::with_nested` is emitted as
+        // `outer::helper`, NOT `outer::with_nested::helper`.
+        let fns = extract_fixture("nested_mods.rs", ComplexityMetric::Cognitive);
+        let _outer = find_fn(&fns, "outer::with_nested");
+        let _helper = find_fn(&fns, "outer::helper");
+        assert!(
+            fns.iter()
+                .all(|f| f.identity.qualified_name != "outer::with_nested::helper"),
+            "nested fn must not inherit the enclosing fn's name as a path segment"
+        );
+    }
+
+    #[test]
+    fn mod_qualification_does_not_disturb_complexity() {
+        // Threading the mod path is a display-only change — complexity
+        // for a fn inside a mod is computed exactly as if it were at
+        // file root.
+        let fns = extract_fixture("nested_mods.rs", ComplexityMetric::Cognitive);
+        let render = find_fn(&fns, "outer::Widget::render");
+        assert_eq!(render.complexity, 1, "render has no branching");
+        let deep = find_fn(&fns, "outer::inner::deep");
+        assert_eq!(deep.complexity, 1, "deep is an empty body");
     }
 
     #[test]
@@ -1927,6 +2034,44 @@ mod proptests {
             prop_assert_eq!(
                 cog.len(), cyc.len(),
                 "Metric should not change function count for {}", fixture
+            );
+        }
+
+        // crap-rs#283 AC: qualified_name length monotonically reflects
+        // nesting depth. Synthesize a source wrapping a single free fn
+        // in `depth` levels of nested mods (`m0::m1::...::f`) and assert
+        // the number of `::`-separated segments is exactly `depth + 1`
+        // — strictly increasing in `depth`.
+        #[test]
+        fn qualified_name_segment_count_tracks_mod_depth(
+            depth in 0u32..6,
+            metric in prop_oneof![
+                Just(ComplexityMetric::Cognitive),
+                Just(ComplexityMetric::Cyclomatic),
+            ],
+        ) {
+            // Build `mod m0 { mod m1 { ... fn f() {} ... } }`.
+            let mut source = String::from("fn f() {}");
+            for level in (0..depth).rev() {
+                source = format!("mod m{level} {{ {source} }}");
+            }
+
+            let fns = adapter().extract(&source, "synth.rs", metric).unwrap();
+            prop_assert_eq!(fns.len(), 1, "exactly one fn expected: {}", source);
+
+            let name = &fns[0].identity.qualified_name;
+            let segments = name.split("::").count();
+            prop_assert_eq!(
+                segments as u32,
+                depth + 1,
+                "fn at mod depth {} should have {} segments, got {:?}",
+                depth, depth + 1, name
+            );
+
+            // The bare ident is always the final segment.
+            prop_assert!(
+                name.ends_with('f'),
+                "qualified name {:?} must end with the fn ident", name
             );
         }
     }
