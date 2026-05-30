@@ -83,7 +83,7 @@ crap4rs --src src/ --coverage lcov.info
 | Command | Purpose |
 |---------|---------|
 | `crap4rs` (no subcommand) | Run the analyzer. Requires `--coverage <FILE>`. |
-| `crap4rs init` | Generate a starter `crap.toml` in the current directory. Interactive (pick a preset); pair with `--force` to overwrite. |
+| `crap4rs init` | Write the exhaustive annotated `crap.toml` (every option, documented — see [`crap.example.toml`](crap.example.toml)) in the current directory; trim it down to your needs. Pair with `--force` to overwrite. |
 | `crap4rs completions <SHELL>` | Print a shell completion script to stdout. See [Shell completions](#shell-completions). |
 | `crap4rs help [SUBCOMMAND]` | Long-form help for the binary or a subcommand. |
 
@@ -148,6 +148,8 @@ Run `crap4rs --help` for the canonical full reference. Grouped here as in `--hel
 ### Config file
 
 The canonical config file name is **`crap.toml`** — a single language-neutral file shared by both `crap4rs` and `crap4ts`, auto-discovered in the working directory. `crap4rs init` writes it, and `--config <FILE>` overrides discovery with an explicit path.
+
+Every supported option, with prose for each field, lives in **[`crap.example.toml`](crap.example.toml)** — the exhaustive annotated reference. It is what `crap4rs init` writes verbatim (trim it down to your real config), is generated from the config type (a sync test keeps it from rotting), and is **not** loaded by the tool — it exists purely as the canonical option reference. The editor-validation schema for `crap.toml` is **[`crap.schema.json`](crap.schema.json)** (point your editor's `$schema` at it for autocomplete + inline validation).
 
 For back-compat, the legacy per-adapter names **`crap4rs.toml`** (and `crap4ts.toml` for crap4ts) are still discovered when no `crap.toml` is present, but are **deprecated aliases**: the tool prints a one-line warning nudging you to rename. A present `crap.toml` always takes precedence over a co-present legacy file (the legacy file is then reported as safe to remove). The config examples below use `crap4rs.toml`; they apply identically to `crap.toml`.
 
