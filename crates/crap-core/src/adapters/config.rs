@@ -8,7 +8,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
 use documented::DocumentedFields;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -190,6 +189,114 @@ pub struct LangSchema {
     pub exclude: Option<Vec<String>>,
 }
 
+// ── Typed loader error ─────────────────────────────────────────────
+
+/// Errors the config loader can produce.
+///
+/// Co-located with the loader (matching the `CrapError` /
+/// `CoverageRangeError` precedent) and `#[non_exhaustive]` so adding a
+/// variant is not a breaking change. The loader's public surface
+/// (`discover_config`, `load_config`) and its private parse/validate
+/// helpers all return `Result<_, ConfigError>`; the CLI boundary
+/// (`cli::load_file_config` and the adapter binaries) lifts it into
+/// `anyhow::Error` via `?`, where `render_error`'s `{:#}` walks the
+/// `#[source]` chain to print the path-bearing wrapper plus its cause.
+///
+/// The error is **two-layer** by design: `Toml` carries only the raw
+/// `toml::de::Error` (path-less — `parse_config` has no path) and
+/// interpolates it directly so an in-crate `parse_config(..).to_string()`
+/// surfaces the underlying deserialize message; `Parse` is the
+/// path-bearing wrapper `load_config` adds, whose Display names the file
+/// and the word "parse" without flattening the source (thiserror's
+/// Display does not walk `#[source]`).
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// A non-`NotFound` I/O error while probing a discovery candidate
+    /// (e.g. `PermissionDenied` on a higher-priority file). Surfaces
+    /// rather than being masked by a legacy-config fall-through.
+    #[error("cannot access config file {path}: {source}\n  hint: check file permissions", path = path.display())]
+    Access {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// Failed to read the config file's contents.
+    #[error("failed to read config file: {path}", path = path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// The path-bearing wrapper `load_config` adds around a parse
+    /// failure, so the user sees which file failed. Its Display names
+    /// the file and "parse"; the underlying `ConfigError` (a `Toml` or
+    /// a validation variant) is the `#[source]`.
+    #[error("failed to parse config file: {path}", path = path.display())]
+    Parse {
+        path: PathBuf,
+        #[source]
+        source: Box<ConfigError>,
+    },
+    /// Raw TOML deserialize failure (path-less). Interpolates its source
+    /// so `parse_config(..).to_string()` shows the underlying message
+    /// (e.g. an `unknown field` from `deny_unknown_fields`).
+    #[error("{0}")]
+    Toml(#[from] toml::de::Error),
+    /// `preset` and `threshold` both set. `section` names the
+    /// `[language.<name>]` block when the conflict is per-language,
+    /// `None` at the top level.
+    #[error("{}preset and threshold are mutually exclusive in config", section_prefix(.section))]
+    MutuallyExclusive { section: Option<String> },
+    /// A `threshold` (top-level or per-language) that is not finite and
+    /// positive.
+    #[error("{}threshold must be a finite positive number, got: {value}", section_prefix(.section))]
+    InvalidThreshold { value: f64, section: Option<String> },
+    /// An `[[overrides]]` `threshold` that is not finite and positive.
+    #[error(
+        "override threshold must be a finite positive number, got: {value} (pattern: {pattern})"
+    )]
+    InvalidOverrideThreshold { value: f64, pattern: String },
+    /// An `[output] annotation_limit` outside `1..=100`.
+    #[error(
+        "output.annotation_limit must be in 1..=100, got: {value}\n  hint: matches the CLI `--annotation-limit` range; 0 disables emission, > 100 floods the GH Actions per-step cap"
+    )]
+    InvalidAnnotationLimit { value: u32 },
+    /// An unrecognized `preset` string.
+    #[error("unknown preset: {value}\n  valid values: strict, default, lenient")]
+    UnknownPreset { value: String },
+    /// An unrecognized `metric` string.
+    #[error("unknown metric: {value}\n  valid values: cognitive, cyclomatic")]
+    UnknownMetric { value: String },
+    /// An unrecognized view-preset `sort` string. `preset` names the
+    /// `[views.<name>]` block.
+    #[error(
+        "preset `{preset}`: unknown sort: {value}\n  valid values: crap, coverage, complexity, path"
+    )]
+    UnknownSortKey { preset: String, value: String },
+    /// An unrecognized view-preset `group_by` string.
+    #[error("preset `{preset}`: unknown group_by: {value}\n  valid values: file")]
+    UnknownGroupKey { preset: String, value: String },
+    /// A view-preset coverage bound outside `[0, 100]`.
+    #[error("preset `{preset}`: coverage value out of range: {value}\n  valid range: [0, 100]")]
+    CoverageOutOfRange { preset: String, value: f64 },
+    /// A view-preset `min_coverage` greater than its `max_coverage`.
+    #[error("preset `{preset}`: min_coverage ({min}) must not exceed max_coverage ({max})")]
+    CoverageMinExceedsMax { preset: String, min: f64, max: f64 },
+}
+
+/// Render a `[language.<name>]: ` prefix for the section-scoped error
+/// variants, or empty string at the top level. Keeps the per-section
+/// variants' Display byte-identical to the previous `bail!` messages
+/// (so `"language.rust"` stays asserted) without duplicating two
+/// `#[error]` strings per variant.
+fn section_prefix(section: &Option<String>) -> String {
+    match section {
+        Some(name) => format!("[language.{name}]: "),
+        None => String::new(),
+    }
+}
+
 // ── Public API ─────────────────────────────────────────────────────
 
 /// Outcome of an ordered config-file discovery scan.
@@ -239,7 +346,7 @@ pub struct ConfigDiscovery {
 ///
 /// Returns `Ok(Some(ConfigDiscovery))` when a candidate exists,
 /// `Ok(None)` when none do.
-pub fn discover_config(candidates: &[PathBuf]) -> Result<Option<ConfigDiscovery>> {
+pub fn discover_config(candidates: &[PathBuf]) -> Result<Option<ConfigDiscovery>, ConfigError> {
     for (index, candidate) in candidates.iter().enumerate() {
         match std::fs::metadata(candidate) {
             Ok(m) if m.is_file() => {
@@ -265,25 +372,33 @@ pub fn discover_config(candidates: &[PathBuf]) -> Result<Option<ConfigDiscovery>
             // we can load; advance to the next candidate.
             Ok(_) => continue,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(e) => anyhow::bail!(
-                "cannot access config file {}: {e}\n  hint: check file permissions",
-                candidate.display()
-            ),
+            // Construct the variant manually (not `#[from]`) so the
+            // load-bearing `path` survives onto the error (I-4).
+            Err(source) => {
+                return Err(ConfigError::Access {
+                    path: candidate.clone(),
+                    source,
+                });
+            }
         }
     }
     Ok(None)
 }
 
 /// Load and parse a config file from the given path.
-pub fn load_config(path: &Path) -> Result<FileConfig> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read config file: {}", path.display()))?;
-    parse_config(&content)
-        .with_context(|| format!("failed to parse config file: {}", path.display()))
+pub fn load_config(path: &Path) -> Result<FileConfig, ConfigError> {
+    let content = std::fs::read_to_string(path).map_err(|source| ConfigError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    parse_config(&content).map_err(|source| ConfigError::Parse {
+        path: path.to_path_buf(),
+        source: Box::new(source),
+    })
 }
 
 /// Parse TOML content into a `FileConfig`.
-fn parse_config(content: &str) -> Result<FileConfig> {
+fn parse_config(content: &str) -> Result<FileConfig, ConfigError> {
     let raw: ConfigSchema = toml::from_str(content)?;
     validate_raw_config(&raw)?;
 
@@ -304,18 +419,18 @@ fn parse_config(content: &str) -> Result<FileConfig> {
         .into_iter()
         .map(|(name, raw_preset)| {
             let preset = parse_view_preset(&name, raw_preset)?;
-            Ok::<_, anyhow::Error>((name, preset))
+            Ok::<_, ConfigError>((name, preset))
         })
-        .collect::<Result<HashMap<_, _>>>()?;
+        .collect::<Result<HashMap<_, _>, _>>()?;
 
     let language = raw
         .language
         .into_iter()
         .map(|(name, raw_lang)| {
             let lang = parse_lang_config(&name, raw_lang)?;
-            Ok::<_, anyhow::Error>((name, lang))
+            Ok::<_, ConfigError>((name, lang))
         })
-        .collect::<Result<HashMap<_, _>>>()?;
+        .collect::<Result<HashMap<_, _>, _>>()?;
 
     Ok(FileConfig {
         threshold: raw.threshold,
@@ -337,14 +452,19 @@ fn parse_config(content: &str) -> Result<FileConfig> {
 /// Project a per-language wire section into its parsed [`LangConfig`].
 /// Carries the same `preset`/`threshold` mutual-exclusion and metric
 /// validation the top level enforces, naming the offending section.
-fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig> {
+fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig, ConfigError> {
     if raw.preset.is_some() && raw.threshold.is_some() {
-        anyhow::bail!("[language.{name}]: preset and threshold are mutually exclusive in config");
+        return Err(ConfigError::MutuallyExclusive {
+            section: Some(name.to_string()),
+        });
     }
     if let Some(t) = raw.threshold
         && !is_valid_threshold(t)
     {
-        anyhow::bail!("[language.{name}]: threshold must be a finite positive number, got: {t}");
+        return Err(ConfigError::InvalidThreshold {
+            value: t,
+            section: Some(name.to_string()),
+        });
     }
     let metric = raw.metric.as_deref().map(parse_metric).transpose()?;
     let preset = raw.preset.as_deref().map(parse_preset).transpose()?;
@@ -356,22 +476,24 @@ fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig> {
     })
 }
 
-fn validate_raw_config(raw: &ConfigSchema) -> Result<()> {
+fn validate_raw_config(raw: &ConfigSchema) -> Result<(), ConfigError> {
     if raw.preset.is_some() && raw.threshold.is_some() {
-        anyhow::bail!("preset and threshold are mutually exclusive in config");
+        return Err(ConfigError::MutuallyExclusive { section: None });
     }
     if let Some(t) = raw.threshold
         && !is_valid_threshold(t)
     {
-        anyhow::bail!("threshold must be a finite positive number, got: {t}");
+        return Err(ConfigError::InvalidThreshold {
+            value: t,
+            section: None,
+        });
     }
     for o in &raw.overrides {
         if !is_valid_threshold(o.threshold) {
-            anyhow::bail!(
-                "override threshold must be a finite positive number, got: {} (pattern: {})",
-                o.threshold,
-                o.pattern
-            );
+            return Err(ConfigError::InvalidOverrideThreshold {
+                value: o.threshold,
+                pattern: o.pattern.clone(),
+            });
         }
     }
     // Mirror the CLI's `clap::value_parser!(u32).range(1..=100)` on
@@ -383,14 +505,12 @@ fn validate_raw_config(raw: &ConfigSchema) -> Result<()> {
     if let Some(limit) = raw.output.annotation_limit
         && !(1..=100).contains(&limit)
     {
-        anyhow::bail!(
-            "output.annotation_limit must be in 1..=100, got: {limit}\n  hint: matches the CLI `--annotation-limit` range; 0 disables emission, > 100 floods the GH Actions per-step cap"
-        );
+        return Err(ConfigError::InvalidAnnotationLimit { value: limit });
     }
     Ok(())
 }
 
-fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset> {
+fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset, ConfigError> {
     let sort = raw
         .sort
         .as_deref()
@@ -414,24 +534,26 @@ fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset> {
     })
 }
 
-fn parse_sort_key(preset_name: &str, s: &str) -> Result<SortKey> {
+fn parse_sort_key(preset_name: &str, s: &str) -> Result<SortKey, ConfigError> {
     match s {
         "crap" => Ok(SortKey::Crap),
         "coverage" => Ok(SortKey::Coverage),
         "complexity" => Ok(SortKey::Complexity),
         "path" => Ok(SortKey::Path),
-        other => anyhow::bail!(
-            "preset `{preset_name}`: unknown sort: {other}\n  valid values: crap, coverage, complexity, path"
-        ),
+        other => Err(ConfigError::UnknownSortKey {
+            preset: preset_name.to_string(),
+            value: other.to_string(),
+        }),
     }
 }
 
-fn parse_group_key(preset_name: &str, s: &str) -> Result<GroupKey> {
+fn parse_group_key(preset_name: &str, s: &str) -> Result<GroupKey, ConfigError> {
     match s {
         "file" => Ok(GroupKey::File),
-        other => {
-            anyhow::bail!("preset `{preset_name}`: unknown group_by: {other}\n  valid values: file")
-        }
+        other => Err(ConfigError::UnknownGroupKey {
+            preset: preset_name.to_string(),
+            value: other.to_string(),
+        }),
     }
 }
 
@@ -444,7 +566,7 @@ fn validate_preset_coverage_range(
     preset_name: &str,
     min: Option<f64>,
     max: Option<f64>,
-) -> Result<()> {
+) -> Result<(), ConfigError> {
     if min.is_none() && max.is_none() {
         return Ok(());
     }
@@ -457,29 +579,38 @@ fn validate_preset_coverage_range(
     // explicit arm here.
     match CoverageRange::new(lo, hi) {
         Ok(_) => Ok(()),
-        Err(CoverageRangeError::OutOfRange { value }) => anyhow::bail!(
-            "preset `{preset_name}`: coverage value out of range: {value}\n  valid range: [0, 100]"
-        ),
-        Err(CoverageRangeError::MinExceedsMax { min, max }) => anyhow::bail!(
-            "preset `{preset_name}`: min_coverage ({min}) must not exceed max_coverage ({max})"
-        ),
+        Err(CoverageRangeError::OutOfRange { value }) => Err(ConfigError::CoverageOutOfRange {
+            preset: preset_name.to_string(),
+            value,
+        }),
+        Err(CoverageRangeError::MinExceedsMax { min, max }) => {
+            Err(ConfigError::CoverageMinExceedsMax {
+                preset: preset_name.to_string(),
+                min,
+                max,
+            })
+        }
     }
 }
 
-fn parse_preset(s: &str) -> Result<ThresholdPreset> {
+fn parse_preset(s: &str) -> Result<ThresholdPreset, ConfigError> {
     match s {
         "strict" => Ok(ThresholdPreset::Strict),
         "default" => Ok(ThresholdPreset::Default),
         "lenient" => Ok(ThresholdPreset::Lenient),
-        other => anyhow::bail!("unknown preset: {other}\n  valid values: strict, default, lenient"),
+        other => Err(ConfigError::UnknownPreset {
+            value: other.to_string(),
+        }),
     }
 }
 
-fn parse_metric(s: &str) -> Result<ComplexityMetric> {
+fn parse_metric(s: &str) -> Result<ComplexityMetric, ConfigError> {
     match s {
         "cognitive" => Ok(ComplexityMetric::Cognitive),
         "cyclomatic" => Ok(ComplexityMetric::Cyclomatic),
-        other => anyhow::bail!("unknown metric: {other}\n  valid values: cognitive, cyclomatic"),
+        other => Err(ConfigError::UnknownMetric {
+            value: other.to_string(),
+        }),
     }
 }
 
@@ -977,6 +1108,83 @@ pub fn all_schema_field_docs() -> Vec<(String, &'static str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Typed `ConfigError` contract (#340) ──────────────────────────
+    //
+    // The substring assertions scattered through this module pin the
+    // user-facing Display text; these pin the *typed* shape — that
+    // `parse_config` / `load_config` return concrete `ConfigError`
+    // variants the caller can match on, not stringly-typed errors. The
+    // two-layer design (I-3) is asserted explicitly: a path-less `Toml`
+    // from `parse_config` wraps into a path-bearing `Parse` at
+    // `load_config`, and the `Parse` Display names the file + "parse"
+    // without flattening the source (thiserror Display does not walk
+    // `#[source]`).
+
+    #[test]
+    fn parse_config_returns_typed_mutually_exclusive() {
+        let err = parse_config("preset = \"strict\"\nthreshold = 10.0\n").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::MutuallyExclusive { section: None }),
+            "expected top-level MutuallyExclusive, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn parse_config_returns_typed_unknown_metric() {
+        let err = parse_config("metric = \"halstead\"\n").unwrap_err();
+        match err {
+            ConfigError::UnknownMetric { value } => assert_eq!(value, "halstead"),
+            other => panic!("expected UnknownMetric, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_config_returns_typed_toml_on_malformed() {
+        let err = parse_config("this is not toml [[[").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::Toml(_)),
+            "expected Toml variant, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn load_config_wraps_parse_in_path_bearing_parse_variant() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("crap.toml");
+        std::fs::write(&path, "threshold = not_a_number\n").unwrap();
+
+        let err = load_config(&path).unwrap_err();
+        // Outer layer: path-bearing Parse whose Display names the file
+        // and "parse" (the through-binary anyhow `{:#}` anchor).
+        match &err {
+            ConfigError::Parse { path: p, source } => {
+                assert_eq!(p, &path);
+                // Inner layer: the path-less Toml deserialize error.
+                assert!(
+                    matches!(**source, ConfigError::Toml(_)),
+                    "Parse source should be Toml, got: {source:?}"
+                );
+            }
+            other => panic!("expected Parse, got: {other:?}"),
+        }
+        let msg = err.to_string();
+        assert!(msg.contains("parse"), "Display must name 'parse': {msg}");
+        assert!(
+            msg.contains("crap.toml"),
+            "Display must name the file: {msg}"
+        );
+    }
+
+    #[test]
+    fn load_config_missing_file_is_typed_read_error() {
+        let err = load_config(Path::new("definitely-nonexistent-config.toml")).unwrap_err();
+        assert!(
+            matches!(err, ConfigError::Read { .. }),
+            "expected Read variant, got: {err:?}"
+        );
+        assert!(err.to_string().contains("failed to read config file"));
+    }
 
     // ── Tooling spike (walking-skeleton step 1) ──────────────────────
     //
