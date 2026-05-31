@@ -113,6 +113,17 @@ pre-push:
       # `scripts/config-discovery-lint.py`.
       run: python3 scripts/config-discovery-lint.py
       timeout: 30s
+    config-ast-purity-lint:
+      # Mechanical enforcement of the crap-rs#342 rule: crap-core's config
+      # adapter (config.rs) must carry no per-adapter literals
+      # (`"crap4rs.toml"` / `"crap4ts.toml"` / `"crap4rs"` / `"crap4ts"`)
+      # in source or inline tests — those belong only in each binary's
+      # AdapterMeta. Local-velocity layer of the same check that
+      # `.github/workflows/ci.yml`'s `config-ast-purity-lint` job runs on
+      # every push. Single source of truth:
+      # `scripts/config-ast-purity-lint.py`.
+      run: python3 scripts/config-ast-purity-lint.py
+      timeout: 30s
     clippy:
       run: cargo clippy --workspace --all-targets -- -D warnings
       timeout: 300s

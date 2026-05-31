@@ -1638,6 +1638,36 @@ jobs:
       - name: Lint in-repo `--src` adapter invocations carry an explicit `--config`
         run: python3 scripts/config-discovery-lint.py
 
+  config-ast-purity-lint:
+    # Mechanical enforcement of the crap-rs#342 rule: crap-core's config
+    # adapter (`crates/crap-core/src/adapters/config.rs`) must stay
+    # name-agnostic — no per-adapter literals (`"crap4rs.toml"`,
+    # `"crap4ts.toml"`, `"crap4rs"`, `"crap4ts"`) in source OR inline
+    # tests. The per-adapter names belong only in each binary's
+    # `AdapterMeta::config_file_names`; discovery flows through that, so a
+    # literal in config.rs is a layering smell. The unified `"crap.toml"`
+    # and adapter names in `//`/`///` comments are allowed (the gate
+    # matches string literals only).
+    #
+    # See `scripts/config-ast-purity-lint.py` for the matcher + limitation
+    # notes. Mirrors the `lefthook.yml` pre-push step — single source of
+    # truth in the script.
+    #
+    # Conventions follow the supply-chain hardening: scoped
+    # `permissions: contents: read`, `persist-credentials: false` on
+    # checkout, no cache (pure-Python, sub-second).
+    name: config-ast-purity lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Lint crap-core config.rs carries no per-adapter literals
+        run: python3 scripts/config-ast-purity-lint.py
+
   templated-example-lint:
     # Mechanical structural lint for the consumer-facing templated
     # example at `.github/workflows/examples/crap-scorecard.yml`.
