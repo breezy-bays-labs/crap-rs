@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `crap-core` is the language-agnostic foundation shared by the
 `crap4rs` (Rust) and `crap4ts` (TypeScript) adapters.
 
+## [Unreleased]
+
+### Changed
+
+- Config-file auto-discovery now **walks upward**: when no explicit
+    `--config` is given, the loader searches the run's anchor directory
+    (the first `--src` root, or the working directory when `--src` is
+    empty) and every ancestor up to the filesystem root, and the
+    nearest directory holding any candidate wins. This lets
+    `crap4rs --src crates/foo` (run from a repo root) discover the
+    repo-root `crap.toml`, and `cd crates && crap4rs --src foo` discover
+    a `crap.toml` one level up. The previous behavior only inspected the
+    working directory. Within each directory the canonical-over-legacy
+    ordering and the same-directory shadow notice are unchanged; a file
+    in a parent directory is never reported as shadowed. Pass an explicit
+    `--config <path>` to bypass discovery entirely. (crap-rs#339)
+    - Edge case: the walk has no `.git` / workspace-root boundary, so a
+        stray `crap.toml` in `$HOME` (or any ancestor above your project)
+        is discovered when no nearer config exists. Use `--config` to
+        pin the file explicitly if an ancestor config is unwanted.
+
+### Internal
+
+- The config loader is now `anyhow`-free: `discover_config`,
+    `load_config`, and the parse/validate helpers return a typed
+    `crap_core::adapters::config::ConfigError`
+    (`thiserror` + `#[non_exhaustive]`); the CLI boundary lifts it into
+    `anyhow` so user-facing output is unchanged. (crap-rs#340)
+- The parsed config POD types (`FileConfig`, `OutputConfig`,
+    `LangConfig`, `ViewPreset`) moved to
+    `crap_core::domain::config`; they are re-exported from
+    `crap_core::adapters::config` so existing import paths keep working.
+    (crap-rs#341)
+
 ## [0.8.0]
 
 ### Added

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Config auto-discovery now walks **upward** from the `--src` anchor
+    (or the working directory when `--src` is omitted): `crap4rs --src
+    crates/foo` run from a repo root discovers the repo-root
+    `crap.toml`, and `cd crates && crap4rs --src foo` discovers a
+    `crap.toml` one level up. The previous behavior inspected only the
+    working directory. Pass an explicit `--config <path>` to bypass
+    discovery. Note: the walk has no `.git`/workspace stop, so a stray
+    `crap.toml` in `$HOME` (or any ancestor) is discovered when no
+    nearer config exists. (crap-rs#339; see `crap-core` CHANGELOG.)
+
 ## [0.6.0](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.5.0...crap4rs-v0.6.0) - 2026-05-24
 
 ### Added

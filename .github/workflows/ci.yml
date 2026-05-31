@@ -1609,6 +1609,35 @@ jobs:
       - name: 'Lint `# tracked: crap-rs#<n>` comment coverage of @unwired/@wip scenarios'
         run: python3 scripts/bdd-tracked-lint.py
 
+  config-discovery-lint:
+    # Mechanical enforcement of the crap-rs#339 C-2 isolation rule: any
+    # analyzer-shelling test that passes an IN-REPO `--src` (a string
+    # literal / format!) without a covering `--config` and without a
+    # tempdir `.current_dir(...)` would, under walk-upward discovery,
+    # climb into the repo-root `crap.toml` (crap-rs#346) and let its
+    # wire-envelope / parity / schema snapshot drift on an unrelated
+    # sibling merge. The fix is an explicit empty `--config` fixture;
+    # this job is its enforcement — documentation rots, CI doesn't.
+    #
+    # See `scripts/config-discovery-lint.py` for the per-invocation
+    # detection shape and limitation notes. Mirrors the `lefthook.yml`
+    # pre-push step — single source of truth in the script.
+    #
+    # Conventions follow the supply-chain hardening: scoped
+    # `permissions: contents: read`, `persist-credentials: false` on
+    # checkout, no cache (pure-Python, sub-second).
+    name: config-discovery lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Lint in-repo `--src` adapter invocations carry an explicit `--config`
+        run: python3 scripts/config-discovery-lint.py
+
   templated-example-lint:
     # Mechanical structural lint for the consumer-facing templated
     # example at `.github/workflows/examples/crap-scorecard.yml`.
