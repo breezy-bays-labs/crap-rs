@@ -93,10 +93,14 @@ pre-push:
       run: python3 scripts/mutants-skip-lint.py
       timeout: 30s
     bdd-tracked-lint:
-      # Mechanical enforcement of AGENTS.md "BDD hygiene" Rule 2: every
-      # `@unwired` or `@wip` scenario across `crates/*/tests/features/`
-      # must carry a `# tracked: crap-rs#<n>` comment inside its
-      # scenario block, naming the issue that owns the wiring deferral.
+      # Mechanical enforcement of AGENTS.md "BDD hygiene" Rules 1 and 2
+      # across `crates/*/tests/features/`:
+      #   Rule 1 — every `Scenario:` / `Scenario Outline:` carries
+      #     EXACTLY ONE status tag (`@wired` / `@unwired` / `@wip`);
+      #     zero or more-than-one both fail.
+      #   Rule 2 — every `@unwired` / `@wip` scenario carries a
+      #     `# tracked: crap-rs#<n>` comment inside its scenario block,
+      #     naming the issue that owns the wiring deferral.
       # Local-velocity layer of the same check that
       # `.github/workflows/ci.yml`'s `bdd-tracked-lint` job runs on
       # every push. Single source of truth: `scripts/bdd-tracked-lint.py`.
