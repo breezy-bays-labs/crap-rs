@@ -1582,16 +1582,25 @@ jobs:
         run: python3 scripts/mutants-skip-lint.py
 
   bdd-tracked-lint:
-    # Mechanical enforcement of AGENTS.md "BDD hygiene" Rule 2: every
-    # `@unwired` or `@wip` scenario across `crates/*/tests/features/`
-    # must carry a `# tracked: crap-rs#<n>` comment inside its
-    # scenario block, naming the issue that owns the wiring deferral.
-    # Without this gate, the rule was documented but unenforced —
+    # Mechanical enforcement of AGENTS.md "BDD hygiene" Rules 1 and 2
+    # across `crates/*/tests/features/` (single script, two rules):
+    #   Rule 1 — every `Scenario:` / `Scenario Outline:` carries EXACTLY
+    #     ONE status tag (`@wired` / `@unwired` / `@wip`). Zero status
+    #     tags (the scenario escapes the lexicon) and more than one
+    #     (mutually-exclusive tags can't coexist) both fail. Added in
+    #     crap-rs#280 after CodeRabbit flagged 45 untagged scenarios in
+    #     delta.feature that silently passed the Rule-2-only lint.
+    #   Rule 2 — every `@unwired` / `@wip` scenario carries a
+    #     `# tracked: crap-rs#<n>` comment inside its scenario block,
+    #     naming the issue that owns the wiring deferral.
+    # Without this gate, the rules were documented but unenforced —
     # documentation rots; CI doesn't.
     #
     # See `scripts/bdd-tracked-lint.py` for the parser shape and
     # limitations. Mirrors the `lefthook.yml` pre-push step — single
-    # source of truth in the script.
+    # source of truth in the script. The job id + display name are kept
+    # as `bdd-tracked-lint` (unchanged from the Rule-2-only era) so a
+    # branch-protection required-check reference does not break.
     #
     # Conventions follow the post-#264 supply-chain hardening: scoped
     # `permissions: contents: read`, `persist-credentials: false` on
@@ -1606,7 +1615,9 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - name: 'Lint `# tracked: crap-rs#<n>` comment coverage of @unwired/@wip scenarios'
+      - name: Self-test the BDD-hygiene lint logic (Rule 1 + Rule 2 fixtures)
+        run: python3 scripts/bdd-tracked-lint.py --self-test
+      - name: 'Lint status-tag (Rule 1) + `# tracked:` (Rule 2) coverage of every scenario'
         run: python3 scripts/bdd-tracked-lint.py
 
   config-discovery-lint:

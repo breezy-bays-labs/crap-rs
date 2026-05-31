@@ -22,7 +22,9 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
 
   # ── Domain: FunctionChange classification ──────────────────────────
 
+  @unwired
   Scenario: Identical baseline and current produces all-Modified delta
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the baseline JSON encodes the exact current AnalysisResult
     When `delta::compute(baseline, current)` runs
     Then every `FunctionChange` is `Modified`
@@ -32,21 +34,27 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     And `delta.summary.new_violations` is `0`
     And `delta.summary.passed` is `true`
 
+  @unwired
   Scenario: Function present in current only is classified Added
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the baseline JSON does not contain function `parser::tokenize`
     And the current analysis does contain `parser::tokenize` with score 31
     When the delta is computed
     Then `parser::tokenize` is in `delta.changes` as `Added` with current.score = 31
     And `delta.summary.added` includes that function
 
+  @unwired
   Scenario: Function present in baseline only is classified Removed
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the baseline JSON contains function `legacy::frob` with score 8
     And the current analysis does not contain `legacy::frob`
     When the delta is computed
     Then `legacy::frob` is in `delta.changes` as `Removed` with baseline.score = 8
     And `delta.summary.removed` includes that function
 
+  @unwired
   Scenario: Function present in both is classified Modified
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given baseline contains `cli::run_inner` with score 8
     And current contains `cli::run_inner` with score 24
     When the delta is computed
@@ -54,7 +62,9 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     And `delta.summary.regressions` includes that function
     And `delta.summary.modified` is incremented
 
+  @unwired
   Scenario: Function with score_delta < 0 is counted as improvement
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given baseline contains `parser::tokenize` with score 47
     And current contains `parser::tokenize` with score 12
     When the delta is computed
@@ -64,13 +74,17 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
 
   # ── Domain: identity matching ──────────────────────────────────────
 
+  @unwired
   Scenario: Functions are matched by (file_path, qualified_name)
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given baseline contains `src/foo.rs::module::fn_a`
     And current contains `src/foo.rs::module::fn_a`
     When the delta is computed
     Then the function is `Modified` (matched), not `Added`+`Removed`
 
+  @unwired
   Scenario: Same name in different files counts as separate functions
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given baseline contains `src/a.rs::helpers::log`
     And current contains `src/b.rs::helpers::log` (file moved, same name)
     When the delta is computed
@@ -78,7 +92,9 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     And one `Added` change for `src/b.rs::helpers::log`
     # Rename/move detection is a v0.3.0 follow-up
 
+  @unwired
   Scenario: Same-file rename produces Add+Remove
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given baseline contains `src/foo.rs::utils::compute_v1`
     And current contains `src/foo.rs::utils::compute_v2` (renamed)
     When the delta is computed
@@ -87,7 +103,9 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
 
   # ── Domain: new_violations gate counting ───────────────────────────
 
+  @unwired
   Scenario: Added function over threshold counts as new_violation
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given threshold is 25
     And baseline does not contain `wild::beast`
     And current contains `wild::beast` with score 31
@@ -95,14 +113,18 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     Then `delta.summary.new_violations` is `1`
     And `delta.summary.passed` is `false`
 
+  @unwired
   Scenario: Modified function crossing from passing to failing counts as new_violation
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given threshold is 25
     And baseline contains `cli::run_inner` with score 8 (passing)
     And current contains `cli::run_inner` with score 47 (failing)
     When the delta is computed
     Then `delta.summary.new_violations` is `1`
 
+  @unwired
   Scenario: Modified function getting worse but still passing does NOT count as new_violation
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given threshold is 25
     And baseline contains `parser::tokenize` with score 8
     And current contains `parser::tokenize` with score 20 (still passing)
@@ -110,7 +132,9 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     Then `delta.summary.regressions` is `1`
     And `delta.summary.new_violations` is `0`
 
+  @unwired
   Scenario: Modified function that was already failing in baseline does NOT count
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given threshold is 25
     And baseline contains `legacy::frob` with score 47 (already failing)
     And current contains `legacy::frob` with score 60 (still failing, worse)
@@ -121,21 +145,29 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
 
   # ── DeltaViewSpec: filter, sort, truncate ──────────────────────────
 
+  @unwired
   Scenario: Default DeltaViewSpec is filter=all, sort=score_delta desc
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When `delta::apply(&delta, DeltaViewSpec::default())` runs
     Then `view.shown` contains every `FunctionChange` in `delta.changes`
     And rows are ordered by signed `score_delta` descending (regressions first, improvements last)
 
+  @unwired
   Scenario: Filter by change_kinds=[added] returns only Added
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When `delta::apply` is called with `filters.change_kinds = Some({Added})`
     Then `view.shown` contains only `Added` variants
 
+  @unwired
   Scenario: Sort by current_crap descending
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When `delta::apply` is called with `sort = CurrentCrap`
     Then rows are ordered by current.score descending
     And `Removed` entries (no current score) sort last
 
+  @unwired
   Scenario: Truncate by limit
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given `delta.changes` has 10 entries
     When `delta::apply` is called with `limit = Some(3)`
     Then `view.shown.len()` is `3`
@@ -144,33 +176,43 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
 
   # ── CLI: --baseline flag resolution ────────────────────────────────
 
+  @unwired
   Scenario: --baseline flag loads JSON envelope and emits delta block
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json --format json`
     Then the JSON envelope contains a top-level `delta` key
     And `delta.summary` is present
     And `delta.spec` echoes resolved DeltaViewSpec
     And `delta.shown` is a denormalized array of FunctionChange entries
 
+  @unwired
   Scenario: Without --baseline, JSON envelope omits delta key entirely
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --format json`
     Then the JSON envelope does NOT contain a `delta` key
     And the envelope is byte-identical to today's output
 
+  @unwired
   Scenario: Without --baseline, all reporters render today's output unchanged
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --format markdown` (no --baseline)
     Then the markdown output contains the existing summary block only
     And no "Delta" section appears
 
   # ── CLI: gate semantics ────────────────────────────────────────────
 
+  @unwired
   Scenario: --baseline alone is informational — exit code reflects only threshold gate
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the current analysis has 3 threshold violations (exit 1 today)
     And the baseline has 3 threshold violations (no new violations introduced)
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json`
     Then the process exits 1 (because of the threshold gate, NOT delta)
     And `delta.summary.passed` is `true`
 
+  @unwired
   Scenario: --baseline alone with passing analysis exits 0 even if delta has regressions
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the current analysis has 0 threshold violations
     And the baseline shows the current PR introduced 2 new regressions
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json`
@@ -179,132 +221,174 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     And `delta.summary.passed` is `false`
     # Default behavior: delta is informational, doesn't gate
 
+  @unwired
   Scenario: --delta-gate makes delta contribute to exit code
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the current analysis has 0 threshold violations
     And the baseline shows this PR introduced 1 new violation
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json --delta-gate`
     Then the process exits 1 (delta gate fired)
     And `delta.summary.passed` is `false`
 
+  @unwired
   Scenario: --delta-gate without new violations exits 0
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the current analysis has 0 threshold violations
     And the baseline shows no new violations introduced
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json --delta-gate`
     Then the process exits 0
     And `delta.summary.passed` is `true`
 
+  @unwired
   Scenario: --no-fail overrides --delta-gate (truth still in JSON)
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the current analysis is failing AND the delta has new violations
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json --delta-gate --no-fail`
     Then the process exits 0
     And `result.passed` is `false`
     And `delta.summary.passed` is `false`
 
+  @unwired
   Scenario: --no-fail without --delta-gate behaves as today
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json --no-fail`
     Then the process exits 0 regardless of threshold violations
     And the delta is still surfaced informationally
 
   # ── CLI: shaping flags compose with delta ──────────────────────────
 
+  @unwired
   Scenario: --delta-top truncates delta.shown
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the delta has 10 changes
     When the operator runs `crap4rs … --baseline baseline.json --delta-top 3 --format json`
     Then `delta.shown.len()` is `3`
     And `delta.eligible_count` is `10`
     And `delta.truncated` is `true`
 
+  @unwired
   Scenario: --delta-sort current-crap orders by current score
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --delta-sort current-crap --format json`
     Then `delta.spec.sort` is `"current_crap"`
     And `delta.shown` is ordered by current.score descending
 
+  @unwired
   Scenario: --delta-only filters to specified change kinds
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --delta-only added,modified --format json`
     Then `delta.shown` contains only `Added` and `Modified` entries
     And `Removed` entries are absent
 
   # ── Reporter rendering ─────────────────────────────────────────────
 
+  @unwired
   Scenario: Table reporter renders Delta section under analysis table
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json` (default --format table)
     Then stdout contains the existing analysis table
     And below it a "Delta vs baseline" header
     And a per-change row table with columns: kind, path, function, baseline, current, Δ
     And a delta summary line: "+N added, M removed, K modified, R regressions, I improvements, V new violations"
 
+  @unwired
   Scenario: Markdown reporter renders PR-comment scorecard
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json --format markdown`
     Then stdout contains a "## CRAP Scorecard" header
     And a Status line ("PASS" or "FAIL" per result.passed)
     And a Delta vs baseline counts block
     And tables for biggest regressions and new violations
 
+  @unwired
   Scenario: CSV reporter adds change_kind column
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --baseline baseline.json --format csv`
     Then the CSV header has 11 columns: existing 10 + `change_kind`
     And data rows include the change kind for each delta entry
 
+  @unwired
   Scenario: --minimal-view does NOT suppress delta block
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --minimal-view --format json`
     Then `view.shown` is omitted (existing --minimal-view behavior)
     And `delta.shown` is still present (delta is the whole reason for invocation)
 
   # ── JSON envelope shape ────────────────────────────────────────────
 
+  @unwired
   Scenario: schema_version stays at 1 (additive)
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --format json`
     Then `schema_version` is `1`
     And `delta` is a sibling of `result` and `view`
 
+  @unwired
   Scenario: delta block contains baseline metadata
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --format json`
     Then `delta.baseline_tool_version` matches the baseline's tool_version
     And `delta.baseline_timestamp` matches the baseline's timestamp
     And `delta.baseline_ref` is `null` (reserved for future --baseline-ref flag)
 
+  @unwired
   Scenario: delta block propagates baseline diagnostics
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given the baseline JSON includes a `diagnostics` field
     When the operator runs `crap4rs … --baseline baseline.json --format json`
     Then `delta.baseline_diagnostics` reflects the baseline's diagnostics
 
   # ── Validation errors ──────────────────────────────────────────────
 
+  @unwired
   Scenario: --baseline with non-existent path exits 2
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --coverage lcov.info --baseline /nonexistent.json`
     Then the process exits 2
     And stderr contains "baseline file not found"
 
+  @unwired
   Scenario: --baseline with malformed JSON exits 2
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given `bad.json` is not valid JSON
     When the operator runs `crap4rs --coverage lcov.info --baseline bad.json`
     Then the process exits 2
     And stderr contains "failed to parse baseline JSON"
 
+  @unwired
   Scenario: --baseline with mismatched schema_version exits 2
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given `future.json` declares `schema_version: 2`
     When the operator runs `crap4rs --coverage lcov.info --baseline future.json`
     Then the process exits 2
     And stderr contains "unsupported baseline schema_version"
 
+  @unwired
   Scenario: --delta-only with unknown kind exits 2
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --delta-only nonsense`
     Then the process exits 2
     And stderr contains "invalid value 'nonsense' for '--delta-only'"
 
+  @unwired
   Scenario: --delta-sort with unknown key exits 2
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --delta-sort nonsense`
     Then the process exits 2
     And stderr contains "invalid value 'nonsense' for '--delta-sort'"
 
+  @unwired
   Scenario: --delta-top with negative value exits 2
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs … --baseline baseline.json --delta-top -5`
     Then the process exits 2
     And stderr contains "invalid value '-5' for '--delta-top'"
 
   # ── Help discoverability ───────────────────────────────────────────
 
+  @unwired
   Scenario: --help advertises --baseline and --delta-gate
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     When the operator runs `crap4rs --help`
     Then stdout mentions "--baseline"
     And stdout mentions "--delta-gate"
@@ -313,20 +397,26 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
 
   # ── Walking-skeleton invariants (property-tested) ──────────────────
 
+  @unwired
   Scenario: Identity invariant — compute(r, r) yields all-Modified, all zero
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given any `AnalysisResult` r
     When `delta::compute(r.clone(), r)` runs
     Then every change is `Modified` with `score_delta == 0.0`
     And `delta.summary.regressions == 0`
     And `delta.summary.new_violations == 0`
 
+  @unwired
   Scenario: Containment invariant — view.shown is a subset of delta.changes
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given any `AnalysisDelta` and any `DeltaViewSpec`
     When `delta::apply(&delta, spec)` runs
     Then every entry in `view.shown` exists in `delta.changes`
     And `view.eligible_count <= delta.changes.len()`
 
+  @unwired
   Scenario: Gate orthogonality — result.passed is unaffected by --baseline
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given any current analysis r
     When the operator runs `crap4rs … --baseline X --format json` and `crap4rs … --format json` (without baseline)
     Then `result` (and `result.passed`) is byte-identical between the two runs

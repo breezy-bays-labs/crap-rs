@@ -30,6 +30,11 @@ on us without false positives.
    commonly mixes wired and unwired scenarios while harness coverage
    grows.
 
+   Mechanical enforcement: the same `scripts/bdd-tracked-lint.py` that
+   owns Rule 2 (run from `lefthook.yml` pre-push and the
+   `bdd-tracked-lint` CI job) also rejects any scenario carrying ZERO
+   status tags or MORE THAN ONE. Documentation rots; CI doesn't.
+
 2. **`@unwired` and `@wip` require a tracking comment.** Inside the
    scenario block, add a Gherkin comment in this exact shape so it
    stays greppable (mirrors `~/.claude/rules/exclusions.md`):
