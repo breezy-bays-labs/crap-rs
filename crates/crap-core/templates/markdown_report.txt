@@ -10,8 +10,33 @@
    composes structure.
 
    escape = "none" because markdown special chars (|, *, _, #) must
-   pass through verbatim. Cell escaping is the reporter's job. -#}
+   pass through verbatim. Cell escaping is the reporter's job.
+
+   `[output] title` / `subtitle` (crap-rs#352): a configured title is the
+   prominent headline — it takes the `#` H1 and the tool/version line
+   demotes to `##` (attribution). This keeps prominence consistent with
+   the table reporter (title-on-top) and the HTML reporter (title-as-h1):
+   the configured label is the banner across all three surfaces. The
+   subtitle renders on a plain line beneath. Each arm is gated +
+   whitespace-stripped so the absent path emits ZERO bytes — and when no
+   title is set the tool/version line stays at `#`, byte-identical to the
+   pre-#352 render (existing snapshots untouched). The fixed heading
+   offset the scorecard composite action applies (`# `→`#### `, `## `→
+   `##### `) is content-agnostic, so the title/tool levels nest cleanly
+   under the action's `### Rust (crap4rs)` wrapper either way. -#}
+{%- if let Some(title) = title -%}
+# {{ title }}
+{% if let Some(subtitle) = subtitle %}
+{{ subtitle }}
+{% endif %}
+## {{ tool_name }} v{{ tool_version }} — CRAP Score Analysis
+{%- else -%}
+{%- if let Some(subtitle) = subtitle -%}
+{{ subtitle }}
+
+{% endif -%}
 # {{ tool_name }} v{{ tool_version }} — CRAP Score Analysis
+{%- endif %}
 
 {% match body -%}
 {%- when MarkdownBody::Empty -%}

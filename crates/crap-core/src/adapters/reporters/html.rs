@@ -58,12 +58,24 @@ use std::collections::BTreeMap;
 /// click away and reachable directly via the `#delta` URL hash (the
 /// inline `<script>` hook honors `location.hash` for CI sticky-comment
 /// deep links).
+/// `report_title` and `subtitle` are the optional `[output] title` /
+/// `subtitle` config labels (crap-rs#352). When `report_title` is
+/// `Some`, the configured label replaces the `<h1>tool report</h1>`
+/// scorecard heading and is also folded into the `<title>` document
+/// element; when `subtitle` is `Some`, it renders on a line beneath the
+/// heading. Both default to `None`, in which case the header is
+/// byte-identical to the unlabeled default — no empty subtitle element
+/// is emitted. (Single-card path only — the multi-language unified
+/// renderer composes its own header and never threads these, per D20.)
+#[allow(clippy::too_many_arguments)]
 pub fn format_html(
     view: &AnalysisView<'_>,
     delta: Option<&DeltaView<'_>>,
     threshold: f64,
     meta: &AdapterMeta,
     effective_metric: ComplexityMetric,
+    report_title: Option<&str>,
+    subtitle: Option<&str>,
 ) -> String {
     // `AdapterMeta`'s `&'static str` fields originate from the adapter
     // binaries' compile-time literals. `format_html_inner` takes
@@ -79,9 +91,12 @@ pub fn format_html(
         meta.tool_version,
         meta.display_name,
         effective_metric,
+        report_title,
+        subtitle,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn format_html_inner(
     view: &AnalysisView<'_>,
     delta: Option<&DeltaView<'_>>,
@@ -90,9 +105,17 @@ fn format_html_inner(
     tool_version: &str,
     display_name: &str,
     effective_metric: ComplexityMetric,
+    report_title: Option<&str>,
+    subtitle: Option<&str>,
 ) -> String {
     let summary = &view.full.summary;
-    let title = format!("{} v{} — CRAP score analysis", tool_name, tool_version);
+    // The `<title>` document element folds in the configured scorecard
+    // title when set (crap-rs#352); otherwise it keeps the unlabeled
+    // tool/version default verbatim (byte-identical absent path).
+    let title = match report_title {
+        Some(t) => format!("{} — {} v{}", t, tool_name, tool_version),
+        None => format!("{} v{} — CRAP score analysis", tool_name, tool_version),
+    };
 
     let metric_label = metric_label(effective_metric);
 
@@ -141,6 +164,8 @@ fn format_html_inner(
 
     let tmpl = HtmlReport {
         title,
+        report_title,
+        subtitle,
         tool_name,
         tool_version,
         adapter_display: display_name,
@@ -169,6 +194,13 @@ fn format_html_inner(
 #[template(path = "html_report.html")]
 struct HtmlReport<'a> {
     title: String,
+    /// Configured scorecard title (`[output] title`, crap-rs#352). When
+    /// `Some`, the template renders it as the `<h1>` heading in place of
+    /// the default `<tool> report` label. `None` keeps the default.
+    report_title: Option<&'a str>,
+    /// Configured scorecard subtitle (`[output] subtitle`), rendered as a
+    /// line beneath the heading. `None` emits no element.
+    subtitle: Option<&'a str>,
     tool_name: &'a str,
     tool_version: &'a str,
     adapter_display: &'a str,
@@ -703,6 +735,11 @@ pub fn format_html_multi(
         // `&'static str` projection — the rendered template only
         // needs the strings to live for the duration of the call,
         // which `&block.tool_name` etc. already guarantee.
+        // No `[output]` title/subtitle on the multi-language passthrough:
+        // the unified renderer composes its own header and the envelope
+        // carries no per-language scorecard label (crap-rs#352, D20). The
+        // `None, None` here keeps single-language passthrough output
+        // byte-identical to the unlabeled `format_html` default.
         return format_html_inner(
             &block.view,
             block.delta.as_ref(),
@@ -711,6 +748,8 @@ pub fn format_html_multi(
             &block.tool_version,
             &block.display_name,
             block.metric,
+            None,
+            None,
         );
     }
 
@@ -1599,7 +1638,15 @@ mod tests {
     }
 
     fn html(view: &AnalysisView<'_>) -> String {
-        format_html(view, None, 8.0, &test_meta(), ComplexityMetric::Cognitive)
+        format_html(
+            view,
+            None,
+            8.0,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        )
     }
 
     fn html_with_delta(view: &AnalysisView<'_>, delta: &DeltaView<'_>) -> String {
@@ -1609,7 +1656,134 @@ mod tests {
             8.0,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         )
+    }
+
+    fn html_labeled(
+        view: &AnalysisView<'_>,
+        title: Option<&str>,
+        subtitle: Option<&str>,
+    ) -> String {
+        format_html(
+            view,
+            None,
+            8.0,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            title,
+            subtitle,
+        )
+    }
+
+    // ── [output] title / subtitle labeling (crap-rs#352) ────────────────
+
+    #[test]
+    fn title_labels_the_html_heading() {
+        let result = make_multi_function_result();
+        let out = html_labeled(
+            &make_view_default(&result),
+            Some("Acme Coverage Report"),
+            None,
+        );
+        // The configured title replaces the default `<tool> report` H1
+        // and is folded into the document `<title>`.
+        assert!(
+            out.contains("<h1>Acme Coverage Report</h1>"),
+            "expected the configured title as the H1; got header region:\n{}",
+            &out[..out.len().min(2000)],
+        );
+        assert!(
+            out.contains("<title>Acme Coverage Report — "),
+            "expected the configured title folded into <title>",
+        );
+        // The default `<tool> report` H1 must no longer be present.
+        assert!(!out.contains(&format!("<h1>{TEST_TOOL_NAME} report</h1>")));
+    }
+
+    #[test]
+    fn subtitle_renders_in_html_header() {
+        let result = make_multi_function_result();
+        let out = html_labeled(
+            &make_view_default(&result),
+            Some("Acme Coverage Report"),
+            Some("nightly build"),
+        );
+        assert!(
+            out.contains(r#"<span class="subtitle">nightly build</span>"#),
+            "expected the subtitle span in the header",
+        );
+    }
+
+    #[test]
+    fn subtitle_without_title_keeps_default_html_heading() {
+        let result = make_multi_function_result();
+        let out = html_labeled(&make_view_default(&result), None, Some("nightly build"));
+        // A subtitle set without a title keeps the default `<tool>
+        // report` H1 (no title to replace it) and still renders the
+        // subtitle span beneath. Exercises the default-h1 + subtitle
+        // combination.
+        assert!(
+            out.contains(&format!("<h1>{TEST_TOOL_NAME} report</h1>")),
+            "expected the default tool H1 when only a subtitle is set",
+        );
+        assert!(
+            out.contains(r#"<span class="subtitle">nightly build</span>"#),
+            "expected the subtitle span even without a title",
+        );
+    }
+
+    #[test]
+    fn html_title_subtitle_are_escaped() {
+        let result = make_multi_function_result();
+        let out = html_labeled(
+            &make_view_default(&result),
+            Some("A & B <script>"),
+            Some("v1 > v0"),
+        );
+        // askama auto-escapes `.html` templates (numeric entities), so
+        // HTML metacharacters in a user-supplied title/subtitle must not
+        // inject raw markup.
+        assert!(
+            out.contains("A &#38; B &#60;script&#62;"),
+            "title must be HTML-escaped in the heading; got:\n{}",
+            &out[..out.len().min(2000)],
+        );
+        assert!(
+            out.contains("v1 &#62; v0"),
+            "subtitle must be HTML-escaped in the header",
+        );
+        // The raw `<script>` token from the title must never appear as
+        // injected markup. The template's own legitimate `<script>` tags
+        // are followed by attributes/newlines, never `>A`, so guarding on
+        // the title-derived `<script>A` reconstruction is precise.
+        assert!(
+            !out.contains("<script>A"),
+            "raw `<script>` from a title must never reach the document",
+        );
+    }
+
+    #[test]
+    fn absent_html_title_subtitle_is_byte_identical() {
+        let result = make_multi_function_result();
+        // Absent title/subtitle must be byte-identical to the unlabeled
+        // default — the template gates both arms so no empty element and
+        // no whitespace drift leaks into the no-config path.
+        let labeled = html_labeled(&make_view_default(&result), None, None);
+        let default = html(&make_view_default(&result));
+        assert_eq!(
+            labeled, default,
+            "absent title/subtitle must produce the unlabeled HTML verbatim",
+        );
+        assert!(
+            default.contains(&format!("<h1>{TEST_TOOL_NAME} report</h1>")),
+            "default header must keep the `<tool> report` H1",
+        );
+        assert!(
+            !default.contains(r#"class="subtitle""#),
+            "no subtitle element when none is configured",
+        );
     }
 
     #[test]
@@ -1799,6 +1973,8 @@ mod tests {
             8.0,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
         assert!(out.contains("footer-adapters"));
         assert!(
@@ -1821,6 +1997,8 @@ mod tests {
             10.0,
             &test_meta(),
             ComplexityMetric::Cyclomatic,
+            None,
+            None,
         );
         assert!(out.contains("cyclomatic complexity"));
         assert!(out.contains("10.00"));
@@ -2188,6 +2366,8 @@ mod tests {
             8.0,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
 
         let block = build_block(
@@ -3098,6 +3278,8 @@ mod tests {
             8.0,
             &test_meta(),
             ComplexityMetric::Cognitive,
+            None,
+            None,
         );
 
         let block = LanguageBlock {

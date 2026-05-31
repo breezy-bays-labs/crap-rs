@@ -32,6 +32,8 @@ pub fn format_table(
         false,
         tool_name,
         tool_version,
+        None,
+        None,
     )
 }
 
@@ -47,6 +49,14 @@ pub fn format_table(
 /// are threaded from the caller — `env!("CARGO_PKG_NAME")` and
 /// `env!("CARGO_PKG_VERSION")` resolve against `crap-core` here, not
 /// the adapter binary, so the calling binary supplies its own identity.
+///
+/// `title` and `subtitle` are the optional `[output] title` / `subtitle`
+/// config labels (crap-rs#352). When `title` is `Some`, it is emitted as
+/// a header line above the tool/version line; when `subtitle` is `Some`,
+/// it renders on the line beneath the title. Both default to `None`, in
+/// which case the header is byte-identical to the unlabeled default — no
+/// empty title/subtitle line is emitted.
+#[allow(clippy::too_many_arguments)]
 pub fn format_table_with_explain(
     view: &AnalysisView<'_>,
     delta: Option<&DeltaView<'_>>,
@@ -55,10 +65,23 @@ pub fn format_table_with_explain(
     explain: bool,
     tool_name: &str,
     tool_version: &str,
+    title: Option<&str>,
+    subtitle: Option<&str>,
 ) -> String {
     let mut output = String::new();
 
-    // Header
+    // Header — the configured title labels the scorecard above the
+    // tool/version line; the subtitle renders beneath the title. Each is
+    // gated on `Some` independently so the absent path emits no empty
+    // line and stays byte-identical to the unlabeled default.
+    if let Some(title) = title {
+        output.push_str(title);
+        output.push('\n');
+    }
+    if let Some(subtitle) = subtitle {
+        output.push_str(subtitle);
+        output.push('\n');
+    }
     output.push_str(&format!(
         "{tool_name} v{tool_version} — CRAP Score Analysis\n",
     ));
@@ -807,6 +830,116 @@ mod tests {
         assert!(output.starts_with(&format!("{TEST_TOOL_NAME} v{TEST_TOOL_VERSION}")));
     }
 
+    // ── [output] title / subtitle labeling (crap-rs#352) ────────────────
+
+    #[test]
+    fn title_labels_the_scorecard_header() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let output = format_table_with_explain(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+            Some("Acme Coverage Report"),
+            None,
+        );
+        // The configured title labels the header — emitted on the first
+        // line, above the tool/version line.
+        assert!(
+            output.starts_with("Acme Coverage Report\n"),
+            "expected the title on the first header line; got:\n{output}",
+        );
+        assert!(output.contains(&format!("{TEST_TOOL_NAME} v{TEST_TOOL_VERSION}")));
+    }
+
+    #[test]
+    fn subtitle_renders_beneath_the_title() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let output = format_table_with_explain(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+            Some("Acme Coverage Report"),
+            Some("nightly build"),
+        );
+        assert!(
+            output.starts_with("Acme Coverage Report\nnightly build\n"),
+            "expected the subtitle beneath the title; got:\n{output}",
+        );
+    }
+
+    #[test]
+    fn absent_title_and_subtitle_emit_no_extra_lines() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        // Absent title/subtitle must be byte-identical to the unlabeled
+        // default — `format_table` is the `None, None` wrapper, so both
+        // paths must produce the exact same bytes (no empty header line).
+        let labeled = format_table_with_explain(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+            None,
+            None,
+        );
+        let default = format_table(
+            &make_view_default(&result),
+            8.0,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+        );
+        assert_eq!(
+            labeled, default,
+            "absent title/subtitle must be byte-identical to the unlabeled default",
+        );
+        assert!(
+            default.starts_with(&format!("{TEST_TOOL_NAME} v{TEST_TOOL_VERSION}")),
+            "default header must lead with the tool/version line, no empty line above",
+        );
+    }
+
+    #[test]
+    fn subtitle_without_title_renders_above_tool_line() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let output = format_table_with_explain(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            TEST_TOOL_NAME,
+            TEST_TOOL_VERSION,
+            None,
+            Some("nightly build"),
+        );
+        // A subtitle set without a title still renders (gated
+        // independently), above the tool/version line, with no empty
+        // title line preceding it.
+        assert!(
+            output.starts_with("nightly build\n"),
+            "expected the subtitle on the first line when no title is set; got:\n{output}",
+        );
+    }
+
     #[test]
     fn test_summary_line_contents() {
         let _guard = acquire_color_lock();
@@ -1101,6 +1234,8 @@ mod tests {
             true,
             TEST_TOOL_NAME,
             TEST_TOOL_VERSION,
+            None,
+            None,
         );
         assert!(output.contains("Legend: +1 = base structural increment."));
         assert!(output.contains("+N (nested) = +1 base plus +(N-1)"));
@@ -1138,6 +1273,8 @@ mod tests {
             true,
             TEST_TOOL_NAME,
             TEST_TOOL_VERSION,
+            None,
+            None,
         );
         assert!(!output.contains("Legend:"));
         assert!(!output.contains("line 3: match (+3 (nested))"));
@@ -1179,6 +1316,8 @@ mod tests {
             true,
             TEST_TOOL_NAME,
             TEST_TOOL_VERSION,
+            None,
+            None,
         );
         assert!(!output.contains("Legend:"));
     }
@@ -1598,6 +1737,8 @@ mod tests {
             false,
             TEST_TOOL_NAME,
             TEST_TOOL_VERSION,
+            None,
+            None,
         );
         assert!(
             output.contains("Delta vs baseline:"),
@@ -1628,6 +1769,8 @@ mod tests {
             false,
             TEST_TOOL_NAME,
             TEST_TOOL_VERSION,
+            None,
+            None,
         );
         // Per-change rows present
         assert!(output.contains("added"));
@@ -1651,6 +1794,8 @@ mod tests {
             false,
             TEST_TOOL_NAME,
             TEST_TOOL_VERSION,
+            None,
+            None,
         );
         assert!(!output.contains("Delta vs baseline"));
     }
@@ -1669,6 +1814,8 @@ mod tests {
             false,
             TEST_TOOL_NAME,
             TEST_TOOL_VERSION,
+            None,
+            None,
         );
         insta::assert_snapshot!(output);
     }

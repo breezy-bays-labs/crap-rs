@@ -55,7 +55,18 @@ fn single_language_passthrough_is_byte_identical_to_direct_format_html() {
 
     // Direct path: what every existing single-binary consumer of
     // `--format html` sees today.
-    let direct = format_html(&view, None, 8.0, &test_meta(), ComplexityMetric::Cognitive);
+    // `None, None` for `[output]` title/subtitle: the multi-language
+    // passthrough never threads a scorecard label (crap-rs#352, D20), so
+    // the direct comparison must also pass `None` to stay byte-identical.
+    let direct = format_html(
+        &view,
+        None,
+        8.0,
+        &test_meta(),
+        ComplexityMetric::Cognitive,
+        None,
+        None,
+    );
 
     // Multi-language passthrough: construct a single-element
     // `MultiLangContext` and route through `format_html_multi`.

@@ -1119,6 +1119,14 @@ struct EffectiveInputs {
     /// only by `format_github_annotations` — every other reporter
     /// ignores it.
     annotation_limit: usize,
+    /// Configured scorecard title from `[output] title` (crap-rs#352).
+    /// `None` renders the default unlabeled header. Top-level only — no
+    /// per-language overlay (the unified scorecard is one header, see
+    /// D20). Honored by the table / markdown / html reporters.
+    title: Option<String>,
+    /// Configured scorecard subtitle from `[output] subtitle`. `None`
+    /// emits no subtitle line. Threaded alongside `title`.
+    subtitle: Option<String>,
 }
 
 /// In-flight pipeline state assembled by `prepare_pipeline`. Owns the
@@ -1182,6 +1190,12 @@ fn merge_effective_inputs(
         .annotation_limit
         .or_else(|| file_config.as_ref().and_then(|c| c.output.annotation_limit))
         .unwrap_or(10) as usize;
+    // Scorecard title / subtitle (crap-rs#352) come from the top-level
+    // `[output]` table only — they are not per-language (D20: the
+    // unified scorecard is one card with one header). No default: `None`
+    // means the reporters render the unlabeled header.
+    let title = file_config.as_ref().and_then(|c| c.output.title.clone());
+    let subtitle = file_config.as_ref().and_then(|c| c.output.subtitle.clone());
     EffectiveInputs {
         src,
         metric,
@@ -1189,6 +1203,8 @@ fn merge_effective_inputs(
         threshold,
         exclude,
         annotation_limit,
+        title,
+        subtitle,
     }
 }
 
@@ -1545,6 +1561,8 @@ fn render_format<P: ParseDiagnostic>(
             cli.display.explain,
             meta.tool_name,
             meta.tool_version,
+            inputs.title.as_deref(),
+            inputs.subtitle.as_deref(),
         ),
         FormatArg::Json | FormatArg::Advice => {
             format_as_json(cli, view, delta_view, delta_state, analysis, inputs, meta)?
@@ -1559,6 +1577,8 @@ fn render_format<P: ParseDiagnostic>(
             cli.display.md_top,
             meta,
             inputs.metric,
+            inputs.title.as_deref(),
+            inputs.subtitle.as_deref(),
         ),
         FormatArg::Csv => reporters::format_csv(view, delta_view, inputs.metric),
         // SARIF is a gate translation, not a display: it iterates
@@ -1576,9 +1596,15 @@ fn render_format<P: ParseDiagnostic>(
         FormatArg::ScorecardRow => {
             format_as_scorecard_row(delta_state, &analysis.result, inputs.threshold)
         }
-        FormatArg::Html => {
-            reporters::format_html(view, delta_view, inputs.threshold, meta, inputs.metric)
-        }
+        FormatArg::Html => reporters::format_html(
+            view,
+            delta_view,
+            inputs.threshold,
+            meta,
+            inputs.metric,
+            inputs.title.as_deref(),
+            inputs.subtitle.as_deref(),
+        ),
         // GitHub Actions annotations is a gate translation like SARIF —
         // iterates `view.full.functions` regardless of View shaping so
         // PR annotations reflect the gate, not a presentation choice.
@@ -3292,6 +3318,8 @@ mod tests {
             threshold: 15.0,
             exclude: Vec::new(),
             annotation_limit: 10,
+            title: None,
+            subtitle: None,
         }
     }
 
