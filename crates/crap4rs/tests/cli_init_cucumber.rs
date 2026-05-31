@@ -1,13 +1,19 @@
 //! Cucumber-rs runner for `@wired`-tagged scenarios in
 //! `tests/features/cli_init.feature` (crap-rs#73).
 //!
-//! Each scenario sets up a tempdir (potentially with a `src/` or
-//! `crates/` subdirectory to exercise auto-detect) and invokes the
-//! `crap4rs init` subcommand via `CARGO_BIN_EXE_crap4rs`. Cross-adapter
-//! parity (`crap4ts init` also writing the canonical `crap.toml`) is
-//! exercised by the plain integration test at `crates/crap4ts/tests/cli_init_integration.rs`
-//! — that env var is per-package and `CARGO_BIN_EXE_crap4ts` is not
-//! available inside crap4rs's harness.
+//! `crap4rs init` emits one deterministic document — the exhaustive
+//! annotated config reference — identical regardless of CLI flags,
+//! piped stdin, or the project's directory layout. There is no
+//! auto-detect and no interactive prompt; `--non-interactive` is a
+//! retained no-op. Scenarios set up a tempdir (some with a `crates/`
+//! subdirectory to prove the layout is ignored, some seeding an
+//! existing `crap.toml` to exercise the collision/`--force` paths) and
+//! invoke the `crap4rs init` subcommand via `CARGO_BIN_EXE_crap4rs`.
+//! Cross-adapter parity (`crap4ts init` also writing the canonical
+//! `crap.toml`) is exercised by the plain integration test at
+//! `crates/crap4ts/tests/cli_init_integration.rs` — that env var is
+//! per-package and `CARGO_BIN_EXE_crap4ts` is not available inside
+//! crap4rs's harness.
 //!
 //! The harness uses `filter_run_and_exit` with the `@wired` filter
 //! pattern per AGENTS.md § BDD hygiene rule 5; `@unwired` scenarios
@@ -76,16 +82,6 @@ fn given_empty_dir(world: &mut InitWorld) {
 fn given_dir_with_subdir(world: &mut InitWorld, name: String) {
     let (dir, path) = fresh_tempdir();
     std::fs::create_dir_all(path.join(&name)).expect("create subdir");
-    world.project_dir = Some(path);
-    world._tempdir = Some(dir);
-}
-
-#[given(
-    regex = r#"^a project directory with a "([^"]+)" subdirectory but no "([^"]+)" subdirectory$"#
-)]
-fn given_dir_with_subdir_but_not(world: &mut InitWorld, present: String, _absent: String) {
-    let (dir, path) = fresh_tempdir();
-    std::fs::create_dir_all(path.join(&present)).expect("create subdir");
     world.project_dir = Some(path);
     world._tempdir = Some(dir);
 }
@@ -219,28 +215,21 @@ fn then_loads(world: &mut InitWorld) {
     );
 }
 
-#[then(regex = r#"^the loaded config has preset "([^"]+)"$"#)]
-fn then_loaded_preset(world: &mut InitWorld, expected: String) {
+#[then("the loaded config has no top-level preset")]
+fn then_loaded_no_preset(world: &mut InitWorld) {
+    // The exhaustive dump sets `threshold` live and leaves `preset` as a
+    // commented-out alternative, so a freshly generated config has no
+    // top-level `preset` key once parsed. Parsing (rather than a text
+    // `does not contain` check) is the honest assertion here: a bare
+    // `preset = "default"` substring also appears on commented lines in
+    // the dump, so only the parsed TOML can prove the key is absent.
     let path = world.config_path("crap.toml");
     let content = std::fs::read_to_string(&path).expect("read config");
     let parsed: toml::Value = toml::from_str(&content).expect("parse config");
-    let preset = parsed
-        .get("preset")
-        .and_then(|v| v.as_str())
-        .expect("preset key missing or wrong type");
-    assert_eq!(preset, expected);
-}
-
-#[then(regex = r#"^the loaded config has src "([^"]+)"$"#)]
-fn then_loaded_src(world: &mut InitWorld, expected: String) {
-    let path = world.config_path("crap.toml");
-    let content = std::fs::read_to_string(&path).expect("read config");
-    let parsed: toml::Value = toml::from_str(&content).expect("parse config");
-    let src = parsed
-        .get("src")
-        .and_then(|v| v.as_str())
-        .expect("src key missing or wrong type");
-    assert_eq!(src, expected);
+    assert!(
+        parsed.get("preset").is_none(),
+        "generated config must not set a top-level preset (it is the commented alternative to a live threshold)\nfull content:\n{content}",
+    );
 }
 
 #[then(regex = r#"^stderr contains "([^"]+)"$"#)]
