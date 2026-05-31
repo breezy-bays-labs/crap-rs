@@ -258,6 +258,45 @@ Notes:
 - `src-ts:` accepts the same multi-root list for the TypeScript side in
   multi-language mode.
 
+## Deferring analysis knobs to `crap.toml` (config dogfood)
+
+The analyzers (`crap4rs` / `crap4ts`) auto-discover a `crap.toml` in the
+working directory and apply its knobs with a precedence cascade: an
+explicit CLI flag wins, then the config file, then the analyzer's
+built-in default. The action lets a project lean on that cascade by
+**omitting** the corresponding inputs:
+
+- **`src:` empty (default) ⇒ `--src` is not forwarded.** The analyzer
+  then uses its own precedence — a `crap.toml` `src = [...]` array, else
+  the built-in `["src"]` default. Set `src:` only to override config.
+- **`threshold:` and `threshold-preset:` both empty ⇒ `--threshold` is
+  not forwarded.** The analyzer uses its config `threshold` / `preset`,
+  else each adapter's own built-in default (crap4rs gates cognitive CRAP
+  at 15; crap4ts gates cyclomatic CRAP at 15 — each adapter keeps its own
+  metric calibration). Set either input only to override config.
+
+```yaml
+# crap.toml owns src + threshold + metric; the workflow stays terse.
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@v1
+  with:
+    languages: rust
+    coverage: lcov.info        # per-run, stays an input
+    gate-mode: gate-on-analysis  # presentation, stays an input
+    # no src / threshold / threshold-preset — crap.toml owns them
+```
+
+> **Behavior change (was: `src:` defaulted to `.`).** Previously `src:`
+> defaulted to `.` and the action **always** forwarded `--src .`,
+> scanning the repository root and shadowing any `crap.toml`-declared
+> source roots. `src:` now defaults to empty and is conditionally
+> forwarded — matching every other optional input (`coverage`,
+> `baseline`, `src-ts`, `config`) — so a wrapper no longer redefines the
+> tool's own default. **If you relied on the implicit repo-root scan,
+> pass `src: .` explicitly** (or, preferably, declare `src` in a
+> `crap.toml`). CI-presentation inputs (`gate-mode`, `comment-*`,
+> `html-report`) and per-run inputs (`coverage`, `baseline`) are
+> unaffected — they are not analyzer config and stay as inputs.
+
 ## Two distinct scorecards on one PR
 
 Run two scorecards on the same PR — e.g. a gated production scorecard
@@ -650,7 +689,7 @@ row; the aggregator owns the comment.
 | `language` | `auto` | `rust`, `typescript`, or `auto` (infer from coverage extension). Superseded by `languages` (preset) when both are set |
 | `coverage` | (required) | Path to LCOV (`.info`) for Rust, Istanbul JSON for TS. In multi-language mode, carries the Rust LCOV (paired with `coverage-ts:`) |
 | `coverage-ts` | `''` | (paired) TypeScript Istanbul JSON path. Required in multi-language mode; ignored in single-language mode. See [Multi-language](#multi-language) |
-| `src` | `.` | Source root passed to the analyzer. In multi-language mode, carries the Rust source root. **Multi-root (crap-rs#336):** accepts a newline-separated list of roots (YAML `\|` block scalar) — the action splits it into one `--src` per non-blank line, unioning their functions into one scorecard against a single `coverage:` file. A single-line value is byte-identical to before. See [Multi-root source](#multi-root-source) |
+| `src` | `''` | Source root passed to the analyzer. In multi-language mode, carries the Rust source root. **Empty default (crap-rs#346):** when omitted, `--src` is NOT forwarded — the analyzer's own precedence takes over (a `crap.toml` `src` array, else its `["src"]` default). Pass `src: .` to restore the old repo-root scan, or declare `src` in a `crap.toml`. **Multi-root (crap-rs#336):** accepts a newline-separated list of roots (YAML `\|` block scalar) — the action splits it into one `--src` per non-blank line, unioning their functions into one scorecard against a single `coverage:` file. A single-line value is byte-identical to before. See [Deferring analysis knobs to `crap.toml`](#deferring-analysis-knobs-to-craptoml) + [Multi-root source](#multi-root-source) |
 | `src-ts` | `''` | (paired) TypeScript source root. Required in multi-language mode; ignored in single-language mode. Accepts the same newline-separated multi-root list as `src:`. See [Multi-language](#multi-language) |
 | `baseline` | `''` | Path to a previously-captured CRAP JSON envelope. Empty = no delta. In multi-language mode, carries the Rust baseline |
 | `baseline-ts` | `''` | (paired) TypeScript baseline JSON envelope. Optional even in multi-language mode (per-language); a language without a baseline contributes neutrally to AND/SUM aggregation. See [Multi-language](#multi-language) |

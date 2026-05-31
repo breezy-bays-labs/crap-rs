@@ -102,9 +102,24 @@ inputs:
     description: |
       Source root directory passed to the analyzer. In multi-language
       mode, this is the **Rust** source root; the TypeScript source
-      root lives on `src-ts:`.
+      root lives on `src-ts:`. Accepts a newline-separated list for
+      multi-root analysis.
+
+      Empty default (crap-rs#346): when omitted, `--src` is NOT
+      forwarded to the analyzer, so the analyzer's own precedence takes
+      over — a `crap.toml` `src = [...]` array (auto-discovered in the
+      working directory), else the analyzer's built-in `["src"]`
+      default. This matches the conditional-forward contract of every
+      other optional input (`coverage`/`baseline`/`src-ts`/`config` all
+      default empty and forward only when set); previously `src` alone
+      defaulted to `.` and the wrapper unconditionally forwarded
+      `--src .`, redefining the analyzer's default and shadowing any
+      config-declared source roots. A wrapper should not redefine the
+      tool's default. Callers who relied on the old repo-root scan must
+      now pass `src: .` explicitly (or, preferably, declare `src` in a
+      `crap.toml`).
     required: false
-    default: '.'
+    default: ''
   src-ts:
     description: |
       TypeScript source root, paired with `coverage-ts:`. Used ONLY
@@ -342,10 +357,19 @@ outputs:
   threshold-resolved:
     description: |
       The threshold value the action's `Resolve presets` step resolved
-      for this invocation (preset-derived or raw passthrough). Surfaces
-      the single source-of-truth threshold so consumers can verify the
+      from its INPUTS (preset-derived or raw passthrough). Surfaces the
+      single source-of-truth threshold so consumers can verify the
       preset-to-raw mapping (e.g. `threshold-preset: strict` resolved
       to 8 on the cognitive scale).
+
+      NOTE (crap-rs#346): this reflects the action's resolved *input*, not
+      necessarily the threshold the analyzer actually gated at. When the
+      caller omits both `threshold` and `threshold-preset`, the action
+      does NOT forward `--threshold` (so the analyzer's own `crap.toml`
+      threshold/preset, else its built-in default, owns the gate), yet
+      this output still reports the action's historical `15` fallback.
+      Consumers that let config own the threshold should read the
+      effective value from the analyzer envelope, not this output.
     value: ${{ steps.presets.outputs.threshold }}
   html-artifact-url:
     description: |
@@ -493,6 +517,25 @@ runs:
           resolved_threshold="15"
         fi
         echo "threshold=$resolved_threshold" >> "$GITHUB_OUTPUT"
+
+        # Did the caller explicitly choose a threshold (raw or preset)?
+        # `resolved_threshold` always carries a number (the historical
+        # `15` fallback when both are empty), so it cannot distinguish
+        # "caller chose 15" from "caller omitted it." This flag captures
+        # that distinction from the RAW inputs. The analysis step forwards
+        # `--threshold` to the analyzer ONLY when this is "true"; when the
+        # caller omits both, `--threshold` is withheld so the analyzer's
+        # own precedence (config `crap.toml` threshold/preset, else its
+        # built-in default) owns the value — the same conditional-forward
+        # contract `src`/`config`/`baseline` already follow, so a project
+        # can dogfood its config's threshold instead of having the wrapper
+        # silently redefine it to 15 (crap-rs#346). `resolved_threshold`
+        # remains the single-source display/annotation value either way.
+        if [ -n "$THRESHOLD_PRESET" ] || [ -n "$THRESHOLD" ]; then
+          echo "threshold_explicit=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "threshold_explicit=false" >> "$GITHUB_OUTPUT"
+        fi
 
         # ----------------------------------------------------------------
         # 2. run-mode → baseline expectations
@@ -880,6 +923,11 @@ runs:
         # reads them: Run analysis, Emit inline annotations, Enforce
         # gates.
         THRESHOLD: ${{ steps.presets.outputs.threshold }}
+        # "true" only when the caller explicitly set `threshold` or
+        # `threshold-preset`. Gates the `--threshold` forward below so an
+        # omitted threshold defers to the analyzer's config/default
+        # precedence (crap-rs#346).
+        THRESHOLD_EXPLICIT: ${{ steps.presets.outputs.threshold_explicit }}
         CONFIG: ${{ inputs.config }}
         DELTA_GATE: ${{ steps.presets.outputs.delta_gate }}
         ANALYSIS_GATE: ${{ steps.presets.outputs.analysis_gate }}
@@ -965,6 +1013,19 @@ runs:
           envelope="$RUNNER_TEMP/${BIN}-envelope.json"
           markdown_file="$RUNNER_TEMP/${BIN}-scorecard.md"
           row_json_file="$RUNNER_TEMP/${BIN}-row.json"
+          # `--threshold` is conditionally forwarded (crap-rs#346): only
+          # when the caller explicitly set `threshold`/`threshold-preset`.
+          # When omitted, the flag is withheld so the analyzer's own
+          # precedence (config `crap.toml` threshold/preset, else its
+          # built-in default) owns the value — the same conditional-
+          # forward contract `--src`/`--config`/`--baseline` follow.
+          # `$THRESHOLD` (the resolved single-source value) is still used
+          # for the annotation/display path; it just no longer overrides a
+          # project's config threshold on every run.
+          common=(--coverage "$LANG_COVERAGE")
+          if [ "$THRESHOLD_EXPLICIT" = "true" ]; then
+            common+=(--threshold "$THRESHOLD")
+          fi
           # Multi-root (crap-rs#336): `src`/`src-ts` accept a
           # newline-separated list of roots (the GHA multiline-input
           # convention); split into one `--src <root>` per non-blank
@@ -972,7 +1033,6 @@ runs:
           # identical to before this PR); blank lines are skipped so a
           # trailing newline never produces an empty `--src ""` (which
           # would silently re-scope the walker to CWD).
-          common=(--coverage "$LANG_COVERAGE" --threshold "$THRESHOLD")
           while IFS= read -r src_root; do
             # Strip a trailing CR so a CRLF-checkout / Windows-runner
             # consumer doesn't emit `--src "crates/foo/src\r"`, which
@@ -1269,6 +1329,10 @@ runs:
         # partial wiring here would silently surface `default`-level
         # annotations under a `strict` preset).
         THRESHOLD: ${{ steps.presets.outputs.threshold }}
+        # Mirror the Run-analysis conditional `--threshold` forward
+        # (crap-rs#346) so annotations honor a config-driven threshold
+        # too — keeps the cutoff coherent across analysis + annotations.
+        THRESHOLD_EXPLICIT: ${{ steps.presets.outputs.threshold_explicit }}
         CONFIG: ${{ inputs.config }}
         ANNOTATION_LIMIT: ${{ inputs.annotation-limit }}
       run: |
@@ -1335,8 +1399,14 @@ runs:
           esac
           # Multi-root (crap-rs#336): same newline-split as the Run
           # analysis loop, so annotations cover every root rather than
-          # silently only the first under multi-root.
-          args=(--coverage "$LANG_COVERAGE" --threshold "$THRESHOLD" --no-fail --format github-annotations)
+          # silently only the first under multi-root. `--threshold` is
+          # conditionally forwarded (crap-rs#346) for parity with the Run
+          # analysis loop — omitted when the caller set no threshold so
+          # the analyzer's config/default precedence owns the cutoff.
+          args=(--coverage "$LANG_COVERAGE" --no-fail --format github-annotations)
+          if [ "$THRESHOLD_EXPLICIT" = "true" ]; then
+            args+=(--threshold "$THRESHOLD")
+          fi
           while IFS= read -r src_root; do
             # Strip a trailing CR (CRLF-checkout / Windows-runner) so the
             # annotations loop doesn't emit `--src "…\r"` (gemini PR #344).
