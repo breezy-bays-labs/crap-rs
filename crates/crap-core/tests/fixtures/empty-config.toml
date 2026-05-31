@@ -1,0 +1,13 @@
+# Intentionally empty config fixture (crap-rs#339 / C-2).
+#
+# Passed as an explicit `--config` to analyzer-shelling canary tests that
+# use an IN-REPO `--src` (e.g. `../crap4rs/src`). An explicit `--config`
+# short-circuits walk-upward discovery (cli/mod.rs `load_file_config`), so
+# the canary never climbs into the repo-root `crap.toml` (crap-rs#346) and
+# its wire-envelope / parity snapshot stays hermetic — pinned to the
+# analyzer output, not to whatever the in-repo config currently sets.
+#
+# Empty body => parses to `FileConfig::default()`, which is byte-identical
+# to "no config" through `merge_effective_inputs` (every field falls
+# through the same CLI > config > default cascade), so passing this is
+# behaviorally equivalent to the pre-#346 hermetic state.

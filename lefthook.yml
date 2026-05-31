@@ -102,6 +102,28 @@ pre-push:
       # every push. Single source of truth: `scripts/bdd-tracked-lint.py`.
       run: python3 scripts/bdd-tracked-lint.py
       timeout: 30s
+    config-discovery-lint:
+      # Mechanical enforcement of the crap-rs#339 C-2 isolation rule:
+      # analyzer-shelling tests with an IN-REPO `--src` and no `--config`
+      # (and no tempdir `.current_dir(...)`) would climb into the repo-root
+      # `crap.toml` under walk-upward discovery and drift their snapshots
+      # on unrelated sibling merges. Local-velocity layer of the same check
+      # that `.github/workflows/ci.yml`'s `config-discovery-lint` job runs
+      # on every push. Single source of truth:
+      # `scripts/config-discovery-lint.py`.
+      run: python3 scripts/config-discovery-lint.py
+      timeout: 30s
+    config-ast-purity-lint:
+      # Mechanical enforcement of the crap-rs#342 rule: crap-core's config
+      # adapter (config.rs) must carry no per-adapter literals
+      # (`"crap4rs.toml"` / `"crap4ts.toml"` / `"crap4rs"` / `"crap4ts"`)
+      # in source or inline tests — those belong only in each binary's
+      # AdapterMeta. Local-velocity layer of the same check that
+      # `.github/workflows/ci.yml`'s `config-ast-purity-lint` job runs on
+      # every push. Single source of truth:
+      # `scripts/config-ast-purity-lint.py`.
+      run: python3 scripts/config-ast-purity-lint.py
+      timeout: 30s
     clippy:
       run: cargo clippy --workspace --all-targets -- -D warnings
       timeout: 300s

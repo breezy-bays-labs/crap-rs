@@ -1,3 +1,4 @@
+pub mod config;
 pub mod crap;
 pub mod delta;
 pub mod diagnostic;

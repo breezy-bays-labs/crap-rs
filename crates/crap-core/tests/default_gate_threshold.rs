@@ -143,6 +143,12 @@ fn crap4rs_threshold(extra_args: &[&str]) -> f64 {
             "../crap4rs/tests/fixtures/crap4rs-self.lcov",
             "--src",
             "../crap4rs/src",
+            // Explicit empty `--config` short-circuits walk-upward
+            // discovery (crap-rs#339). Load-bearing here: this test asserts
+            // the BUILT-IN default threshold, so it must not read the
+            // repo-root `crap.toml`'s `preset` (crap-rs#346). See the fixture.
+            "--config",
+            "tests/fixtures/empty-config.toml",
         ])
         .args(extra_args)
         .args(["--format", "json", "--no-fail"])

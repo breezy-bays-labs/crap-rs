@@ -1778,16 +1778,27 @@ fn load_file_config(
         let cfg = config::load_config(path)?;
         Ok(Some((cfg, path.clone())))
     } else {
-        // Auto-discovery: search the adapter's ordered names (canonical
-        // first, legacy fallbacks after) relative to the working directory.
-        // Bare names resolve CWD-relative, identical to the previous
-        // single-name behavior.
-        let candidates: Vec<std::path::PathBuf> = meta
-            .config_file_names
-            .iter()
-            .map(std::path::PathBuf::from)
-            .collect();
-        match config::discover_config(&candidates)? {
+        // Auto-discovery: walk upward from the run's anchor directory,
+        // resolving the adapter's ordered names (canonical first, legacy
+        // fallbacks after) within each ancestor; the nearest directory
+        // with any candidate wins (crap-rs#339).
+        //
+        // Anchor on the RAW first `--src` (`cli.input.src`, not the
+        // post-merge effective src), falling back to the working
+        // directory (`.`) when `--src` is empty. This MUST precede the
+        // config→`src` merge: `prepare_pipeline` runs `load_file_config`
+        // before `merge_effective_inputs`, and the config can *set* `src`
+        // — anchoring discovery on the effective src would be circular
+        // (need the config to find the config). `absolute(".")` resolves
+        // to the working directory, preserving the prior CWD-relative
+        // back-compat (a `crap.toml` in CWD is still the nearest match).
+        let start = cli
+            .input
+            .src
+            .first()
+            .cloned()
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        match config::discover_config(&start, meta.config_file_names)? {
             Some(disc) => {
                 // The rename target is the canonical name (the single
                 // source of truth for "first = canonical"); the shadower

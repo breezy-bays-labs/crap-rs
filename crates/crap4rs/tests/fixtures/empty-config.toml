@@ -1,0 +1,8 @@
+# Intentionally empty config fixture (crap-rs#339 / C-2).
+#
+# Passed as an explicit `--config` by analyzer-shelling tests that use an
+# IN-REPO `--src` (here `{CARGO_MANIFEST_DIR}/src`). An explicit `--config` short-circuits
+# walk-upward discovery, so the test never climbs into the repo-root
+# `crap.toml` (crap-rs#346) and its schema-validated output stays
+# hermetic. Empty body parses to `FileConfig::default()`, behaviorally
+# equivalent to "no config" through the merge cascade.

@@ -77,6 +77,12 @@ fn envelope() {
             "../crap4rs/tests/fixtures/crap4rs-self.lcov",
             "--src",
             "../crap4rs/src",
+            // Explicit empty `--config` short-circuits walk-upward
+            // discovery (crap-rs#339), so this in-repo `--src` canary never
+            // climbs into the repo-root `crap.toml` (crap-rs#346) and the
+            // snapshot stays hermetic. See the fixture's header.
+            "--config",
+            "tests/fixtures/empty-config.toml",
             "--threshold",
             "8",
             "--format",

@@ -175,3 +175,41 @@ fn malformed_canonical_crap_toml_errors_without_legacy_fallthrough() {
         "must not fall through to the legacy config; stdout: {stdout}"
     );
 }
+
+#[test]
+fn walk_upward_finds_ancestor_config_from_nested_relative_src() {
+    // crap-rs#339 C-1 regression guard. This is the ONE shape that
+    // distinguishes the `std::path::absolute(start)` fix from a lexical
+    // `start.ancestors()`: a NESTED working directory with a RELATIVE
+    // `--src`. `Path::ancestors()` is lexical, so `"src".ancestors()`
+    // would yield `["src", ""]` and never climb to the real parent — the
+    // walk-upward feature would silently find nothing and fall back to
+    // the built-in default. Absolutizing `start` against the process CWD
+    // first makes the ancestor chain the genuine on-disk parents.
+    //
+    // The crap-core unit tests can't catch this: they pass absolute
+    // tempdir starts (which already climb to `/`), and a unit test cannot
+    // control the process CWD parallel-safely. Only a subprocess with a
+    // controlled `current_dir` + relative `--src` exercises the bug.
+    //
+    // Layout: `crap.toml` (threshold 22) at the tempdir root; the source
+    // tree + LCOV one level down in `sub/`. Run from `sub/` with
+    // `--src src`. Lexical bug → falls to the default `threshold (15)`;
+    // absolutized → climbs to the ancestor `threshold (22)`.
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("crap.toml"), "threshold = 22.0\n").unwrap();
+    let sub = root.path().join("sub");
+    std::fs::create_dir_all(&sub).unwrap();
+    seed_project(&sub);
+
+    let out = run_summary(&sub);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(out.status.success(), "run should succeed; stderr: {stderr}");
+    assert!(
+        stdout.contains("threshold (22)"),
+        "walk-upward must discover the ancestor crap.toml from a nested relative --src \
+         (a lexical `ancestors()` would fall to the default 15); stdout: {stdout}"
+    );
+}

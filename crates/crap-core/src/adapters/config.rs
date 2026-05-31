@@ -8,7 +8,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
 use documented::DocumentedFields;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -19,109 +18,17 @@ use crate::domain::threshold::{ThresholdOverride, ThresholdPreset, is_valid_thre
 use crate::domain::types::ComplexityMetric;
 use crate::domain::view::{CoverageRange, CoverageRangeError, GroupKey, SortKey};
 
-// ── Public config type (adapter output) ────────────────────────────
-
-/// Parsed configuration from a TOML file.
-///
-/// All fields are optional — missing fields mean "use CLI default."
-/// The CLI layer merges this with command-line flags.
-///
-/// This is the **parsed projection**: its fields are domain types
-/// (`ThresholdPreset`, `ComplexityMetric`, `PathBuf`, …), the shape the
-/// rest of crap-core consumes. It is deliberately distinct from
-/// [`ConfigSchema`] (the wire/documented type) — see the WHY note on
-/// `ConfigSchema`.
-#[derive(Debug, Clone, Default)]
-pub struct FileConfig {
-    pub threshold: Option<f64>,
-    pub preset: Option<ThresholdPreset>,
-    pub metric: Option<ComplexityMetric>,
-    /// Source roots the analyzer walks, in declaration order.
-    ///
-    /// Empty means "unset, defer to CLI / the `["src"]` default." A
-    /// single root keeps src-relative identity (byte-identical
-    /// back-compat); multiple roots key git-toplevel-relative (D18,
-    /// enforced downstream by `cli::resolve_identity_base`). The TOML
-    /// `src` key accepts either a bare string (`src = "crates"`) or an
-    /// array (`src = ["a", "b"]`) — both deserialize into this list.
-    pub src: Vec<PathBuf>,
-    pub exclude: Option<Vec<String>>,
-    pub overrides: Vec<ThresholdOverride>,
-    /// Saved view presets keyed by preset name.
-    ///
-    /// Each `[views.<name>]` block in TOML deserializes into a
-    /// [`ViewPreset`]; the CLI layer resolves `--view <name>` against
-    /// this map and folds preset values into `Cli` before
-    /// `build_view_spec`.
-    pub views: HashMap<String, ViewPreset>,
-    /// Per-language override sections keyed by language name.
-    ///
-    /// Each `[language.<name>]` block in TOML deserializes into a
-    /// [`LangConfig`]; the CLI layer selects the running adapter's
-    /// section via `AdapterMeta::config_lang_key` and overlays it over
-    /// the shared top-level defaults (per-language wins). Languages the
-    /// adapter doesn't recognize are simply never selected.
-    pub language: HashMap<String, LangConfig>,
-    /// Output-shaping settings under `[output]`.
-    ///
-    /// Reporter-specific knobs (`annotation_limit`, `title`,
-    /// `subtitle`) live here so they share a single TOML namespace
-    /// rather than polluting the top-level table. Missing `[output]`
-    /// blocks deserialize to `OutputConfig::default()`.
-    pub output: OutputConfig,
-}
-
-/// Reporter-level output settings (TOML `[output]` table).
-///
-/// All fields are optional — missing fields mean "use CLI default."
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct OutputConfig {
-    /// Cap on the number of `::warning` annotations emitted by the
-    /// `github-annotations` reporter per invocation. `None` defers to
-    /// the CLI default (10); a CLI `--annotation-limit` flag always
-    /// wins over this value when both are set.
-    pub annotation_limit: Option<u32>,
-    /// Scorecard title — a single header label for the whole report.
-    /// `None` renders the default unlabeled header.
-    pub title: Option<String>,
-    /// Scorecard subtitle, rendered beneath the title. `None` emits no
-    /// subtitle line.
-    pub subtitle: Option<String>,
-}
-
-/// Per-language config overrides (TOML `[language.<name>]` table).
-///
-/// A language section may assert any subset of the shared top-level
-/// knobs that are meaningful per-language; the CLI layer overlays a
-/// `Some` here over the inherited shared value. `preset` and
-/// `threshold` remain mutually exclusive — a section asserting both is
-/// rejected at parse time, the same as the top level.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct LangConfig {
-    pub threshold: Option<f64>,
-    pub preset: Option<ThresholdPreset>,
-    pub metric: Option<ComplexityMetric>,
-    pub exclude: Option<Vec<String>>,
-}
-
-/// Saved view preset.
-///
-/// All fields are optional — `None` means "preset does not assert this
-/// field, defer to CLI / defaults." Booleans are `Option<bool>` so the
-/// preset can distinguish "absent" from "explicitly false," which lets
-/// the CLI layer treat a CLI bool of `false` as "user didn't say"
-/// (OR-merge semantics — see `apply_preset_to_cli`).
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ViewPreset {
-    pub top: Option<u32>,
-    pub min_coverage: Option<f64>,
-    pub max_coverage: Option<f64>,
-    pub sort: Option<SortKey>,
-    pub only_failing: Option<bool>,
-    pub no_fail: Option<bool>,
-    pub group_by: Option<GroupKey>,
-    pub minimal_view: Option<bool>,
-}
+// ── Parsed config types (re-exported from domain) ──────────────────
+//
+// The parsed-projection POD types (`FileConfig`, `OutputConfig`,
+// `LangConfig`, `ViewPreset`) live in `crate::domain::config` — they are
+// the language-agnostic shape the core merges and analyzes (#341). They
+// are re-exported here so this adapter (which constructs them in
+// `parse_config`) and existing consumers (`cli::mod`, `cli::view_args`)
+// keep importing them from `adapters::config` unchanged. The
+// wire/schema family below (`ConfigSchema` et al., schemars + documented)
+// stays in this adapter layer.
+pub use crate::domain::config::{FileConfig, LangConfig, OutputConfig, ViewPreset};
 
 // ── Config schema — the public, documented WIRE type ───────────────
 //
@@ -282,6 +189,114 @@ pub struct LangSchema {
     pub exclude: Option<Vec<String>>,
 }
 
+// ── Typed loader error ─────────────────────────────────────────────
+
+/// Errors the config loader can produce.
+///
+/// Co-located with the loader (matching the `CrapError` /
+/// `CoverageRangeError` precedent) and `#[non_exhaustive]` so adding a
+/// variant is not a breaking change. The loader's public surface
+/// (`discover_config`, `load_config`) and its private parse/validate
+/// helpers all return `Result<_, ConfigError>`; the CLI boundary
+/// (`cli::load_file_config` and the adapter binaries) lifts it into
+/// `anyhow::Error` via `?`, where `render_error`'s `{:#}` walks the
+/// `#[source]` chain to print the path-bearing wrapper plus its cause.
+///
+/// The error is **two-layer** by design: `Toml` carries only the raw
+/// `toml::de::Error` (path-less — `parse_config` has no path) and
+/// interpolates it directly so an in-crate `parse_config(..).to_string()`
+/// surfaces the underlying deserialize message; `Parse` is the
+/// path-bearing wrapper `load_config` adds, whose Display names the file
+/// and the word "parse" without flattening the source (thiserror's
+/// Display does not walk `#[source]`).
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// A non-`NotFound` I/O error while probing a discovery candidate
+    /// (e.g. `PermissionDenied` on a higher-priority file). Surfaces
+    /// rather than being masked by a legacy-config fall-through.
+    #[error("cannot access config file {path}: {source}\n  hint: check file permissions", path = path.display())]
+    Access {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// Failed to read the config file's contents.
+    #[error("failed to read config file: {path}", path = path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// The path-bearing wrapper `load_config` adds around a parse
+    /// failure, so the user sees which file failed. Its Display names
+    /// the file and "parse"; the underlying `ConfigError` (a `Toml` or
+    /// a validation variant) is the `#[source]`.
+    #[error("failed to parse config file: {path}", path = path.display())]
+    Parse {
+        path: PathBuf,
+        #[source]
+        source: Box<ConfigError>,
+    },
+    /// Raw TOML deserialize failure (path-less). Interpolates its source
+    /// so `parse_config(..).to_string()` shows the underlying message
+    /// (e.g. an `unknown field` from `deny_unknown_fields`).
+    #[error("{0}")]
+    Toml(#[from] toml::de::Error),
+    /// `preset` and `threshold` both set. `section` names the
+    /// `[language.<name>]` block when the conflict is per-language,
+    /// `None` at the top level.
+    #[error("{}preset and threshold are mutually exclusive in config", section_prefix(.section))]
+    MutuallyExclusive { section: Option<String> },
+    /// A `threshold` (top-level or per-language) that is not finite and
+    /// positive.
+    #[error("{}threshold must be a finite positive number, got: {value}", section_prefix(.section))]
+    InvalidThreshold { value: f64, section: Option<String> },
+    /// An `[[overrides]]` `threshold` that is not finite and positive.
+    #[error(
+        "override threshold must be a finite positive number, got: {value} (pattern: {pattern})"
+    )]
+    InvalidOverrideThreshold { value: f64, pattern: String },
+    /// An `[output] annotation_limit` outside `1..=100`.
+    #[error(
+        "output.annotation_limit must be in 1..=100, got: {value}\n  hint: matches the CLI `--annotation-limit` range; 0 disables emission, > 100 floods the GH Actions per-step cap"
+    )]
+    InvalidAnnotationLimit { value: u32 },
+    /// An unrecognized `preset` string.
+    #[error("unknown preset: {value}\n  valid values: strict, default, lenient")]
+    UnknownPreset { value: String },
+    /// An unrecognized `metric` string.
+    #[error("unknown metric: {value}\n  valid values: cognitive, cyclomatic")]
+    UnknownMetric { value: String },
+    /// An unrecognized view-preset `sort` string. `preset` names the
+    /// `[views.<name>]` block.
+    #[error(
+        "preset `{preset}`: unknown sort: {value}\n  valid values: crap, coverage, complexity, path"
+    )]
+    UnknownSortKey { preset: String, value: String },
+    /// An unrecognized view-preset `group_by` string.
+    #[error("preset `{preset}`: unknown group_by: {value}\n  valid values: file")]
+    UnknownGroupKey { preset: String, value: String },
+    /// A view-preset coverage bound outside `[0, 100]`.
+    #[error("preset `{preset}`: coverage value out of range: {value}\n  valid range: [0, 100]")]
+    CoverageOutOfRange { preset: String, value: f64 },
+    /// A view-preset `min_coverage` greater than its `max_coverage`.
+    #[error("preset `{preset}`: min_coverage ({min}) must not exceed max_coverage ({max})")]
+    CoverageMinExceedsMax { preset: String, min: f64, max: f64 },
+}
+
+/// Render a `[language.<name>]: ` prefix for the section-scoped error
+/// variants, or empty string at the top level. Keeps the per-section
+/// variants' Display byte-identical to the previous `bail!` messages
+/// (so `"language.rust"` stays asserted) without duplicating two
+/// `#[error]` strings per variant.
+fn section_prefix(section: &Option<String>) -> String {
+    match section {
+        Some(name) => format!("[language.{name}]: "),
+        None => String::new(),
+    }
+}
+
 // ── Public API ─────────────────────────────────────────────────────
 
 /// Outcome of an ordered config-file discovery scan.
@@ -305,77 +320,127 @@ pub struct ConfigDiscovery {
     pub shadowed: Vec<PathBuf>,
 }
 
-/// Discover the adapter's config file by walking `candidates` in priority
-/// order; the first *existing* file wins.
+/// Discover the adapter's config file by walking upward from `start`
+/// (and every ancestor directory) and, within each directory, resolving
+/// `file_names` in priority order. **The first ancestor directory that
+/// yields any candidate wins** — the walk stops there.
 ///
-/// Candidates may be relative or absolute paths; this function never
-/// touches the working directory itself, so it is CWD-agnostic. In
-/// production the CLI layer passes bare relative names
-/// (`PathBuf::from("crap.toml")`), which resolve CWD-relative when
-/// `metadata` is called; tests pass tempdir-qualified absolute paths to
-/// stay safe under parallel execution (no process-wide CWD mutation).
-/// Index 0 is the canonical name (`crap.toml`); later entries are legacy
-/// per-adapter fallbacks (`crap4rs.toml` / `crap4ts.toml`).
+/// `start` is the directory the search anchors on — in production the
+/// first `--src` root, or the working directory when `--src` is empty.
+/// It is **absolutized** via [`std::path::absolute`] before walking
+/// (NOT canonicalized): `Path::ancestors()` is purely *lexical*, so
+/// `"crates/foo".ancestors()` would yield `["crates/foo", "crates", ""]`
+/// and never climb to the real repo root. `absolute` makes the path
+/// absolute by prepending the process CWD when it is relative, so the
+/// ancestors are the genuine on-disk parent chain — without touching the
+/// filesystem, resolving symlinks, or erroring on a non-existent path
+/// (which `canonicalize` would). Because it consults the process CWD only
+/// (never *mutates* it), the function stays parallel-safe under nextest;
+/// a relative `start` resolves against whatever CWD the caller runs in.
 ///
-/// Discovery is by *existence*, not parseability: a present-but-malformed
-/// canonical file still wins, and surfaces its parse error downstream — it
-/// never silently falls through to a stale legacy file that happens to
-/// parse.
+/// Within each directory the resolution mirrors the single-directory
+/// contract: index 0 in `file_names` is the canonical name (`crap.toml`);
+/// later entries are legacy per-adapter fallbacks. Discovery is by
+/// *existence*, not parseability — a present-but-malformed canonical file
+/// still wins and surfaces its parse error downstream, never silently
+/// falling through to a stale legacy file that happens to parse. Only
+/// `io::ErrorKind::NotFound` advances to the next name; any other I/O
+/// error (e.g. `PermissionDenied`) short-circuits with `Err` so a
+/// permission problem on the canonical config surfaces rather than being
+/// masked by a legacy-config deprecation warning.
 ///
-/// While searching for the winner, only `io::ErrorKind::NotFound` advances
-/// to the next candidate. Any other I/O error (e.g. `PermissionDenied` on
-/// a higher-priority file) short-circuits and returns `Err`: a permission
-/// problem on the canonical config must surface, never be masked by
-/// emitting a legacy-config deprecation warning for a file the operator
-/// cannot read.
+/// Shadow detection stays **same-directory only**: lower-priority names
+/// that also exist *in the winning directory* are reported as `shadowed`
+/// (safe to remove). A file in a *parent* directory is never reported as
+/// shadowed — the operator is never told a file outside the chosen
+/// config's directory is redundant.
 ///
-/// Returns `Ok(Some(ConfigDiscovery))` when a candidate exists,
-/// `Ok(None)` when none do.
-pub fn discover_config(candidates: &[PathBuf]) -> Result<Option<ConfigDiscovery>> {
-    for (index, candidate) in candidates.iter().enumerate() {
-        match std::fs::metadata(candidate) {
+/// The walk climbs to the filesystem root with no `.git` / workspace
+/// boundary stop. One consequence to be aware of: a stray `crap.toml` in
+/// `$HOME` (or any ancestor above the project) will be discovered when no
+/// nearer config exists. Pass an explicit `--config` to bypass discovery
+/// entirely.
+///
+/// Returns `Ok(Some(ConfigDiscovery))` when a candidate exists in some
+/// ancestor directory, `Ok(None)` when none do anywhere up to the root.
+pub fn discover_config(
+    start: &Path,
+    file_names: &[&str],
+) -> Result<Option<ConfigDiscovery>, ConfigError> {
+    // Absolutize so `.ancestors()` climbs the real parent chain rather
+    // than the lexical components of a relative `start` (C-1). On the
+    // rare error path (e.g. an empty path) fall back to the raw `start`
+    // so a single-dir lookup still works.
+    let anchored = std::path::absolute(start).unwrap_or_else(|_| start.to_path_buf());
+
+    for dir in anchored.ancestors() {
+        if let Some(found) = discover_in_dir(dir, file_names)? {
+            return Ok(Some(found));
+        }
+    }
+    Ok(None)
+}
+
+/// Run the ordered-name resolution within a single directory. Returns
+/// `Ok(Some(_))` for the highest-priority existing file (with any
+/// lower-priority same-dir files recorded as `shadowed`), `Ok(None)`
+/// when no candidate exists here (so the caller advances to the parent),
+/// or `Err` on a non-`NotFound` I/O error probing a candidate.
+fn discover_in_dir(
+    dir: &Path,
+    file_names: &[&str],
+) -> Result<Option<ConfigDiscovery>, ConfigError> {
+    for (index, name) in file_names.iter().enumerate() {
+        let candidate = dir.join(name);
+        match std::fs::metadata(&candidate) {
             Ok(m) if m.is_file() => {
-                // Winner found. Report any lower-priority candidates that
-                // also exist as `shadowed` so the operator can delete them.
-                // Best-effort and existence-confirmed: only paths that are
-                // genuinely files are recorded. A metadata error on a
-                // lower-priority candidate is irrelevant — we already hold a
-                // valid winner — and must never produce a spurious shadow
-                // warning for a phantom or inaccessible path.
-                let shadowed = candidates[index + 1..]
+                // Winner found. Report any lower-priority names that also
+                // exist *in this same directory* as `shadowed` so the
+                // operator can delete them. Existence-confirmed via
+                // `is_file()` (not `exists()`): a directory at a
+                // lower-priority name is never reported as shadowed.
+                let shadowed = file_names[index + 1..]
                     .iter()
+                    .map(|n| dir.join(n))
                     .filter(|p| p.is_file())
-                    .cloned()
                     .collect();
                 return Ok(Some(ConfigDiscovery {
-                    path: candidate.clone(),
+                    path: candidate,
                     used_index: index,
                     shadowed,
                 }));
             }
-            // Exists but not a regular file (directory, etc.) — not a config
-            // we can load; advance to the next candidate.
+            // Exists but not a regular file (directory, etc.) — not a
+            // config we can load; advance to the next name.
             Ok(_) => continue,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(e) => anyhow::bail!(
-                "cannot access config file {}: {e}\n  hint: check file permissions",
-                candidate.display()
-            ),
+            // Construct the variant manually (not `#[from]`) so the
+            // load-bearing `path` survives onto the error (I-4).
+            Err(source) => {
+                return Err(ConfigError::Access {
+                    path: candidate,
+                    source,
+                });
+            }
         }
     }
     Ok(None)
 }
 
 /// Load and parse a config file from the given path.
-pub fn load_config(path: &Path) -> Result<FileConfig> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read config file: {}", path.display()))?;
-    parse_config(&content)
-        .with_context(|| format!("failed to parse config file: {}", path.display()))
+pub fn load_config(path: &Path) -> Result<FileConfig, ConfigError> {
+    let content = std::fs::read_to_string(path).map_err(|source| ConfigError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    parse_config(&content).map_err(|source| ConfigError::Parse {
+        path: path.to_path_buf(),
+        source: Box::new(source),
+    })
 }
 
 /// Parse TOML content into a `FileConfig`.
-fn parse_config(content: &str) -> Result<FileConfig> {
+fn parse_config(content: &str) -> Result<FileConfig, ConfigError> {
     let raw: ConfigSchema = toml::from_str(content)?;
     validate_raw_config(&raw)?;
 
@@ -396,18 +461,18 @@ fn parse_config(content: &str) -> Result<FileConfig> {
         .into_iter()
         .map(|(name, raw_preset)| {
             let preset = parse_view_preset(&name, raw_preset)?;
-            Ok::<_, anyhow::Error>((name, preset))
+            Ok::<_, ConfigError>((name, preset))
         })
-        .collect::<Result<HashMap<_, _>>>()?;
+        .collect::<Result<HashMap<_, _>, _>>()?;
 
     let language = raw
         .language
         .into_iter()
         .map(|(name, raw_lang)| {
             let lang = parse_lang_config(&name, raw_lang)?;
-            Ok::<_, anyhow::Error>((name, lang))
+            Ok::<_, ConfigError>((name, lang))
         })
-        .collect::<Result<HashMap<_, _>>>()?;
+        .collect::<Result<HashMap<_, _>, _>>()?;
 
     Ok(FileConfig {
         threshold: raw.threshold,
@@ -429,14 +494,19 @@ fn parse_config(content: &str) -> Result<FileConfig> {
 /// Project a per-language wire section into its parsed [`LangConfig`].
 /// Carries the same `preset`/`threshold` mutual-exclusion and metric
 /// validation the top level enforces, naming the offending section.
-fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig> {
+fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig, ConfigError> {
     if raw.preset.is_some() && raw.threshold.is_some() {
-        anyhow::bail!("[language.{name}]: preset and threshold are mutually exclusive in config");
+        return Err(ConfigError::MutuallyExclusive {
+            section: Some(name.to_string()),
+        });
     }
     if let Some(t) = raw.threshold
         && !is_valid_threshold(t)
     {
-        anyhow::bail!("[language.{name}]: threshold must be a finite positive number, got: {t}");
+        return Err(ConfigError::InvalidThreshold {
+            value: t,
+            section: Some(name.to_string()),
+        });
     }
     let metric = raw.metric.as_deref().map(parse_metric).transpose()?;
     let preset = raw.preset.as_deref().map(parse_preset).transpose()?;
@@ -448,22 +518,24 @@ fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig> {
     })
 }
 
-fn validate_raw_config(raw: &ConfigSchema) -> Result<()> {
+fn validate_raw_config(raw: &ConfigSchema) -> Result<(), ConfigError> {
     if raw.preset.is_some() && raw.threshold.is_some() {
-        anyhow::bail!("preset and threshold are mutually exclusive in config");
+        return Err(ConfigError::MutuallyExclusive { section: None });
     }
     if let Some(t) = raw.threshold
         && !is_valid_threshold(t)
     {
-        anyhow::bail!("threshold must be a finite positive number, got: {t}");
+        return Err(ConfigError::InvalidThreshold {
+            value: t,
+            section: None,
+        });
     }
     for o in &raw.overrides {
         if !is_valid_threshold(o.threshold) {
-            anyhow::bail!(
-                "override threshold must be a finite positive number, got: {} (pattern: {})",
-                o.threshold,
-                o.pattern
-            );
+            return Err(ConfigError::InvalidOverrideThreshold {
+                value: o.threshold,
+                pattern: o.pattern.clone(),
+            });
         }
     }
     // Mirror the CLI's `clap::value_parser!(u32).range(1..=100)` on
@@ -475,14 +547,12 @@ fn validate_raw_config(raw: &ConfigSchema) -> Result<()> {
     if let Some(limit) = raw.output.annotation_limit
         && !(1..=100).contains(&limit)
     {
-        anyhow::bail!(
-            "output.annotation_limit must be in 1..=100, got: {limit}\n  hint: matches the CLI `--annotation-limit` range; 0 disables emission, > 100 floods the GH Actions per-step cap"
-        );
+        return Err(ConfigError::InvalidAnnotationLimit { value: limit });
     }
     Ok(())
 }
 
-fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset> {
+fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset, ConfigError> {
     let sort = raw
         .sort
         .as_deref()
@@ -506,24 +576,26 @@ fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset> {
     })
 }
 
-fn parse_sort_key(preset_name: &str, s: &str) -> Result<SortKey> {
+fn parse_sort_key(preset_name: &str, s: &str) -> Result<SortKey, ConfigError> {
     match s {
         "crap" => Ok(SortKey::Crap),
         "coverage" => Ok(SortKey::Coverage),
         "complexity" => Ok(SortKey::Complexity),
         "path" => Ok(SortKey::Path),
-        other => anyhow::bail!(
-            "preset `{preset_name}`: unknown sort: {other}\n  valid values: crap, coverage, complexity, path"
-        ),
+        other => Err(ConfigError::UnknownSortKey {
+            preset: preset_name.to_string(),
+            value: other.to_string(),
+        }),
     }
 }
 
-fn parse_group_key(preset_name: &str, s: &str) -> Result<GroupKey> {
+fn parse_group_key(preset_name: &str, s: &str) -> Result<GroupKey, ConfigError> {
     match s {
         "file" => Ok(GroupKey::File),
-        other => {
-            anyhow::bail!("preset `{preset_name}`: unknown group_by: {other}\n  valid values: file")
-        }
+        other => Err(ConfigError::UnknownGroupKey {
+            preset: preset_name.to_string(),
+            value: other.to_string(),
+        }),
     }
 }
 
@@ -536,7 +608,7 @@ fn validate_preset_coverage_range(
     preset_name: &str,
     min: Option<f64>,
     max: Option<f64>,
-) -> Result<()> {
+) -> Result<(), ConfigError> {
     if min.is_none() && max.is_none() {
         return Ok(());
     }
@@ -549,29 +621,38 @@ fn validate_preset_coverage_range(
     // explicit arm here.
     match CoverageRange::new(lo, hi) {
         Ok(_) => Ok(()),
-        Err(CoverageRangeError::OutOfRange { value }) => anyhow::bail!(
-            "preset `{preset_name}`: coverage value out of range: {value}\n  valid range: [0, 100]"
-        ),
-        Err(CoverageRangeError::MinExceedsMax { min, max }) => anyhow::bail!(
-            "preset `{preset_name}`: min_coverage ({min}) must not exceed max_coverage ({max})"
-        ),
+        Err(CoverageRangeError::OutOfRange { value }) => Err(ConfigError::CoverageOutOfRange {
+            preset: preset_name.to_string(),
+            value,
+        }),
+        Err(CoverageRangeError::MinExceedsMax { min, max }) => {
+            Err(ConfigError::CoverageMinExceedsMax {
+                preset: preset_name.to_string(),
+                min,
+                max,
+            })
+        }
     }
 }
 
-fn parse_preset(s: &str) -> Result<ThresholdPreset> {
+fn parse_preset(s: &str) -> Result<ThresholdPreset, ConfigError> {
     match s {
         "strict" => Ok(ThresholdPreset::Strict),
         "default" => Ok(ThresholdPreset::Default),
         "lenient" => Ok(ThresholdPreset::Lenient),
-        other => anyhow::bail!("unknown preset: {other}\n  valid values: strict, default, lenient"),
+        other => Err(ConfigError::UnknownPreset {
+            value: other.to_string(),
+        }),
     }
 }
 
-fn parse_metric(s: &str) -> Result<ComplexityMetric> {
+fn parse_metric(s: &str) -> Result<ComplexityMetric, ConfigError> {
     match s {
         "cognitive" => Ok(ComplexityMetric::Cognitive),
         "cyclomatic" => Ok(ComplexityMetric::Cyclomatic),
-        other => anyhow::bail!("unknown metric: {other}\n  valid values: cognitive, cyclomatic"),
+        other => Err(ConfigError::UnknownMetric {
+            value: other.to_string(),
+        }),
     }
 }
 
@@ -1070,6 +1151,83 @@ pub fn all_schema_field_docs() -> Vec<(String, &'static str)> {
 mod tests {
     use super::*;
 
+    // ── Typed `ConfigError` contract (#340) ──────────────────────────
+    //
+    // The substring assertions scattered through this module pin the
+    // user-facing Display text; these pin the *typed* shape — that
+    // `parse_config` / `load_config` return concrete `ConfigError`
+    // variants the caller can match on, not stringly-typed errors. The
+    // two-layer design (I-3) is asserted explicitly: a path-less `Toml`
+    // from `parse_config` wraps into a path-bearing `Parse` at
+    // `load_config`, and the `Parse` Display names the file + "parse"
+    // without flattening the source (thiserror Display does not walk
+    // `#[source]`).
+
+    #[test]
+    fn parse_config_returns_typed_mutually_exclusive() {
+        let err = parse_config("preset = \"strict\"\nthreshold = 10.0\n").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::MutuallyExclusive { section: None }),
+            "expected top-level MutuallyExclusive, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn parse_config_returns_typed_unknown_metric() {
+        let err = parse_config("metric = \"halstead\"\n").unwrap_err();
+        match err {
+            ConfigError::UnknownMetric { value } => assert_eq!(value, "halstead"),
+            other => panic!("expected UnknownMetric, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_config_returns_typed_toml_on_malformed() {
+        let err = parse_config("this is not toml [[[").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::Toml(_)),
+            "expected Toml variant, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn load_config_wraps_parse_in_path_bearing_parse_variant() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("crap.toml");
+        std::fs::write(&path, "threshold = not_a_number\n").unwrap();
+
+        let err = load_config(&path).unwrap_err();
+        // Outer layer: path-bearing Parse whose Display names the file
+        // and "parse" (the through-binary anyhow `{:#}` anchor).
+        match &err {
+            ConfigError::Parse { path: p, source } => {
+                assert_eq!(p, &path);
+                // Inner layer: the path-less Toml deserialize error.
+                assert!(
+                    matches!(**source, ConfigError::Toml(_)),
+                    "Parse source should be Toml, got: {source:?}"
+                );
+            }
+            other => panic!("expected Parse, got: {other:?}"),
+        }
+        let msg = err.to_string();
+        assert!(msg.contains("parse"), "Display must name 'parse': {msg}");
+        assert!(
+            msg.contains("crap.toml"),
+            "Display must name the file: {msg}"
+        );
+    }
+
+    #[test]
+    fn load_config_missing_file_is_typed_read_error() {
+        let err = load_config(Path::new("definitely-nonexistent-config.toml")).unwrap_err();
+        assert!(
+            matches!(err, ConfigError::Read { .. }),
+            "expected Read variant, got: {err:?}"
+        );
+        assert!(err.to_string().contains("failed to read config file"));
+    }
+
     // ── Tooling spike (walking-skeleton step 1) ──────────────────────
     //
     // Proves the schemars 1.x API the config-schema design relies on
@@ -1495,8 +1653,11 @@ threshold = 0.0
 
     #[test]
     fn load_config_valid_file() {
+        // `load_config` is name-agnostic — it loads whatever path it is
+        // handed. The unified canonical name keeps this in step with the
+        // config-ast-purity gate (crap-rs#342).
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("crap4rs.toml");
+        let path = dir.path().join("crap.toml");
         std::fs::write(&path, "threshold = 10.0\n").unwrap();
 
         let config = load_config(&path).unwrap();
@@ -1506,7 +1667,7 @@ threshold = 0.0
     #[test]
     fn load_config_invalid_toml() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("crap4rs.toml");
+        let path = dir.path().join("crap.toml");
         std::fs::write(&path, "not valid toml [[[").unwrap();
 
         let err = load_config(&path).unwrap_err();
@@ -1814,29 +1975,48 @@ nonsense_field = "x"
         );
     }
 
-    // ── discover_config ordered dual-discovery (4 back-compat cases) ──
+    // ── discover_config walk-upward + within-dir ordered discovery ────
     //
-    // `discover_config` walks an ordered candidate list (full paths;
-    // the caller joins names to the working dir) and returns the
-    // highest-priority *existing* file. Index 0 is canonical (`crap.toml`),
-    // the rest are legacy fallbacks. These four cases pin the back-compat
-    // contract: a unified `crap.toml` wins; a lone legacy file is still
-    // discovered (and reported via `used_index > 0` so the CLI can nudge a
-    // rename); a co-present legacy file is reported as `shadowed`; an empty
-    // directory discovers nothing. Tempdir-qualified paths keep this safe
-    // under nextest's parallel execution model (no process-wide CWD).
+    // `discover_config(start, file_names)` absolutizes `start`, walks its
+    // ancestor directories, and within each directory resolves the
+    // ordered `file_names` (index 0 canonical, the rest legacy
+    // fallbacks). The first ancestor directory yielding any candidate
+    // wins. These cases pin the WITHIN-DIR contract (the same-dir
+    // back-compat the single-directory loader had): a canonical file
+    // wins; a lone legacy file is discovered at `used_index > 0`; a
+    // co-present legacy file is reported as `shadowed`; an empty tree
+    // discovers nothing; a directory at a name is skipped; a non-NotFound
+    // I/O error bails. The CROSS-DIR contract (walk-upward, nearest-dir
+    // wins) is pinned by the dedicated ancestor / nearest-wins cases
+    // below. The synthetic adapter names keep the analyzer's own
+    // per-adapter literals (`crap4rs.toml` / `crap4ts.toml`) out of this
+    // module per the config-ast-purity gate (crap-rs#342) — discovery is
+    // name-agnostic, so synthetic names exercise the identical code path.
+    //
+    // `start` is the tempdir itself in the same-dir cases, so the winning
+    // directory is the first ancestor and no climb occurs. Tempdir-rooted
+    // (absolute) starts keep this safe under nextest's parallel execution
+    // model (no process-wide CWD dependence).
+
+    /// Canonical adapter config name used in the discovery unit tests —
+    /// synthetic so the per-adapter analyzer names stay out of this
+    /// module (crap-rs#342). The unified `crap.toml` and the synthetic
+    /// legacy below exercise the same name-agnostic discovery path.
+    const TEST_CANONICAL: &str = "crap.toml";
+    /// Synthetic legacy fallback name (index 1) for the discovery tests.
+    const TEST_LEGACY: &str = "test-adapter-legacy.toml";
+    const TEST_NAMES: &[&str] = &[TEST_CANONICAL, TEST_LEGACY];
 
     #[test]
     fn discover_config_canonical_only_wins_at_index_zero() {
         let dir = tempfile::tempdir().unwrap();
-        let canonical = dir.path().join("crap.toml");
+        let canonical = dir.path().join(TEST_CANONICAL);
         std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
 
-        let candidates = vec![canonical.clone(), dir.path().join("crap4rs.toml")];
-        let disc = discover_config(&candidates).unwrap().unwrap();
+        let disc = discover_config(dir.path(), TEST_NAMES).unwrap().unwrap();
 
         assert_eq!(disc.path, canonical);
-        assert_eq!(disc.used_index, 0, "canonical crap.toml is index 0");
+        assert_eq!(disc.used_index, 0, "canonical name is index 0");
         assert!(
             disc.shadowed.is_empty(),
             "no legacy file present, nothing shadowed"
@@ -1846,13 +2026,12 @@ nonsense_field = "x"
     #[test]
     fn discover_config_legacy_only_falls_back_at_index_one() {
         let dir = tempfile::tempdir().unwrap();
-        let legacy = dir.path().join("crap4rs.toml");
+        let legacy = dir.path().join(TEST_LEGACY);
         std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
 
-        // crap.toml (index 0) is absent → discovery advances to the legacy
-        // fallback at index 1.
-        let candidates = vec![dir.path().join("crap.toml"), legacy.clone()];
-        let disc = discover_config(&candidates).unwrap().unwrap();
+        // Canonical (index 0) is absent → discovery advances to the legacy
+        // fallback at index 1 within the same directory.
+        let disc = discover_config(dir.path(), TEST_NAMES).unwrap().unwrap();
 
         assert_eq!(disc.path, legacy);
         assert_eq!(disc.used_index, 1, "legacy fallback is index 1");
@@ -1865,15 +2044,14 @@ nonsense_field = "x"
     #[test]
     fn discover_config_both_present_canonical_wins_legacy_shadowed() {
         let dir = tempfile::tempdir().unwrap();
-        let canonical = dir.path().join("crap.toml");
-        let legacy = dir.path().join("crap4rs.toml");
+        let canonical = dir.path().join(TEST_CANONICAL);
+        let legacy = dir.path().join(TEST_LEGACY);
         std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
         std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
 
-        let candidates = vec![canonical.clone(), legacy.clone()];
-        let disc = discover_config(&candidates).unwrap().unwrap();
+        let disc = discover_config(dir.path(), TEST_NAMES).unwrap().unwrap();
 
-        assert_eq!(disc.path, canonical, "canonical wins by list order");
+        assert_eq!(disc.path, canonical, "canonical wins by name order");
         assert_eq!(disc.used_index, 0);
         assert_eq!(
             disc.shadowed,
@@ -1884,34 +2062,32 @@ nonsense_field = "x"
 
     #[test]
     fn discover_config_neither_present_returns_none() {
+        // An empty tempdir tree (its ancestors are real but carry no
+        // candidate up to the root). Discovery returns None rather than
+        // climbing into an unrelated config — the tempdir lives under the
+        // system temp root, which has no config.
         let dir = tempfile::tempdir().unwrap();
-        let candidates = vec![
-            dir.path().join("crap.toml"),
-            dir.path().join("crap4rs.toml"),
-        ];
 
         assert_eq!(
-            discover_config(&candidates).unwrap(),
+            discover_config(dir.path(), TEST_NAMES).unwrap(),
             None,
-            "no candidate exists → no config discovered"
+            "no candidate in the tree → no config discovered"
         );
     }
 
     #[test]
     fn discover_config_non_file_at_canonical_advances_to_legacy() {
-        // A non-regular file at the canonical position (here a directory
-        // literally named `crap.toml`) is not a config we can load, so
-        // discovery advances to the legacy fallback rather than treating
-        // the directory as the winner or erroring. Pins the `Ok(_) =>
-        // continue` arm.
+        // A non-regular file at the canonical position (a directory at the
+        // canonical name) is not a config we can load, so discovery
+        // advances to the legacy fallback within the same directory rather
+        // than treating the directory as the winner or erroring. Pins the
+        // `Ok(_) => continue` arm.
         let dir = tempfile::tempdir().unwrap();
-        let canonical = dir.path().join("crap.toml");
-        std::fs::create_dir(&canonical).unwrap();
-        let legacy = dir.path().join("crap4rs.toml");
+        std::fs::create_dir(dir.path().join(TEST_CANONICAL)).unwrap();
+        let legacy = dir.path().join(TEST_LEGACY);
         std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
 
-        let candidates = vec![canonical, legacy.clone()];
-        let disc = discover_config(&candidates).unwrap().unwrap();
+        let disc = discover_config(dir.path(), TEST_NAMES).unwrap().unwrap();
 
         assert_eq!(disc.path, legacy, "directory at index 0 is skipped");
         assert_eq!(disc.used_index, 1);
@@ -1921,16 +2097,15 @@ nonsense_field = "x"
     #[test]
     fn discover_config_non_file_shadow_candidate_is_not_recorded() {
         // A lower-priority candidate that exists but is not a regular file
-        // (a directory named `crap4rs.toml`) must NOT appear in `shadowed`
-        // — the filter is `is_file()`, not `exists()`, so the operator is
+        // (a directory at the legacy name) must NOT appear in `shadowed` —
+        // the filter is `is_file()`, not `exists()`, so the operator is
         // never told to "remove" a directory. Pins the shadow filter.
         let dir = tempfile::tempdir().unwrap();
-        let canonical = dir.path().join("crap.toml");
+        let canonical = dir.path().join(TEST_CANONICAL);
         std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
-        std::fs::create_dir(dir.path().join("crap4rs.toml")).unwrap();
+        std::fs::create_dir(dir.path().join(TEST_LEGACY)).unwrap();
 
-        let candidates = vec![canonical.clone(), dir.path().join("crap4rs.toml")];
-        let disc = discover_config(&candidates).unwrap().unwrap();
+        let disc = discover_config(dir.path(), TEST_NAMES).unwrap().unwrap();
 
         assert_eq!(disc.path, canonical);
         assert_eq!(disc.used_index, 0);
@@ -1944,20 +2119,20 @@ nonsense_field = "x"
     #[cfg(unix)]
     fn discover_config_permission_error_short_circuits_no_legacy_fallthrough() {
         // The load-bearing contract: a non-`NotFound` I/O error (here
-        // `PermissionDenied`) on a higher-priority candidate must bail,
-        // never silently fall through to a co-present legacy file. Without
-        // this, an unreadable `crap.toml` would be masked by a stale
-        // `crap4rs.toml` and the operator would get a confusing legacy
-        // deprecation warning instead of a permissions error.
+        // `PermissionDenied`) probing a candidate must bail, never
+        // silently fall through to a co-present legacy file. Without this,
+        // an unreadable canonical config would be masked by a stale legacy
+        // file and the operator would get a confusing legacy deprecation
+        // warning instead of a permissions error.
         use std::os::unix::fs::PermissionsExt;
 
         let dir = tempfile::tempdir().unwrap();
-        let canonical = dir.path().join("crap.toml");
+        let canonical = dir.path().join(TEST_CANONICAL);
         std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
-        let legacy = dir.path().join("crap4rs.toml");
+        let legacy = dir.path().join(TEST_LEGACY);
         std::fs::write(&legacy, "threshold = 9.0\n").unwrap();
 
-        // Block traversal of the parent dir so `metadata(canonical)` yields
+        // Block traversal of the dir so `metadata(canonical)` yields
         // PermissionDenied (chmod 000 on the file itself still permits
         // `metadata`, which reads the inode, not contents).
         std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o000)).unwrap();
@@ -1966,7 +2141,7 @@ nonsense_field = "x"
         // bypasses the check), this branch is untestable here — restore and
         // skip rather than emit a false failure.
         let still_readable = std::fs::metadata(&canonical).is_ok();
-        let result = discover_config(&[canonical, legacy]);
+        let result = discover_config(dir.path(), TEST_NAMES);
         std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
 
         if still_readable {
@@ -1976,6 +2151,65 @@ nonsense_field = "x"
         assert!(
             err.to_string().contains("cannot access config file"),
             "got: {err}"
+        );
+    }
+
+    // ── walk-upward cross-dir contract (crap-rs#339) ──────────────────
+
+    #[test]
+    fn discover_config_finds_config_in_an_ancestor_directory() {
+        // The walk-upward core: a config in a *parent* of `start` is
+        // found when `start` itself has none. `start` is an absolute
+        // nested tempdir path, so `.ancestors()` climbs to the parent
+        // holding the config. (The relative-`start`-from-a-nested-CWD
+        // case — which is what truly exercises the `std::path::absolute`
+        // C-1 fix — lives in the subprocess regression test in
+        // crap4rs/tests/config_discovery_integration.rs, because a unit
+        // test cannot control the process CWD parallel-safely.)
+        let root = tempfile::tempdir().unwrap();
+        let canonical = root.path().join(TEST_CANONICAL);
+        std::fs::write(&canonical, "threshold = 22.0\n").unwrap();
+        let nested = root.path().join("crates").join("sub");
+        std::fs::create_dir_all(&nested).unwrap();
+
+        let disc = discover_config(&nested, TEST_NAMES).unwrap().unwrap();
+
+        assert_eq!(
+            disc.path, canonical,
+            "discovery must climb to the ancestor config"
+        );
+        assert_eq!(disc.used_index, 0);
+    }
+
+    #[test]
+    fn discover_config_nearest_dir_wins_nearer_legacy_beats_farther_canonical() {
+        // I-2: "first ancestor dir with any candidate wins, ordered names
+        // within that dir." A nearer legacy file beats a farther canonical
+        // — the nearest directory holding ANY candidate stops the walk, so
+        // its (legacy) file wins even though a canonical exists higher up.
+        // This is NEW behavior vs the within-dir canonical-over-legacy
+        // guarantee, and is a conscious nearest-wins decision (recorded in
+        // the closeout ADR). Shadow detection stays same-dir: the farther
+        // canonical is NOT reported as shadowed (no cross-dir "safe to
+        // remove" notice).
+        let root = tempfile::tempdir().unwrap();
+        let far_canonical = root.path().join(TEST_CANONICAL);
+        std::fs::write(&far_canonical, "threshold = 22.0\n").unwrap();
+        let child = root.path().join("child");
+        std::fs::create_dir(&child).unwrap();
+        let near_legacy = child.join(TEST_LEGACY);
+        std::fs::write(&near_legacy, "threshold = 9.0\n").unwrap();
+
+        let disc = discover_config(&child, TEST_NAMES).unwrap().unwrap();
+
+        assert_eq!(
+            disc.path, near_legacy,
+            "the nearer legacy file wins over the farther canonical"
+        );
+        assert_eq!(disc.used_index, 1, "the winner is the legacy name");
+        assert!(
+            disc.shadowed.is_empty(),
+            "the farther canonical is in a different dir — never reported as shadowed"
         );
     }
 }

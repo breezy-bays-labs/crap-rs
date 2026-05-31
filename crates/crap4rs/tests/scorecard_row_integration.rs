@@ -143,6 +143,12 @@ fn cli_dispatch_emits_scorecard_row_validating_against_schema() {
             &format!("{manifest_dir}/tests/fixtures/crap4rs-self.lcov"),
             "--src",
             &format!("{manifest_dir}/src"),
+            // Explicit empty `--config` short-circuits walk-upward
+            // discovery (crap-rs#339): this in-repo `--src` would otherwise
+            // climb into the repo-root `crap.toml` (crap-rs#346) and the
+            // schema-validated output could shift. See the fixture header.
+            "--config",
+            &format!("{manifest_dir}/tests/fixtures/empty-config.toml"),
             "--format",
             "scorecard-row",
             "--no-fail",

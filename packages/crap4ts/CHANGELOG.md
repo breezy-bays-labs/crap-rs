@@ -13,6 +13,17 @@ shared-core development.
 
 ## [Unreleased]
 
+### Changed
+
+- Config auto-discovery now walks **upward** from the `--src` anchor
+    (or the working directory when `--src` is omitted): a subdirectory
+    `--src` discovers a `crap.toml` higher up the tree, where the
+    previous behavior inspected only the working directory. Pass an
+    explicit `--config <path>` to bypass discovery. Note: the walk has
+    no `.git`/workspace stop, so a stray `crap.toml` in `$HOME` (or any
+    ancestor) is discovered when no nearer config exists. (crap-rs#339;
+    see `crap-core` CHANGELOG.)
+
 ## [2.0.0-rc.3](https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.2...crap4ts-v2.0.0-rc.3) - 2026-05-24
 
 ### Added

@@ -171,6 +171,11 @@ fn run_crap4rs_json() -> Value {
             "../crap4rs/tests/fixtures/crap4rs-self.lcov",
             "--src",
             "../crap4rs/src",
+            // Explicit empty `--config` short-circuits walk-upward
+            // discovery (crap-rs#339) so this in-repo `--src` canary stays
+            // hermetic against the repo-root `crap.toml`. See the fixture.
+            "--config",
+            "tests/fixtures/empty-config.toml",
             "--threshold",
             "8",
             "--format",
