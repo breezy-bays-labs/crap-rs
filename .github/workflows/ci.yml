@@ -89,6 +89,16 @@ jobs:
       # `.config/nextest.toml` and they run via `cargo test`. Without
       # this step the `@wired` BDD status would be enforced only by the
       # `lefthook.yml` pre-push hook, not on every PR.
+      #
+      # Ordering is load-bearing for `multi_lang_html_cucumber`: it
+      # resolves the `crap-render` binary via
+      # `assert_cmd::cargo_bin("crap-render")`. `crap-render` ships in
+      # crap-core, not crap4rs, so `CARGO_BIN_EXE_crap-render` is unset
+      # for this crap4rs-package test — `cargo_bin` instead discovers
+      # the binary in the shared target dir. The preceding
+      # `cargo nextest run --workspace --all-targets` step builds it
+      # there. Keep that step before this one; reordering would leave
+      # crap-render unbuilt and silently break this harness.
       - run: >-
           cargo test
           --test json_reporter_cucumber
@@ -99,6 +109,10 @@ jobs:
           --test arrow_function_coverage_cucumber
           --test file_extensions_cucumber
           --test branch_coverage_cucumber
+          --test cli_init_cucumber
+          --test cli_ergonomics_cucumber
+          --test github_annotations_cucumber
+          --test multi_lang_html_cucumber
 
   crap4ts-build:
     # Per-platform build check for the new `crap4ts` shell crate (S5,
