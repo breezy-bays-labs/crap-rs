@@ -134,7 +134,7 @@ def parse_blocks(feature_path: Path) -> list[ScenarioBlock]:
     the next `Scenario:`/`Scenario Outline:` header; treat everything
     up to the next tag-line, scenario-header, or EOF as that scenario's
     body."""
-    lines = feature_path.read_text().splitlines()
+    lines = feature_path.read_text(encoding="utf-8").splitlines()
     blocks: list[ScenarioBlock] = []
 
     i = 0
@@ -351,7 +351,7 @@ def self_test() -> int:
             root = Path(td)
             feat_dir = root / "crates" / "fixture" / "tests" / "features"
             feat_dir.mkdir(parents=True)
-            (feat_dir / f"{name}.feature").write_text(body)
+            (feat_dir / f"{name}.feature").write_text(body, encoding="utf-8")
             # Silence the per-case stdout/stderr; only the exit code matters.
             import contextlib
             import io
@@ -365,6 +365,8 @@ def self_test() -> int:
                     f"expected exit {expected}, got {got}",
                     file=sys.stderr,
                 )
+                print("Captured output:", file=sys.stderr)
+                print(buf.getvalue(), file=sys.stderr)
                 failures += 1
 
     if failures:
