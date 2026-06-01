@@ -44,20 +44,26 @@
 //! ## Why this is NOT "mapped against per-adapter thresholds"
 //!
 //! Issue #317's prose says to map the High/Moderate/Acceptable/Low
-//! buckets "against their respective per-adapter thresholds
-//! (cognitive 15/25/40 ⇄ cyclomatic 8/16/30)". Reading the substrate
-//! shows those two things are distinct and must not be conflated:
+//! buckets "against their respective per-adapter thresholds". (#317
+//! was written when the presets were metric-keyed to different numbers
+//! per metric; #281 later flattened them to `8/15/25` for both metrics,
+//! so there is no longer a per-metric threshold split — but the
+//! distinction below holds regardless of the numbers.) Reading the
+//! substrate shows the band and the gate are distinct and must not be
+//! conflated:
 //!
 //! * **`RiskLevel` bands are score-based and shared.** `classify_risk`
 //!   keys off the raw CRAP *score* (≤8 Low, ≤15 Acceptable, ≤25
 //!   Moderate, else
 //!   High) and is metric-agnostic — identical for both adapters,
 //!   independent of any `--threshold`.
-//! * **The per-adapter calibrated numbers drive the `--threshold`
+//! * **The preset threshold numbers drive the `--threshold`
 //!   GATE**, not the risk band. They decide `exceeds` /
 //!   scorecard-row `status` (Green/Yellow/Red), which is a *separate*
 //!   axis already locked by `scorecard_row_parity.rs` +
-//!   `default_gate_threshold.rs`.
+//!   `default_gate_threshold.rs`. (They happen to equal the band
+//!   numbers `8/15/25` today, but the gate is `preset.threshold(metric)`,
+//!   not `classify_risk`.)
 //!
 //! So the honest invariant — the one ζ's Combined-view ranking
 //! actually depends on (risk-level desc, then CRAP/threshold ratio
