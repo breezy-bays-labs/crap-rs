@@ -70,21 +70,7 @@ pub fn format_table_with_explain(
 ) -> String {
     let mut output = String::new();
 
-    // Header — the configured title labels the scorecard above the
-    // tool/version line; the subtitle renders beneath the title. Each is
-    // gated on `Some` independently so the absent path emits no empty
-    // line and stays byte-identical to the unlabeled default.
-    if let Some(title) = title {
-        output.push_str(title);
-        output.push('\n');
-    }
-    if let Some(subtitle) = subtitle {
-        output.push_str(subtitle);
-        output.push('\n');
-    }
-    output.push_str(&format!(
-        "{tool_name} v{tool_version} — CRAP Score Analysis\n",
-    ));
+    append_header(&mut output, title, subtitle, tool_name, tool_version);
 
     // Empty guard — derived from the underlying analysis (the gate),
     // not from the shaped view, so an empty `view.shown` resulting from
@@ -92,9 +78,7 @@ pub fn format_table_with_explain(
     // an actually-empty analysis does.
     if view.full.functions.is_empty() {
         output.push_str("\nNo functions analyzed\n");
-        if let Some(delta_view) = delta {
-            append_delta_block(&mut output, delta_view);
-        }
+        append_delta_if_present(&mut output, delta);
         return output;
     }
 
@@ -105,9 +89,7 @@ pub fn format_table_with_explain(
         output.push_str(&format_grouped_table(view));
         output.push('\n');
         append_summary_block(&mut output, view, threshold);
-        if let Some(delta_view) = delta {
-            append_delta_block(&mut output, delta_view);
-        }
+        append_delta_if_present(&mut output, delta);
         return output;
     }
 
@@ -135,14 +117,63 @@ pub fn format_table_with_explain(
         output.push_str(&table.to_string());
     }
 
-    if breakdown
-        && explain
-        && shown
-            .iter()
-            .filter(|verdict| verdict.exceeds)
-            .flat_map(|verdict| verdict.scored.contributors.iter())
-            .any(|contributor| contributor.increment > 1)
-    {
+    append_explain_legend(&mut output, breakdown, explain, shown);
+
+    output.push('\n');
+
+    append_summary_block(&mut output, view, threshold);
+
+    append_delta_if_present(&mut output, delta);
+
+    output
+}
+
+/// Emit the scorecard header — the optional title/subtitle labels above
+/// the tool/version line. The configured title labels the scorecard; the
+/// subtitle renders beneath it. Each is gated on `Some` independently so
+/// the absent path emits no empty line and stays byte-identical to the
+/// unlabeled default.
+fn append_header(
+    output: &mut String,
+    title: Option<&str>,
+    subtitle: Option<&str>,
+    tool_name: &str,
+    tool_version: &str,
+) {
+    if let Some(title) = title {
+        output.push_str(title);
+        output.push('\n');
+    }
+    if let Some(subtitle) = subtitle {
+        output.push_str(subtitle);
+        output.push('\n');
+    }
+    output.push_str(&format!(
+        "{tool_name} v{tool_version} — CRAP Score Analysis\n",
+    ));
+}
+
+/// Append the delta block when a baseline was supplied. Folding the
+/// `Option` gate into one place lets every return path in
+/// `format_table_with_explain` (empty, grouped, default) share a single
+/// delta-emission site instead of repeating the `if let Some` guard.
+fn append_delta_if_present(output: &mut String, delta: Option<&DeltaView<'_>>) {
+    if let Some(delta_view) = delta {
+        append_delta_block(output, delta_view);
+    }
+}
+
+/// Append the breakdown legend explaining the `+N (nested)` increments.
+/// Only emitted when breakdown sub-rows are shown (`breakdown && explain`)
+/// AND at least one displayed contributor carries a nesting bump
+/// (`increment > 1`) — a flat breakdown needs no legend.
+fn append_explain_legend(
+    output: &mut String,
+    breakdown: bool,
+    explain: bool,
+    shown: &[&crate::domain::types::FunctionVerdict],
+) {
+    if breakdown && explain && has_nested_contributor(shown) {
         output.push('\n');
         output.push_str("\nLegend: +1 = base structural increment.\n");
         output.push_str("        +N (nested) = +1 base plus +(N-1) from active nesting depth.\n");
@@ -151,16 +182,16 @@ pub fn format_table_with_explain(
 while/for/loop bodies, let-else diverging branches, and closures.\n",
         );
     }
+}
 
-    output.push('\n');
-
-    append_summary_block(&mut output, view, threshold);
-
-    if let Some(delta_view) = delta {
-        append_delta_block(&mut output, delta_view);
-    }
-
-    output
+/// True when any exceeding function in the view has a contributor whose
+/// increment exceeds the +1 base — i.e. a nesting bump worth a legend.
+fn has_nested_contributor(shown: &[&crate::domain::types::FunctionVerdict]) -> bool {
+    shown
+        .iter()
+        .filter(|verdict| verdict.exceeds)
+        .flat_map(|verdict| verdict.scored.contributors.iter())
+        .any(|contributor| contributor.increment > 1)
 }
 
 /// Build the per-function `comfy_table::Table` body. Header and row
@@ -261,36 +292,7 @@ fn append_delta_block(output: &mut String, view: &DeltaView<'_>) {
     table.set_header(vec!["Kind", "File", "Function", "Baseline", "Current", "Δ"]);
 
     for change in view.shown.iter() {
-        let kind_str = change.kind().as_str();
-        let baseline_str = change
-            .baseline_score()
-            .map(|s| format!("{s:.2}"))
-            .unwrap_or_else(|| "—".to_string());
-        let current_str = change
-            .current_score()
-            .map(|s| format!("{s:.2}"))
-            .unwrap_or_else(|| "—".to_string());
-        let delta_str = change
-            .score_delta()
-            .map(|d| {
-                let prefix = if d > 0.0 { "+" } else { "" };
-                format!("{prefix}{d:.2}")
-            })
-            .unwrap_or_else(|| "—".to_string());
-
-        let colored_delta = match change {
-            FunctionChange::Modified { .. } => delta_color(change.score_delta(), &delta_str),
-            _ => delta_str,
-        };
-
-        table.add_row(vec![
-            kind_str.to_string(),
-            change.file_path().to_string(),
-            change.qualified_name().to_string(),
-            baseline_str,
-            current_str,
-            colored_delta,
-        ]);
+        table.add_row(delta_change_row(change));
     }
 
     output.push('\n');
@@ -303,6 +305,50 @@ fn append_delta_block(output: &mut String, view: &DeltaView<'_>) {
             view.shown.len(),
             view.eligible_count
         ));
+    }
+}
+
+/// Build the row cells for one delta change: Kind / File / Function /
+/// Baseline / Current / Δ. Absent scores render the `—` sentinel; the Δ
+/// cell is colored (red worse / green better) only for `Modified`
+/// changes, where a before/after delta is meaningful.
+fn delta_change_row(change: &FunctionChange) -> Vec<String> {
+    let baseline_str = format_optional_score(change.baseline_score());
+    let current_str = format_optional_score(change.current_score());
+    let delta_str = format_signed_delta(change.score_delta());
+
+    let colored_delta = match change {
+        FunctionChange::Modified { .. } => delta_color(change.score_delta(), &delta_str),
+        _ => delta_str,
+    };
+
+    vec![
+        change.kind().as_str().to_string(),
+        change.file_path().to_string(),
+        change.qualified_name().to_string(),
+        baseline_str,
+        current_str,
+        colored_delta,
+    ]
+}
+
+/// Two-decimal score cell, or the `—` sentinel when the score is absent
+/// (added functions have no baseline; removed functions have no current).
+fn format_optional_score(score: Option<f64>) -> String {
+    score
+        .map(|s| format!("{s:.2}"))
+        .unwrap_or_else(|| "—".to_string())
+}
+
+/// Signed two-decimal delta cell (`+` prefix when the score rose), or the
+/// `—` sentinel when there is no delta (added/removed have only one side).
+fn format_signed_delta(score_delta: Option<f64>) -> String {
+    match score_delta {
+        Some(d) => {
+            let prefix = if d > 0.0 { "+" } else { "" };
+            format!("{prefix}{d:.2}")
+        }
+        None => "—".to_string(),
     }
 }
 
@@ -416,21 +462,39 @@ fn inject_breakdown_subrows(
     let mut result_lines: Vec<String> = Vec::new();
     for line in table_str.lines() {
         result_lines.push(line.to_string());
-        for verdict in sorted.iter() {
-            if verdict.exceeds
-                && !verdict.scored.contributors.is_empty()
-                && row_contains_name(line, &verdict.scored.identity.qualified_name)
-            {
-                let contributors = &verdict.scored.contributors;
-                let last_idx = contributors.len() - 1;
-                for (i, c) in contributors.iter().enumerate() {
-                    result_lines.push(format_contributor_subrow(c, i == last_idx));
-                }
-                break;
-            }
+        if let Some(verdict) = verdict_for_row(line, sorted) {
+            result_lines.extend(format_contributor_subrows(&verdict.scored.contributors));
         }
     }
     result_lines.join("\n")
+}
+
+/// Find the exceeding verdict whose contributor sub-rows belong under this
+/// table row, if any. A verdict qualifies when it exceeds threshold, has
+/// contributors to show, and its name word-matches the row. The first
+/// match wins — a table row carries at most one function's sub-rows.
+fn verdict_for_row<'a>(
+    line: &str,
+    sorted: &'a [&crate::domain::types::FunctionVerdict],
+) -> Option<&'a crate::domain::types::FunctionVerdict> {
+    sorted.iter().copied().find(|verdict| {
+        verdict.exceeds
+            && !verdict.scored.contributors.is_empty()
+            && row_contains_name(line, &verdict.scored.identity.qualified_name)
+    })
+}
+
+/// Render a verdict's contributors as indented tree-style sub-row lines.
+/// The last contributor uses the `└─` corner; the rest use `├─`.
+fn format_contributor_subrows(
+    contributors: &[crate::domain::types::ComplexityContributor],
+) -> Vec<String> {
+    let last_idx = contributors.len().saturating_sub(1);
+    contributors
+        .iter()
+        .enumerate()
+        .map(|(i, c)| format_contributor_subrow(c, i == last_idx))
+        .collect()
 }
 
 /// Format a single contributor sub-row with tree-drawing prefix.
