@@ -59,23 +59,46 @@ pub fn match_functions(
     results
 }
 
+/// Returns `true` if `line` falls within `span`'s inclusive `[start_line,
+/// end_line]` range. The single point-in-span test both line- and
+/// branch-coverage counting share.
+fn line_within_span(span: SourceSpan, line: usize) -> bool {
+    line >= span.start_line && line <= span.end_line
+}
+
+/// Counts `(covered, total)` instrumentable lines whose line number falls
+/// within `span`. A line is covered when its hit count is nonzero.
+fn count_line_coverage(span: SourceSpan, file_lines: &[LineCoverage]) -> (usize, usize) {
+    let in_span = file_lines
+        .iter()
+        .filter(|line| line_within_span(span, line.line));
+
+    let total = in_span.clone().count();
+    let covered = in_span.filter(|line| line.hits > 0).count();
+    (covered, total)
+}
+
+/// Counts `(covered, total)` branch points within `span`. Only branches
+/// with a recorded `taken` count participate; a branch is covered when
+/// that count is nonzero.
+fn count_branch_coverage(span: SourceSpan, branches: &[BranchCoverage]) -> (usize, usize) {
+    let taken_in_span = branches
+        .iter()
+        .filter(|branch| line_within_span(span, branch.line))
+        .filter_map(|branch| branch.taken);
+
+    let total = taken_in_span.clone().count();
+    let covered = taken_in_span.filter(|&taken| taken > 0).count();
+    (covered, total)
+}
+
 fn compute_function_coverage(
     file_path: &str,
     span: SourceSpan,
     file_lines: &[LineCoverage],
     file_branches: Option<&[BranchCoverage]>,
 ) -> FunctionCoverage {
-    let mut total = 0usize;
-    let mut covered = 0usize;
-
-    for line in file_lines {
-        if line.line >= span.start_line && line.line <= span.end_line {
-            total += 1;
-            if line.hits > 0 {
-                covered += 1;
-            }
-        }
-    }
+    let (covered, total) = count_line_coverage(span, file_lines);
 
     let percent = if total > 0 {
         (covered as f64 / total as f64) * 100.0
@@ -99,20 +122,7 @@ fn compute_function_coverage(
 }
 
 fn compute_branch_coverage(span: SourceSpan, branches: &[BranchCoverage]) -> Option<CoverageRatio> {
-    let mut total = 0usize;
-    let mut covered = 0usize;
-
-    for branch in branches {
-        if branch.line >= span.start_line
-            && branch.line <= span.end_line
-            && let Some(taken) = branch.taken
-        {
-            total += 1;
-            if taken > 0 {
-                covered += 1;
-            }
-        }
-    }
+    let (covered, total) = count_branch_coverage(span, branches);
 
     if total == 0 {
         return None;
