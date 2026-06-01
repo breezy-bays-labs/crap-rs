@@ -228,6 +228,28 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
             return Ok(early);
         }
 
+        self.score_and_assemble(
+            all_complexities,
+            parse_output,
+            discovered.files_found,
+            files_unparseable,
+            functions_extracted,
+        )
+    }
+
+    /// Final pipeline phase: match the extracted functions against
+    /// coverage, score them, and assemble the `AnalysisOutput` (result +
+    /// run diagnostics). Reached only when discovery and both diff-mode
+    /// short-circuits have left work to do, so this is the hot path of a
+    /// successful run.
+    fn score_and_assemble(
+        &self,
+        all_complexities: Vec<FunctionComplexity>,
+        parse_output: ParseOutput<P>,
+        files_found: usize,
+        files_unparseable: usize,
+        functions_extracted: usize,
+    ) -> Result<AnalysisOutput<P>> {
         ensure_functions_extracted(&all_complexities, &self.options.src)?;
 
         let matched = match_functions(
@@ -254,7 +276,7 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
 
         let diagnostics = AnalysisDiagnostics {
             parse_diagnostics: parse_output.diagnostics,
-            files_found: discovered.files_found,
+            files_found,
             files_unparseable,
             functions_extracted,
             functions_matched,
@@ -292,15 +314,7 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
                 self.options.respect_gitignore,
                 &extensions,
             )?;
-            for path in found {
-                let key = self.options.identity_base.relativize(&path, root);
-                if seen_keys.insert(key) {
-                    source_files.push(DiscoveredFile {
-                        root: root.clone(),
-                        path,
-                    });
-                }
-            }
+            self.dedup_into_sources(found, root, &mut seen_keys, &mut source_files);
         }
         // Sort by the discovered PATH (PathBuf order), NOT the
         // relativized identity-key string. The walker's pre-multi-root
@@ -322,6 +336,29 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
             source_files,
             files_found,
         })
+    }
+
+    /// Union one root's discovered paths into the accumulator, deduping on
+    /// the global identity key. An overlapping root must not double-count
+    /// a function's file — the union semantics #336 promises. Each kept
+    /// file is tagged with the `root` it was discovered under so
+    /// `IdentityBase::relativize` later strips against the right base.
+    fn dedup_into_sources(
+        &self,
+        found: Vec<PathBuf>,
+        root: &Path,
+        seen_keys: &mut std::collections::HashSet<String>,
+        source_files: &mut Vec<DiscoveredFile>,
+    ) {
+        for path in found {
+            let key = self.options.identity_base.relativize(&path, root);
+            if seen_keys.insert(key) {
+                source_files.push(DiscoveredFile {
+                    root: root.to_path_buf(),
+                    path,
+                });
+            }
+        }
     }
 
     fn load_diff_data(
@@ -501,32 +538,38 @@ fn ensure_source_files_found(
     extensions: &[&str],
 ) -> Result<()> {
     if source_files.is_empty() {
-        // Render a comma-separated list of dotted extensions for the
-        // hint. Single source of truth — `cli/mod.rs` previously had a
-        // duplicate pre-flight walk that emitted identical wording; that
-        // duplicate was retired once both paths agreed (issue #163).
-        let pretty = match extensions {
-            [] => "supported".to_string(),
-            [only] => format!(".{only}"),
-            [first, rest @ .., last] => {
-                let mut out = format!(".{first}");
-                for e in rest {
-                    out.push_str(", .");
-                    out.push_str(e);
-                }
-                out.push_str(", or .");
-                out.push_str(last);
-                out
-            }
-        };
         bail!(
             "no source files found in {}\n  \
              hint: check that --src points to a directory containing {} files",
             display_roots(src),
-            pretty,
+            format_extension_hint(extensions),
         );
     }
     Ok(())
+}
+
+/// Render the accepted extensions as a human-readable list for the
+/// no-source-files hint: `[]` → "supported", `[rs]` → ".rs",
+/// `[ts, tsx, js]` → ".ts, .tsx, or .js".
+///
+/// Single source of truth — `cli/mod.rs` previously had a duplicate
+/// pre-flight walk that emitted identical wording; that duplicate was
+/// retired once both paths agreed (issue #163).
+fn format_extension_hint(extensions: &[&str]) -> String {
+    match extensions {
+        [] => "supported".to_string(),
+        [only] => format!(".{only}"),
+        [first, rest @ .., last] => {
+            let mut out = format!(".{first}");
+            for e in rest {
+                out.push_str(", .");
+                out.push_str(e);
+            }
+            out.push_str(", or .");
+            out.push_str(last);
+            out
+        }
+    }
 }
 
 /// Render one-or-more `--src` roots for an error message: a single root
@@ -1006,5 +1049,75 @@ mod tests {
         assert!(result.functions.is_empty());
         assert!(result.passed);
         assert_eq!(result.summary.total_functions, 0);
+    }
+
+    // ── format_extension_hint / ensure_source_files_found ─────────────
+
+    #[test]
+    fn extension_hint_empty_is_generic() {
+        // No extensions threaded (a library caller that left
+        // `AnalyzeOptions::extensions` at its `Vec::new()` default) →
+        // the hint can't name a concrete extension, so it falls back to
+        // the generic word.
+        assert_eq!(format_extension_hint(&[]), "supported");
+    }
+
+    #[test]
+    fn extension_hint_single_is_dotted() {
+        assert_eq!(format_extension_hint(&["rs"]), ".rs");
+    }
+
+    #[test]
+    fn extension_hint_two_uses_or() {
+        // Two extensions: `first` then `last`, no middle — exercises the
+        // `[first, rest @ .., last]` arm with an empty `rest`.
+        assert_eq!(format_extension_hint(&["ts", "tsx"]), ".ts, or .tsx");
+    }
+
+    #[test]
+    fn extension_hint_three_or_more_joins_middle() {
+        // Three+ extensions exercises the inner `for e in rest` loop that
+        // joins the middle elements before the trailing ", or .".
+        assert_eq!(
+            format_extension_hint(&["ts", "tsx", "js", "jsx"]),
+            ".ts, .tsx, .js, or .jsx"
+        );
+    }
+
+    fn discovered_file(path: &str) -> DiscoveredFile {
+        DiscoveredFile {
+            root: PathBuf::from("src"),
+            path: PathBuf::from(path),
+        }
+    }
+
+    #[test]
+    fn ensure_source_files_found_ok_when_non_empty() {
+        let files = [discovered_file("src/lib.rs")];
+        assert!(ensure_source_files_found(&files, &[PathBuf::from("src")], &["rs"]).is_ok());
+    }
+
+    #[test]
+    fn ensure_source_files_found_errors_with_roots_and_hint() {
+        let err = ensure_source_files_found(&[], &[PathBuf::from("src")], &["rs"])
+            .expect_err("empty discovery must error");
+        let msg = err.to_string();
+        assert!(msg.contains("no source files found in src"), "msg: {msg}");
+        assert!(msg.contains(".rs files"), "msg: {msg}");
+    }
+
+    #[test]
+    fn ensure_source_files_found_errors_multi_root_lists_all() {
+        // Multiple roots render as a comma-separated list, and with no
+        // extensions threaded the hint uses the generic fallback word.
+        let err = ensure_source_files_found(
+            &[],
+            &[PathBuf::from("crates/a/src"), PathBuf::from("crates/b/src")],
+            &[],
+        )
+        .expect_err("empty discovery must error");
+        let msg = err.to_string();
+        assert!(msg.contains("crates/a/src, crates/b/src"), "msg: {msg}");
+        assert!(msg.contains("supported files"), "msg: {msg}");
     }
 }
