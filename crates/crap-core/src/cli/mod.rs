@@ -1390,6 +1390,34 @@ fn apply_diagnostics<P: ParseDiagnostic + std::fmt::Display>(
     }
 }
 
+/// Resolve display flags, color, the on-disk config file, and the
+/// `--view <NAME>` preset — the up-front phase that runs before any
+/// source root is known. Returns the loaded `FileConfig` (if any) for
+/// `merge_effective_inputs` to fold in.
+///
+/// `--view` is resolved *before* `validate_view_args` so preset fields
+/// participate in the same validation pass as CLI flags;
+/// `apply_preset_to_cli` mutates `cli` in place (CLI explicit values win
+/// on `Option<T>` fields, bools OR-merge). The config file's path is
+/// kept alongside the loaded config so the unknown-preset diagnostic can
+/// point the user at the exact file to edit.
+fn resolve_config_and_view(cli: &mut Cli, meta: &AdapterMeta) -> Result<Option<FileConfig>> {
+    validate_display_flags(cli)?;
+    apply_color(cli.display.color);
+
+    let (file_config, config_path) = load_file_config(cli, meta)?.unzip();
+
+    view_args::resolve_view_preset(
+        cli,
+        file_config.as_ref(),
+        config_path.as_deref(),
+        meta.canonical_config_file_name(),
+    )?;
+    view_args::validate_view_args(cli)?;
+
+    Ok(file_config)
+}
+
 /// Validates inputs, merges effective config, runs the analyzer, and
 /// resolves the optional baseline delta. The bulk of `run_inner`'s
 /// pre-render work lives here so `run_inner` itself stays a flat dispatch.
@@ -1409,26 +1437,7 @@ where
     P: ParseDiagnostic + std::fmt::Display + 'static,
     F: FnOnce(&Path) -> Box<dyn CoveragePort<Diagnostic = P>>,
 {
-    validate_display_flags(cli)?;
-    apply_color(cli.display.color);
-
-    // Load config file (explicit path or auto-discovered). Path is
-    // kept alongside the loaded config so downstream diagnostics
-    // (e.g., unknown `--view` preset) can point the user at the
-    // exact file to edit.
-    let (file_config, config_path) = load_file_config(cli, meta)?.unzip();
-
-    // Resolve `--view <NAME>` before validate_view_args runs
-    // so preset fields participate in the same validation pass as CLI
-    // flags. `apply_preset_to_cli` mutates `cli` in place: CLI explicit
-    // values win on `Option<T>` fields, bools OR-merge.
-    view_args::resolve_view_preset(
-        cli,
-        file_config.as_ref(),
-        config_path.as_deref(),
-        meta.canonical_config_file_name(),
-    )?;
-    view_args::validate_view_args(cli)?;
+    let file_config = resolve_config_and_view(cli, meta)?;
 
     let inputs = merge_effective_inputs(cli, &file_config, meta);
     let coverage_path = validate_runtime_inputs(cli, &inputs, meta)?;
@@ -1657,21 +1666,25 @@ fn print_formatted_output<P: ParseDiagnostic>(
         }
     }
 
-    // Advice's stderr summary fires once even if Advice appears multiple
-    // times in `--format`. SARIF stays silent — its primary deliverable
-    // is the `.sarif` file uploaded to Code Scanning; stderr would noise
-    // up CI logs.
-    if cli
+    emit_advice_summary(cli, view);
+    Ok(())
+}
+
+/// Emit Advice's once-per-run stderr summary when `--format advice` was
+/// requested. Fires once even if Advice appears multiple times in
+/// `--format`. SARIF stays silent — its primary deliverable is the
+/// `.sarif` file uploaded to Code Scanning; stderr would noise up CI
+/// logs.
+fn emit_advice_summary(cli: &Cli, view: &view::AnalysisView<'_>) {
+    let wants_advice = cli
         .output
         .format
         .iter()
-        .any(|s| matches!(s.format, FormatArg::Advice))
-    {
+        .any(|s| matches!(s.format, FormatArg::Advice));
+    if wants_advice {
         let mut stderr = std::io::stderr();
         let _ = reporters::render_advice_summary(view, &mut stderr);
     }
-
-    Ok(())
 }
 
 fn compute_exit_code<P: ParseDiagnostic>(
@@ -1770,60 +1783,75 @@ fn load_file_config(
     cli: &Cli,
     meta: &AdapterMeta,
 ) -> Result<Option<(FileConfig, std::path::PathBuf)>> {
-    if let Some(path) = &cli.input.config {
+    match &cli.input.config {
         // An explicit `--config <path>` is the operator's deliberate
         // choice; the tool has no opinion on what they name it, so no
         // deprecation/shadow notice is emitted here even if the path uses
         // a legacy name. (Discovery notices only apply to auto-discovery.)
-        let cfg = config::load_config(path)?;
-        Ok(Some((cfg, path.clone())))
-    } else {
-        // Auto-discovery: walk upward from the run's anchor directory,
-        // resolving the adapter's ordered names (canonical first, legacy
-        // fallbacks after) within each ancestor; the nearest directory
-        // with any candidate wins (crap-rs#339).
-        //
-        // Anchor on the RAW first `--src` (`cli.input.src`, not the
-        // post-merge effective src), falling back to the working
-        // directory (`.`) when `--src` is empty. This MUST precede the
-        // config→`src` merge: `prepare_pipeline` runs `load_file_config`
-        // before `merge_effective_inputs`, and the config can *set* `src`
-        // — anchoring discovery on the effective src would be circular
-        // (need the config to find the config). `absolute(".")` resolves
-        // to the working directory, preserving the prior CWD-relative
-        // back-compat (a `crap.toml` in CWD is still the nearest match).
-        let start = cli
-            .input
-            .src
-            .first()
-            .cloned()
-            .unwrap_or_else(|| std::path::PathBuf::from("."));
-        match config::discover_config(&start, meta.config_file_names)? {
-            Some(disc) => {
-                // The rename target is the canonical name (the single
-                // source of truth for "first = canonical"); the shadower
-                // is the file that actually won (`disc.path`), which is
-                // robust if the ordered list ever grows past two names.
-                let canonical = meta.canonical_config_file_name();
-                if disc.used_index > 0 {
-                    eprintln!(
-                        "warning: using deprecated config name `{}`; rename it to `{}`",
-                        disc.path.display(),
-                        canonical
-                    );
-                }
-                for shadow in &disc.shadowed {
-                    eprintln!(
-                        "warning: `{}` is shadowed by `{}` and ignored; it is safe to remove",
-                        shadow.display(),
-                        disc.path.display(),
-                    );
-                }
-                let cfg = config::load_config(&disc.path)?;
-                Ok(Some((cfg, disc.path)))
-            }
-            None => Ok(None),
+        Some(path) => {
+            let cfg = config::load_config(path)?;
+            Ok(Some((cfg, path.clone())))
         }
+        None => discover_and_load_config(cli, meta),
+    }
+}
+
+/// Auto-discover a config file by adapter convention and load it.
+///
+/// Walks upward from the run's anchor directory, resolving the
+/// adapter's ordered names (canonical first, legacy fallbacks after)
+/// within each ancestor; the nearest directory with any candidate wins
+/// (crap-rs#339).
+///
+/// Anchors on the RAW first `--src` (`cli.input.src`, not the post-merge
+/// effective src), falling back to the working directory (`.`) when
+/// `--src` is empty. This MUST precede the config→`src` merge:
+/// `prepare_pipeline` runs `load_file_config` before
+/// `merge_effective_inputs`, and the config can *set* `src` — anchoring
+/// discovery on the effective src would be circular (need the config to
+/// find the config). `.` resolves to the working directory, preserving
+/// the prior CWD-relative back-compat (a `crap.toml` in CWD is still the
+/// nearest match).
+fn discover_and_load_config(
+    cli: &Cli,
+    meta: &AdapterMeta,
+) -> Result<Option<(FileConfig, std::path::PathBuf)>> {
+    let start = cli
+        .input
+        .src
+        .first()
+        .cloned()
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    match config::discover_config(&start, meta.config_file_names)? {
+        Some(disc) => {
+            warn_config_discovery(&disc, meta.canonical_config_file_name());
+            let cfg = config::load_config(&disc.path)?;
+            Ok(Some((cfg, disc.path)))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Emit the deprecation + shadow warnings for an auto-discovered config.
+///
+/// The rename target is the canonical name (the single source of truth
+/// for "first = canonical"); the shadower is the file that actually won
+/// (`disc.path`), which is robust if the ordered list ever grows past
+/// two names.
+fn warn_config_discovery(disc: &config::ConfigDiscovery, canonical: &str) {
+    if disc.used_index > 0 {
+        eprintln!(
+            "warning: using deprecated config name `{}`; rename it to `{}`",
+            disc.path.display(),
+            canonical
+        );
+    }
+    for shadow in &disc.shadowed {
+        eprintln!(
+            "warning: `{}` is shadowed by `{}` and ignored; it is safe to remove",
+            shadow.display(),
+            disc.path.display(),
+        );
     }
 }
 
@@ -2868,6 +2896,71 @@ mod tests {
             .expect("git init");
         assert!(status.success(), "git init failed");
         assert!(preflight_git_worktree(tmp.path()).is_ok());
+    }
+
+    // ── validate_diff_preflight branch coverage ─────────────────────
+    //
+    // Exercises every path of the `--diff` pre-flight without shelling
+    // an adapter binary (the fn is called directly): absent diff,
+    // invalid ref, valid ref + src in-repo, valid ref + src outside any
+    // work tree, and valid ref + empty src (preflight skipped).
+
+    #[test]
+    fn validate_diff_preflight_noop_when_diff_absent() {
+        // No `--diff` → returns Ok without touching git, regardless of
+        // whether the src root is inside a work tree.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let inputs = inputs_with_roots(vec![tmp.path().to_path_buf()]);
+        assert!(validate_diff_preflight(&cli, &inputs).is_ok());
+    }
+
+    #[test]
+    fn validate_diff_preflight_rejects_invalid_ref_before_preflight() {
+        // An invalid diff ref fails at `validate_diff_ref` — before the
+        // git work-tree pre-flight runs — so a valid in-repo src cannot
+        // mask the bad ref. The dash-prefixed ref is parsed via `--diff=`
+        // so clap treats it as a value, not a flag.
+        let cli = parse(&["--coverage", "lcov.info", "--diff=--evil"]).unwrap();
+        let tmp = temp_git_repo();
+        let inputs = inputs_with_roots(vec![tmp.path().join("crate-x/src")]);
+        let err = validate_diff_preflight(&cli, &inputs).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("invalid diff ref"), "got: {msg}");
+        assert!(msg.contains("must not start with a dash"), "got: {msg}");
+    }
+
+    #[test]
+    fn validate_diff_preflight_ok_with_valid_ref_in_git_repo() {
+        // Valid ref + first src root inside a git work tree → Ok.
+        let cli = parse(&["--coverage", "lcov.info", "--diff", "main"]).unwrap();
+        let tmp = temp_git_repo();
+        let inputs = inputs_with_roots(vec![tmp.path().join("crate-x/src")]);
+        assert!(validate_diff_preflight(&cli, &inputs).is_ok());
+    }
+
+    #[test]
+    fn validate_diff_preflight_errors_when_src_outside_work_tree() {
+        // Valid ref but the first src root lives outside any git work
+        // tree → the pre-flight `git rev-parse --is-inside-work-tree`
+        // fails and the error names the missing work tree. A bare
+        // system tempdir is outside the repo under test.
+        let cli = parse(&["--coverage", "lcov.info", "--diff", "main"]).unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let inputs = inputs_with_roots(vec![tmp.path().to_path_buf()]);
+        let err = validate_diff_preflight(&cli, &inputs).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("git work tree"), "got: {msg}");
+    }
+
+    #[test]
+    fn validate_diff_preflight_skips_preflight_when_src_empty() {
+        // Valid ref + no src roots → the ref is validated but the
+        // `inputs.src.first()` guard short-circuits the git pre-flight,
+        // so it returns Ok even with no work tree to probe.
+        let cli = parse(&["--coverage", "lcov.info", "--diff", "main"]).unwrap();
+        let inputs = inputs_with_roots(vec![]);
+        assert!(validate_diff_preflight(&cli, &inputs).is_ok());
     }
 
     #[test]
