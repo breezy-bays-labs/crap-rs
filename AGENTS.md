@@ -339,11 +339,15 @@ then CRAP/threshold ratio desc within band).
 Two axes are deliberately kept distinct here, since #317's prose
 conflates them: `RiskLevel` **bands** are score-based, fixed in
 `classify_risk` (≤8 Low / ≤15 Acceptable / ≤25 Moderate / else High),
-metric-agnostic, and independent of `--threshold`; the per-adapter
-**calibrated thresholds** (cognitive 15/25/40 ⇄ cyclomatic 8/16/30)
-drive the `--threshold` GATE (`exceeds` / scorecard-row `status`),
-which is the separate axis the scorecard-row + default-gate canaries
-own. The RiskLevel canary pins the band axis only.
+metric-agnostic, and independent of `--threshold`; the
+**preset thresholds** (strict/default/lenient, flat `8/15/25` across
+both metrics today, routed through metric-keyed infrastructure so a
+future per-metric recalibration stays a one-line change) drive the
+`--threshold` GATE (`exceeds` / scorecard-row `status`), which is the
+separate axis the scorecard-row + default-gate canaries own. The
+RiskLevel canary pins the band axis only. The two axes share the same
+`8/15/25` numbers today but remain conceptually distinct: the band is
+score-based via `classify_risk`, the gate is `preset.threshold(metric)`.
 
 **Mechanical enforcement**:
 `crates/crap-core/tests/risk_level_cross_adapter.rs` (test fn
