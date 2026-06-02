@@ -447,32 +447,9 @@ fn parse_config(content: &str) -> Result<FileConfig, ConfigError> {
     let metric = raw.metric.as_deref().map(parse_metric).transpose()?;
     let preset = raw.preset.as_deref().map(parse_preset).transpose()?;
 
-    let overrides = raw
-        .overrides
-        .into_iter()
-        .map(|o| ThresholdOverride {
-            pattern: o.pattern,
-            threshold: o.threshold,
-        })
-        .collect();
-
-    let views = raw
-        .views
-        .into_iter()
-        .map(|(name, raw_preset)| {
-            let preset = parse_view_preset(&name, raw_preset)?;
-            Ok::<_, ConfigError>((name, preset))
-        })
-        .collect::<Result<HashMap<_, _>, _>>()?;
-
-    let language = raw
-        .language
-        .into_iter()
-        .map(|(name, raw_lang)| {
-            let lang = parse_lang_config(&name, raw_lang)?;
-            Ok::<_, ConfigError>((name, lang))
-        })
-        .collect::<Result<HashMap<_, _>, _>>()?;
+    let overrides = parse_overrides(raw.overrides);
+    let views = parse_views(raw.views)?;
+    let language = parse_languages(raw.language)?;
 
     Ok(FileConfig {
         threshold: raw.threshold,
@@ -489,6 +466,46 @@ fn parse_config(content: &str) -> Result<FileConfig, ConfigError> {
             subtitle: raw.output.subtitle,
         },
     })
+}
+
+/// Project the wire `[[overrides]]` blocks into the domain's per-path
+/// override list. Infallible — the override thresholds are range-checked
+/// up front by `validate_raw_config`, so this is a pure field rename.
+fn parse_overrides(raw: Vec<OverrideSchema>) -> Vec<ThresholdOverride> {
+    raw.into_iter()
+        .map(|o| ThresholdOverride {
+            pattern: o.pattern,
+            threshold: o.threshold,
+        })
+        .collect()
+}
+
+/// Project the wire `[views.<name>]` map into the domain's saved view
+/// presets, parsing each section's sort/group keys (the fallible step,
+/// hence the `Result`-bearing collect).
+fn parse_views(
+    raw: HashMap<String, ViewPresetSchema>,
+) -> Result<HashMap<String, ViewPreset>, ConfigError> {
+    raw.into_iter()
+        .map(|(name, raw_preset)| {
+            let preset = parse_view_preset(&name, raw_preset)?;
+            Ok((name, preset))
+        })
+        .collect()
+}
+
+/// Project the wire `[language.<name>]` map into the domain's per-language
+/// config, validating each section's preset/threshold exclusivity (the
+/// fallible step, hence the `Result`-bearing collect).
+fn parse_languages(
+    raw: HashMap<String, LangSchema>,
+) -> Result<HashMap<String, LangConfig>, ConfigError> {
+    raw.into_iter()
+        .map(|(name, raw_lang)| {
+            let lang = parse_lang_config(&name, raw_lang)?;
+            Ok((name, lang))
+        })
+        .collect()
 }
 
 /// Project a per-language wire section into its parsed [`LangConfig`].
@@ -519,9 +536,26 @@ fn parse_lang_config(name: &str, raw: LangSchema) -> Result<LangConfig, ConfigEr
 }
 
 fn validate_raw_config(raw: &ConfigSchema) -> Result<(), ConfigError> {
+    check_preset_threshold_exclusive(raw)?;
+    check_top_level_threshold_range(raw)?;
+    check_override_thresholds(raw)?;
+    check_annotation_limit(raw)?;
+    Ok(())
+}
+
+/// `preset` and `threshold` are mutually exclusive at the top level (set
+/// one, not both). The per-section variant of this carve-out lives in
+/// `parse_lang_config`; this one names no section.
+fn check_preset_threshold_exclusive(raw: &ConfigSchema) -> Result<(), ConfigError> {
     if raw.preset.is_some() && raw.threshold.is_some() {
         return Err(ConfigError::MutuallyExclusive { section: None });
     }
+    Ok(())
+}
+
+/// The top-level `threshold`, when set, must be a positive finite value
+/// (`is_valid_threshold`). Section-less so the error points at the root.
+fn check_top_level_threshold_range(raw: &ConfigSchema) -> Result<(), ConfigError> {
     if let Some(t) = raw.threshold
         && !is_valid_threshold(t)
     {
@@ -530,6 +564,12 @@ fn validate_raw_config(raw: &ConfigSchema) -> Result<(), ConfigError> {
             section: None,
         });
     }
+    Ok(())
+}
+
+/// Every `[[overrides]]` threshold must be in the same valid range as the
+/// top-level threshold; the error names the offending glob `pattern`.
+fn check_override_thresholds(raw: &ConfigSchema) -> Result<(), ConfigError> {
     for o in &raw.overrides {
         if !is_valid_threshold(o.threshold) {
             return Err(ConfigError::InvalidOverrideThreshold {
@@ -538,12 +578,18 @@ fn validate_raw_config(raw: &ConfigSchema) -> Result<(), ConfigError> {
             });
         }
     }
-    // Mirror the CLI's `clap::value_parser!(u32).range(1..=100)` on
-    // `--annotation-limit` so config and CLI agree on the legal range.
-    // Without this check a TOML `[output] annotation_limit = 0` would
-    // silently disable annotation emission (only the truncation notice
-    // fires); `= 999` would silently flood the per-step UI cap. Both
-    // are rejected by clap at the CLI boundary — config must match.
+    Ok(())
+}
+
+/// `[output] annotation_limit`, when set, must be in `1..=100`.
+///
+/// Mirror the CLI's `clap::value_parser!(u32).range(1..=100)` on
+/// `--annotation-limit` so config and CLI agree on the legal range.
+/// Without this check a TOML `[output] annotation_limit = 0` would
+/// silently disable annotation emission (only the truncation notice
+/// fires); `= 999` would silently flood the per-step UI cap. Both
+/// are rejected by clap at the CLI boundary — config must match.
+fn check_annotation_limit(raw: &ConfigSchema) -> Result<(), ConfigError> {
     if let Some(limit) = raw.output.annotation_limit
         && !(1..=100).contains(&limit)
     {
@@ -732,7 +778,7 @@ fn comment_key(table: &mut toml_edit::Table, key: &str, doc: &str, blank_before:
 /// field to `ConfigSchema` fails to compile until it is wired into this
 /// emitter, so a new option can never silently ship undocumented.
 pub fn render_example_config(meta: &AdapterMeta) -> String {
-    use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table, value};
+    use toml_edit::DocumentMut;
 
     // Exhaustive destructure — NO `..`. The compile guard: a new
     // ConfigSchema field breaks this line until it is emitted below.
@@ -763,7 +809,19 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
     let root = doc.as_table_mut();
     root.set_implicit(false);
 
-    // Header banner.
+    emit_header_banner(root, meta);
+    emit_top_scalars(root, threshold, metric, src, exclude);
+    emit_overrides_block(root, overrides);
+    emit_views_block(root, views);
+    emit_language_block(root, language);
+    emit_output_block(root, output);
+
+    doc.to_string()
+}
+
+/// Emit the leading `#`-comment banner on the root table — the three-line
+/// "generated by `<tool> init`" header naming the canonical config file.
+fn emit_header_banner(root: &mut toml_edit::Table, meta: &AdapterMeta) {
     root.decor_mut().set_prefix(format!(
         "# {name} — exhaustive annotated config reference (every supported option).\n\
          # Generated by `{tool} init`; regenerate with `{tool} init --force`.\n\
@@ -771,8 +829,22 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
         name = meta.canonical_config_file_name(),
         tool = meta.tool_name,
     ));
+}
 
-    // ── top-level scalars ──
+/// Emit the top-level scalar keys in order: live `threshold` (with the
+/// commented `preset` alternative beneath it), `metric`, `src` array, and
+/// `exclude` array. `preset` is None in the value so the example
+/// round-trips to `threshold`; it renders as a `#`-comment carrying its
+/// own doc so the field stays documented.
+fn emit_top_scalars(
+    root: &mut toml_edit::Table,
+    threshold: Option<f64>,
+    metric: Option<String>,
+    src: Option<SrcSpec>,
+    exclude: Option<Vec<String>>,
+) {
+    use toml_edit::{Array, value};
+
     // threshold is live; preset is the commented mutually-exclusive
     // alternative (emitted as a comment so the example round-trips).
     let threshold_val = threshold.expect("exhaustive example sets threshold");
@@ -783,21 +855,7 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
         field_doc::<ConfigSchema>("threshold"),
         false,
     );
-
-    // preset: commented alternative. `preset` is None in the value (so
-    // round-trip parses threshold), shown here as a `#`-commented line
-    // carrying its own doc so the field stays documented.
-    let preset_example = preset_alternative();
-    let preset_block = format!(
-        "{doc}# preset = \"{val}\"\n",
-        doc = doc_comment(field_doc::<ConfigSchema>("preset")),
-        val = preset_example,
-    );
-    // Attach the preset block as a suffix on the threshold key's value so
-    // it renders directly below the live `threshold = N` line.
-    if let Some(v) = root.get_mut("threshold").and_then(|i| i.as_value_mut()) {
-        v.decor_mut().set_suffix(format!("\n\n{preset_block}"));
-    }
+    emit_preset_alternative_comment(root);
 
     root.insert("metric", value(metric.expect("metric set")));
     comment_key(root, "metric", field_doc::<ConfigSchema>("metric"), true);
@@ -817,8 +875,28 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
     }
     root.insert("exclude", value(excl_arr));
     comment_key(root, "exclude", field_doc::<ConfigSchema>("exclude"), true);
+}
 
-    // ── [[overrides]] array-of-tables ──
+/// Attach the commented `# preset = "..."` alternative as a suffix on the
+/// live `threshold` value, so it renders directly below the `threshold =
+/// N` line. The block carries the `preset` field's own doc.
+fn emit_preset_alternative_comment(root: &mut toml_edit::Table) {
+    let preset_block = format!(
+        "{doc}# preset = \"{val}\"\n",
+        doc = doc_comment(field_doc::<ConfigSchema>("preset")),
+        val = preset_alternative(),
+    );
+    if let Some(v) = root.get_mut("threshold").and_then(|i| i.as_value_mut()) {
+        v.decor_mut().set_suffix(format!("\n\n{preset_block}"));
+    }
+}
+
+/// Emit the `[[overrides]]` array-of-tables — one table per override with
+/// its `pattern`/`threshold` keys, and the `overrides` field doc as a
+/// header above the first table.
+fn emit_overrides_block(root: &mut toml_edit::Table, overrides: Vec<OverrideSchema>) {
+    use toml_edit::{ArrayOfTables, Item, Table, value};
+
     let mut overrides_aot = ArrayOfTables::new();
     for o in overrides {
         // Exhaustive destructure (no `..`) — extends the compile guard to
@@ -849,89 +927,96 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
         ));
     }
     root.insert("overrides", Item::ArrayOfTables(overrides_aot));
+}
 
-    // ── [views.<name>] tables (sorted by name) ──
-    {
-        // One sub-table per preset; emit the `views` doc above the first.
-        let mut views_sorted: Vec<_> = views.into_iter().collect();
-        views_sorted.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut views_tbl = Table::new();
-        views_tbl.set_implicit(true);
-        let mut first = true;
-        for (name, vp) in views_sorted {
-            let mut t = Table::new();
-            insert_view_preset(&mut t, vp);
-            if first {
-                t.decor_mut().set_prefix(format!(
-                    "\n{}",
-                    doc_comment(field_doc::<ConfigSchema>("views"))
-                ));
-                first = false;
-            }
-            views_tbl.insert(&name, Item::Table(t));
-        }
-        root.insert("views", Item::Table(views_tbl));
-    }
+/// Emit the `[views.<name>]` tables, sorted by name for deterministic
+/// output, with the `views` field doc above the first sub-table.
+fn emit_views_block(root: &mut toml_edit::Table, views: HashMap<String, ViewPresetSchema>) {
+    use toml_edit::{Item, Table};
 
-    // ── [language.<name>] tables (sorted by name) ──
-    {
-        let mut lang_sorted: Vec<_> = language.into_iter().collect();
-        lang_sorted.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut lang_tbl = Table::new();
-        lang_tbl.set_implicit(true);
-        let mut first = true;
-        for (name, ls) in lang_sorted {
-            let mut t = Table::new();
-            insert_lang_section(&mut t, ls);
-            if first {
-                t.decor_mut().set_prefix(format!(
-                    "\n{}",
-                    doc_comment(field_doc::<ConfigSchema>("language"))
-                ));
-                first = false;
-            }
-            lang_tbl.insert(&name, Item::Table(t));
-        }
-        root.insert("language", Item::Table(lang_tbl));
-    }
-
-    // ── [output] table ──
-    {
-        // Exhaustive destructure (no `..`) — extends the compile guard to
-        // OutputSchema: a new field breaks this until it is emitted.
-        let OutputSchema {
-            annotation_limit,
-            title,
-            subtitle,
-        } = output;
+    let mut views_sorted: Vec<_> = views.into_iter().collect();
+    views_sorted.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut views_tbl = Table::new();
+    views_tbl.set_implicit(true);
+    let mut first = true;
+    for (name, vp) in views_sorted {
         let mut t = Table::new();
-        t.insert(
-            "annotation_limit",
-            value(i64::from(annotation_limit.expect("annotation_limit"))),
-        );
-        comment_key(
-            &mut t,
-            "annotation_limit",
-            field_doc::<OutputSchema>("annotation_limit"),
-            false,
-        );
-        t.insert("title", value(title.expect("title")));
-        comment_key(&mut t, "title", field_doc::<OutputSchema>("title"), false);
-        t.insert("subtitle", value(subtitle.expect("subtitle")));
-        comment_key(
-            &mut t,
-            "subtitle",
-            field_doc::<OutputSchema>("subtitle"),
-            false,
-        );
-        t.decor_mut().set_prefix(format!(
-            "\n{}",
-            doc_comment(field_doc::<ConfigSchema>("output"))
-        ));
-        root.insert("output", Item::Table(t));
+        insert_view_preset(&mut t, vp);
+        set_section_doc_on_first(&mut t, &mut first, field_doc::<ConfigSchema>("views"));
+        views_tbl.insert(&name, Item::Table(t));
     }
+    root.insert("views", Item::Table(views_tbl));
+}
 
-    doc.to_string()
+/// Emit the `[language.<name>]` tables, sorted by name for deterministic
+/// output, with the `language` field doc above the first sub-table.
+fn emit_language_block(root: &mut toml_edit::Table, language: HashMap<String, LangSchema>) {
+    use toml_edit::{Item, Table};
+
+    let mut lang_sorted: Vec<_> = language.into_iter().collect();
+    lang_sorted.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut lang_tbl = Table::new();
+    lang_tbl.set_implicit(true);
+    let mut first = true;
+    for (name, ls) in lang_sorted {
+        let mut t = Table::new();
+        insert_lang_section(&mut t, ls);
+        set_section_doc_on_first(&mut t, &mut first, field_doc::<ConfigSchema>("language"));
+        lang_tbl.insert(&name, Item::Table(t));
+    }
+    root.insert("language", Item::Table(lang_tbl));
+}
+
+/// Set `doc` as the section-header comment on `table` only when `first` is
+/// still true, flipping it to false. Shared by the views/language map
+/// emitters so the field doc renders above the first sub-table only.
+fn set_section_doc_on_first(table: &mut toml_edit::Table, first: &mut bool, doc: &str) {
+    if *first {
+        table
+            .decor_mut()
+            .set_prefix(format!("\n{}", doc_comment(doc)));
+        *first = false;
+    }
+}
+
+/// Emit the `[output]` table — `annotation_limit`, `title`, `subtitle`,
+/// each with its `///` doc, and the `output` field doc as the table
+/// header.
+fn emit_output_block(root: &mut toml_edit::Table, output: OutputSchema) {
+    use toml_edit::{Item, Table, value};
+
+    // Exhaustive destructure (no `..`) — extends the compile guard to
+    // OutputSchema: a new field breaks this until it is emitted.
+    let OutputSchema {
+        annotation_limit,
+        title,
+        subtitle,
+    } = output;
+    let mut t = Table::new();
+    t.insert(
+        "annotation_limit",
+        value(i64::from(annotation_limit.expect("annotation_limit"))),
+    );
+    comment_key(
+        &mut t,
+        "annotation_limit",
+        field_doc::<OutputSchema>("annotation_limit"),
+        false,
+    );
+    t.insert("title", value(title.expect("title")));
+    comment_key(&mut t, "title", field_doc::<OutputSchema>("title"), false);
+    t.insert("subtitle", value(subtitle.expect("subtitle")));
+    comment_key(
+        &mut t,
+        "subtitle",
+        field_doc::<OutputSchema>("subtitle"),
+        false,
+    );
+    t.decor_mut().set_prefix(format!(
+        "\n{}",
+        doc_comment(field_doc::<ConfigSchema>("output"))
+    ));
+    root.insert("output", Item::Table(t));
 }
 
 /// Insert every field of a [`ViewPresetSchema`] into `table`, each with
