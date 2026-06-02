@@ -17,87 +17,104 @@ pub fn compute_summary<'a, I>(verdicts: I) -> AnalysisSummary
 where
     I: IntoIterator<Item = &'a FunctionVerdict>,
 {
-    let mut distribution = RiskDistribution {
-        low: 0,
-        acceptable: 0,
-        moderate: 0,
-        high: 0,
-    };
-
-    let mut scores: Vec<f64> = Vec::new();
-    let mut complexities: Vec<u32> = Vec::new();
-    let mut finite_coverages: Vec<f64> = Vec::new();
-    let mut files: std::collections::HashSet<&'a String> = std::collections::HashSet::new();
-    let mut exceeding: usize = 0;
-    let mut max_crap = None;
-    let mut worst_function = None;
-    let mut max_complexity: u32 = 0;
-
+    let mut acc = SummaryAcc::default();
     for v in verdicts {
+        acc.fold(v);
+    }
+    acc.finish()
+}
+
+/// Running totals for `compute_summary`.
+///
+/// Splitting the per-verdict update (`fold`) and the final reduction
+/// (`finish`) out of `compute_summary` keeps each step a single
+/// responsibility — the loop body that branched on risk level, max
+/// CRAP, and max complexity no longer inflates the public function's
+/// cognitive complexity. Mirrors the per-file `FileAcc` accumulator
+/// below. Stays pure: only domain types, no I/O.
+struct SummaryAcc<'a> {
+    scores: Vec<f64>,
+    complexities: Vec<u32>,
+    finite_coverages: Vec<f64>,
+    files: std::collections::HashSet<&'a String>,
+    exceeding: usize,
+    max_crap: Option<f64>,
+    worst_function: Option<FunctionIdentity>,
+    max_complexity: u32,
+    distribution: RiskDistribution,
+}
+
+impl<'a> Default for SummaryAcc<'a> {
+    fn default() -> Self {
+        Self {
+            scores: Vec::new(),
+            complexities: Vec::new(),
+            finite_coverages: Vec::new(),
+            files: std::collections::HashSet::new(),
+            exceeding: 0,
+            max_crap: None,
+            worst_function: None,
+            max_complexity: 0,
+            distribution: RiskDistribution {
+                low: 0,
+                acceptable: 0,
+                moderate: 0,
+                high: 0,
+            },
+        }
+    }
+}
+
+impl<'a> SummaryAcc<'a> {
+    fn fold(&mut self, v: &'a FunctionVerdict) {
         let score = v.scored.crap.value;
-        scores.push(score);
-        complexities.push(v.scored.complexity);
+        self.scores.push(score);
+        self.complexities.push(v.scored.complexity);
         let cov = v.scored.coverage_percent;
         if cov.is_finite() {
-            finite_coverages.push(cov);
+            self.finite_coverages.push(cov);
         }
-        files.insert(&v.scored.identity.file_path);
-
+        self.files.insert(&v.scored.identity.file_path);
         if v.exceeds {
-            exceeding += 1;
+            self.exceeding += 1;
         }
-
-        match v.scored.crap.risk_level {
-            RiskLevel::Low => distribution.low += 1,
-            RiskLevel::Acceptable => distribution.acceptable += 1,
-            RiskLevel::Moderate => distribution.moderate += 1,
-            RiskLevel::High => distribution.high += 1,
+        bump_distribution(&mut self.distribution, v.scored.crap.risk_level);
+        if beats(self.max_crap, score) {
+            self.max_crap = Some(score);
+            self.worst_function = Some(v.scored.identity.clone());
         }
-
-        if max_crap.is_none() || score > max_crap.unwrap_or(0.0) {
-            max_crap = Some(score);
-            worst_function = Some(v.scored.identity.clone());
-        }
-        if v.scored.complexity > max_complexity {
-            max_complexity = v.scored.complexity;
+        if v.scored.complexity > self.max_complexity {
+            self.max_complexity = v.scored.complexity;
         }
     }
 
-    let total_functions = scores.len();
-    scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    complexities.sort_unstable();
-    finite_coverages.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    fn finish(mut self) -> AnalysisSummary {
+        let total_functions = self.scores.len();
+        self.scores
+            .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        self.complexities.sort_unstable();
+        self.finite_coverages
+            .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-    let average_crap = mean_f64(&scores);
-    let median_crap = median_f64_sorted(&scores);
-
-    let average_complexity = mean_u32(&complexities);
-    let median_complexity = median_u32_sorted(&complexities);
-
-    let min_coverage = finite_coverages.first().copied().unwrap_or(0.0);
-    let average_coverage = mean_f64(&finite_coverages);
-    let median_coverage = median_f64_sorted(&finite_coverages);
-
-    AnalysisSummary {
-        total_functions,
-        total_files: files.len(),
-        exceeding_threshold: exceeding,
-        average_crap,
-        median_crap,
-        max_crap: max_crap.map(super::crap::classify_risk).map(|risk_level| {
-            super::types::CrapScore {
-                value: max_crap.unwrap(),
-                risk_level,
-            }
-        }),
-        worst_function,
-        distribution,
-        max_complexity,
-        average_complexity,
-        median_complexity,
-        min_coverage,
-        average_coverage,
-        median_coverage,
+        AnalysisSummary {
+            total_functions,
+            total_files: self.files.len(),
+            exceeding_threshold: self.exceeding,
+            average_crap: mean_f64(&self.scores),
+            median_crap: median_f64_sorted(&self.scores),
+            max_crap: self.max_crap.map(|value| CrapScore {
+                value,
+                risk_level: super::crap::classify_risk(value),
+            }),
+            worst_function: self.worst_function,
+            distribution: self.distribution,
+            max_complexity: self.max_complexity,
+            average_complexity: mean_u32(&self.complexities),
+            median_complexity: median_u32_sorted(&self.complexities),
+            min_coverage: self.finite_coverages.first().copied().unwrap_or(0.0),
+            average_coverage: mean_f64(&self.finite_coverages),
+            median_coverage: median_f64_sorted(&self.finite_coverages),
+        }
     }
 }
 

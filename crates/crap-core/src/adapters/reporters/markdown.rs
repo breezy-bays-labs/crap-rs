@@ -427,70 +427,81 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
         new_violations = summary.new_violations,
     ));
 
-    // Filter threshold matches the `{:.2}` cell-rendering precision:
-    // a delta below 0.005 rounds to "+0.00" in the table and looks
-    // like a falsely-flagged regression. Anything that rounds up to
-    // ≥ +0.01 is admitted. (CrapScore values are themselves
-    // 2-decimal rounded, so this gate rarely fires in practice — but
-    // float arithmetic can produce sub-0.005 noise on identity
-    // comparisons.)
+    push_regressions_table(&mut out, view);
+    push_new_violations_table(&mut out, view);
+
+    out
+}
+
+/// True when a change is a `Modified` whose CRAP rose by at least 0.005.
+///
+/// The 0.005 cutoff matches the `{:.2}` cell-rendering precision: a
+/// delta below it rounds to "+0.00" in the table and looks like a
+/// falsely-flagged regression. (CrapScore values are themselves
+/// 2-decimal rounded, so this gate rarely fires in practice — but float
+/// arithmetic can produce sub-0.005 noise on identity comparisons.)
+fn is_md_regression(change: &FunctionChange) -> bool {
+    matches!(change, FunctionChange::Modified { .. })
+        && change.score_delta().unwrap_or(0.0) >= 0.005
+}
+
+/// True when a change first crosses the threshold in the current run —
+/// a newly-added violator or an existing function that just broke the
+/// gate. Removed functions never count.
+fn is_new_violation(change: &FunctionChange) -> bool {
+    match change {
+        FunctionChange::Added { current } => current.exceeds,
+        FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
+        FunctionChange::Removed { .. } => false,
+    }
+}
+
+fn push_regressions_table(out: &mut String, view: &DeltaView<'_>) {
     let regressions: Vec<&FunctionChange> = view
         .shown
         .iter()
         .copied()
-        .filter(|c| {
-            matches!(c, FunctionChange::Modified { .. }) && c.score_delta().unwrap_or(0.0) >= 0.005
-        })
+        .filter(|c| is_md_regression(c))
         .collect();
-    if !regressions.is_empty() {
-        out.push_str("\n### Regressions\n\n");
-        out.push_str("| File | Function | Baseline CRAP | Current CRAP | Δ |\n");
-        out.push_str("|------|----------|--------------:|-------------:|--:|\n");
-        for change in regressions {
-            let baseline = change.baseline_score().unwrap_or(0.0);
-            let current = change.current_score().unwrap_or(0.0);
-            let delta = change.score_delta().unwrap_or(0.0);
-            out.push_str(&format!(
-                "| {} | {} | {:.2} | {:.2} | +{:.2} |\n",
-                escape_cell(change.file_path()),
-                escape_cell(change.qualified_name()),
-                baseline,
-                current,
-                delta,
-            ));
-        }
+    if regressions.is_empty() {
+        return;
     }
+    out.push_str("\n### Regressions\n\n");
+    out.push_str("| File | Function | Baseline CRAP | Current CRAP | Δ |\n");
+    out.push_str("|------|----------|--------------:|-------------:|--:|\n");
+    for change in regressions {
+        out.push_str(&format!(
+            "| {} | {} | {:.2} | {:.2} | +{:.2} |\n",
+            escape_cell(change.file_path()),
+            escape_cell(change.qualified_name()),
+            change.baseline_score().unwrap_or(0.0),
+            change.current_score().unwrap_or(0.0),
+            change.score_delta().unwrap_or(0.0),
+        ));
+    }
+}
 
+fn push_new_violations_table(out: &mut String, view: &DeltaView<'_>) {
     let new_violations: Vec<&FunctionChange> = view
         .shown
         .iter()
         .copied()
-        .filter(|c| match c {
-            FunctionChange::Added { current } => current.exceeds,
-            FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
-            FunctionChange::Removed { .. } => false,
-            // `FunctionChange` has `#[non_exhaustive]` paused per ADR
-            // D10 (restored at v1.0). In-crate match is exhaustive —
-            // no wildcard arm needed. v1.0 new variants will require
-            // an explicit arm here.
-        })
+        .filter(|c| is_new_violation(c))
         .collect();
-    if !new_violations.is_empty() {
-        out.push_str("\n### New violations\n\n");
-        out.push_str("| File | Function | Current CRAP |\n");
-        out.push_str("|------|----------|-------------:|\n");
-        for change in new_violations {
-            let current = change.current_score().unwrap_or(0.0);
-            out.push_str(&format!(
-                "| {} | {} | {:.2} |\n",
-                escape_cell(change.file_path()),
-                escape_cell(change.qualified_name()),
-                current,
-            ));
-        }
+    if new_violations.is_empty() {
+        return;
     }
-
-    out
+    out.push_str("\n### New violations\n\n");
+    out.push_str("| File | Function | Current CRAP |\n");
+    out.push_str("|------|----------|-------------:|\n");
+    for change in new_violations {
+        out.push_str(&format!(
+            "| {} | {} | {:.2} |\n",
+            escape_cell(change.file_path()),
+            escape_cell(change.qualified_name()),
+            change.current_score().unwrap_or(0.0),
+        ));
+    }
 }
 
 /// Escape characters with special meaning inside a GFM table cell.

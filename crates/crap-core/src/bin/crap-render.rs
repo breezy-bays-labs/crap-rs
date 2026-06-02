@@ -223,39 +223,54 @@ fn run(cli: Cli) -> Result<()> {
 /// Returns the parsed input envelopes and baseline envelopes. Enforces,
 /// in order: at least one `--input`; no duplicate input language key;
 /// no duplicate baseline language key; every baseline pairs with an
-/// input by language key. Extracted from `run` (crap-rs#336, Commit 2)
-/// so the orchestrator stays a flat pipeline — behavior-preserving;
-/// the error strings are unchanged (pinned by the `crap_render_cli`
-/// characterization tests).
+/// input by language key. Kept separate from `run` so the orchestrator
+/// stays a flat pipeline — the error strings are stable and pinned by
+/// the `crap_render_cli` characterization tests.
 fn parse_and_validate_envelopes(cli: &Cli) -> Result<(Vec<ParsedEnvelope>, Vec<ParsedEnvelope>)> {
     if cli.inputs.is_empty() {
         bail!("at least one --input <LANG>=<FILE> argument is required");
     }
 
-    let mut parsed: Vec<ParsedEnvelope> = Vec::with_capacity(cli.inputs.len());
-    for spec in &cli.inputs {
-        parsed.push(parse_input_spec(spec, "input")?);
-    }
+    let parsed = parse_all_specs(&cli.inputs, "input")?;
     guard_unique_languages(&parsed, "input")?;
 
     // Parse optional baselines. Each baseline pairs by `<LANG>` key
     // with one of the `--input` envelopes; a baseline whose key has
     // no matching input is an operator error (typo / wrong file).
-    let mut baselines: Vec<ParsedEnvelope> = Vec::with_capacity(cli.baselines.len());
-    for spec in &cli.baselines {
-        baselines.push(parse_input_spec(spec, "baseline")?);
-    }
+    let baselines = parse_all_specs(&cli.baselines, "baseline")?;
     guard_unique_languages(&baselines, "baseline")?;
-    for env in &baselines {
-        if !parsed.iter().any(|e| e.language == env.language) {
+    guard_baselines_pair_with_inputs(&baselines, &parsed)?;
+
+    Ok((parsed, baselines))
+}
+
+/// Parse every `<LANG>=<FILE>` spec in `specs` into a `ParsedEnvelope`.
+/// `kind` (`"input"` / `"baseline"`) flows into per-spec error messages
+/// so the operator sees which flag to fix.
+fn parse_all_specs(specs: &[String], kind: &str) -> Result<Vec<ParsedEnvelope>> {
+    let mut parsed: Vec<ParsedEnvelope> = Vec::with_capacity(specs.len());
+    for spec in specs {
+        parsed.push(parse_input_spec(spec, kind)?);
+    }
+    Ok(parsed)
+}
+
+/// Refuse a baseline whose language key has no matching `--input`. A
+/// baseline only composes against an input of the same key, so an
+/// orphan baseline is an operator error (typo / wrong file).
+fn guard_baselines_pair_with_inputs(
+    baselines: &[ParsedEnvelope],
+    inputs: &[ParsedEnvelope],
+) -> Result<()> {
+    for env in baselines {
+        if !inputs.iter().any(|e| e.language == env.language) {
             bail!(
                 "--baseline for language '{}' has no matching --input. Each baseline must pair with an input by language key.",
                 env.language
             );
         }
     }
-
-    Ok((parsed, baselines))
+    Ok(())
 }
 
 /// Refuse two envelopes for the same language key. `kind` is `"input"`

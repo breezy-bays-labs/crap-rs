@@ -495,41 +495,7 @@ fn worst_offenders_top4_from_files(files: &[FileCard]) -> Vec<OffenderRow> {
 
 fn file_cards(view: &AnalysisView<'_>, threshold: f64) -> Vec<FileCard> {
     let fns_by_file = group_by_file(&view.shown);
-
-    // Resolve file order: with grouping, honor the grouped order; else
-    // sort files by max-CRAP descending so the worst offenders surface
-    // at the top of the file list (matches the Sakura design).
-    let file_order: Vec<String> = if let Some(grouped) = view.grouped.as_ref() {
-        grouped.files.iter().map(|f| f.file_path.clone()).collect()
-    } else {
-        let mut paths: Vec<String> = fns_by_file.keys().map(|k| k.to_string()).collect();
-        paths.sort_by(|a, b| {
-            let ma = fns_by_file
-                .get(a.as_str())
-                .and_then(|v| {
-                    v.iter().map(|f| f.scored.crap.value).fold(None, |acc, x| {
-                        Some(match acc {
-                            Some(y) if y > x => y,
-                            _ => x,
-                        })
-                    })
-                })
-                .unwrap_or(f64::NEG_INFINITY);
-            let mb = fns_by_file
-                .get(b.as_str())
-                .and_then(|v| {
-                    v.iter().map(|f| f.scored.crap.value).fold(None, |acc, x| {
-                        Some(match acc {
-                            Some(y) if y > x => y,
-                            _ => x,
-                        })
-                    })
-                })
-                .unwrap_or(f64::NEG_INFINITY);
-            mb.partial_cmp(&ma).unwrap_or(std::cmp::Ordering::Equal)
-        });
-        paths
-    };
+    let file_order = resolve_file_order(view, &fns_by_file);
 
     file_order
         .into_iter()
@@ -538,6 +504,40 @@ fn file_cards(view: &AnalysisView<'_>, threshold: f64) -> Vec<FileCard> {
             Some(build_file_card(file, &fns, threshold))
         })
         .collect()
+}
+
+/// Resolve the file render order. With `--group-by` the grouped order
+/// is honored verbatim; otherwise files are sorted by max-CRAP
+/// descending so the worst offenders surface at the top of the file
+/// list (matches the Sakura design).
+fn resolve_file_order(
+    view: &AnalysisView<'_>,
+    fns_by_file: &BTreeMap<&str, Vec<&FunctionVerdict>>,
+) -> Vec<String> {
+    if let Some(grouped) = view.grouped.as_ref() {
+        return grouped.files.iter().map(|f| f.file_path.clone()).collect();
+    }
+    let mut paths: Vec<String> = fns_by_file.keys().map(|k| k.to_string()).collect();
+    paths.sort_by(|a, b| {
+        let ma = max_crap_in_file(fns_by_file, a);
+        let mb = max_crap_in_file(fns_by_file, b);
+        mb.partial_cmp(&ma).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    paths
+}
+
+/// Largest CRAP value among the functions grouped under `file`, or
+/// `f64::NEG_INFINITY` when the file has no entries (so an empty bucket
+/// sorts last under the descending order).
+fn max_crap_in_file(fns_by_file: &BTreeMap<&str, Vec<&FunctionVerdict>>, file: &str) -> f64 {
+    fns_by_file
+        .get(file)
+        .map(|v| {
+            v.iter()
+                .map(|f| f.scored.crap.value)
+                .fold(f64::NEG_INFINITY, f64::max)
+        })
+        .unwrap_or(f64::NEG_INFINITY)
 }
 
 fn build_file_card(file: String, fns: &[&FunctionVerdict], threshold: f64) -> FileCard {
@@ -1304,6 +1304,87 @@ fn build_combined_delta_panel(cd: crate::domain::multi_lang::CombinedDelta) -> C
 // (e.g. when a function's surrounding LOC changed but its body
 // didn't).
 
+/// The three rendered row buckets of a delta panel, partitioned from
+/// the shaped change list.
+struct DeltaRowBuckets {
+    regressions: Vec<DeltaRow>,
+    improvements: Vec<DeltaRow>,
+    new_functions: Vec<DeltaRow>,
+}
+
+/// Partition the shaped change list into rendered row buckets.
+///
+/// `shown` is sort-by-signed-impact descending by default, so
+/// regressions lead and improvements trail; each bucket preserves that
+/// order (largest-impact-first) so the most consequential changes lead.
+/// Removed functions are intentionally not surfaced — the
+/// regression-focused scorecard treats them as out of scope; their
+/// count still rides in the summary line.
+fn partition_delta_rows(shown: &[&FunctionChange]) -> DeltaRowBuckets {
+    let mut buckets = DeltaRowBuckets {
+        regressions: Vec::new(),
+        improvements: Vec::new(),
+        new_functions: Vec::new(),
+    };
+    for change in shown.iter().copied() {
+        match change {
+            FunctionChange::Added { current } => {
+                buckets.new_functions.push(added_row(current));
+            }
+            FunctionChange::Removed { .. } => {}
+            FunctionChange::Modified { baseline, current } => {
+                push_modified_row(&mut buckets, baseline, current);
+            }
+        }
+    }
+    buckets
+}
+
+/// Route a `Modified` change into the regressions or improvements
+/// bucket by the sign of its CRAP delta. Sub-0.005 moves (which round
+/// to "+0.00" in `{:.2}` output) land in neither — they're counted as
+/// unchanged by `count_unchanged`.
+fn push_modified_row(
+    buckets: &mut DeltaRowBuckets,
+    baseline: &FunctionVerdict,
+    current: &FunctionVerdict,
+) {
+    let delta = current.scored.crap.value - baseline.scored.crap.value;
+    if delta >= 0.005 {
+        buckets.regressions.push(modified_row(baseline, current));
+    } else if delta <= -0.005 {
+        buckets.improvements.push(modified_row(baseline, current));
+    }
+}
+
+/// Count `Modified` functions whose CRAP barely moved (|delta| < 0.005).
+///
+/// Counts from the FULL delta (pre-truncate, pre-sort) so a `--top N`
+/// cap doesn't silently lop them off — under the default signed-impact
+/// sort, near-zero-delta entries land at the bottom of the list and are
+/// the first to drop on truncation. Respects the user's `change_kinds`
+/// filter so a deliberate exclusion of Modified entries doesn't get
+/// re-surfaced in the footer line.
+fn count_unchanged(view: &DeltaView<'_>) -> u32 {
+    view.full
+        .changes
+        .iter()
+        .filter(|c| {
+            view.spec
+                .filters
+                .change_kinds
+                .as_ref()
+                .is_none_or(|kinds| kinds.contains(&c.kind()))
+        })
+        .filter(|c| match c {
+            FunctionChange::Modified { baseline, current } => {
+                (current.scored.crap.value - baseline.scored.crap.value).abs() < 0.005
+            }
+            _ => false,
+        })
+        .count() as u32
+}
+
 fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
     let summary = view.full.summary;
     let baseline_summary = &view.full.baseline.summary;
@@ -1325,62 +1406,13 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
 
     let kpis = build_delta_kpis(&summary, baseline_summary, current_summary);
 
-    let mut regressions: Vec<DeltaRow> = Vec::new();
-    let mut improvements: Vec<DeltaRow> = Vec::new();
-    let mut new_functions: Vec<DeltaRow> = Vec::new();
+    let DeltaRowBuckets {
+        regressions,
+        improvements,
+        new_functions,
+    } = partition_delta_rows(&view.shown);
 
-    // The shaped `view.shown` is sort-by-signed-impact descending by
-    // default, so we get regressions first → improvements last under
-    // the default spec. Within each bucket we preserve that order
-    // (largest-impact-first) so the most consequential changes lead.
-    for change in view.shown.iter().copied() {
-        match change {
-            FunctionChange::Added { current } => {
-                new_functions.push(added_row(current));
-            }
-            FunctionChange::Removed { .. } => {
-                // v1 design intentionally drops the Removed-zero
-                // panel per chat1.md simplification, and the regular
-                // case (Removed > 0) isn't surfaced in this iteration
-                // either — the chat1.md trim treats removed functions
-                // as out of scope for a regression-focused scorecard.
-                // Counts still ride in the summary line.
-            }
-            FunctionChange::Modified { baseline, current } => {
-                let delta = current.scored.crap.value - baseline.scored.crap.value;
-                if delta >= 0.005 {
-                    regressions.push(modified_row(baseline, current));
-                } else if delta <= -0.005 {
-                    improvements.push(modified_row(baseline, current));
-                }
-            }
-        }
-    }
-
-    // Count unchanged from the FULL delta (pre-truncate, pre-sort) so a
-    // `--top N` cap doesn't silently lop them off — under the default
-    // signed-impact sort, near-zero-delta entries land at the bottom of
-    // the list and are the first to drop on truncation. Respect the
-    // user's `change_kinds` filter so a deliberate exclusion of Modified
-    // entries doesn't get re-surfaced in the footer line.
-    let unchanged_count: u32 = view
-        .full
-        .changes
-        .iter()
-        .filter(|c| {
-            view.spec
-                .filters
-                .change_kinds
-                .as_ref()
-                .is_none_or(|kinds| kinds.contains(&c.kind()))
-        })
-        .filter(|c| match c {
-            FunctionChange::Modified { baseline, current } => {
-                (current.scored.crap.value - baseline.scored.crap.value).abs() < 0.005
-            }
-            _ => false,
-        })
-        .count() as u32;
+    let unchanged_count = count_unchanged(view);
 
     DeltaPanel {
         summary: panel_summary,
@@ -2115,7 +2147,7 @@ mod tests {
         // the report — we anchor on the tile structure).
         assert!(
             !out.contains("<span class=\"delta-kpi-label\">Functions</span>"),
-            "the 5th 'Functions' tile from the mock is intentionally dropped per orchestrator-locked Discovery #2"
+            "the 5th 'Functions' tile from the mock is intentionally dropped"
         );
     }
 
@@ -2178,7 +2210,7 @@ mod tests {
         let out = html_with_delta(&make_view_default(&delta.current), &dview);
         assert!(
             out.contains("delta-unchanged"),
-            "unchanged count should render as a single-line note (the chat1.md trim)"
+            "unchanged count should render as a single-line note, not a table"
         );
         assert!(
             !out.contains("delta-table unchanged"),
@@ -2519,7 +2551,7 @@ mod tests {
             .expect("TS moderate-risk row should render");
         assert!(
             high_pos < moderate_pos,
-            "expected High-risk before Moderate-risk in ranked table (D2d sort)"
+            "expected High-risk before Moderate-risk in ranked table"
         );
     }
 
@@ -3181,7 +3213,7 @@ mod tests {
             .expect("TypeScript Moderate-risk regression must surface in Combined Delta");
         assert!(
             rs_pos < ts_pos,
-            "Rust High-risk regression must rank ahead of TypeScript Moderate-risk regression in Combined Delta (D2d sort: risk band desc, ratio desc)"
+            "Rust High-risk regression must rank ahead of TypeScript Moderate-risk regression in Combined Delta (sort: risk band desc, ratio desc)"
         );
     }
 

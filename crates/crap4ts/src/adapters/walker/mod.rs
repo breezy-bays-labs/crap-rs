@@ -718,16 +718,28 @@ impl<'src> FunctionFinder<'src> {
     ) {
         match init {
             ForStatementInit::VariableDeclaration(vd) => {
-                for d in &vd.declarations {
-                    if let Some(init_expr) = &d.init {
-                        self.visit_expression(init_expr, out, nesting);
-                    }
-                }
+                self.visit_var_decl_initializers(vd, out, nesting);
             }
             other => {
                 if let Some(expr) = for_init_as_expression(other) {
                     self.visit_expression(expr, out, nesting);
                 }
+            }
+        }
+    }
+
+    /// Walk the initializer expression of each declarator in a
+    /// `for (let x = …; …)` head. A declarator without an initializer
+    /// (`for (let x; …)`) contributes nothing.
+    fn visit_var_decl_initializers(
+        &mut self,
+        vd: &oxc::ast::ast::VariableDeclaration<'_>,
+        out: &mut Contributors,
+        nesting: Option<u32>,
+    ) {
+        for d in &vd.declarations {
+            if let Some(init_expr) = &d.init {
+                self.visit_expression(init_expr, out, nesting);
             }
         }
     }
@@ -1244,17 +1256,7 @@ impl<'src> FunctionFinder<'src> {
         let Some(body) = &ns.body else {
             return;
         };
-        let prefix: Option<String> = match module_declaration_name(&ns.id) {
-            Some(seg) => Some(match parent_prefix {
-                Some(p) => format!("{p}.{seg}"),
-                None => seg,
-            }),
-            // A string-literal module name with no usable segment keeps
-            // the inherited prefix unchanged (extreme edge — `module
-            // "x" { … }` augmentation; `module_declaration_name` already
-            // returns the literal value for the common case).
-            None => parent_prefix.map(str::to_string),
-        };
+        let prefix = extend_namespace_prefix(&ns.id, parent_prefix);
         match body {
             TSModuleDeclarationBody::TSModuleBlock(block) => {
                 for stmt in &block.body {
@@ -1516,6 +1518,25 @@ fn module_declaration_name(id: &oxc::ast::ast::TSModuleDeclarationName<'_>) -> O
     match id {
         N::Identifier(bi) => Some(bi.name.as_str().to_string()),
         N::StringLiteral(lit) => Some(lit.value.as_str().to_string()),
+    }
+}
+
+/// Build the dotted namespace prefix for a `TSModuleDeclaration` by
+/// appending this declaration's own name segment to `parent_prefix`.
+/// A string-literal module name with no usable segment keeps the
+/// inherited prefix unchanged (extreme edge — `module "x" { … }`
+/// augmentation; `module_declaration_name` already returns the literal
+/// value for the common case).
+fn extend_namespace_prefix(
+    id: &oxc::ast::ast::TSModuleDeclarationName<'_>,
+    parent_prefix: Option<&str>,
+) -> Option<String> {
+    match module_declaration_name(id) {
+        Some(seg) => Some(match parent_prefix {
+            Some(p) => format!("{p}.{seg}"),
+            None => seg,
+        }),
+        None => parent_prefix.map(str::to_string),
     }
 }
 

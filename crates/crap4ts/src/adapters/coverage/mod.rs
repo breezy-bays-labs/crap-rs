@@ -238,40 +238,46 @@ impl IstanbulCoverage {
     ///   `effective_src` would otherwise leak an out-of-tree match.
     fn suffix_match_under(&self, raw: &Path) -> Option<PathBuf> {
         let components: Vec<_> = raw.components().collect();
-        for start in 0..components.len() {
+        (0..components.len()).find_map(|start| {
             let candidate_rel: PathBuf = components[start..].iter().collect();
-            // Reject traversal: `Path::starts_with` is lexical, so a
-            // `..` component would pass the under-root guard but
-            // `.is_file()` resolves it outside `effective_src`. Skip
-            // any suffix containing a ParentDir component before the
-            // filesystem touch (#216 gemini security-medium).
-            if candidate_rel
-                .components()
-                .any(|c| c == std::path::Component::ParentDir)
-            {
-                continue;
-            }
-            let candidate_abs = self.effective_src.join(&candidate_rel);
-            if candidate_abs.starts_with(&self.effective_src) && candidate_abs.is_file() {
-                return Some(candidate_rel);
-            }
+            self.candidate_resolves(&candidate_rel)
+                .then_some(candidate_rel)
+        })
+    }
+
+    /// True when `candidate_rel`, joined under `effective_src`, resolves
+    /// to a real in-tree file.
+    ///
+    /// A suffix containing a `..` component is rejected before the
+    /// filesystem touch: `Path::starts_with` is lexical, so a `..` would
+    /// pass the under-root guard but `.is_file()` resolves it *outside*
+    /// `effective_src` (a small perf win and a traversal guard). The
+    /// `starts_with` check defends the `start == 0` absolute-path case,
+    /// where `join` collapses back to the absolute `raw` itself.
+    fn candidate_resolves(&self, candidate_rel: &Path) -> bool {
+        if candidate_rel
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+        {
+            return false;
         }
-        None
+        let candidate_abs = self.effective_src.join(candidate_rel);
+        candidate_abs.starts_with(&self.effective_src) && candidate_abs.is_file()
     }
 }
 
 // ── Internal Istanbul schema types ───────────────────────────────────
 //
 // All types are private (parser-internal). They model the minimal
-// jest-flavored shape W1.1 consumes; `#[serde(default)]` on optional
+// jest-flavored shape the parser consumes; `#[serde(default)]` on optional
 // fields keeps deserialization permissive against jest/vitest/nyc
 // metadata fields we don't care about (`hash`, `contentHash`, `all`,
 // etc.) — serde drops unknown fields by default.
 
-/// One per-file entry in `coverage-final.json`. Field types are widened
-/// to `u64` (vs the breadboard's `u32`) to handle high-iteration code
-/// — Istanbul's `s` counts can comfortably exceed `u32::MAX` on stress
-/// tests, and `LineCoverage.hits` is `u64` downstream anyway.
+/// One per-file entry in `coverage-final.json`. Field types are `u64`
+/// (not `u32`) to handle high-iteration code — Istanbul's `s` counts
+/// can comfortably exceed `u32::MAX` on stress tests, and
+/// `LineCoverage.hits` is `u64` downstream anyway.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct IstanbulCoverageFile {
@@ -352,42 +358,53 @@ impl IstanbulCoverage {
         let mut diagnostics: Vec<IstanbulParseDiagnostic> = Vec::new();
 
         for (_key, entry) in raw {
-            // ── Path normalization ──────────────────────────────────
-            let Some(normalized) = self.normalize_path(&entry.path) else {
-                diagnostics.push(self.path_unresolved_diagnostic(&entry.path));
-                continue;
-            };
-
-            // ── MissingField: `s` populated but `statementMap` empty,
-            // or `statementMap` populated but `s` empty. Both cases
-            // indicate a partial / corrupt emitter record; emit and
-            // skip per breadboard W-3.
-            if let Some(diag) = Self::missing_field_diagnostic(&entry) {
-                diagnostics.push(diag);
-                continue;
-            }
-
-            let lines = Self::line_coverage_for(&entry);
-            let branches = Self::branch_coverage_for(&entry, &mut diagnostics);
-
-            let key = normalized.to_string_lossy().into_owned();
-            coverage.insert(key.clone(), lines);
-            if !branches.is_empty() {
-                branch_map_out.insert(key, branches);
-            }
+            self.fold_entry(&entry, &mut coverage, &mut branch_map_out, &mut diagnostics);
         }
 
         // `branches: None` ↔ "no branch data in this coverage file"
         // (semantic distinction from `Some({})`; mirrors the LCOV
         // adapter's `(!state.raw_branches.is_empty()).then(|| ...)`
-        // gate). This regression-pins existing W1.1 fixtures which
-        // have `"b": {}` everywhere.
+        // gate). This keeps fixtures with `"b": {}` everywhere reading
+        // as "no branch data" rather than "empty branch map".
         let branches = (!branch_map_out.is_empty()).then_some(branch_map_out);
 
         ParseOutput {
             coverage,
             branches,
             diagnostics,
+        }
+    }
+
+    /// Fold one Istanbul entry into the running coverage/branch maps,
+    /// or record a diagnostic and skip. Two skip paths: an unresolvable
+    /// path, and a partial/corrupt record where exactly one half of the
+    /// `s` / `statementMap` pair is empty. Otherwise the entry's line
+    /// coverage is inserted under its normalized key, and any branch
+    /// coverage it carries is inserted alongside.
+    fn fold_entry(
+        &self,
+        entry: &IstanbulCoverageFile,
+        coverage: &mut HashMap<String, Vec<LineCoverage>>,
+        branch_map_out: &mut HashMap<String, Vec<BranchCoverage>>,
+        diagnostics: &mut Vec<IstanbulParseDiagnostic>,
+    ) {
+        let Some(normalized) = self.normalize_path(&entry.path) else {
+            diagnostics.push(self.path_unresolved_diagnostic(&entry.path));
+            return;
+        };
+
+        if let Some(diag) = Self::missing_field_diagnostic(entry) {
+            diagnostics.push(diag);
+            return;
+        }
+
+        let lines = Self::line_coverage_for(entry);
+        let branches = Self::branch_coverage_for(entry, diagnostics);
+
+        let key = normalized.to_string_lossy().into_owned();
+        coverage.insert(key.clone(), lines);
+        if !branches.is_empty() {
+            branch_map_out.insert(key, branches);
         }
     }
 

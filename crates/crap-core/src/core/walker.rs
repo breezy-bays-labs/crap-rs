@@ -30,25 +30,12 @@ pub fn discover_source_files(
 ) -> Result<Vec<PathBuf>> {
     let mut builder = WalkBuilder::new(src);
     builder.git_ignore(respect_gitignore);
-
-    // Add exclude patterns as overrides
-    if !exclude.is_empty() {
-        let mut overrides = ignore::overrides::OverrideBuilder::new(src);
-        for pattern in exclude {
-            overrides
-                .add(&format!("!{pattern}"))
-                .with_context(|| format!("invalid exclude pattern: {pattern}"))?;
-        }
-        builder.overrides(overrides.build()?);
-    }
+    apply_exclude_overrides(&mut builder, src, exclude)?;
 
     let mut files = Vec::new();
     for entry in builder.build() {
         let entry = entry?;
-        if entry.file_type().is_some_and(|ft| ft.is_file())
-            && let Some(ext) = entry.path().extension()
-            && extensions.iter().any(|e| ext == *e)
-        {
+        if entry_matches(&entry, extensions) {
             files.push(entry.into_path());
         }
     }
@@ -56,6 +43,39 @@ pub fn discover_source_files(
     // Sort for deterministic output
     files.sort();
     Ok(files)
+}
+
+/// Register each user exclude pattern as a walker override. The
+/// `ignore` crate's override semantics invert gitignore: a bare glob
+/// whitelists, so each pattern is prefixed with `!` to turn it into an
+/// exclusion. A no-op when `exclude` is empty.
+fn apply_exclude_overrides(
+    builder: &mut WalkBuilder,
+    src: &Path,
+    exclude: &[String],
+) -> Result<()> {
+    if exclude.is_empty() {
+        return Ok(());
+    }
+    let mut overrides = ignore::overrides::OverrideBuilder::new(src);
+    for pattern in exclude {
+        overrides
+            .add(&format!("!{pattern}"))
+            .with_context(|| format!("invalid exclude pattern: {pattern}"))?;
+    }
+    builder.overrides(overrides.build()?);
+    Ok(())
+}
+
+/// True when a walk entry is a regular file whose extension is in the
+/// allow-list. Directories, symlinks-to-nowhere, and extension-less or
+/// wrong-extension files are rejected.
+fn entry_matches(entry: &ignore::DirEntry, extensions: &[&str]) -> bool {
+    entry.file_type().is_some_and(|ft| ft.is_file())
+        && entry
+            .path()
+            .extension()
+            .is_some_and(|ext| extensions.iter().any(|e| ext == *e))
 }
 
 #[cfg(test)]
