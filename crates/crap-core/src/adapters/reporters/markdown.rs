@@ -5,7 +5,7 @@
 //! documentation.
 //!
 //! Rendering goes through an askama compile-time template
-//! (`crates/crap-core/templates/markdown_report.txt`, crap-rs#260).
+//! (`crates/crap-core/templates/markdown_report.txt`).
 //! Width-aligned numeric fields are pre-formatted in Rust because
 //! askama's `{{ }}` interpolation does not honor Rust format
 //! specifiers; the template is composition-only.
@@ -41,17 +41,16 @@ use askama::Template;
 ///
 /// `meta` carries the calling binary's identity (the literal
 /// `env!("CARGO_PKG_NAME")` value resolves to `crap-core` here, not
-/// the adapter binary's name — so the binary supplies its own). The
-/// signature widened from `(&str, &str)` to `&AdapterMeta` in
-/// crap-rs#260 to thread `display_name` + `default_metric` through
-/// to the HTML reporter's per-adapter footer; the markdown reporter
-/// only consumes `tool_name` + `tool_version` but takes the bundle
-/// for signature symmetry with `format_html`. `effective_metric` is
-/// the runtime-resolved metric (post-CLI/config merge); see
-/// `EffectiveInputs.metric`.
+/// the adapter binary's name — so the binary supplies its own). `meta`
+/// is the full `&AdapterMeta` bundle: the markdown reporter only
+/// consumes `tool_name` and `tool_version`, but takes the whole bundle
+/// for signature symmetry with `format_html` (which threads
+/// `display_name` and `default_metric` into the HTML per-adapter
+/// footer). `effective_metric` is the runtime-resolved metric
+/// (post-CLI/config merge); see `EffectiveInputs.metric`.
 ///
 /// `title` and `subtitle` are the optional `[output] title` / `subtitle`
-/// config labels (crap-rs#352). When `title` is `Some`, it renders as a
+/// config labels. When `title` is `Some`, it renders as a
 /// `## <title>` line above the tool/version H1; when `subtitle` is
 /// `Some`, it renders on the line beneath. Both default to `None`, in
 /// which case the output is byte-identical to the unlabeled default — no
@@ -100,9 +99,8 @@ pub fn format_markdown(
     let mut out = tmpl
         .render()
         .expect("markdown template render is total — all fields owned");
-    // POSIX text files end with `\n`. Pre-PR-#260 the hand-rolled
-    // reporter always emitted a trailing newline; askama's `{%-` ws
-    // operator strips it in the template, and `insta` snapshot
+    // POSIX text files end with `\n`. askama's `{%-` ws operator strips
+    // the trailing newline in the template, and `insta` snapshot
     // assertions trim trailing whitespace on compare so the drift is
     // invisible to in-process tests. The composite scorecard action's
     // `cat <file>` + `echo "<EOF>"` heredoc emission relies on the
@@ -567,7 +565,7 @@ mod tests {
         )
     }
 
-    // ── [output] title / subtitle labeling (crap-rs#352) ────────────────
+    // ── [output] title / subtitle labeling ─────────────────────────────
 
     fn md_labeled(view: &AnalysisView<'_>, title: Option<&str>, subtitle: Option<&str>) -> String {
         format_markdown(
@@ -869,7 +867,7 @@ mod tests {
         insta::assert_snapshot!(out);
     }
 
-    // ── Delta scorecard (VS5) ───────────────────────────────────────
+    // ── Delta scorecard ─────────────────────────────────────────────
 
     #[test]
     fn delta_scorecard_includes_status_and_counts() {

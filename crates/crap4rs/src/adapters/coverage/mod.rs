@@ -60,13 +60,13 @@ impl LcovParser {
     ///    lexically strip, so the lexical result keeps the full
     ///    workspace-relative path. The walker keys by the src-relative
     ///    basename, so the two never matched and coverage silently
-    ///    dropped to 0 (crap-rs#331). A filesystem-validated
-    ///    longest-suffix match rescues this case.
+    ///    dropped to 0. A filesystem-validated longest-suffix match
+    ///    rescues this case.
     ///
     /// The suffix match does bounded `.is_file()` I/O — this parser is
     /// no longer pure strip-prefix; it now converges with crap4ts's
     /// `IstanbulCoverage::normalize_path`, which made the same trade for
-    /// cross-form portability (#215/#216).
+    /// cross-form portability.
     fn normalize_path(&self, path: &str) -> String {
         let fwd = path.replace('\\', "/");
         let root_fwd = self.root_path.to_string_lossy().replace('\\', "/");
@@ -78,8 +78,8 @@ impl LcovParser {
         // the source root (shapes 1 and 2 above). Keep it verbatim — no
         // suffix scan needed.
         //
-        // Traversal guard (mirrors crap4ts #216, ported into the
-        // suffix-match below too): `strip_prefix` is lexical, so a
+        // Traversal guard (mirrors the crap4ts adapter's guard, applied
+        // in the suffix-match below too): `strip_prefix` is lexical, so a
         // user-supplied `SF:/root/../outside/secret.rs` strips to
         // `../outside/secret.rs` and `root.join(..).is_file()` would
         // resolve — and thus probe the existence of — a file *outside*
@@ -93,9 +93,9 @@ impl LcovParser {
             return lexical.to_string_lossy().replace('\\', "/");
         }
 
-        // Rescue path (#331): a workspace-relative `SF:` line couldn't
-        // strip the canonical absolute root. Recover the walker's key
-        // as the longest path suffix that resolves to a real file.
+        // Rescue path: a workspace-relative `SF:` line couldn't strip
+        // the canonical absolute root. Recover the walker's key as the
+        // longest path suffix that resolves to a real file.
         if let Some(suffix) = suffix_match_under(root, p) {
             return suffix;
         }
@@ -115,13 +115,13 @@ impl LcovParser {
 /// Iterates longest → shortest so a leaf filename that exists in
 /// multiple directories is disambiguated by the longest shared path —
 /// the structural truth, not the machine-specific prefix. Mirrors
-/// `crap4ts`'s `IstanbulCoverage::suffix_match_under` (#215).
+/// `crap4ts`'s `IstanbulCoverage::suffix_match_under`.
 ///
 /// `.is_file()` (one syscall, not `.exists()`) avoids a directory
 /// false-positive. Any suffix containing a `..` component is skipped
 /// before the syscall: `SF:` records are user-supplied, so a `..` that
 /// lexically passes `starts_with(root)` would resolve a real file
-/// *outside* `root` (mirrors crap4ts's #216 traversal guard).
+/// *outside* `root` (mirrors the crap4ts adapter's traversal guard).
 fn suffix_match_under(root: &Path, path: &Path) -> Option<String> {
     let components: Vec<_> = path.components().collect();
     for start in 0..components.len() {
@@ -625,14 +625,14 @@ mod tests {
 
     #[test]
     fn parentdir_sf_path_does_not_take_fast_path_is_file_probe() {
-        // crap-rs#333 / mirrors crap4ts #216. `SF:` records are
-        // user-supplied; a `..` makes the lexical `strip_prefix` succeed
-        // with a `..`-bearing relative result that `root.join(..).is_file()`
-        // resolves OUTSIDE the root — a traversal-escape existence oracle
-        // on the fast path. The fast path must reject `..` and fall
-        // through to the guarded suffix match, which re-anchors the clean
-        // tail under the root. Needs real on-disk files so the `is_file()`
-        // behaviour is actually exercised.
+        // `SF:` records are user-supplied; a `..` makes the lexical
+        // `strip_prefix` succeed with a `..`-bearing relative result
+        // that `root.join(..).is_file()` resolves OUTSIDE the root — a
+        // traversal-escape existence oracle on the fast path. The fast
+        // path must reject `..` and fall through to the guarded suffix
+        // match, which re-anchors the clean tail under the root. Needs
+        // real on-disk files so the `is_file()` behaviour is actually
+        // exercised.
         let tmp = tempfile::tempdir().expect("tempdir");
         let root = tmp.path().canonicalize().expect("canonicalize tempdir");
         std::fs::write(root.join("secret.rs"), "fn x() {}").expect("write secret.rs");
@@ -640,8 +640,8 @@ mod tests {
         let parser = LcovParser::new(root.clone());
 
         // `<root>/../<leaf>/secret.rs` lexically strips to
-        // `../<leaf>/secret.rs`; the pre-#333 fast path resolved that and
-        // returned the unusable `..` key.
+        // `../<leaf>/secret.rs`; an unguarded fast path would resolve
+        // that and return the unusable `..` key.
         let sf = format!("{}/../{leaf}/secret.rs", root.display());
         let output = parser.parse_str(&format!("SF:{sf}\nDA:1,1\nend_of_record\n"));
 

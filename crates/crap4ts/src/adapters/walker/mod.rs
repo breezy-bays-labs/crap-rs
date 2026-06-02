@@ -10,24 +10,22 @@
 //!    `.mjs` / `.cjs`) plus `.mts` / `.cts` / `.d.ts`. Unknown
 //!    extensions fall back to `SourceType::ts()` so the walker stays
 //!    robust against discovery paths that hand us non-source files.
-//!    W2.2 (#185) verified this dispatcher covers the full extension
-//!    matrix without a hand-rolled match — see PR #173 W2.2 plan
-//!    deviation notes.
+//!    `SourceType::from_path` covers the full extension matrix without
+//!    a hand-rolled match.
 //! 2. If `ret.errors` is non-empty, returns
 //!    `Err(CrapError::SourceParse(format!("{file_path}: {}", err)))`.
-//!    The orchestrator at `crap-core/src/core/mod.rs:286-310` catches
-//!    this and increments `AnalysisDiagnostics.files_unparseable`.
+//!    The orchestrator in `crap-core`'s `core` module catches this and
+//!    increments `AnalysisDiagnostics.files_unparseable`.
 //! 3. Otherwise walks the AST, emitting one `FunctionComplexity` per
 //!    function declaration / function expression / arrow function /
 //!    class method. Each function's contributors list captures the
 //!    decision points scored inside its own body — nested functions
 //!    accumulate independently.
 //!
-//! ## W1.2 + W2.1 decision-point coverage (crap-rs#182 + #184)
+//! ## Decision-point coverage
 //!
-//! The 11-row decision-point mapping table — see ADR (a) (D15) at
-//! <https://github.com/breezy-bays-labs/ops/blob/main/decisions/crap-rs/adr-cyclomatic-decision-points-ts.md>
-//! for the rationale + per-row justification:
+//! The 11-row decision-point mapping table. Each row maps an oxc AST
+//! node to the `ContributorKind` it scores:
 //!
 //! | oxc AST node                                              | ContributorKind   |
 //! |-----------------------------------------------------------|-------------------|
@@ -43,7 +41,7 @@
 //! | `TryStatement.handler.is_some()` (`catch`)                | `Catch`           |
 //! | JSX conditional `{cond && <Element/>}`                    | `LogicalOperator` (decomposes through `LogicalExpression(And)`) |
 //!
-//! ### Compound counting (W2.1)
+//! ### Compound counting
 //!
 //! Each operator counts +1 unconditionally; chains/nestings never
 //! flatten. `a ? b : c ? d : e` produces CC 3 (two `Ternary`);
@@ -52,7 +50,7 @@
 //! AND the inner `&&`. Implementation: the expression visitor recurses
 //! through children unconditionally so chains accumulate naturally.
 //!
-//! ### Class-element traversal (#199)
+//! ### Class-element traversal
 //!
 //! `visit_class` discovers three function-entry kinds beyond plain
 //! `MethodDefinition`:
@@ -77,8 +75,8 @@
 //! - `end_line   = byte_to_line(source, span.end.saturating_sub(1))`
 //!
 //! i.e. `end_line` is the 1-based line of the LAST BYTE in the span.
-//! The W1.2 prompt's "add +1" claim was a secondary-source error
-//! (Context7-confirmed); see `observations.md` for the recorded pin.
+//! Note the `saturating_sub(1)`: `span.end` is exclusive, so the last
+//! byte of the span is at `span.end - 1`.
 
 use std::path::Path;
 
@@ -202,9 +200,8 @@ impl<'src> FunctionFinder<'src> {
             }
             // All other top-level statements may still contain nested
             // function-expression entries inside their expression trees
-            // (e.g. an IIFE at module scope). For W1.2 the fixture
-            // corpus never exercises this path; we still descend so
-            // the walker is robust against real-world code.
+            // (e.g. an IIFE at module scope). We descend so the walker
+            // is robust against real-world code.
             other => {
                 let mut sink = Contributors::default();
                 self.visit_statement(other, &mut sink, None);
@@ -268,7 +265,7 @@ impl<'src> FunctionFinder<'src> {
 
     /// Discover function-entry sites on a class body. Beyond plain
     /// `MethodDefinition`, two ES2022/TS shapes carry executable
-    /// function bodies (#199):
+    /// function bodies:
     ///
     /// 1. `ClassElement::PropertyDefinition` (`onClick = () => {…}` or
     ///    `static setup = function () {…}`) — the class-field auto-bind
@@ -282,7 +279,7 @@ impl<'src> FunctionFinder<'src> {
     ///    whose body is the static block's statement list. Decision
     ///    points inside the block contribute to that synthetic
     ///    function, mirroring the "static initialisation is method-
-    ///    like" interpretation from #199's discovery section.
+    ///    like" interpretation.
     fn visit_class(&mut self, class: &Class<'_>, name_hint: Option<String>) {
         let class_name = class
             .id
@@ -327,10 +324,10 @@ impl<'src> FunctionFinder<'src> {
     /// (the field doesn't itself contribute to any parent accumulator —
     /// it is the parent in this position).
     ///
-    /// #205 (class side): a **computed** property key
+    /// A **computed** property key
     /// (`class Foo { [(() => "x")()]: 42 = 0 }`) is an arbitrary
     /// expression that can embed nested functions or decision points,
-    /// exactly like the object-literal case (#200 item 1). When
+    /// exactly like the object-literal computed-key case. When
     /// `prop.computed` is set we recurse into the key expression first,
     /// through a throwaway sink because the class element is its own
     /// root — it has no parent function accumulator to charge. This
@@ -373,10 +370,10 @@ impl<'src> FunctionFinder<'src> {
     /// `static { ... }` block. The block's statement list is walked the
     /// same way a function body is — decision points inside it
     /// accumulate against the synthetic function and nested function
-    /// entries spawn their own complexity sites. Per #199 discovery,
-    /// this matches the "static initialisation is method-like"
-    /// interpretation rather than rolling decision points up into the
-    /// class (which has no executable body of its own to charge).
+    /// entries spawn their own complexity sites. This matches the
+    /// "static initialisation is method-like" interpretation rather than
+    /// rolling decision points up into the class (which has no
+    /// executable body of its own to charge).
     fn record_static_block(&mut self, block: &oxc::ast::ast::StaticBlock<'_>, class_name: &str) {
         let qualified = format!("{class_name}.<static-init>");
         let mut contributors = Contributors::default();
@@ -483,7 +480,7 @@ impl<'src> FunctionFinder<'src> {
             Statement::LabeledStatement(l) => self.visit_statement(&l.body, out, nesting),
             Statement::ThrowStatement(th) => self.visit_expression(&th.argument, out, nesting),
 
-            // #200 item 2: TS namespaces / modules. A
+            // TS namespaces / modules. A
             // `namespace Foo { function bar() {} }` carries an
             // executable body whose statements must be walked so `bar`
             // (and any decision points / nested functions) are
@@ -627,12 +624,12 @@ impl<'src> FunctionFinder<'src> {
         }
     }
 
-    /// W2.1 (#184): `try { … } catch (e) { … }` contributes one
-    /// `Catch` decision point. Per ADR (a), the score is on
-    /// `handler.is_some()` rather than per-thrown-type — a single
-    /// `catch (e)` clause is one branch in the control-flow graph
-    /// regardless of how it discriminates the error. `try { … }
-    /// finally { … }` (no handler) is NOT a decision point.
+    /// `try { … } catch (e) { … }` contributes one `Catch` decision
+    /// point. The score is on `handler.is_some()` rather than
+    /// per-thrown-type — a single `catch (e)` clause is one branch in
+    /// the control-flow graph regardless of how it discriminates the
+    /// error. `try { … } finally { … }` (no handler) is NOT a decision
+    /// point.
     ///
     /// After scoring, walk the try block, handler body, and finalizer
     /// for nested-function discovery + any universal decision points
@@ -751,8 +748,7 @@ impl<'src> FunctionFinder<'src> {
         _nesting: Option<u32>,
     ) {
         // The LHS of for-in / for-of is a BindingPattern or
-        // AssignmentTarget — no decision points are encoded there for
-        // W1.2's universal set.
+        // AssignmentTarget — no decision points are encoded there.
     }
 
     /// Push a `ForLoop` contributor + recurse via the caller — separated
@@ -784,12 +780,12 @@ impl<'src> FunctionFinder<'src> {
             Expression::FunctionExpression(func) => self.record_function(func, None),
             Expression::ClassExpression(class) => self.visit_class(class, None),
 
-            // W2.1 TS-specific decision points (ADR (a)) — scoring +
-            // recursion both happen inside the helper.
+            // TS-specific decision points — scoring + recursion both
+            // happen inside the helper.
             Expression::ConditionalExpression(ce) => self.visit_conditional(ce, out, nesting),
             Expression::ChainExpression(ce) => self.visit_chain(ce, out, nesting),
 
-            // JSX traversal (W2.1): `{cond && <Element/>}` decomposes
+            // JSX traversal: `{cond && <Element/>}` decomposes
             // through `LogicalExpression(And)` once we descend into the
             // expression container, so the existing logical-operator
             // scoring handles the JSX-conditional pattern without a
@@ -818,10 +814,9 @@ impl<'src> FunctionFinder<'src> {
                 self.visit_expression(&b.right, out, nesting);
             }
             Expression::AssignmentExpression(a) => {
-                // #200 item 3 (+ gemini review on PR #220): a
-                // member-expression LHS embeds sub-expressions that can
+                // A member-expression LHS embeds sub-expressions that can
                 // contain a nested function (e.g. an IIFE) or decision
-                // points. The pre-#200 arm discarded `a.left` entirely.
+                // points, so `a.left` must be descended (not discarded).
                 // `AssignmentTarget` flattens `MemberExpression`'s three
                 // variants via `inherit_variants!`:
                 //  - Computed (`x[foo()] = 1`): recurse object + the
@@ -850,14 +845,12 @@ impl<'src> FunctionFinder<'src> {
                 }
                 self.visit_expression(&a.right, out, nesting);
             }
-            // #200 item 4 (+ gemini review on PR #220): `x[foo()]++`,
-            // `getObj().p++`, `getObj().#p++`. The `UpdateExpression`
-            // operand is a `SimpleAssignmentTarget`, which flattens the
-            // same three `MemberExpression` variants; recurse their
-            // sub-expressions for nested-function discovery (Static /
-            // PrivateField carry only `.object`; Computed also carries
-            // the index `.expression`). Pre-#200 the whole arm was
-            // dropped by the `_ => {}` fallthrough.
+            // `x[foo()]++`, `getObj().p++`, `getObj().#p++`. The
+            // `UpdateExpression` operand is a `SimpleAssignmentTarget`,
+            // which flattens the same three `MemberExpression` variants;
+            // recurse their sub-expressions for nested-function discovery
+            // (Static / PrivateField carry only `.object`; Computed also
+            // carries the index `.expression`).
             Expression::UpdateExpression(u) => {
                 use oxc::ast::ast::SimpleAssignmentTarget as SAT;
                 match &u.argument {
@@ -906,7 +899,7 @@ impl<'src> FunctionFinder<'src> {
 
             // Member-expression family (inherited variants on
             // `Expression` from `MemberExpression`). Treat as opaque
-            // receivers for W1.2; no decision-point scoring.
+            // receivers; no decision-point scoring.
             Expression::ComputedMemberExpression(m) => {
                 self.visit_expression(&m.object, out, nesting);
                 self.visit_expression(&m.expression, out, nesting);
@@ -918,14 +911,14 @@ impl<'src> FunctionFinder<'src> {
                 self.visit_expression(&m.object, out, nesting);
             }
 
-            // Leaves + JSX (out of scope for W1.2) — no scoring, no
-            // recursion. JSX bodies get full coverage in W2.1.
+            // Leaves — no scoring, no recursion. (JSX element/fragment
+            // expressions are handled by their own arms above.)
             _ => {}
         }
     }
 
-    /// W2.1 (#184): `cond ? a : b` contributes one `Ternary` decision
-    /// point. Chained ternaries (`a ? b : c ? d : e`) parse as
+    /// `cond ? a : b` contributes one `Ternary` decision point. Chained
+    /// ternaries (`a ? b : c ? d : e`) parse as
     /// `a ? b : (c ? d : e)` — two nested `ConditionalExpression` nodes
     /// → two `Ternary` contributors. After scoring, recurse into the
     /// three branch expressions so universal decision points + nested
@@ -986,14 +979,13 @@ impl<'src> FunctionFinder<'src> {
         }
     }
 
-    /// W2.1 (#184): all three `LogicalOperator` variants count as one
+    /// All three `LogicalOperator` variants count as one
     /// `LogicalOperator` contributor each. Mapping table:
     /// - `&&` (`And`) → `LogicalOperator`
     /// - `||` (`Or`) → `LogicalOperator`
-    /// - `??` (`Coalesce`) → `LogicalOperator` (per ADR (a) — TS
-    ///   nullish-coalescing is a short-circuiting decision point that
-    ///   slots cleanly into the existing variant; no `NullishCoalesce`
-    ///   variant is introduced).
+    /// - `??` (`Coalesce`) → `LogicalOperator` (nullish-coalescing is a
+    ///   short-circuiting decision point that slots cleanly into the
+    ///   existing variant; no `NullishCoalesce` variant is introduced).
     ///
     /// Chains accumulate without flattening: `a && b && c && d` parses
     /// as `((a && b) && c) && d` — three `LogicalExpression` nodes,
@@ -1014,22 +1006,20 @@ impl<'src> FunctionFinder<'src> {
         }
         // Intentional non-discrimination on `le.operator`: all current
         // variants (`And`, `Or`, `Coalesce`) and any future variant
-        // score identically per ADR (a). See the function rustdoc
-        // above for the mapping table.
+        // score identically. See the function rustdoc above for the
+        // mapping table.
         self.visit_expression(&le.left, out, nesting);
         self.visit_expression(&le.right, out, nesting);
     }
 
-    /// W2.1 (#184): score one `OptionalChain` contributor per
-    /// `ChainExpression`. Per the BDD outline (cyclomatic_walker
-    /// scenario "TypeScript-specific decision points add to
-    /// cyclomatic"), `obj?.field` and `obj?.method()` each add ONE
-    /// decision point — and a chain like `obj?.nested?.value` is wrapped
-    /// in a single `ChainExpression`, so a multi-link chain still
-    /// produces a single contributor (matches the breadboard's
-    /// "presence-of-optional-flow" semantics rather than per-`?.` link
-    /// counting). After scoring, recurse into the inner chain element
-    /// for nested-function / universal-decision-point discovery.
+    /// Score one `OptionalChain` contributor per `ChainExpression`.
+    /// `obj?.field` and `obj?.method()` each add ONE decision point —
+    /// and a chain like `obj?.nested?.value` is wrapped in a single
+    /// `ChainExpression`, so a multi-link chain still produces a single
+    /// contributor (presence-of-optional-flow semantics rather than
+    /// per-`?.` link counting). After scoring, recurse into the inner
+    /// chain element for nested-function / universal-decision-point
+    /// discovery.
     fn visit_chain(
         &mut self,
         ce: &oxc::ast::ast::ChainExpression<'_>,
@@ -1085,7 +1075,7 @@ impl<'src> FunctionFinder<'src> {
         }
     }
 
-    /// W2.1 (#184): walk a JSX element's attributes + children. The
+    /// Walk a JSX element's attributes + children. The
     /// JSX wrapper itself is not a decision point — `LogicalOperator`
     /// scoring happens once we recurse out of the
     /// `JSXExpressionContainer` and into the inner `&&` /
@@ -1165,7 +1155,7 @@ impl<'src> FunctionFinder<'src> {
     /// Walk an object literal's properties for nested-function +
     /// decision-point discovery.
     ///
-    /// #200 item 1 / #205 (object side): a **computed** property key
+    /// A **computed** property key
     /// (`{ [foo()]: 1 }`, `{ [a && b]: 1 }`) is an arbitrary expression
     /// that can embed nested functions or decision points. When
     /// `p.computed` is set we recurse into the key expression via the
@@ -1495,8 +1485,8 @@ fn byte_to_line_col(source: &str, byte: u32) -> (usize, u32) {
 /// Extract the simple binding name from a declarator's pattern.
 /// Object / array / assignment patterns return `None` — destructuring
 /// is uncommon for top-level function-binding declarators, and the
-/// W1.2 walker prefers `<arrow>` / `<anonymous>` sentinels over
-/// inventing a synthetic name for `const {a, b} = ...` shapes.
+/// walker prefers `<arrow>` / `<anonymous>` sentinels over inventing a
+/// synthetic name for `const {a, b} = ...` shapes.
 fn binding_name(pattern: &BindingPattern<'_>) -> Option<String> {
     match pattern {
         BindingPattern::BindingIdentifier(bi) => Some(bi.name.as_str().to_string()),

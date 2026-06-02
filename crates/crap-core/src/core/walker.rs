@@ -141,9 +141,9 @@ mod tests {
     /// A `**/*.d.ts` glob in the exclude list drops TypeScript
     /// declaration files while a sibling `app.ts` survives — pins the
     /// `ignore::overrides` contract the crap4ts `forced_excludes`
-    /// wiring in `cli::merge_exclude` relies on (crap-rs#253). The
-    /// adapter passes `**/*.d.ts` via `AdapterMeta::forced_excludes`;
-    /// this test confirms the walker mechanism honors that glob shape.
+    /// wiring in `cli::merge_exclude` relies on. The adapter passes
+    /// `**/*.d.ts` via `AdapterMeta::forced_excludes`; this test
+    /// confirms the walker mechanism honors that glob shape.
     #[test]
     fn discover_source_files_dts_excluded_by_glob() {
         let dir = tempfile::tempdir().unwrap();

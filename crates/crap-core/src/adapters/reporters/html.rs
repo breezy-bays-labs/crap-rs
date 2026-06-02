@@ -3,11 +3,11 @@
 //!
 //! Produces a single document with inline CSS + inline `<script>` and
 //! no external assets — no CDN, no font URLs, no `<link>` to anything
-//! external. Layout follows the **Sakura Reports** design system
-//! (crap-rs#260): a verdict-stamped header, 4 KPI tiles, a risk
-//! distribution bar, up to 4 worst offenders, a `<details>` card per
-//! file with a function-level table, and a per-adapter footer carrying
-//! metric / coverage / threshold provenance.
+//! external. Layout follows the **Sakura Reports** design system:
+//! a verdict-stamped header, 4 KPI tiles, a risk distribution bar, up
+//! to 4 worst offenders, a `<details>` card per file with a
+//! function-level table, and a per-adapter footer carrying metric /
+//! coverage / threshold provenance.
 //!
 //! Color-coded risk levels map onto the Sakura ordinal `--risk-1` …
 //! `--risk-4` token ladder (low → high) so light + optional dark mode
@@ -40,33 +40,30 @@ use std::collections::BTreeMap;
 /// footer renders this verbatim so users can see which metric a
 /// report was scored under.
 ///
-/// The signature widened from `(view, threshold, &str, &str)` to
-/// `(view, threshold, &AdapterMeta, ComplexityMetric)` in crap-rs#260
-/// (locked plan deviation #1) so the template can render the per-
-/// adapter footer without reading domain state — the dispatcher in
-/// `cli/mod.rs` already holds both in scope.
+/// `meta` and `effective_metric` are passed (rather than read from
+/// domain state) so the template can render the per-adapter footer
+/// without reaching inward — the dispatcher in `cli/mod.rs` already
+/// holds both in scope.
 ///
-/// The signature widened again in crap-rs#306 to accept an optional
-/// `&DeltaView<'_>`. When `delta` is `None` the output is byte-
-/// identical to the v0.5.0 single-tab render (no tabs nav, no second
-/// panel — preserves the contract every existing consumer relies on).
-/// When `delta` is `Some(_)`, a `<nav class="tabs">` is emitted between
-/// the header and the body, and a second `<div class="tab-panel"
-/// data-tab="delta">` follows the Current panel with the delta KPI
-/// grid + per-category change tables. The Current tab opens by default
-/// so first-time users see the Sakura summary; the delta tab is one
-/// click away and reachable directly via the `#delta` URL hash (the
-/// inline `<script>` hook honors `location.hash` for CI sticky-comment
-/// deep links).
+/// `delta` is optional. When `delta` is `None` the output is the
+/// single-tab render (no tabs nav, no second panel — the contract every
+/// existing consumer relies on). When `delta` is `Some(_)`, a `<nav
+/// class="tabs">` is emitted between the header and the body, and a
+/// second `<div class="tab-panel" data-tab="delta">` follows the
+/// Current panel with the delta KPI grid + per-category change tables.
+/// The Current tab opens by default so first-time users see the Sakura
+/// summary; the delta tab is one click away and reachable directly via
+/// the `#delta` URL hash (the inline `<script>` hook honors
+/// `location.hash` for CI sticky-comment deep links).
 /// `report_title` and `subtitle` are the optional `[output] title` /
-/// `subtitle` config labels (crap-rs#352). When `report_title` is
-/// `Some`, the configured label replaces the `<h1>tool report</h1>`
-/// scorecard heading and is also folded into the `<title>` document
-/// element; when `subtitle` is `Some`, it renders on a line beneath the
-/// heading. Both default to `None`, in which case the header is
-/// byte-identical to the unlabeled default — no empty subtitle element
-/// is emitted. (Single-card path only — the multi-language unified
-/// renderer composes its own header and never threads these, per D20.)
+/// `subtitle` config labels. When `report_title` is `Some`, the
+/// configured label replaces the `<h1>tool report</h1>` scorecard
+/// heading and is also folded into the `<title>` document element; when
+/// `subtitle` is `Some`, it renders on a line beneath the heading. Both
+/// default to `None`, in which case the header is byte-identical to the
+/// unlabeled default — no empty subtitle element is emitted.
+/// (Single-card path only — the multi-language unified renderer
+/// composes its own header and never threads these.)
 #[allow(clippy::too_many_arguments)]
 pub fn format_html(
     view: &AnalysisView<'_>,
@@ -110,8 +107,8 @@ fn format_html_inner(
 ) -> String {
     let summary = &view.full.summary;
     // The `<title>` document element folds in the configured scorecard
-    // title when set (crap-rs#352); otherwise it keeps the unlabeled
-    // tool/version default verbatim (byte-identical absent path).
+    // title when set; otherwise it keeps the unlabeled tool/version
+    // default verbatim (byte-identical absent path).
     let title = match report_title {
         Some(t) => format!("{} — {} v{}", t, tool_name, tool_version),
         None => format!("{} v{} — CRAP score analysis", tool_name, tool_version),
@@ -148,8 +145,8 @@ fn format_html_inner(
     // The delta panel is boxed because it carries several owned
     // `Vec<DeltaRow>` fields. Boxing keeps the `Option::None` arm
     // cheap (the no-baseline byte-identical contract is the dominant
-    // path) and mirrors #260's `MarkdownBody::Filled.summary` pattern
-    // for the same `large_enum_variant` reason.
+    // path) and mirrors the markdown reporter's `MarkdownBody::Filled`
+    // boxing for the same `large_enum_variant` reason.
     let delta_panel = delta.map(|d| Box::new(build_delta_panel(d)));
     let has_delta = delta_panel.is_some();
     let current_tab_count = if is_empty { 0 } else { summary.total_functions };
@@ -194,9 +191,9 @@ fn format_html_inner(
 #[template(path = "html_report.html")]
 struct HtmlReport<'a> {
     title: String,
-    /// Configured scorecard title (`[output] title`, crap-rs#352). When
-    /// `Some`, the template renders it as the `<h1>` heading in place of
-    /// the default `<tool> report` label. `None` keeps the default.
+    /// Configured scorecard title (`[output] title`). When `Some`, the
+    /// template renders it as the `<h1>` heading in place of the default
+    /// `<tool> report` label. `None` keeps the default.
     report_title: Option<&'a str>,
     /// Configured scorecard subtitle (`[output] subtitle`), rendered as a
     /// line beneath the heading. `None` emits no element.
@@ -237,18 +234,18 @@ struct HtmlReport<'a> {
     /// was supplied. Boxed because the populated case carries several
     /// owned `Vec<DeltaRow>` fields and `large_enum_variant` would
     /// otherwise penalize the dominant `None` arm — same boxing
-    /// pattern as the markdown reporter's `MarkdownBody::Filled.summary`.
+    /// pattern as the markdown reporter's `MarkdownBody::Filled`.
     delta_panel: Option<Box<DeltaPanel>>,
 }
 
 /// Per-tab projection of a `DeltaView` into render-ready row + KPI
 /// data. Pure presentation — no domain types leak into the template.
 ///
-/// The four-KPI lock matches the Current-tab convention from the
-/// Sakura design (chat1.md trim). The five-tile "Functions" KPI from
-/// the mock is dropped: the change-counts already show added /
-/// removed / modified inline above the tables, and the per-section
-/// counts are visible in each table header.
+/// Exactly four KPI tiles, matching the Current-tab convention from the
+/// Sakura design. A fifth "Functions" tile is deliberately dropped: the
+/// change-counts already show added / removed / modified inline above
+/// the tables, and the per-section counts are visible in each table
+/// header.
 struct DeltaPanel {
     /// Aggregate counts mirroring `DeltaSummary` (copied so the
     /// template doesn't import a domain type). Drives the verdict
@@ -279,11 +276,11 @@ struct DeltaPanel {
     /// `unchanged_count` is the count of baseline functions whose
     /// identity persists in current and whose CRAP score moved less
     /// than 0.005 (`Modified` with zero-ish delta). Rendered as a
-    /// single-line note per the chat1.md trim — no full table.
+    /// single-line note — no full table.
     unchanged_count: u32,
     /// Display label for the baseline reference. Today this is always
-    /// "baseline" because `DeltaView.baseline_ref` is `None` reserved
-    /// until F2; once a `--baseline-ref <label>` CLI flag lands, this
+    /// "baseline" because `DeltaView.baseline_ref` is reserved for a
+    /// future `--baseline-ref <label>` CLI flag; once that lands, this
     /// field carries the label verbatim (e.g. "main@a1f3c2b").
     baseline_ref: &'static str,
 }
@@ -737,9 +734,9 @@ pub fn format_html_multi(
         // which `&block.tool_name` etc. already guarantee.
         // No `[output]` title/subtitle on the multi-language passthrough:
         // the unified renderer composes its own header and the envelope
-        // carries no per-language scorecard label (crap-rs#352, D20). The
-        // `None, None` here keeps single-language passthrough output
-        // byte-identical to the unlabeled `format_html` default.
+        // carries no per-language scorecard label. The `None, None` here
+        // keeps single-language passthrough output byte-identical to the
+        // unlabeled `format_html` default.
         return format_html_inner(
             &block.view,
             block.delta.as_ref(),
@@ -1424,9 +1421,9 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
         improvements,
         new_functions,
         unchanged_count,
-        // F2 follow-up: when `--baseline-ref <label>` lands, thread
-        // the label through `DeltaView.baseline_ref` and surface it
-        // here. Until then the honest label is the literal "baseline."
+        // When a `--baseline-ref <label>` flag lands, thread the label
+        // through `DeltaView.baseline_ref` and surface it here. Until
+        // then the honest label is the literal "baseline."
         baseline_ref: "baseline",
     }
 }
@@ -1709,7 +1706,7 @@ mod tests {
         )
     }
 
-    // ── [output] title / subtitle labeling (crap-rs#352) ────────────────
+    // ── [output] title / subtitle labeling ─────────────────────────────
 
     #[test]
     fn title_labels_the_html_heading() {
@@ -2045,7 +2042,7 @@ mod tests {
     }
 
     /// Byte-level snapshot lock for the HTML reporter under the
-    /// Sakura design (crap-rs#260).
+    /// Sakura design.
     #[test]
     fn full_html_snapshot() {
         let result = make_multi_function_result();
@@ -2053,7 +2050,7 @@ mod tests {
         insta::assert_snapshot!(out);
     }
 
-    // ── Delta tab (crap-rs#306) ───────────────────────────────────────
+    // ── Delta tab ─────────────────────────────────────────────────────
 
     use crate::adapters::reporters::test_fixtures::{make_delta_view_default, make_sample_delta};
 
@@ -2089,8 +2086,8 @@ mod tests {
             out.contains("<nav class=\"tabs\""),
             "tabs nav should render when delta is supplied"
         );
-        // Current tab opens by default (default-open lock from
-        // orchestrator pre-resolved Discovery #1)
+        // Current tab opens by default so first-time readers see the
+        // summary before the delta.
         assert!(
             out.contains("data-tab=\"current\" data-active"),
             "Current tab should open by default"
@@ -2111,7 +2108,8 @@ mod tests {
         assert!(out.contains("data-tab=\"current\""));
         assert!(out.contains("data-tab=\"delta\""));
         // The Delta tab label is anchored on the literal baseline-ref
-        // string until F2 introduces `--baseline-ref <label>`.
+        // string until a `--baseline-ref <label>` flag introduces a
+        // configurable label.
         assert!(
             out.contains("Delta vs baseline"),
             "delta tab label should anchor on the baseline-ref literal"
@@ -2120,9 +2118,9 @@ mod tests {
 
     #[test]
     fn delta_panel_has_exactly_4_kpi_tiles() {
-        // 4-tile lock from orchestrator pre-resolved Discovery #2 —
-        // matches the Current tab's 4-KPI convention. Mirrors the
-        // playwright assertion (`.delta-kpi-grid .kpi` count == 4).
+        // Exactly 4 KPI tiles, matching the Current tab's 4-KPI
+        // convention. Mirrors the playwright assertion
+        // (`.delta-kpi-grid .kpi` count == 4).
         let delta = make_sample_delta();
         let dview = make_delta_view_default(&delta);
         let out = html_with_delta(&make_view_default(&delta.current), &dview);
@@ -2358,7 +2356,7 @@ mod tests {
     }
 
     /// Byte-level snapshot lock for the HTML reporter's delta-tab
-    /// render (crap-rs#306).
+    /// render.
     #[test]
     fn full_html_with_delta_snapshot() {
         let delta = make_sample_delta();
@@ -2541,8 +2539,9 @@ mod tests {
         let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
 
         // The Rust High-risk function must appear BEFORE the TS
-        // Moderate-risk function in the ranked-CRAP table — the D2d
-        // dimensional-consistency-aware sort rule.
+        // Moderate-risk function in the ranked-CRAP table — the
+        // dimensional-consistency-aware sort ranks by risk band
+        // descending first, then CRAP/threshold ratio within band.
         let high_pos = out
             .find("rs::high_fn")
             .expect("Rust high-risk row should render");

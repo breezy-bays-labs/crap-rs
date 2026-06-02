@@ -260,9 +260,9 @@ impl FileAcc {
 
     fn fold(&mut self, v: &FunctionVerdict) {
         let score = v.scored.crap.value;
-        // Strip NaN from the median set so per-file median is deterministic
-        // (CodeRabbit observation on summary.rs:256 — `partial_cmp.unwrap_or(Equal)`
-        // can otherwise leave NaN at the middle index). NaN scores still
+        // Strip NaN from the median set so per-file median is deterministic:
+        // the median sort uses `partial_cmp(...).unwrap_or(Equal)`, which can
+        // otherwise leave a NaN at the middle index. NaN scores still
         // contribute to `sum_crap` to mirror `compute_summary`'s aggregate
         // behavior; in practice the CRAP formula is always finite, so this
         // only matters as a defensive contract.

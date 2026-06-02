@@ -11,23 +11,22 @@
 //!
 //! ## Scope
 //!
-//! - **W1.1**: statement coverage (`s` + `statementMap`) + jest-flat
-//!   top-level shape + `PathUnresolved` diagnostics. Branch- /
-//!   schema-variance fields landed in W1.1's struct with
-//!   `#[serde(default)]` so the consumer-side extensions stay
-//!   type-stable.
-//! - **W2.3 (#186)**: branch coverage. Each Istanbul branchId in `b`
-//!   carries a `Vec<u64>` of per-arm hit counts; the parser fans this
-//!   into one `BranchCoverage` row per arm keyed at the `branchMap`
-//!   entry's start line. Orphan branchIds (`b` references a missing
-//!   `branchMap` entry) emit `BranchMismatch` and skip THAT branch
-//!   only — the rest of the file still parses.
-//! - **W2.4 (#187)**: jest / vitest / nyc + wrapped emitter
-//!   tolerance. The parser tries the flat `{[path]: entry}` shape
-//!   first, then a single-level unwrap (`{"coverage-final":
-//!   {...flat...}}`), then emits `SchemaUnrecognized` with the
-//!   detected top-level keys. `MissingField` covers entries that
-//!   have `s` records but an empty `statementMap` (or vice versa).
+//! - **Statement coverage**: `s` + `statementMap`, jest-flat top-level
+//!   shape, `PathUnresolved` diagnostics. Branch- / schema-variance
+//!   fields carry `#[serde(default)]` so the consumer-side extensions
+//!   stay type-stable.
+//! - **Branch coverage**: each Istanbul branchId in `b` carries a
+//!   `Vec<u64>` of per-arm hit counts; the parser fans this into one
+//!   `BranchCoverage` row per arm keyed at the `branchMap` entry's
+//!   start line. Orphan branchIds (`b` references a missing `branchMap`
+//!   entry) emit `BranchMismatch` and skip THAT branch only — the rest
+//!   of the file still parses.
+//! - **Emitter tolerance** (jest / vitest / nyc + wrapped): the parser
+//!   tries the flat `{[path]: entry}` shape first, then a single-level
+//!   unwrap (`{"coverage-final": {...flat...}}`), then emits
+//!   `SchemaUnrecognized` with the detected top-level keys.
+//!   `MissingField` covers entries that have `s` records but an empty
+//!   `statementMap` (or vice versa).
 //!
 //! ## Schema minimalism (only model what is consumed)
 //!
@@ -63,8 +62,8 @@
 //! Two-arm strategy (see `IstanbulCoverage::normalize_path`): a pure
 //! `strip_prefix(effective_src)` fast path for same-machine captures,
 //! then a bounded `.is_file()` longest-suffix reachability fallback
-//! (#215) for portable fixtures whose absolute paths were captured on
-//! a different machine and share no prefix with the local
+//! for portable fixtures whose absolute paths were captured on a
+//! different machine and share no prefix with the local
 //! `effective_src`. The orchestrator pre-canonicalizes `effective_src`
 //! at the factory-closure boundary. Entries whose paths resolve under
 //! neither arm emit an `IstanbulParseDiagnostic { kind: PathUnresolved,
@@ -125,11 +124,11 @@ impl IstanbulCoverage {
     ///    a relative path to itself, which for a workspace-relative
     ///    `path` (`crates/foo/ts/bar.ts`, the natural shape a coverage
     ///    tool emits from the workspace root) is a *nonexistent* file.
-    ///    The old code accepted that invalid result and shadowed arm 2,
-    ///    so coverage silently dropped to 0 (crap-rs#331).
-    /// 2. **Suffix-reachability fallback (bounded `.is_file()` I/O,
-    ///    #215).** Handles two cases: a *relative* `raw` (routed here
-    ///    directly per arm 1 above), and a cross-machine *absolute*
+    ///    Accepting that invalid result would shadow arm 2 and silently
+    ///    drop coverage to 0, so a relative `raw` skips this arm.
+    /// 2. **Suffix-reachability fallback (bounded `.is_file()` I/O).**
+    ///    Handles two cases: a *relative* `raw` (routed here directly
+    ///    per arm 1 above), and a cross-machine *absolute*
     ///    `raw` (portable fixture: coverage produced on machine A,
     ///    analyzed on machine B) whose path shares no prefix with the
     ///    local `effective_src`. Arm 2 walks the path's components
@@ -147,13 +146,13 @@ impl IstanbulCoverage {
     /// That trade buys cross-machine fixture portability *and*
     /// cross-form (`absolute` / `workspace-relative` / `src-relative`)
     /// `path` resolution. `crap4rs`'s `LcovParser::normalize_path`
-    /// converged on the same filesystem-validated fallback in #331, so
-    /// the two adapters now resolve coverage paths identically. When
-    /// even the suffix match fails, this returns `None` and the caller
-    /// emits `PathUnresolved` as before — the diagnostic-and-skip
-    /// contract (D16) is preserved as the final arm.
+    /// converged on the same filesystem-validated fallback, so the two
+    /// adapters now resolve coverage paths identically. When even the
+    /// suffix match fails, this returns `None` and the caller emits
+    /// `PathUnresolved` — the diagnostic-and-skip contract is preserved
+    /// as the final arm.
     ///
-    /// **Traversal guard (authoritative, #216).** The relative path
+    /// **Traversal guard (authoritative).** The relative path
     /// returned from *either* arm is rejected (`None`) if it contains a
     /// `Component::ParentDir` (`..`). This is the single, authoritative
     /// guard and covers both arms uniformly. It is *not* redundant with
@@ -164,17 +163,16 @@ impl IstanbulCoverage {
     /// `.is_file()`-resolves *outside* `effective_src`. Since
     /// `coverage-final.json` is user-supplied, the return-point guard
     /// closes this traversal-escape for the strip-prefix fast path too,
-    /// not just the suffix fallback. (Gemini security-medium on #216,
-    /// scope-expanded beyond the stated arm-2-only finding after a
-    /// standalone `strip_prefix` repro proved arm 1 had the same
-    /// defect.)
+    /// not just the suffix fallback. (The guard covers arm 1 as well as
+    /// arm 2 because a standalone `strip_prefix` repro proved arm 1 had
+    /// the same defect.)
     fn normalize_path(&self, raw: &str) -> Option<PathBuf> {
         let path = PathBuf::from(raw);
         let candidate = if path.is_absolute() {
-            // Arm 1: strip the canonical effective_src prefix (W2.4 fast
+            // Arm 1: strip the canonical effective_src prefix (fast
             // path — same-machine absolute capture). Cross-machine
             // absolute paths don't share a prefix — fall through to the
-            // suffix match (arm 2, #215).
+            // suffix match (arm 2).
             if let Ok(stripped) = path.strip_prefix(&self.effective_src) {
                 stripped.to_path_buf()
             } else {
@@ -184,13 +182,13 @@ impl IstanbulCoverage {
             // Relative `raw` (workspace-relative or already src-relative).
             // A lexical `effective_src.join(raw)` + `strip_prefix` would
             // round-trip to `raw` verbatim — a nonexistent file for the
-            // workspace-relative case — and shadow arm 2 (crap-rs#331).
-            // Route straight to the filesystem suffix match, which
+            // workspace-relative case — and shadow arm 2. Route straight
+            // to the filesystem suffix match, which
             // resolves both `crates/foo/ts/bar.ts` and bare `bar.ts` to
             // the walker's src-relative key.
             self.suffix_match_under(&path)?
         };
-        // Authoritative traversal guard (#216): both `strip_prefix`
+        // Authoritative traversal guard: both `strip_prefix`
         // and `starts_with` are lexical, so a `..`-containing result
         // points outside `effective_src` once resolved. Reject any
         // ParentDir in the final relative path — covers both arms.
@@ -229,7 +227,7 @@ impl IstanbulCoverage {
     ///   it; a later, cleaner suffix (e.g. `c/file.ts` from
     ///   `/a/b/../c/file.ts`) still resolves. `CurDir` (`.`) is
     ///   harmless and left alone. The authoritative rejection is still
-    ///   `normalize_path`'s return-point guard (#216).
+    ///   `normalize_path`'s return-point guard.
     /// - **`starts_with(effective_src)` guard.** Defense-in-depth for
     ///   the `start == 0` degenerate case: when `raw` is absolute,
     ///   `effective_src.join(raw)` collapses back to `raw` itself
@@ -447,12 +445,12 @@ impl IstanbulCoverage {
         })
     }
 
-    /// Per-line coverage records (W1.1) for one entry: join `s`
+    /// Per-line coverage records for one entry: join `s`
     /// (counts) to `statementMap` (line spans). Statements whose IDs do
     /// not appear in `statementMap` are skipped; hits are keyed at the
     /// start-of-statement line (Istanbul's emitter granularity).
     ///
-    /// **Multi-statement-per-line aggregation (#252).** Istanbul records
+    /// **Multi-statement-per-line aggregation.** Istanbul records
     /// one entry per statement, and a single source line can carry
     /// multiple statements — most notably `export const cube = (x) => x*x*x;`
     /// emits TWO statements at the same line: the `const` declaration
@@ -460,8 +458,8 @@ impl IstanbulCoverage {
     /// the arrow is invoked → hits = 0 when uninvoked). Emitting both as
     /// separate `LineCoverage` records would make the matcher's per-function
     /// rollup see total=2/covered=1 = 50% for an uninvoked single-line
-    /// arrow, which `crap-rs#252` documents as the silent-undercount bug.
-    /// LCOV by construction emits one `DA:line,hits` per line (its
+    /// arrow — a silent undercount. LCOV by construction emits one
+    /// `DA:line,hits` per line (its
     /// `BTreeMap` per block dedupes by line), so the
     /// `crap-core::domain::matching` line-range join is implicitly
     /// contracted as "one record per line per file". This collapse aligns
@@ -484,7 +482,7 @@ impl IstanbulCoverage {
         // Capacity hint: at most one record per statement (one-to-one
         // upper bound; MIN aggregation only shrinks the map). Pre-
         // allocating avoids rehashing during the grouping phase on
-        // large coverage files (gemini perf hint on PR #257).
+        // large coverage files.
         let mut by_line: HashMap<u32, u64> = HashMap::with_capacity(entry.s.len());
         for (stmt_id, hits) in &entry.s {
             if let Some(loc) = entry.statement_map.get(stmt_id) {
@@ -505,7 +503,7 @@ impl IstanbulCoverage {
         lines
     }
 
-    /// Per-branch coverage records (W2.3) for one entry. Each branchId
+    /// Per-branch coverage records for one entry. Each branchId
     /// in `b` is looked up in `branchMap`; a missing entry emits
     /// `BranchMismatch` into `diagnostics` and skips THAT branch only
     /// (the rest of the file still parses). Per the consumer contract
@@ -586,7 +584,7 @@ impl IstanbulCoverage {
 
         // Path 2: re-parse as untyped `Value` for the unwrap arm and
         // for top-level-key detection. If JSON itself is malformed,
-        // surface as fatal `SourceParse` per the W1.1 contract.
+        // surface as a fatal `SourceParse` error.
         let value: Value = serde_json::from_str(data)
             .map_err(|e| CrapError::SourceParse(format!("istanbul: {e}")))?;
 
@@ -655,7 +653,7 @@ impl CoveragePort for IstanbulCoverage {
     /// negligible against the parsed tree's footprint. Pre-flight
     /// [`Self::validate`] also slurps for the same reason.
     ///
-    /// **Top-level shape tolerance (W2.4)** — implemented by
+    /// **Top-level shape tolerance** — implemented by
     /// [`Self::parse_str`]:
     ///
     /// 1. Try the flat `{[path]: entry}` shape first (jest, vitest,
@@ -682,7 +680,7 @@ impl CoveragePort for IstanbulCoverage {
     /// Pre-flight structural check: parse the file as Istanbul JSON and
     /// require at least one entry with a non-empty `statementMap`.
     ///
-    /// **Tolerance parity with `parse`** (W2.4): mirrors the
+    /// **Tolerance parity with `parse`**: mirrors the
     /// flat-then-unwrap cascade in `parse` so the CLI's pre-flight
     /// gate doesn't reject wrapped fixtures before parse ever runs.
     /// The CLI calls `validate` via
@@ -758,7 +756,7 @@ mod tests {
         }
     }
 
-    // ── #252: multi-statement-per-line MIN aggregation ────────────────
+    // ── multi-statement-per-line MIN aggregation ──────────────────────
     //
     // Direct unit tests for `line_coverage_for` against the conflation
     // pattern Istanbul emits for single-line arrow declarations:
