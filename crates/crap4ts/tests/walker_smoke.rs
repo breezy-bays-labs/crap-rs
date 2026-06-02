@@ -1362,3 +1362,67 @@ fn jsx_nested_element_in_attribute_is_walked() {
     assert_eq!(f.contributors.len(), 1);
     assert_eq!(f.contributors[0].kind, ContributorKind::LogicalOperator);
 }
+
+#[test]
+fn jsx_element_valued_attribute_is_walked() {
+    // `<Comp icon=<Inner active={a && b} /> />` — a bare JSX element as
+    // an attribute value (no `{ }` braces). This is the rarely-used
+    // `JSXAttributeValue::Element` form; pins that arm by planting a
+    // decision point on the element-valued attribute's own attribute.
+    let src = r#"
+        function ElementValuedAttr(a: boolean, b: boolean) {
+            return <Comp icon=<Inner active={a && b} /> />;
+        }
+    "#;
+    let fns = extract(src, "element-valued-attr.tsx");
+    let f = find_fn(&fns, "ElementValuedAttr");
+    assert_eq!(
+        f.complexity, 2,
+        "the && inside the element-valued attribute is counted"
+    );
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::LogicalOperator);
+}
+
+#[test]
+fn jsx_fragment_valued_attribute_is_walked() {
+    // `<Comp slot=<>{a && b}</> />` — a bare JSX fragment as an attribute
+    // value. Pins the `JSXAttributeValue::Fragment` arm, which walks the
+    // fragment's children; the `&&` inside is the observable decision
+    // point.
+    let src = r#"
+        function FragmentValuedAttr(a: boolean, b: boolean) {
+            return <Comp slot=<>{a && b}</> />;
+        }
+    "#;
+    let fns = extract(src, "fragment-valued-attr.tsx");
+    let f = find_fn(&fns, "FragmentValuedAttr");
+    assert_eq!(
+        f.complexity, 2,
+        "the && inside the fragment-valued attribute is counted"
+    );
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::LogicalOperator);
+}
+
+#[test]
+fn jsx_child_fragment_and_spread_are_walked() {
+    // `<Outer>{...items}<>{a && b}</></Outer>` exercises two child arms
+    // of `visit_jsx_children` reached from a JSX element's children: a
+    // `JSXChild::Spread` (`{...items}`) and a `JSXChild::Fragment`
+    // (`<>…</>`) carrying a decision point. The `&&` inside the fragment
+    // child is the observable proof the fragment-child arm recursed.
+    let src = r#"
+        function ChildFragmentSpread(a: boolean, b: boolean, items: number[]) {
+            return <Outer>{...items}<>{a && b}</></Outer>;
+        }
+    "#;
+    let fns = extract(src, "child-fragment-spread.tsx");
+    let f = find_fn(&fns, "ChildFragmentSpread");
+    assert_eq!(
+        f.complexity, 2,
+        "the && inside the fragment child is counted through visit_jsx_children"
+    );
+    assert_eq!(f.contributors.len(), 1);
+    assert_eq!(f.contributors[0].kind, ContributorKind::LogicalOperator);
+}
