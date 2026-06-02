@@ -72,21 +72,28 @@
 //! deliberately does not re-assert the threshold-gate calibration;
 //! that lives in the scorecard-row / default-gate canaries.
 //!
-//! ## Fixture corpus note (TS side is all-Low)
+//! ## Fixture corpus note (both self corpora are all-Low)
 //!
-//! The Rust self-LCOV fixture spans two bands at `--threshold 8`
-//! (`low` + `acceptable`), so the oracle exercises a real band
-//! boundary on the Rust side. The crap4ts istanbul fixture corpus is
-//! entirely `low` (its functions are small, near-fully-covered). The
-//! oracle check is the spine and is meaningful on all-`low` data —
-//! it still re-derives and compares the band from the wire `value`
-//! for every TS function, and the canonical-set/subset assertion +
-//! the single shared `classify_risk` oracle carry the cross-adapter
-//! guarantee
-//! regardless of the TS spread. Constructing a synthetic high-CRAP
-//! TS fixture would add brittleness (hand-authored istanbul
-//! statement/branch maps) without strengthening the invariant this
-//! canary locks.
+//! The crap4rs *self* source is entirely `low` at `--threshold 8`:
+//! every production function scores ≤ 8 CRAP by construction, since the
+//! strict production gate holds the whole tree in the Low band. The
+//! crap4ts istanbul fixture corpus is likewise entirely `low` (small,
+//! near-fully-covered functions). The oracle check is the spine and is
+//! meaningful on all-`low` data — it still re-derives and compares the
+//! band from the wire `value` for every function on both adapters, and
+//! the canonical-set/subset assertion plus the single shared
+//! `classify_risk` oracle carry the cross-adapter guarantee regardless
+//! of the spread.
+//!
+//! Because neither self corpus crosses a band boundary, the
+//! non-degeneracy guard — the check that the oracle is being exercised
+//! across an actual band transition rather than on a single-band input
+//! — runs on the `crap-examples` corpus instead. That corpus is the
+//! intentionally-bad teaching sample, excluded from every production
+//! gate, so it spans multiple bands (`low` + `acceptable` + `moderate`)
+//! permanently and can never be driven flat by a CRAP-reduction
+//! campaign. Its committed `lcov.info` joins to real coverage, so the
+//! spread is a genuine score spread.
 //!
 //! ## Mutants gate interaction
 //!
@@ -180,6 +187,45 @@ fn run_crap4rs_json() -> Value {
             // Explicit empty `--config` short-circuits walk-upward
             // discovery (crap-rs#339) so this in-repo `--src` canary stays
             // hermetic against the repo-root `crap.toml`. See the fixture.
+            "--config",
+            "tests/fixtures/empty-config.toml",
+            "--threshold",
+            "8",
+            "--format",
+            "json",
+            "--no-fail",
+        ])
+        .output()
+        .expect("crap4rs binary executes");
+    assert!(
+        output.status.success(),
+        "crap4rs exited non-zero: stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    serde_json::from_slice(&output.stdout).expect("crap4rs --format json emits valid JSON")
+}
+
+/// Invoke `crap4rs --format json` against the committed `crap-examples`
+/// corpus (the intentionally-bad teaching sample) at `--threshold 8`.
+/// Returns the parsed envelope.
+///
+/// `crap-examples` is the home of the non-degeneracy band-span check:
+/// it is excluded from every production gate, so it is never driven
+/// flat by a CRAP-reduction campaign and keeps spanning multiple risk
+/// bands permanently (its committed `lcov.info` joins to real coverage,
+/// so the spread is a genuine score spread, not a 0%-coverage artifact).
+fn run_crap4rs_examples_json() -> Value {
+    let output = Command::cargo_bin("crap4rs")
+        .expect("crap4rs binary discoverable in workspace")
+        .args([
+            "--coverage",
+            "../crap-examples/lcov.info",
+            "--src",
+            "../crap-examples/src",
+            // Explicit empty `--config` short-circuits walk-upward config
+            // discovery so this in-repo `--src` canary stays hermetic
+            // against the repo-root `crap.toml`.
             "--config",
             "tests/fixtures/empty-config.toml",
             "--threshold",
@@ -337,18 +383,31 @@ fn risk_level_envelope_parity() {
     assert_bands_consistent(&rs_bands, "crap4rs");
     assert_bands_consistent(&ts_bands, "crap4ts");
 
-    // Sanity: the Rust self-LCOV fixture is expected to span more than
-    // one band at --threshold 8 (it has uncovered functions that round
-    // into `acceptable`). If this collapses to a single band, the
-    // fixture changed and the oracle no longer exercises a real band
+    let rs_observed: BTreeSet<&str> = rs_bands.iter().map(|b| b.risk_level.as_str()).collect();
+
+    // Non-degeneracy guard: keep the oracle honest by exercising it
+    // against a corpus that crosses a real band boundary. The crap4rs
+    // *self* source is all-`low` by construction — every production
+    // function scores ≤ 8 CRAP (the CRAP-8 campaign drove it there and
+    // the strict production gate keeps it there), so self can never span
+    // bands again. The band-span check therefore runs on `crap-examples`
+    // (the intentionally-bad sample), which is gate-excluded and spans
+    // multiple bands permanently. If THIS collapses to a single band, the
+    // crap-examples corpus changed and the oracle stopped crossing a
     // boundary — surface it loudly rather than silently weakening the
     // canary.
-    let rs_observed: BTreeSet<&str> = rs_bands.iter().map(|b| b.risk_level.as_str()).collect();
+    let examples = run_crap4rs_examples_json();
+    let mut examples_bands = Vec::new();
+    collect_bands(&examples, "rust-examples", &mut examples_bands);
+    let examples_observed: BTreeSet<&str> = examples_bands
+        .iter()
+        .map(|b| b.risk_level.as_str())
+        .collect();
     assert!(
-        rs_observed.len() >= 2,
-        "crap4rs self-LCOV fixture collapsed to a single risk band {rs_observed:?} at \
-         --threshold 8 — the oracle no longer crosses a band boundary; refresh the fixture \
-         expectation so the canary keeps exercising a transition"
+        examples_observed.len() >= 2,
+        "crap-examples corpus collapsed to a single risk band {examples_observed:?} at \
+         --threshold 8 — the oracle no longer crosses a band boundary; the band-span \
+         corpus changed and the canary is no longer exercising a transition"
     );
 
     // Both adapters draw from one shared enum, so neither observed set
