@@ -73,7 +73,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
-      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+      - uses: taiki-e/install-action@8f531eaecd1898bc3da7d104ad91bee98d1b97bd # v2
         with:
           tool: cargo-nextest@0.9
       - name: Verify cargo + nextest resolve (broken-rustup canary)
@@ -198,10 +198,10 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+      - uses: taiki-e/install-action@8f531eaecd1898bc3da7d104ad91bee98d1b97bd # v2
         with:
           tool: cargo-nextest@0.9
-      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+      - uses: taiki-e/install-action@8f531eaecd1898bc3da7d104ad91bee98d1b97bd # v2
         with:
           tool: cargo-llvm-cov@0.6
       - name: Generate workspace LCOV (excluding crap-examples)
@@ -289,7 +289,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff # v2
+      - uses: taiki-e/install-action@8f531eaecd1898bc3da7d104ad91bee98d1b97bd # v2
         with:
           tool: cargo-mutants
       - name: Run cargo mutants on crates/crap-core/src/domain/view.rs
@@ -1221,7 +1221,7 @@ jobs:
       # supply-chain check. The repo-wide SHA-pinning sweep (#233)
       # brought every other action up to the same standard — see
       # AGENTS.md "Supply-chain hygiene".
-      - uses: EmbarkStudios/cargo-deny-action@6c8f9facfa5047ec02d8485b6bf52b587b7777d1 # v2
+      - uses: EmbarkStudios/cargo-deny-action@a531616d8ce3b9177443e48a1159bc945a099823 # v2
         with:
           command: check
 
