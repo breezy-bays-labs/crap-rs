@@ -16,7 +16,7 @@
 //! column-keyed). Future schema bumps will need an explicit
 //! migration path.
 
-use crate::domain::types::{AnalysisDiagnostics, AnalysisResult};
+use crate::domain::types::{AnalysisDiagnostics, AnalysisResult, MissingCoveragePolicy};
 use crate::ports::ParseDiagnostic;
 use serde::Deserialize;
 use std::fs::File;
@@ -55,6 +55,13 @@ struct BaselineEnvelope<P: ParseDiagnostic> {
     result: AnalysisResult,
     #[serde(default)]
     diagnostics: Option<AnalysisDiagnostics<P>>,
+    /// Policy the baseline was generated under. Absent on envelopes
+    /// emitted before the field existed, and on any pessimistic run
+    /// (the emitter elides the default) — both deserialize to
+    /// `Pessimistic` via `Default`, the load-bearing "absent ⇒
+    /// pessimistic" convention the delta mismatch warning relies on.
+    #[serde(default)]
+    missing_coverage_policy: MissingCoveragePolicy,
 }
 
 /// What the loader returns to callers. The fields are all the metadata
@@ -69,6 +76,10 @@ pub struct BaselineSnapshot<P: ParseDiagnostic> {
     pub tool_version: String,
     pub timestamp: String,
     pub diagnostics: Option<AnalysisDiagnostics<P>>,
+    /// Policy the baseline was generated under (`Pessimistic` when the
+    /// envelope omits the key). The delta path compares this to the
+    /// current run's policy and warns on a mismatch.
+    pub missing_coverage_policy: MissingCoveragePolicy,
 }
 
 /// Errors raised while loading a baseline envelope.
@@ -147,6 +158,7 @@ pub fn load<P: ParseDiagnostic>(path: &Path) -> Result<BaselineSnapshot<P>, Base
         tool_version: envelope.tool_version,
         timestamp: envelope.timestamp,
         diagnostics: envelope.diagnostics,
+        missing_coverage_policy: envelope.missing_coverage_policy,
     })
 }
 
@@ -217,6 +229,44 @@ mod tests {
         assert_eq!(snapshot.result.functions.len(), 0);
         assert!(snapshot.result.passed);
         assert!(snapshot.diagnostics.is_none());
+    }
+
+    #[test]
+    fn load_envelope_without_policy_defaults_to_pessimistic() {
+        // The "absent ⇒ pessimistic" convention the delta mismatch warning
+        // relies on: a baseline that omits the key (pre-field envelopes and
+        // every pessimistic run, which elides the default) loads as
+        // Pessimistic.
+        let file = write_envelope(minimal_envelope_json());
+        let snapshot = load_test(file.path()).expect("load minimal envelope");
+        assert_eq!(
+            snapshot.missing_coverage_policy,
+            MissingCoveragePolicy::Pessimistic
+        );
+    }
+
+    #[test]
+    fn load_envelope_with_policy_round_trips() {
+        let json = r#"{
+            "schema_version": 2,
+            "missing_coverage_policy": "optimistic",
+            "result": {
+                "functions": [],
+                "summary": {
+                    "total_functions": 0, "total_files": 0, "exceeding_threshold": 0,
+                    "average_crap": 0.0, "median_crap": 0.0,
+                    "max_crap": null, "worst_function": null,
+                    "distribution": { "low": 0, "acceptable": 0, "moderate": 0, "high": 0 }
+                },
+                "passed": true
+            }
+        }"#;
+        let file = write_envelope(json);
+        let snapshot = load_test(file.path()).expect("load envelope with policy");
+        assert_eq!(
+            snapshot.missing_coverage_policy,
+            MissingCoveragePolicy::Optimistic
+        );
     }
 
     #[test]

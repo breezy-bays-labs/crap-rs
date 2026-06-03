@@ -15,7 +15,9 @@
 //! per-key assertions. Pure relocation — no behavior change.
 
 use crap4rs::adapters::reporters::{JsonConfig, format_json};
-use crap4rs::domain::types::{AnalysisDiagnostics, AnalysisResult, ComplexityMetric};
+use crap4rs::domain::types::{
+    AnalysisDiagnostics, AnalysisResult, ComplexityMetric, MissingCoveragePolicy,
+};
 use crap4rs::domain::view::{self, ViewSpec};
 
 fn make_empty_result() -> AnalysisResult {
@@ -65,6 +67,7 @@ fn diagnostics_included_when_present() {
     let config = JsonConfig {
         tool_version: "0.1.0".to_string(),
         metric: ComplexityMetric::Cognitive,
+        missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
         threshold: 8.0,
         timestamp: "2026-03-28T12:00:00Z".to_string(),
         diagnostics: Some(&diag),

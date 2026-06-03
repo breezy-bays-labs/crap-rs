@@ -1528,7 +1528,7 @@ where
     // envelope and compute the AnalysisDelta. None when --baseline is
     // absent — the JSON envelope omits the `delta` block entirely so
     // existing consumers see byte-identical output.
-    let delta_state = load_delta_state(cli, &analysis.result)?;
+    let delta_state = load_delta_state(cli, &analysis.result, options.missing_coverage_policy)?;
 
     Ok(PipelinePrep {
         inputs,
@@ -1557,6 +1557,7 @@ fn format_as_json<P: ParseDiagnostic>(
     let config = reporters::json::JsonConfig {
         tool_version: meta.tool_version.to_string(),
         metric: inputs.metric,
+        missing_coverage_policy: inputs.missing_coverage_policy,
         threshold: inputs.threshold,
         timestamp: now_unix_epoch(),
         diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
@@ -1756,15 +1757,40 @@ struct DeltaState<P: ParseDiagnostic> {
 fn load_delta_state<P: ParseDiagnostic>(
     cli: &Cli,
     current: &crate::domain::types::AnalysisResult,
+    current_policy: MissingCoveragePolicy,
 ) -> Result<Option<DeltaState<P>>> {
     let Some(path) = cli.input.baseline.as_ref() else {
         return Ok(None);
     };
     let snapshot = baseline::load::<P>(path).map_err(|e| anyhow::anyhow!("{e}"))?;
+    if let Some(msg) = policy_mismatch_warning(snapshot.missing_coverage_policy, current_policy) {
+        eprintln!("{msg}");
+    }
     // delta::compute consumes both — we own snapshot.result, clone the
     // current analysis so the surrounding pipeline keeps its handle.
     let delta = delta::compute(snapshot.result.clone(), current.clone());
     Ok(Some(DeltaState { snapshot, delta }))
+}
+
+/// The warning text when the baseline and the current run used different
+/// missing-coverage policies, or `None` when they match. The delta
+/// compares two analyses that scored coverage-absent functions under
+/// different rules, so the per-function deltas can mislead: a
+/// `pessimistic` → `optimistic` switch makes every such function look
+/// like a large improvement, and a `pessimistic` → `skip` switch makes
+/// them look *deleted* (present in the baseline, absent now). Pure so the
+/// message is unit-testable; the caller emits it as a non-fatal stderr
+/// warning (the delta still computes).
+fn policy_mismatch_warning(
+    baseline: MissingCoveragePolicy,
+    current: MissingCoveragePolicy,
+) -> Option<String> {
+    (baseline != current).then(|| {
+        format!(
+            "warning: baseline used `missing_coverage_policy = {baseline}` but this run uses `{current}`; \
+             delta scores for functions absent from coverage may be misleading"
+        )
+    })
 }
 
 fn validate_display_flags(cli: &Cli) -> Result<()> {
@@ -3647,6 +3673,47 @@ mod tests {
             inputs.missing_coverage_policy,
             MissingCoveragePolicy::Skip
         ));
+    }
+
+    #[test]
+    fn policy_mismatch_warning_none_when_policies_match() {
+        assert!(
+            policy_mismatch_warning(
+                MissingCoveragePolicy::Pessimistic,
+                MissingCoveragePolicy::Pessimistic
+            )
+            .is_none()
+        );
+        assert!(
+            policy_mismatch_warning(MissingCoveragePolicy::Skip, MissingCoveragePolicy::Skip)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn policy_mismatch_warning_flags_pessimistic_baseline_vs_skip_current() {
+        // The phantom-deletion case: a pessimistic baseline scored
+        // coverage-absent functions at 0% (present in the baseline); a
+        // `skip` current run omits them, so the delta reads them as
+        // deletions. The warning must name both policies.
+        let msg = policy_mismatch_warning(
+            MissingCoveragePolicy::Pessimistic,
+            MissingCoveragePolicy::Skip,
+        )
+        .expect("mismatched policies must warn");
+        assert!(msg.contains("pessimistic"), "names the baseline policy");
+        assert!(msg.contains("skip"), "names the current policy");
+        assert!(msg.contains("misleading"), "flags the comparison risk");
+    }
+
+    #[test]
+    fn policy_mismatch_warning_flags_pessimistic_baseline_vs_optimistic_current() {
+        let msg = policy_mismatch_warning(
+            MissingCoveragePolicy::Pessimistic,
+            MissingCoveragePolicy::Optimistic,
+        )
+        .expect("mismatched policies must warn");
+        assert!(msg.contains("pessimistic") && msg.contains("optimistic"));
     }
 
     #[test]
