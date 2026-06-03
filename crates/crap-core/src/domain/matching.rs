@@ -232,7 +232,12 @@ mod tests {
     fn no_coverage_data_for_file() {
         let comp = make_complexity("a.rs", "foo", 1, 10);
         let line_data = make_line_data(&[("b.rs", &[(1, 5)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].1.line_coverage.percent, 0.0);
         assert_eq!(result[0].1.line_coverage.covered, 0);
@@ -299,7 +304,12 @@ mod tests {
     fn full_coverage() {
         let comp = make_complexity("a.rs", "foo", 1, 3);
         let line_data = make_line_data(&[("a.rs", &[(1, 1), (2, 3), (3, 7)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert_eq!(result[0].1.line_coverage.covered, 3);
         assert_eq!(result[0].1.line_coverage.total, 3);
         assert_eq!(result[0].1.line_coverage.percent, 100.0);
@@ -309,7 +319,12 @@ mod tests {
     fn zero_coverage_all_unhit() {
         let comp = make_complexity("a.rs", "foo", 1, 3);
         let line_data = make_line_data(&[("a.rs", &[(1, 0), (2, 0), (3, 0)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert_eq!(result[0].1.line_coverage.covered, 0);
         assert_eq!(result[0].1.line_coverage.total, 3);
         assert_eq!(result[0].1.line_coverage.percent, 0.0);
@@ -319,7 +334,12 @@ mod tests {
     fn partial_coverage() {
         let comp = make_complexity("a.rs", "foo", 1, 3);
         let line_data = make_line_data(&[("a.rs", &[(1, 1), (2, 0), (3, 5)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert_eq!(result[0].1.line_coverage.covered, 2);
         assert_eq!(result[0].1.line_coverage.total, 3);
         let pct = result[0].1.line_coverage.percent;
@@ -331,7 +351,12 @@ mod tests {
         let comp = make_complexity("a.rs", "foo", 3, 5);
         let line_data =
             make_line_data(&[("a.rs", &[(1, 1), (2, 1), (3, 1), (4, 0), (5, 1), (6, 1)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         // Only lines 3, 4, 5 should be counted
         assert_eq!(result[0].1.line_coverage.total, 3);
         assert_eq!(result[0].1.line_coverage.covered, 2); // lines 3 and 5
@@ -341,7 +366,12 @@ mod tests {
     fn boundary_inclusive_start() {
         let comp = make_complexity("a.rs", "foo", 5, 10);
         let line_data = make_line_data(&[("a.rs", &[(5, 3)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert_eq!(result[0].1.line_coverage.total, 1);
         assert_eq!(result[0].1.line_coverage.covered, 1);
     }
@@ -350,7 +380,12 @@ mod tests {
     fn boundary_inclusive_end() {
         let comp = make_complexity("a.rs", "foo", 5, 10);
         let line_data = make_line_data(&[("a.rs", &[(10, 2)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert_eq!(result[0].1.line_coverage.total, 1);
         assert_eq!(result[0].1.line_coverage.covered, 1);
     }
@@ -360,7 +395,12 @@ mod tests {
         let comp = make_complexity("a.rs", "foo", 5, 10);
         // No DA lines in the span at all
         let line_data = make_line_data(&[("a.rs", &[(1, 1), (20, 1)])]);
-        let result = match_functions(&[comp], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert_eq!(result[0].1.line_coverage.total, 0);
         assert_eq!(result[0].1.line_coverage.percent, 100.0);
     }
@@ -371,7 +411,12 @@ mod tests {
         let comp2 = make_complexity("a.rs", "bar", 10, 15);
         let line_data =
             make_line_data(&[("a.rs", &[(1, 1), (2, 0), (3, 1), (10, 0), (11, 0), (12, 0)])]);
-        let result = match_functions(&[comp1, comp2], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp1, comp2],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
 
         // foo: 2/3 covered
         assert_eq!(result[0].1.line_coverage.covered, 2);
@@ -390,7 +435,12 @@ mod tests {
             ("a.rs", &[(1, 5), (2, 5), (3, 5)]),
             ("b.rs", &[(1, 0), (2, 0)]),
         ]);
-        let result = match_functions(&[comp_a, comp_b], &line_data, None, MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp_a, comp_b],
+            &line_data,
+            None,
+            MissingCoveragePolicy::Pessimistic,
+        );
 
         // a.rs: 3/3 = 100%
         assert_eq!(result[0].1.line_coverage.percent, 100.0);
@@ -424,7 +474,12 @@ mod tests {
         let line_data = make_line_data(&[("a.rs", &[(5, 1)])]);
         let branch_data =
             make_branch_data(&[("a.rs", &[(7, Some(3)), (10, Some(1)), (12, Some(0))])]);
-        let result = match_functions(&[comp], &line_data, Some(&branch_data), MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            Some(&branch_data),
+            MissingCoveragePolicy::Pessimistic,
+        );
         let bc = result[0]
             .1
             .branch_coverage
@@ -439,7 +494,12 @@ mod tests {
         let line_data = make_line_data(&[("a.rs", &[(5, 1)])]);
         let branch_data =
             make_branch_data(&[("a.rs", &[(3, Some(1)), (10, Some(1)), (20, Some(1))])]);
-        let result = match_functions(&[comp], &line_data, Some(&branch_data), MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            Some(&branch_data),
+            MissingCoveragePolicy::Pessimistic,
+        );
         let bc = result[0]
             .1
             .branch_coverage
@@ -453,7 +513,12 @@ mod tests {
         let comp = make_complexity("a.rs", "foo", 5, 15);
         let line_data = make_line_data(&[("a.rs", &[(5, 1)])]);
         let branch_data = make_branch_data(&[("a.rs", &[(5, Some(1)), (15, Some(1))])]);
-        let result = match_functions(&[comp], &line_data, Some(&branch_data), MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            Some(&branch_data),
+            MissingCoveragePolicy::Pessimistic,
+        );
         let bc = result[0]
             .1
             .branch_coverage
@@ -468,7 +533,12 @@ mod tests {
         let comp = make_complexity("a.rs", "foo", 5, 15);
         let line_data = make_line_data(&[("a.rs", &[(5, 1)])]);
         let branch_data = make_branch_data(&[("a.rs", &[(7, Some(3)), (10, None), (12, Some(0))])]);
-        let result = match_functions(&[comp], &line_data, Some(&branch_data), MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            Some(&branch_data),
+            MissingCoveragePolicy::Pessimistic,
+        );
         let bc = result[0]
             .1
             .branch_coverage
@@ -486,7 +556,12 @@ mod tests {
         let line_data = make_line_data(&[("a.rs", &[(5, 1)])]);
         // Branch data exists but outside span
         let branch_data = make_branch_data(&[("a.rs", &[(20, Some(1))])]);
-        let result = match_functions(&[comp], &line_data, Some(&branch_data), MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp],
+            &line_data,
+            Some(&branch_data),
+            MissingCoveragePolicy::Pessimistic,
+        );
         assert!(result[0].1.branch_coverage.is_none());
     }
 
@@ -496,7 +571,12 @@ mod tests {
         let comp_b = make_complexity("b.rs", "bar", 1, 10);
         let line_data = make_line_data(&[("a.rs", &[(1, 1)]), ("b.rs", &[(1, 1)])]);
         let branch_data = make_branch_data(&[("a.rs", &[(5, Some(1))])]);
-        let result = match_functions(&[comp_a, comp_b], &line_data, Some(&branch_data), MissingCoveragePolicy::Pessimistic);
+        let result = match_functions(
+            &[comp_a, comp_b],
+            &line_data,
+            Some(&branch_data),
+            MissingCoveragePolicy::Pessimistic,
+        );
         // a.rs has branch coverage
         let a_bc = result[0]
             .1
