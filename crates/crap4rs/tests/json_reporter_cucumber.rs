@@ -26,7 +26,7 @@ use cucumber::{World, given, then, when, writer};
 use serde_json::{Value, json};
 
 use crap4rs::adapters::reporters::{JsonConfig, format_json};
-use crap4rs::domain::types::{AnalysisResult, ComplexityMetric};
+use crap4rs::domain::types::{AnalysisResult, ComplexityMetric, MissingCoveragePolicy};
 use crap4rs::domain::view::{self, ViewSpec};
 
 /// State threaded through Given/When/Then steps. Each scenario starts
@@ -56,6 +56,7 @@ impl JsonWorld {
         let config = JsonConfig {
             tool_version: "0.1.0".to_string(),
             metric,
+            missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold,
             timestamp: "2026-05-04T00:00:00Z".to_string(),
             diagnostics: None,

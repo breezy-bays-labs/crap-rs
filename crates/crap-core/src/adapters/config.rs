@@ -15,7 +15,7 @@ use serde::Deserialize;
 use crate::cli::AdapterMeta;
 
 use crate::domain::threshold::{ThresholdOverride, ThresholdPreset, is_valid_threshold};
-use crate::domain::types::ComplexityMetric;
+use crate::domain::types::{ComplexityMetric, MissingCoveragePolicy};
 use crate::domain::view::{CoverageRange, CoverageRangeError, GroupKey, SortKey};
 
 // ── Parsed config types (re-exported from domain) ──────────────────
@@ -75,6 +75,10 @@ pub struct ConfigSchema {
     /// Complexity metric: `"cognitive"` (default for the Rust adapter)
     /// or `"cyclomatic"`.
     pub metric: Option<String>,
+    /// How to score a function whose source file is entirely absent from
+    /// the coverage data: `"pessimistic"` (default — 0% covered),
+    /// `"optimistic"` (100% covered), or `"skip"` (omit from the report).
+    pub missing_coverage_policy: Option<String>,
     /// Source root(s) the analyzer walks. Accepts a single string
     /// (`src = "crates"`) or an array (`src = ["crate-a", "crate-b"]`).
     /// A single root stays src-relative; multiple roots are keyed
@@ -268,6 +272,11 @@ pub enum ConfigError {
     /// An unrecognized `metric` string.
     #[error("unknown metric: {value}\n  valid values: cognitive, cyclomatic")]
     UnknownMetric { value: String },
+    /// An unrecognized `missing_coverage_policy` string.
+    #[error(
+        "unknown missing_coverage_policy: {value}\n  valid values: pessimistic, optimistic, skip"
+    )]
+    UnknownMissingCoveragePolicy { value: String },
     /// An unrecognized view-preset `sort` string. `preset` names the
     /// `[views.<name>]` block.
     #[error(
@@ -445,6 +454,11 @@ fn parse_config(content: &str) -> Result<FileConfig, ConfigError> {
     validate_raw_config(&raw)?;
 
     let metric = raw.metric.as_deref().map(parse_metric).transpose()?;
+    let missing_coverage_policy = raw
+        .missing_coverage_policy
+        .as_deref()
+        .map(parse_missing_coverage_policy)
+        .transpose()?;
     let preset = raw.preset.as_deref().map(parse_preset).transpose()?;
 
     let overrides = parse_overrides(raw.overrides);
@@ -455,6 +469,7 @@ fn parse_config(content: &str) -> Result<FileConfig, ConfigError> {
         threshold: raw.threshold,
         preset,
         metric,
+        missing_coverage_policy,
         src: raw.src.map(SrcSpec::into_paths).unwrap_or_default(),
         exclude: raw.exclude,
         overrides,
@@ -702,6 +717,17 @@ fn parse_metric(s: &str) -> Result<ComplexityMetric, ConfigError> {
     }
 }
 
+fn parse_missing_coverage_policy(s: &str) -> Result<MissingCoveragePolicy, ConfigError> {
+    match s {
+        "pessimistic" => Ok(MissingCoveragePolicy::Pessimistic),
+        "optimistic" => Ok(MissingCoveragePolicy::Optimistic),
+        "skip" => Ok(MissingCoveragePolicy::Skip),
+        other => Err(ConfigError::UnknownMissingCoveragePolicy {
+            value: other.to_string(),
+        }),
+    }
+}
+
 // ── JSON Schema artifact ───────────────────────────────────────────
 
 /// Render the committed JSON Schema for [`ConfigSchema`] as pretty JSON.
@@ -787,6 +813,7 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
         threshold,
         preset,
         metric,
+        missing_coverage_policy,
         src,
         exclude,
         overrides,
@@ -810,7 +837,14 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
     root.set_implicit(false);
 
     emit_header_banner(root, meta);
-    emit_top_scalars(root, threshold, metric, src, exclude);
+    emit_top_scalars(
+        root,
+        threshold,
+        metric,
+        missing_coverage_policy,
+        src,
+        exclude,
+    );
     emit_overrides_block(root, overrides);
     emit_views_block(root, views);
     emit_language_block(root, language);
@@ -840,6 +874,7 @@ fn emit_top_scalars(
     root: &mut toml_edit::Table,
     threshold: Option<f64>,
     metric: Option<String>,
+    missing_coverage_policy: Option<String>,
     src: Option<SrcSpec>,
     exclude: Option<Vec<String>>,
 ) {
@@ -859,6 +894,17 @@ fn emit_top_scalars(
 
     root.insert("metric", value(metric.expect("metric set")));
     comment_key(root, "metric", field_doc::<ConfigSchema>("metric"), true);
+
+    root.insert(
+        "missing_coverage_policy",
+        value(missing_coverage_policy.expect("missing_coverage_policy set")),
+    );
+    comment_key(
+        root,
+        "missing_coverage_policy",
+        field_doc::<ConfigSchema>("missing_coverage_policy"),
+        true,
+    );
 
     // src: emit the multi-root array form (the exhaustive shape).
     let mut src_arr = Array::new();
@@ -1182,6 +1228,7 @@ fn exhaustive_example(meta: &AdapterMeta) -> ConfigSchema {
         threshold: Some(15.0),
         preset: None,
         metric: Some("cognitive".to_string()),
+        missing_coverage_policy: Some("optimistic".to_string()),
         src: Some(SrcSpec::Many(vec![
             "crates/core/src".to_string(),
             "crates/cli/src".to_string(),
@@ -1264,6 +1311,30 @@ mod tests {
             ConfigError::UnknownMetric { value } => assert_eq!(value, "halstead"),
             other => panic!("expected UnknownMetric, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_config_returns_typed_unknown_missing_coverage_policy() {
+        let err = parse_config("missing_coverage_policy = \"halt\"\n").unwrap_err();
+        match err {
+            ConfigError::UnknownMissingCoveragePolicy { value } => assert_eq!(value, "halt"),
+            other => panic!("expected UnknownMissingCoveragePolicy, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_config_parses_missing_coverage_policy() {
+        let config = parse_config("missing_coverage_policy = \"skip\"\n").unwrap();
+        assert_eq!(
+            config.missing_coverage_policy,
+            Some(MissingCoveragePolicy::Skip)
+        );
+    }
+
+    #[test]
+    fn parse_config_missing_coverage_policy_absent_is_none() {
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert_eq!(config.missing_coverage_policy, None);
     }
 
     #[test]

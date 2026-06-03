@@ -24,7 +24,7 @@ use crate::adapters::reporters::json::DeltaContext;
 use crate::core::{AnalysisOutput, AnalyzeOptions};
 use crate::domain::delta::{self, AnalysisDelta, DeltaView};
 use crate::domain::threshold::{ThresholdConfig, ThresholdPreset, is_valid_threshold};
-use crate::domain::types::{AnalysisDiagnostics, ComplexityMetric};
+use crate::domain::types::{AnalysisDiagnostics, ComplexityMetric, MissingCoveragePolicy};
 use crate::domain::view::{self, GroupKey, SortKey};
 use crate::ports::{ComplexityPort, CoveragePort, ParseDiagnostic};
 
@@ -48,6 +48,28 @@ impl From<MetricArg> for ComplexityMetric {
         match arg {
             MetricArg::Cognitive => ComplexityMetric::Cognitive,
             MetricArg::Cyclomatic => ComplexityMetric::Cyclomatic,
+        }
+    }
+}
+
+/// How to score a function whose source file is absent from the coverage
+/// data. Clap-side wrapper that keeps `clap::ValueEnum` out of the domain.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum MissingCoveragePolicyArg {
+    /// Score as 0% covered (CRAP = c² + c) — the default, never hides risk
+    Pessimistic,
+    /// Score as 100% covered (CRAP = c) — for scoped local test slices
+    Optimistic,
+    /// Omit such functions from the report entirely
+    Skip,
+}
+
+impl From<MissingCoveragePolicyArg> for MissingCoveragePolicy {
+    fn from(arg: MissingCoveragePolicyArg) -> Self {
+        match arg {
+            MissingCoveragePolicyArg::Pessimistic => MissingCoveragePolicy::Pessimistic,
+            MissingCoveragePolicyArg::Optimistic => MissingCoveragePolicy::Optimistic,
+            MissingCoveragePolicyArg::Skip => MissingCoveragePolicy::Skip,
         }
     }
 }
@@ -307,6 +329,11 @@ pub struct InputArgs {
     /// Complexity metric to use
     #[arg(long, value_enum)]
     pub metric: Option<MetricArg>,
+
+    /// How to score functions whose file is absent from the coverage data
+    /// [default: pessimistic]
+    #[arg(long, value_enum)]
+    pub missing_coverage_policy: Option<MissingCoveragePolicyArg>,
 
     /// Path to config file (default: auto-discover the adapter's config TOML)
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
@@ -1110,6 +1137,10 @@ struct EffectiveInputs {
     /// byte-identical back-compat case (crap-rs#336).
     src: Vec<PathBuf>,
     metric: ComplexityMetric,
+    /// Resolved policy for functions whose file is absent from coverage.
+    /// CLI flag wins over the top-level config key; defaults to
+    /// `Pessimistic`. Top-level only — no per-language overlay.
+    missing_coverage_policy: MissingCoveragePolicy,
     threshold_config: ThresholdConfig,
     threshold: f64,
     exclude: Vec<String>,
@@ -1183,6 +1214,16 @@ fn merge_effective_inputs(
         .or_else(|| lang.and_then(|l| l.metric))
         .or_else(|| file_config.as_ref().and_then(|c| c.metric))
         .unwrap_or(meta.default_metric);
+    // CLI flag wins over the top-level config key, then the domain
+    // default (`Pessimistic`). Top-level only — no per-language overlay,
+    // since the policy governs the whole run's treatment of files absent
+    // from coverage.
+    let missing_coverage_policy = cli
+        .input
+        .missing_coverage_policy
+        .map(Into::into)
+        .or_else(|| file_config.as_ref().and_then(|c| c.missing_coverage_policy))
+        .unwrap_or_default();
     let (threshold_config, threshold) = merge_threshold(cli, file_config, lang, metric);
     let exclude = merge_exclude(cli, file_config, lang, meta);
     let annotation_limit = cli
@@ -1199,6 +1240,7 @@ fn merge_effective_inputs(
     EffectiveInputs {
         src,
         metric,
+        missing_coverage_policy,
         threshold_config,
         threshold,
         exclude,
@@ -1366,6 +1408,7 @@ fn build_analyze_options(
         coverage: coverage.to_path_buf(),
         threshold_config: inputs.threshold_config.clone(),
         metric: inputs.metric,
+        missing_coverage_policy: inputs.missing_coverage_policy,
         exclude: inputs.exclude.clone(),
         respect_gitignore: !cli.filter.no_gitignore,
         diff_ref: cli.filter.diff.clone(),
@@ -1485,7 +1528,7 @@ where
     // envelope and compute the AnalysisDelta. None when --baseline is
     // absent — the JSON envelope omits the `delta` block entirely so
     // existing consumers see byte-identical output.
-    let delta_state = load_delta_state(cli, &analysis.result)?;
+    let delta_state = load_delta_state(cli, &analysis.result, options.missing_coverage_policy)?;
 
     Ok(PipelinePrep {
         inputs,
@@ -1514,6 +1557,7 @@ fn format_as_json<P: ParseDiagnostic>(
     let config = reporters::json::JsonConfig {
         tool_version: meta.tool_version.to_string(),
         metric: inputs.metric,
+        missing_coverage_policy: inputs.missing_coverage_policy,
         threshold: inputs.threshold,
         timestamp: now_unix_epoch(),
         diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
@@ -1713,15 +1757,40 @@ struct DeltaState<P: ParseDiagnostic> {
 fn load_delta_state<P: ParseDiagnostic>(
     cli: &Cli,
     current: &crate::domain::types::AnalysisResult,
+    current_policy: MissingCoveragePolicy,
 ) -> Result<Option<DeltaState<P>>> {
     let Some(path) = cli.input.baseline.as_ref() else {
         return Ok(None);
     };
     let snapshot = baseline::load::<P>(path).map_err(|e| anyhow::anyhow!("{e}"))?;
+    if let Some(msg) = policy_mismatch_warning(snapshot.missing_coverage_policy, current_policy) {
+        eprintln!("{msg}");
+    }
     // delta::compute consumes both — we own snapshot.result, clone the
     // current analysis so the surrounding pipeline keeps its handle.
     let delta = delta::compute(snapshot.result.clone(), current.clone());
     Ok(Some(DeltaState { snapshot, delta }))
+}
+
+/// The warning text when the baseline and the current run used different
+/// missing-coverage policies, or `None` when they match. The delta
+/// compares two analyses that scored coverage-absent functions under
+/// different rules, so the per-function deltas can mislead: a
+/// `pessimistic` → `optimistic` switch makes every such function look
+/// like a large improvement, and a `pessimistic` → `skip` switch makes
+/// them look *deleted* (present in the baseline, absent now). Pure so the
+/// message is unit-testable; the caller emits it as a non-fatal stderr
+/// warning (the delta still computes).
+fn policy_mismatch_warning(
+    baseline: MissingCoveragePolicy,
+    current: MissingCoveragePolicy,
+) -> Option<String> {
+    (baseline != current).then(|| {
+        format!(
+            "warning: baseline used `missing_coverage_policy = {baseline}` but this run uses `{current}`; \
+             delta scores for functions absent from coverage may be misleading"
+        )
+    })
 }
 
 fn validate_display_flags(cli: &Cli) -> Result<()> {
@@ -3418,6 +3487,7 @@ mod tests {
         EffectiveInputs {
             src: roots,
             metric: ComplexityMetric::Cognitive,
+            missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold_config: crate::domain::threshold::ThresholdConfig::default(),
             threshold: 15.0,
             exclude: Vec::new(),
@@ -3554,6 +3624,96 @@ mod tests {
         });
         let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
         assert!(matches!(inputs.metric, ComplexityMetric::Cyclomatic));
+    }
+
+    #[test]
+    fn merge_effective_inputs_default_missing_coverage_policy_is_pessimistic() {
+        // No CLI flag, no config key → the domain default (Pessimistic),
+        // which preserves the historic 0%-coverage behavior.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let inputs = merge_effective_inputs(&cli, &None, &fake_meta());
+        assert!(matches!(
+            inputs.missing_coverage_policy,
+            MissingCoveragePolicy::Pessimistic
+        ));
+    }
+
+    #[test]
+    fn merge_effective_inputs_config_sets_missing_coverage_policy() {
+        // Config key flows through when no CLI flag overrides it.
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            missing_coverage_policy: Some(MissingCoveragePolicy::Optimistic),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
+        assert!(matches!(
+            inputs.missing_coverage_policy,
+            MissingCoveragePolicy::Optimistic
+        ));
+    }
+
+    #[test]
+    fn merge_effective_inputs_cli_missing_coverage_policy_overrides_config() {
+        // CLI flag wins over the config key (the cascade is CLI > config
+        // > default, same as every other knob).
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--missing-coverage-policy",
+            "skip",
+        ])
+        .unwrap();
+        let file_config = Some(FileConfig {
+            missing_coverage_policy: Some(MissingCoveragePolicy::Optimistic),
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
+        assert!(matches!(
+            inputs.missing_coverage_policy,
+            MissingCoveragePolicy::Skip
+        ));
+    }
+
+    #[test]
+    fn policy_mismatch_warning_none_when_policies_match() {
+        assert!(
+            policy_mismatch_warning(
+                MissingCoveragePolicy::Pessimistic,
+                MissingCoveragePolicy::Pessimistic
+            )
+            .is_none()
+        );
+        assert!(
+            policy_mismatch_warning(MissingCoveragePolicy::Skip, MissingCoveragePolicy::Skip)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn policy_mismatch_warning_flags_pessimistic_baseline_vs_skip_current() {
+        // The phantom-deletion case: a pessimistic baseline scored
+        // coverage-absent functions at 0% (present in the baseline); a
+        // `skip` current run omits them, so the delta reads them as
+        // deletions. The warning must name both policies.
+        let msg = policy_mismatch_warning(
+            MissingCoveragePolicy::Pessimistic,
+            MissingCoveragePolicy::Skip,
+        )
+        .expect("mismatched policies must warn");
+        assert!(msg.contains("pessimistic"), "names the baseline policy");
+        assert!(msg.contains("skip"), "names the current policy");
+        assert!(msg.contains("misleading"), "flags the comparison risk");
+    }
+
+    #[test]
+    fn policy_mismatch_warning_flags_pessimistic_baseline_vs_optimistic_current() {
+        let msg = policy_mismatch_warning(
+            MissingCoveragePolicy::Pessimistic,
+            MissingCoveragePolicy::Optimistic,
+        )
+        .expect("mismatched policies must warn");
+        assert!(msg.contains("pessimistic") && msg.contains("optimistic"));
     }
 
     #[test]

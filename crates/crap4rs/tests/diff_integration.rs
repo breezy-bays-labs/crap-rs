@@ -8,7 +8,7 @@ use crap4rs::adapters::coverage::LcovParser;
 use crap4rs::core::identity::IdentityBase;
 use crap4rs::core::{AnalysisOutput, AnalyzeOptions, analyze};
 use crap4rs::domain::threshold::ThresholdConfig;
-use crap4rs::domain::types::ComplexityMetric;
+use crap4rs::domain::types::{ComplexityMetric, MissingCoveragePolicy};
 use std::path::Path;
 use std::process::Command;
 
@@ -602,6 +602,7 @@ fn json_envelope_contains_diff_ref() {
     let config = reporters::json::JsonConfig {
         tool_version: "0.1.0".to_string(),
         metric: ComplexityMetric::Cognitive,
+        missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
         threshold: 30.0,
         timestamp: "2026-03-29T00:00:00Z".to_string(),
         diagnostics: None,
@@ -639,6 +640,7 @@ fn json_envelope_diff_ref_null_without_flag() {
     let config = reporters::json::JsonConfig {
         tool_version: "0.1.0".to_string(),
         metric: ComplexityMetric::Cognitive,
+        missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
         threshold: 30.0,
         timestamp: "2026-03-29T00:00:00Z".to_string(),
         diagnostics: None,

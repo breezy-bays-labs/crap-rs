@@ -8,7 +8,7 @@ use crap4rs::adapters::coverage::LcovParser;
 use crap4rs::core::identity::IdentityBase;
 use crap4rs::core::{AnalyzeOptions, analyze};
 use crap4rs::domain::threshold::ThresholdConfig;
-use crap4rs::domain::types::ComplexityMetric;
+use crap4rs::domain::types::{ComplexityMetric, MissingCoveragePolicy};
 use std::path::{Path, PathBuf};
 
 /// Construct the LCOV/syn adapter pair rooted at `src`. Threaded
@@ -126,6 +126,87 @@ fn self_referential_with_cyclomatic() {
 
     // Should still find the same set of functions
     assert!(result.functions.len() > 10);
+}
+
+/// End-to-end snapshot of all three missing-coverage policies (AC #7):
+/// a single function whose file is absent from coverage scores three
+/// different ways. Complexity `c` is read from the result rather than
+/// hardcoded, so the CRAP assertions stay robust to the walker's exact
+/// cognitive count.
+#[test]
+fn missing_coverage_policy_changes_outputs_end_to_end() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    // Cognitive complexity > 1 so the 0%-vs-100% CRAP scores differ.
+    std::fs::write(
+        src.join("lib.rs"),
+        "pub fn classify(n: i32) -> &'static str {\n\
+         \x20   if n < 0 { \"neg\" } else if n == 0 { \"zero\" } else { \"pos\" }\n\
+         }\n",
+    )
+    .unwrap();
+    // LCOV covers an unrelated file, so `lib.rs` is absent from coverage
+    // and the policy decides its fate.
+    let lcov_path = tmp.path().join("lcov.info");
+    std::fs::write(&lcov_path, "SF:unrelated.rs\nDA:1,1\nend_of_record\n").unwrap();
+
+    let opts_for = |policy| AnalyzeOptions {
+        identity_base: IdentityBase::SrcRelative(src.clone()),
+        src: vec![src.clone()],
+        coverage: lcov_path.clone(),
+        threshold_config: ThresholdConfig {
+            global: 1000.0,
+            ..ThresholdConfig::default()
+        },
+        metric: ComplexityMetric::Cognitive,
+        exclude: Vec::new(),
+        respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
+        missing_coverage_policy: policy,
+        ..AnalyzeOptions::default()
+    };
+
+    // Pessimistic: present, 0% coverage, CRAP = c² + c.
+    let (cx, cov) = adapters(&src);
+    let pess = analyze(&opts_for(MissingCoveragePolicy::Pessimistic), &cx, &cov)
+        .unwrap()
+        .result;
+    assert_eq!(pess.functions.len(), 1, "pessimistic keeps the function");
+    let f = &pess.functions[0].scored;
+    let c = f.complexity as f64;
+    assert!(c > 1.0, "fixture complexity must exceed 1, got {c}");
+    assert_eq!(f.coverage_percent, 0.0);
+    assert!(
+        (f.crap.value - (c * c + c)).abs() < 1e-9,
+        "pessimistic CRAP must be c²+c, got {} (c={c})",
+        f.crap.value
+    );
+
+    // Optimistic: present, 100% coverage, CRAP = c.
+    let (cx, cov) = adapters(&src);
+    let opt = analyze(&opts_for(MissingCoveragePolicy::Optimistic), &cx, &cov)
+        .unwrap()
+        .result;
+    assert_eq!(opt.functions.len(), 1, "optimistic keeps the function");
+    let f = &opt.functions[0].scored;
+    assert_eq!(f.coverage_percent, 100.0);
+    assert!(
+        (f.crap.value - c).abs() < 1e-9,
+        "optimistic CRAP must equal complexity {c}, got {}",
+        f.crap.value
+    );
+
+    // Skip: the function is omitted from the result entirely.
+    let (cx, cov) = adapters(&src);
+    let skip = analyze(&opts_for(MissingCoveragePolicy::Skip), &cx, &cov)
+        .unwrap()
+        .result;
+    assert!(
+        skip.functions.is_empty(),
+        "skip omits functions whose file is absent from coverage"
+    );
+    assert!(skip.passed, "an empty skip result still passes the gate");
 }
 
 #[test]

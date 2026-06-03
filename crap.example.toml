@@ -15,6 +15,11 @@ threshold = 15.0
 # or `"cyclomatic"`.
 metric = "cognitive"
 
+# How to score a function whose source file is entirely absent from
+# the coverage data: `"pessimistic"` (default — 0% covered),
+# `"optimistic"` (100% covered), or `"skip"` (omit from the report).
+missing_coverage_policy = "optimistic"
+
 # Source root(s) the analyzer walks. Accepts a single string
 # (`src = "crates"`) or an array (`src = ["crate-a", "crate-b"]`).
 # A single root stays src-relative; multiple roots are keyed

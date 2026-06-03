@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use super::threshold::{ThresholdOverride, ThresholdPreset};
-use super::types::ComplexityMetric;
+use super::types::{ComplexityMetric, MissingCoveragePolicy};
 use super::view::{GroupKey, SortKey};
 
 /// Parsed configuration from a TOML file.
@@ -39,6 +39,10 @@ pub struct FileConfig {
     pub threshold: Option<f64>,
     pub preset: Option<ThresholdPreset>,
     pub metric: Option<ComplexityMetric>,
+    /// How to score a function whose file is absent from the coverage
+    /// data. `None` defers to the CLI default
+    /// ([`MissingCoveragePolicy::Pessimistic`]).
+    pub missing_coverage_policy: Option<MissingCoveragePolicy>,
     /// Source roots the analyzer walks, in declaration order.
     ///
     /// Empty means "unset, defer to CLI / the `["src"]` default." A

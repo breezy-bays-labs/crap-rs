@@ -28,6 +28,13 @@
         "null"
       ]
     },
+    "missing_coverage_policy": {
+      "description": "How to score a function whose source file is entirely absent from\nthe coverage data: `\"pessimistic\"` (default — 0% covered),\n`\"optimistic\"` (100% covered), or `\"skip\"` (omit from the report).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "output": {
       "description": "Output-shaping settings (`[output]`): annotation cap, scorecard\ntitle, and subtitle.",
       "$ref": "#/$defs/OutputSchema"

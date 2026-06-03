@@ -202,6 +202,56 @@ impl fmt::Display for ComplexityMetric {
     }
 }
 
+// ── Missing-Coverage Policy ──────────────────────────────────────────
+
+/// How to score a function whose source file is entirely absent from the
+/// coverage data.
+///
+/// A file can be missing from coverage for benign reasons — a `#[cfg(…)]`
+/// feature gate excluded from the coverage build, an untested file, or a
+/// scoped per-package coverage run. The policy decides what coverage such
+/// a function is assigned:
+///
+/// - [`Pessimistic`](Self::Pessimistic) treats it as 0% covered, so its
+///   CRAP score is `c² + c` (the historic behavior — the safe default
+///   that never hides risk).
+/// - [`Optimistic`](Self::Optimistic) treats it as 100% covered, so its
+///   CRAP score is `c` (the complexity alone) — appropriate when running
+///   a scoped test slice that legitimately omits some files.
+/// - [`Skip`](Self::Skip) omits the function from the result entirely; it
+///   appears in no summary, scorecard, or function list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum MissingCoveragePolicy {
+    /// Score files missing from coverage as 0% covered (CRAP = `c² + c`).
+    #[default]
+    Pessimistic,
+    /// Score files missing from coverage as 100% covered (CRAP = `c`).
+    Optimistic,
+    /// Exclude functions in files missing from coverage from the result.
+    Skip,
+}
+
+impl MissingCoveragePolicy {
+    /// Canonical wire string — the single vocabulary shared by the CLI
+    /// flag value, the config key value, and the envelope token. Each arm
+    /// is held equal to this enum's serde (`rename_all = "lowercase"`)
+    /// representation by an integration test so the two never drift.
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Pessimistic => "pessimistic",
+            Self::Optimistic => "optimistic",
+            Self::Skip => "skip",
+        }
+    }
+}
+
+impl fmt::Display for MissingCoveragePolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_wire_str())
+    }
+}
+
 // ── Function Identity & Metrics ─────────────────────────────────────
 
 /// Identifies a function in the source code.

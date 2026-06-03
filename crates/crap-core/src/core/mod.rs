@@ -29,7 +29,7 @@ use crate::domain::summary::compute_summary;
 use crate::domain::threshold::ThresholdConfig;
 use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, ComplexityMetric, CoverageMetric, FileChangeKind,
-    FunctionComplexity, FunctionVerdict, LineCoverage, ScoredFunction,
+    FunctionComplexity, FunctionVerdict, LineCoverage, MissingCoveragePolicy, ScoredFunction,
 };
 use crate::ports::{ComplexityPort, CoveragePort, DiffPort, ParseDiagnostic, ParseOutput};
 
@@ -80,6 +80,11 @@ pub struct AnalyzeOptions {
     /// computation is pure-domain and bounded — runs only on exceeding
     /// verdicts, so the cost scales with violations, not total functions.
     pub compute_diagnostics: bool,
+    /// How to score a function whose source file is entirely absent from
+    /// the coverage data (feature-gated file, untested file, or scoped
+    /// coverage run). The default is [`MissingCoveragePolicy::Pessimistic`]
+    /// — 0% coverage, the behavior that never hides risk.
+    pub missing_coverage_policy: MissingCoveragePolicy,
 }
 
 /// Full output from an analysis run, including both the scored results
@@ -136,6 +141,7 @@ impl Default for AnalyzeOptions {
             // parser-neutral diagnostic when nothing matches (#161).
             extensions: Vec::new(),
             compute_diagnostics: false,
+            missing_coverage_policy: MissingCoveragePolicy::default(),
         }
     }
 }
@@ -256,13 +262,26 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
             &all_complexities,
             &parse_output.coverage,
             parse_output.branches.as_ref(),
+            self.options.missing_coverage_policy,
         );
 
-        let functions_no_coverage = matched
+        // `functions_no_coverage` counts every extracted function whose
+        // file is absent from the coverage data. It is derived from
+        // `all_complexities`, not `matched`, so the count is correct under
+        // every policy: `Skip` drops such functions from `matched`, but
+        // they are still reported here. `functions_matched` counts the
+        // functions that did join coverage data (`matched` entries whose
+        // file is present). Because `match_functions` only ever omits
+        // no-coverage functions, the two counts partition every extracted
+        // function — the invariant the `debug_assert_eq!` below guards.
+        let functions_no_coverage = all_complexities
             .iter()
-            .filter(|(comp, _)| !parse_output.coverage.contains_key(&comp.identity.file_path))
+            .filter(|comp| !parse_output.coverage.contains_key(&comp.identity.file_path))
             .count();
-        let functions_matched = matched.len() - functions_no_coverage;
+        let functions_matched = matched
+            .iter()
+            .filter(|(comp, _)| parse_output.coverage.contains_key(&comp.identity.file_path))
+            .count();
 
         let resolver = ThresholdResolver::new(&self.options.threshold_config)?;
         let mut result = score_and_summarize(&matched, &resolver)?;
@@ -287,8 +306,8 @@ impl<'a, P: ParseDiagnostic> AnalysisContext<'a, P> {
 
         debug_assert_eq!(
             diagnostics.functions_matched + diagnostics.functions_no_coverage,
-            result.functions.len(),
-            "diagnostics counts must partition scored functions"
+            all_complexities.len(),
+            "matched-with-coverage and no-coverage counts must partition every extracted function",
         );
 
         Ok(AnalysisOutput {

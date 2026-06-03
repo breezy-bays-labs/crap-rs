@@ -9,6 +9,7 @@
 use crate::domain::delta::{DeltaSummary, DeltaView, DeltaViewSpec, FunctionChange};
 use crate::domain::types::{
     AnalysisDiagnostics, AnalysisResult, AnalysisSummary, ComplexityMetric, FunctionVerdict,
+    MissingCoveragePolicy,
 };
 use crate::domain::view::{AnalysisView, GroupedView, ViewSpec};
 use crate::ports::ParseDiagnostic;
@@ -24,6 +25,11 @@ use serde::Serialize;
 pub struct JsonConfig<'a, P: ParseDiagnostic> {
     pub tool_version: String,
     pub metric: ComplexityMetric,
+    /// Resolved missing-coverage policy for this run. Recorded in the
+    /// envelope (unless `Pessimistic`) so a baseline captures the policy
+    /// it was generated under and a later delta run can warn on a
+    /// mismatch.
+    pub missing_coverage_policy: MissingCoveragePolicy,
     pub threshold: f64,
     pub timestamp: String,
     /// When present, diagnostics are included in the JSON output (--verbose).
@@ -86,6 +92,22 @@ struct JsonEnvelope<'a, P: ParseDiagnostic> {
     delta: Option<DeltaWire<'a, P>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     diagnostics: Option<&'a AnalysisDiagnostics<P>>,
+    /// Missing-coverage policy. Elided when `Pessimistic` (the default)
+    /// so every existing pessimistic-run envelope stays byte-identical;
+    /// emitted as `"optimistic"` / `"skip"` otherwise. A reader treats an
+    /// absent key as `Pessimistic` (see `baseline::BaselineEnvelope`).
+    /// Additive — does not bump `schema_version` (the default case is
+    /// unchanged).
+    #[serde(skip_serializing_if = "is_pessimistic")]
+    missing_coverage_policy: MissingCoveragePolicy,
+}
+
+/// `skip_serializing_if` predicate: elide the envelope's
+/// `missing_coverage_policy` key when it carries the default, so a
+/// pessimistic run's envelope is byte-identical to before the field
+/// existed.
+fn is_pessimistic(policy: &MissingCoveragePolicy) -> bool {
+    *policy == MissingCoveragePolicy::Pessimistic
 }
 
 /// On-the-wire delta representation. Mirrors the `delta` envelope key
@@ -194,6 +216,7 @@ pub fn format_json<P: ParseDiagnostic>(
         view: ViewWire::from_view(view, config.minimal_view),
         delta: delta_wire,
         diagnostics: config.diagnostics,
+        missing_coverage_policy: config.missing_coverage_policy,
     };
     serde_json::to_string_pretty(&envelope)
 }
@@ -216,6 +239,7 @@ mod tests {
         JsonConfig {
             tool_version: "0.1.0".to_string(),
             metric: ComplexityMetric::Cognitive,
+            missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold: 8.0,
             timestamp: "2026-03-28T12:00:00Z".to_string(),
             diagnostics: None,
@@ -257,6 +281,38 @@ mod tests {
         assert!(r.get("functions").is_some());
         assert!(r.get("summary").is_some());
         assert!(r.get("passed").is_some());
+    }
+
+    #[test]
+    fn missing_coverage_policy_elided_when_pessimistic() {
+        // The default policy keeps the envelope byte-identical to before
+        // the field existed — the key is absent entirely.
+        let result = make_empty_result();
+        let v = parse_json(&result, &default_config());
+        assert!(
+            v.get("missing_coverage_policy").is_none(),
+            "pessimistic policy must elide the envelope key"
+        );
+    }
+
+    #[test]
+    fn missing_coverage_policy_emitted_when_non_default() {
+        let result = make_empty_result();
+        for (policy, wire) in [
+            (MissingCoveragePolicy::Optimistic, "optimistic"),
+            (MissingCoveragePolicy::Skip, "skip"),
+        ] {
+            let config = JsonConfig {
+                missing_coverage_policy: policy,
+                ..default_config()
+            };
+            let v = parse_json(&result, &config);
+            assert_eq!(
+                v.get("missing_coverage_policy").and_then(|x| x.as_str()),
+                Some(wire),
+                "non-default policy must serialize its wire token"
+            );
+        }
     }
 
     #[test]
@@ -603,6 +659,7 @@ mod proptests {
         (1.0..100.0f64,).prop_map(|(threshold,)| JsonConfig {
             tool_version: "0.1.0".to_string(),
             metric: ComplexityMetric::Cognitive,
+            missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold,
             timestamp: "2026-01-01T00:00:00Z".to_string(),
             diagnostics: None,
