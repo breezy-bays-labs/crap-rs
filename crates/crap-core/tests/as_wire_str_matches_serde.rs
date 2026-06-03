@@ -13,7 +13,9 @@
 use crap_core::domain::delta::{ChangeKind, DeltaSortKey};
 use crap_core::domain::diagnostic::{Applicability, RootCause, SplitKind};
 use crap_core::domain::summary::CrapDeltaStatus;
-use crap_core::domain::types::{ComplexityMetric, ContributorKind, CoverageMetric, RiskLevel};
+use crap_core::domain::types::{
+    ComplexityMetric, ContributorKind, CoverageMetric, MissingCoveragePolicy, RiskLevel,
+};
 use crap_core::domain::view::{GroupKey, SortKey};
 use serde::Serialize;
 use serde_json::Value;
@@ -69,6 +71,17 @@ fn complexity_metric_wire_str_matches_serde() {
 #[test]
 fn coverage_metric_wire_str_matches_serde() {
     for v in [CoverageMetric::Line, CoverageMetric::Branch] {
+        assert_wire_str(v, v.as_wire_str());
+    }
+}
+
+#[test]
+fn missing_coverage_policy_wire_str_matches_serde() {
+    for v in [
+        MissingCoveragePolicy::Pessimistic,
+        MissingCoveragePolicy::Optimistic,
+        MissingCoveragePolicy::Skip,
+    ] {
         assert_wire_str(v, v.as_wire_str());
     }
 }

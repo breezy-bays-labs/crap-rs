@@ -43,7 +43,8 @@ pub mod domain {
             AnalysisResult, AnalysisSummary, BranchCoverage, ComplexityContributor,
             ComplexityMetric, ContributorKind, CoverageMetric, CoverageRatio, CrapError, CrapScore,
             Diagnostic, FileChangeKind, FunctionComplexity, FunctionCoverage, FunctionIdentity,
-            FunctionVerdict, LineCoverage, RiskDistribution, RiskLevel, ScoredFunction, SourceSpan,
+            FunctionVerdict, LineCoverage, MissingCoveragePolicy, RiskDistribution, RiskLevel,
+            ScoredFunction, SourceSpan,
         };
 
         /// v0.4 alias of [`crate::parse_diagnostic::LcovParseDiagnostic`].
