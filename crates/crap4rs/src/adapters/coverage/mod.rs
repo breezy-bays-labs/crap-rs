@@ -254,7 +254,10 @@ fn is_well_formed_da(line: &str) -> bool {
     let Some((line_no, hits)) = rest.split_once(',') else {
         return false;
     };
-    line_no.parse::<usize>().is_ok() && hits.split(',').next().unwrap_or("").parse::<u64>().is_ok()
+    // Share the record parser's line-number rule (1-based; line 0 is
+    // malformed) so the preflight never accepts a DA the parser rejects.
+    parse_lcov_line_no(line_no).is_ok()
+        && hits.split(',').next().unwrap_or("").parse::<u64>().is_ok()
 }
 
 fn handle_parse_line(parser: &LcovParser, state: &mut ParseState, line: &str, line_number: usize) {
@@ -532,6 +535,15 @@ mod tests {
     #[test]
     fn validate_malformed_da_rejected() {
         assert!(validate_str("SF:src/main.rs\nDA:not_a_number\nend_of_record\n").is_err());
+    }
+
+    #[test]
+    fn validate_da_line_zero_rejected() {
+        // LCOV line numbers are 1-based, so `DA:0,...` is malformed. The
+        // preflight must agree with the record parser, which rejects line
+        // 0 — otherwise validate() green-lights a file the parser then
+        // discards, yielding empty coverage instead of a loud error.
+        assert!(validate_str("SF:src/main.rs\nDA:0,5\nend_of_record\n").is_err());
     }
 
     #[test]
