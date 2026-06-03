@@ -62,6 +62,18 @@ The risk tiers themselves:
 
 The presets correspond to "gate at the next risk tier up." Override with `--threshold <N>` for a custom value, or define presets per-codebase in `crap.toml` (the canonical config name, written by `crap4rs init`). The legacy name `crap4rs.toml` is still discovered as a deprecated alias when no `crap.toml` is present.
 
+### Files missing from coverage
+
+When a source file is absent from the coverage report — a `#[cfg(feature = "…")]` module left out of the coverage build, an untested file, or a scoped per-package run — its functions are scored at 0% coverage by default, which inflates their CRAP (a complexity-`c` function jumps to `c² + c`). Choose how that case is handled with `--missing-coverage-policy` (or a `missing_coverage_policy` key in `crap.toml`):
+
+| Value | Behavior |
+|---|---|
+| `pessimistic` (default) | Score at 0% coverage — never hides risk. |
+| `optimistic` | Score at 100% coverage (CRAP = complexity) — for a scoped local test slice that legitimately omits some files. |
+| `skip` | Omit those functions from the report entirely. |
+
+The chosen policy is recorded in the JSON envelope (unless `pessimistic`), so a `--baseline` delta run warns when its policy differs from the baseline's.
+
 ## What it looks like
 
 ### Table (TTY default)
