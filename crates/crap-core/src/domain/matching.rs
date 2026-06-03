@@ -23,56 +23,59 @@ pub fn overlaps_any(span: &SourceSpan, changed_ranges: &[SourceSpan]) -> bool {
 
 /// Match complexity entries with coverage using line-range overlap.
 ///
-/// For each function in `complexities`, finds DA lines from `line_data`
-/// that fall within the function's span, then computes coverage ratio.
-/// If `branch_data` is provided, also computes branch coverage per function.
-///
-/// When a function's file is entirely absent from `line_data`,
-/// `missing_coverage_policy` decides the outcome: score it at 0%
-/// ([`Pessimistic`](MissingCoveragePolicy::Pessimistic)), score it at 100%
-/// ([`Optimistic`](MissingCoveragePolicy::Optimistic)), or omit it from the
-/// returned vec ([`Skip`](MissingCoveragePolicy::Skip)). A function whose
-/// file *is* present is matched the same way under every policy.
+/// Pairs each function in `complexities` with its computed
+/// [`FunctionCoverage`] via [`coverage_for_function`]. Functions the
+/// policy omits ([`Skip`](MissingCoveragePolicy::Skip) on a file absent
+/// from `line_data`) are filtered out, so the result may be shorter than
+/// `complexities`.
 pub fn match_functions(
     complexities: &[FunctionComplexity],
     line_data: &HashMap<String, Vec<LineCoverage>>,
     branch_data: Option<&HashMap<String, Vec<BranchCoverage>>>,
     missing_coverage_policy: MissingCoveragePolicy,
 ) -> Vec<(FunctionComplexity, FunctionCoverage)> {
-    let mut results = Vec::new();
+    complexities
+        .iter()
+        .filter_map(|comp| {
+            coverage_for_function(comp, line_data, branch_data, missing_coverage_policy)
+                .map(|coverage| (comp.clone(), coverage))
+        })
+        .collect()
+}
 
-    for comp in complexities {
-        let file_lines = match line_data.get(&comp.identity.file_path) {
-            Some(lines) => lines,
-            None => {
-                // File absent from coverage — score per the configured policy.
-                match missing_coverage_policy {
-                    MissingCoveragePolicy::Pessimistic => results.push((
-                        comp.clone(),
-                        zero_coverage(&comp.identity.file_path, comp.identity.span),
-                    )),
-                    MissingCoveragePolicy::Optimistic => results.push((
-                        comp.clone(),
-                        full_coverage(&comp.identity.file_path, comp.identity.span),
-                    )),
-                    MissingCoveragePolicy::Skip => {}
-                }
-                continue;
-            }
-        };
+/// Compute one function's coverage, or `None` when the policy omits it.
+///
+/// When the function's file is present in `line_data`, coverage is measured
+/// from the DA lines (and optional branch data) within its span. When the
+/// file is entirely absent, `missing_coverage_policy` decides: score it at
+/// 0% ([`Pessimistic`](MissingCoveragePolicy::Pessimistic)), score it at
+/// 100% ([`Optimistic`](MissingCoveragePolicy::Optimistic)), or drop it
+/// ([`Skip`](MissingCoveragePolicy::Skip) — the only case returning `None`).
+fn coverage_for_function(
+    comp: &FunctionComplexity,
+    line_data: &HashMap<String, Vec<LineCoverage>>,
+    branch_data: Option<&HashMap<String, Vec<BranchCoverage>>>,
+    missing_coverage_policy: MissingCoveragePolicy,
+) -> Option<FunctionCoverage> {
+    let file_path = &comp.identity.file_path;
+    let span = comp.identity.span;
 
-        let file_branches =
-            branch_data.and_then(|bd| bd.get(&comp.identity.file_path).map(|v| v.as_slice()));
-        let coverage = compute_function_coverage(
-            &comp.identity.file_path,
-            comp.identity.span,
-            file_lines,
-            file_branches,
-        );
-        results.push((comp.clone(), coverage));
+    match line_data.get(file_path) {
+        Some(file_lines) => {
+            let file_branches = branch_data.and_then(|bd| bd.get(file_path).map(|v| v.as_slice()));
+            Some(compute_function_coverage(
+                file_path,
+                span,
+                file_lines,
+                file_branches,
+            ))
+        }
+        None => match missing_coverage_policy {
+            MissingCoveragePolicy::Pessimistic => Some(zero_coverage(file_path, span)),
+            MissingCoveragePolicy::Optimistic => Some(full_coverage(file_path, span)),
+            MissingCoveragePolicy::Skip => None,
+        },
     }
-
-    results
 }
 
 /// Returns `true` if `line` falls within `span`'s inclusive `[start_line,
