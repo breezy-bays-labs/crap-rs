@@ -24,10 +24,11 @@ pub fn overlaps_any(span: &SourceSpan, changed_ranges: &[SourceSpan]) -> bool {
 /// Match complexity entries with coverage using line-range overlap.
 ///
 /// Pairs each function in `complexities` with its computed
-/// [`FunctionCoverage`] via [`coverage_for_function`]. Functions the
-/// policy omits ([`Skip`](MissingCoveragePolicy::Skip) on a file absent
-/// from `line_data`) are filtered out, so the result may be shorter than
-/// `complexities`.
+/// [`FunctionCoverage`] — line (and optional branch) coverage measured
+/// within the function's span, or the `missing_coverage_policy` outcome
+/// when the function's file is absent from `line_data`. Functions the
+/// policy omits ([`Skip`](MissingCoveragePolicy::Skip) on a missing file)
+/// are filtered out, so the result may be shorter than `complexities`.
 pub fn match_functions(
     complexities: &[FunctionComplexity],
     line_data: &HashMap<String, Vec<LineCoverage>>,
