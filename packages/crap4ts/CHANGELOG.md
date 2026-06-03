@@ -13,6 +13,19 @@ shared-core development.
 
 ## [Unreleased]
 
+## [2.0.0-rc.4](https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.3...crap4ts-v2.0.0-rc.4) - 2026-06-03
+
+### Added
+
+- *(core+ci)* #260 — complete CRAP-8 campaign + flip production gate to strict-8 ([#372](https://github.com/breezy-bays-labs/crap-rs/pull/372))
+- *(core)* #348 — multi-language [language.*] config schema + [output] title/subtitle + public ConfigSchema ([#355](https://github.com/breezy-bays-labs/crap-rs/pull/355))
+- *(core+cli)* #345 — unified crap.toml config name + dual-discovery back-compat ([#349](https://github.com/breezy-bays-labs/crap-rs/pull/349))
+- *(core+ci)* #336 — base-gated multi-root src + separate production scorecard from examples dogfood ([#344](https://github.com/breezy-bays-labs/crap-rs/pull/344))
+
+### Other
+
+- #331 — analyzer resolves workspace-relative coverage paths in both adapters ([#333](https://github.com/breezy-bays-labs/crap-rs/pull/333))
+
 ### Changed
 
 - Config auto-discovery now walks **upward** from the `--src` anchor

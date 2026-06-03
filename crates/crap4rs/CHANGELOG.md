@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.6.0...crap4rs-v0.6.1) - 2026-06-03
+
+### Added
+
+- *(core+ci)* #260 — complete CRAP-8 campaign + flip production gate to strict-8 ([#372](https://github.com/breezy-bays-labs/crap-rs/pull/372))
+- *(core+cli)* config loader hardening (#339 #340 #341 #342) ([#361](https://github.com/breezy-bays-labs/crap-rs/pull/361))
+- *(adapters)* #283 — nested-mod qualified function names in the walker ([#354](https://github.com/breezy-bays-labs/crap-rs/pull/354))
+- *(core)* #348 — multi-language [language.*] config schema + [output] title/subtitle + public ConfigSchema ([#355](https://github.com/breezy-bays-labs/crap-rs/pull/355))
+- *(core+cli)* #345 — unified crap.toml config name + dual-discovery back-compat ([#349](https://github.com/breezy-bays-labs/crap-rs/pull/349))
+- *(core+ci)* #336 — base-gated multi-root src + separate production scorecard from examples dogfood ([#344](https://github.com/breezy-bays-labs/crap-rs/pull/344))
+- *(ci)* #314 — wire-envelope publication to release assets + smoke flip to baseline mode ([#332](https://github.com/breezy-bays-labs/crap-rs/pull/332))
+- *(crap-core+ci)* #326 — Current/Delta View axis on multi-language unified HTML report ([#327](https://github.com/breezy-bays-labs/crap-rs/pull/327))
+- *(crap-core+ci)* #315 — unified multi-language HTML report with per-language toggle ([#318](https://github.com/breezy-bays-labs/crap-rs/pull/318))
+
+### Other
+
+- *(crap4rs)* #262 — rewrite cli_init.feature to the #347 init contract + gate 4 wired cucumber harnesses ([#363](https://github.com/breezy-bays-labs/crap-rs/pull/363))
+- *(bdd)* #280 — enforce one-status-tag-per-scenario + backfill delta.feature ([#362](https://github.com/breezy-bays-labs/crap-rs/pull/362))
+- #331 — analyzer resolves workspace-relative coverage paths in both adapters ([#333](https://github.com/breezy-bays-labs/crap-rs/pull/333))
+
 ### Changed
 
 - Config auto-discovery now walks **upward** from the `--src` anchor
