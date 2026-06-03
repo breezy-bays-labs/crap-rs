@@ -1768,12 +1768,36 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "test_helpers::extract_src",
+            "span": {
+              "end_column": 5,
+              "end_line": 955,
+              "start_column": 5,
+              "start_line": 948
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
             "qualified_name": "test_helpers::find_fn",
             "span": {
               "end_column": 5,
-              "end_line": 959,
+              "end_line": 968,
               "start_column": 5,
-              "start_line": 948
+              "start_line": 957
             }
           }
         },
@@ -1795,9 +1819,9 @@ expression: pretty
             "qualified_name": "tests::baseline_complexity_is_one_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 975,
+              "end_line": 984,
               "start_column": 5,
-              "start_line": 970
+              "start_line": 979
             }
           }
         },
@@ -1819,9 +1843,9 @@ expression: pretty
             "qualified_name": "tests::baseline_complexity_is_one_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 982,
+              "end_line": 991,
               "start_column": 5,
-              "start_line": 977
+              "start_line": 986
             }
           }
         },
@@ -1843,9 +1867,9 @@ expression: pretty
             "qualified_name": "tests::top_level_fn_identity",
             "span": {
               "end_column": 5,
-              "end_line": 993,
+              "end_line": 1002,
               "start_column": 5,
-              "start_line": 986
+              "start_line": 995
             }
           }
         },
@@ -1867,9 +1891,9 @@ expression: pretty
             "qualified_name": "tests::impl_method_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 1001,
+              "end_line": 1010,
               "start_column": 5,
-              "start_line": 995
+              "start_line": 1004
             }
           }
         },
@@ -1891,9 +1915,9 @@ expression: pretty
             "qualified_name": "tests::top_level_fn_in_nested_mods_fixture_is_unqualified",
             "span": {
               "end_column": 5,
-              "end_line": 1011,
+              "end_line": 1020,
               "start_column": 5,
-              "start_line": 1005
+              "start_line": 1014
             }
           }
         },
@@ -1915,9 +1939,9 @@ expression: pretty
             "qualified_name": "tests::one_level_mod_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 1017,
+              "end_line": 1026,
               "start_column": 5,
-              "start_line": 1013
+              "start_line": 1022
             }
           }
         },
@@ -1939,9 +1963,9 @@ expression: pretty
             "qualified_name": "tests::multi_level_mod_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 1023,
+              "end_line": 1032,
               "start_column": 5,
-              "start_line": 1019
+              "start_line": 1028
             }
           }
         },
@@ -1963,9 +1987,9 @@ expression: pretty
             "qualified_name": "tests::impl_method_inside_mod_prepends_mod_path",
             "span": {
               "end_column": 5,
-              "end_line": 1032,
+              "end_line": 1041,
               "start_column": 5,
-              "start_line": 1025
+              "start_line": 1034
             }
           }
         },
@@ -1987,9 +2011,9 @@ expression: pretty
             "qualified_name": "tests::nested_fn_inside_mod_is_mod_scoped_not_fn_scoped",
             "span": {
               "end_column": 5,
-              "end_line": 1047,
+              "end_line": 1056,
               "start_column": 5,
-              "start_line": 1034
+              "start_line": 1043
             }
           }
         },
@@ -2011,9 +2035,9 @@ expression: pretty
             "qualified_name": "tests::mod_qualification_does_not_disturb_complexity",
             "span": {
               "end_column": 5,
-              "end_line": 1059,
+              "end_line": 1068,
               "start_column": 5,
-              "start_line": 1049
+              "start_line": 1058
             }
           }
         },
@@ -2035,9 +2059,9 @@ expression: pretty
             "qualified_name": "tests::span_accuracy",
             "span": {
               "end_column": 5,
-              "end_line": 1082,
+              "end_line": 1091,
               "start_column": 5,
-              "start_line": 1061
+              "start_line": 1070
             }
           }
         },
@@ -2059,9 +2083,9 @@ expression: pretty
             "qualified_name": "tests::span_carries_one_based_columns",
             "span": {
               "end_column": 5,
-              "end_line": 1103,
+              "end_line": 1112,
               "start_column": 5,
-              "start_line": 1084
+              "start_line": 1093
             }
           }
         },
@@ -2083,9 +2107,9 @@ expression: pretty
             "qualified_name": "tests::columns_are_exact_one_based_offsets_unindented",
             "span": {
               "end_column": 5,
-              "end_line": 1133,
+              "end_line": 1142,
               "start_column": 5,
-              "start_line": 1105
+              "start_line": 1114
             }
           }
         },
@@ -2107,9 +2131,9 @@ expression: pretty
             "qualified_name": "tests::columns_are_exact_one_based_offsets_indented",
             "span": {
               "end_column": 5,
-              "end_line": 1158,
+              "end_line": 1167,
               "start_column": 5,
-              "start_line": 1135
+              "start_line": 1144
             }
           }
         },
@@ -2131,9 +2155,9 @@ expression: pretty
             "qualified_name": "tests::multiple_fns_returns_all",
             "span": {
               "end_column": 5,
-              "end_line": 1164,
+              "end_line": 1173,
               "start_column": 5,
-              "start_line": 1160
+              "start_line": 1169
             }
           }
         },
@@ -2155,9 +2179,9 @@ expression: pretty
             "qualified_name": "tests::async_fn_detected",
             "span": {
               "end_column": 5,
-              "end_line": 1172,
+              "end_line": 1181,
               "start_column": 5,
-              "start_line": 1166
+              "start_line": 1175
             }
           }
         },
@@ -2179,9 +2203,9 @@ expression: pretty
             "qualified_name": "tests::if_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1182,
+              "end_line": 1191,
               "start_column": 5,
-              "start_line": 1176
+              "start_line": 1185
             }
           }
         },
@@ -2203,9 +2227,9 @@ expression: pretty
             "qualified_name": "tests::nested_if_cognitive_penalty",
             "span": {
               "end_column": 5,
-              "end_line": 1190,
+              "end_line": 1199,
               "start_column": 5,
-              "start_line": 1184
+              "start_line": 1193
             }
           }
         },
@@ -2227,9 +2251,9 @@ expression: pretty
             "qualified_name": "tests::else_is_not_counted_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1199,
+              "end_line": 1208,
               "start_column": 5,
-              "start_line": 1192
+              "start_line": 1201
             }
           }
         },
@@ -2251,9 +2275,9 @@ expression: pretty
             "qualified_name": "tests::match_flat_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1207,
+              "end_line": 1216,
               "start_column": 5,
-              "start_line": 1201
+              "start_line": 1210
             }
           }
         },
@@ -2275,9 +2299,9 @@ expression: pretty
             "qualified_name": "tests::if_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1217,
+              "end_line": 1226,
               "start_column": 5,
-              "start_line": 1211
+              "start_line": 1220
             }
           }
         },
@@ -2299,9 +2323,9 @@ expression: pretty
             "qualified_name": "tests::nested_if_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1225,
+              "end_line": 1234,
               "start_column": 5,
-              "start_line": 1219
+              "start_line": 1228
             }
           }
         },
@@ -2323,9 +2347,9 @@ expression: pretty
             "qualified_name": "tests::match_arms_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1233,
+              "end_line": 1242,
               "start_column": 5,
-              "start_line": 1227
+              "start_line": 1236
             }
           }
         },
@@ -2347,9 +2371,9 @@ expression: pretty
             "qualified_name": "tests::cognitive_gte_cyclomatic_for_nested",
             "span": {
               "end_column": 5,
-              "end_line": 1246,
+              "end_line": 1255,
               "start_column": 5,
-              "start_line": 1235
+              "start_line": 1244
             }
           }
         },
@@ -2371,9 +2395,9 @@ expression: pretty
             "qualified_name": "tests::bool_same_sequence_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1256,
+              "end_line": 1265,
               "start_column": 5,
-              "start_line": 1250
+              "start_line": 1259
             }
           }
         },
@@ -2395,9 +2419,9 @@ expression: pretty
             "qualified_name": "tests::bool_same_sequence_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1264,
+              "end_line": 1273,
               "start_column": 5,
-              "start_line": 1258
+              "start_line": 1267
             }
           }
         },
@@ -2419,9 +2443,9 @@ expression: pretty
             "qualified_name": "tests::bool_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1272,
+              "end_line": 1281,
               "start_column": 5,
-              "start_line": 1266
+              "start_line": 1275
             }
           }
         },
@@ -2443,9 +2467,9 @@ expression: pretty
             "qualified_name": "tests::bool_operator_switch_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1280,
+              "end_line": 1289,
               "start_column": 5,
-              "start_line": 1274
+              "start_line": 1283
             }
           }
         },
@@ -2467,9 +2491,9 @@ expression: pretty
             "qualified_name": "tests::bool_in_condition_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1288,
+              "end_line": 1297,
               "start_column": 5,
-              "start_line": 1282
+              "start_line": 1291
             }
           }
         },
@@ -2491,9 +2515,9 @@ expression: pretty
             "qualified_name": "tests::long_or_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1296,
+              "end_line": 1305,
               "start_column": 5,
-              "start_line": 1290
+              "start_line": 1299
             }
           }
         },
@@ -2515,9 +2539,9 @@ expression: pretty
             "qualified_name": "tests::alternating_operators_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1304,
+              "end_line": 1313,
               "start_column": 5,
-              "start_line": 1298
+              "start_line": 1307
             }
           }
         },
@@ -2539,9 +2563,9 @@ expression: pretty
             "qualified_name": "tests::closure_in_parent_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1317,
+              "end_line": 1326,
               "start_column": 5,
-              "start_line": 1308
+              "start_line": 1317
             }
           }
         },
@@ -2563,9 +2587,9 @@ expression: pretty
             "qualified_name": "tests::try_operator_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1327,
+              "end_line": 1336,
               "start_column": 5,
-              "start_line": 1321
+              "start_line": 1330
             }
           }
         },
@@ -2587,9 +2611,9 @@ expression: pretty
             "qualified_name": "tests::try_operator_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1335,
+              "end_line": 1344,
               "start_column": 5,
-              "start_line": 1329
+              "start_line": 1338
             }
           }
         },
@@ -2611,9 +2635,9 @@ expression: pretty
             "qualified_name": "tests::loop_with_break_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1345,
+              "end_line": 1354,
               "start_column": 5,
-              "start_line": 1339
+              "start_line": 1348
             }
           }
         },
@@ -2635,9 +2659,9 @@ expression: pretty
             "qualified_name": "tests::loop_with_break_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1353,
+              "end_line": 1362,
               "start_column": 5,
-              "start_line": 1347
+              "start_line": 1356
             }
           }
         },
@@ -2659,9 +2683,9 @@ expression: pretty
             "qualified_name": "tests::let_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1363,
+              "end_line": 1372,
               "start_column": 5,
-              "start_line": 1357
+              "start_line": 1366
             }
           }
         },
@@ -2683,9 +2707,81 @@ expression: pretty
             "qualified_name": "tests::let_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1371,
+              "end_line": 1380,
               "start_column": 5,
-              "start_line": 1365
+              "start_line": 1374
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::else_if_chain_cognitive_counts_each_continuation",
+            "span": {
+              "end_column": 5,
+              "end_line": 1423,
+              "start_column": 5,
+              "start_line": 1389
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::else_if_chain_cyclomatic_counts_each_arm",
+            "span": {
+              "end_column": 5,
+              "end_line": 1445,
+              "start_column": 5,
+              "start_line": 1425
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::else_if_chain_with_nested_decision_inside_arm",
+            "span": {
+              "end_column": 5,
+              "end_line": 1468,
+              "start_column": 5,
+              "start_line": 1447
             }
           }
         },
@@ -2707,9 +2803,9 @@ expression: pretty
             "qualified_name": "tests::chained_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1381,
+              "end_line": 1478,
               "start_column": 5,
-              "start_line": 1375
+              "start_line": 1472
             }
           }
         },
@@ -2731,9 +2827,9 @@ expression: pretty
             "qualified_name": "tests::chained_try_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1389,
+              "end_line": 1486,
               "start_column": 5,
-              "start_line": 1383
+              "start_line": 1480
             }
           }
         },
@@ -2755,9 +2851,9 @@ expression: pretty
             "qualified_name": "tests::for_iterator_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1397,
+              "end_line": 1494,
               "start_column": 5,
-              "start_line": 1391
+              "start_line": 1488
             }
           }
         },
@@ -2779,9 +2875,9 @@ expression: pretty
             "qualified_name": "tests::for_iterator_try_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1405,
+              "end_line": 1502,
               "start_column": 5,
-              "start_line": 1399
+              "start_line": 1496
             }
           }
         },
@@ -2803,9 +2899,9 @@ expression: pretty
             "qualified_name": "tests::match_scrutinee_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1413,
+              "end_line": 1510,
               "start_column": 5,
-              "start_line": 1407
+              "start_line": 1504
             }
           }
         },
@@ -2827,9 +2923,9 @@ expression: pretty
             "qualified_name": "tests::trait_default_method_found",
             "span": {
               "end_column": 5,
-              "end_line": 1423,
+              "end_line": 1520,
               "start_column": 5,
-              "start_line": 1417
+              "start_line": 1514
             }
           }
         },
@@ -2851,9 +2947,9 @@ expression: pretty
             "qualified_name": "tests::trait_method_without_default_not_found",
             "span": {
               "end_column": 5,
-              "end_line": 1434,
+              "end_line": 1531,
               "start_column": 5,
-              "start_line": 1425
+              "start_line": 1522
             }
           }
         },
@@ -2867,18 +2963,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1469,
+              "end_line": 1566,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1463,
+              "line": 1560,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 1476,
+              "end_line": 1573,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1470,
+              "line": 1567,
               "nesting_depth": 0
             }
           ],
@@ -2892,9 +2988,9 @@ expression: pretty
             "qualified_name": "tests::trait_default_and_concrete_override_have_disjoint_spans",
             "span": {
               "end_column": 5,
-              "end_line": 1477,
+              "end_line": 1574,
               "start_column": 5,
-              "start_line": 1436
+              "start_line": 1533
             }
           }
         },
@@ -2916,9 +3012,9 @@ expression: pretty
             "qualified_name": "tests::impl_method_no_branch",
             "span": {
               "end_column": 5,
-              "end_line": 1486,
+              "end_line": 1583,
               "start_column": 5,
-              "start_line": 1481
+              "start_line": 1578
             }
           }
         },
@@ -2940,9 +3036,9 @@ expression: pretty
             "qualified_name": "tests::impl_method_with_branch",
             "span": {
               "end_column": 5,
-              "end_line": 1494,
+              "end_line": 1591,
               "start_column": 5,
-              "start_line": 1488
+              "start_line": 1585
             }
           }
         },
@@ -2956,10 +3052,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1505,
+              "end_line": 1602,
               "increment": 1,
               "kind": "match",
-              "line": 1502,
+              "line": 1599,
               "nesting_depth": 0
             }
           ],
@@ -2973,9 +3069,9 @@ expression: pretty
             "qualified_name": "tests::invalid_source_returns_error",
             "span": {
               "end_column": 5,
-              "end_line": 1506,
+              "end_line": 1603,
               "start_column": 5,
-              "start_line": 1498
+              "start_line": 1595
             }
           }
         },
@@ -2997,9 +3093,9 @@ expression: pretty
             "qualified_name": "contributor_tests::contributors_for",
             "span": {
               "end_column": 5,
-              "end_line": 1523,
+              "end_line": 1620,
               "start_column": 5,
-              "start_line": 1516
+              "start_line": 1613
             }
           }
         },
@@ -3013,10 +3109,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1535,
+              "end_line": 1632,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1527,
+              "line": 1624,
               "nesting_depth": 0
             }
           ],
@@ -3030,9 +3126,9 @@ expression: pretty
             "qualified_name": "contributor_tests::base_fn_empty_contributors",
             "span": {
               "end_column": 5,
-              "end_line": 1536,
+              "end_line": 1633,
               "start_column": 5,
-              "start_line": 1525
+              "start_line": 1622
             }
           }
         },
@@ -3054,9 +3150,9 @@ expression: pretty
             "qualified_name": "contributor_tests::if_branch_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1545,
+              "end_line": 1642,
               "start_column": 5,
-              "start_line": 1538
+              "start_line": 1635
             }
           }
         },
@@ -3078,9 +3174,9 @@ expression: pretty
             "qualified_name": "contributor_tests::nested_if_nesting_increment",
             "span": {
               "end_column": 5,
-              "end_line": 1557,
+              "end_line": 1654,
               "start_column": 5,
-              "start_line": 1547
+              "start_line": 1644
             }
           }
         },
@@ -3102,9 +3198,9 @@ expression: pretty
             "qualified_name": "contributor_tests::match_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1566,
+              "end_line": 1663,
               "start_column": 5,
-              "start_line": 1559
+              "start_line": 1656
             }
           }
         },
@@ -3118,10 +3214,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1581,
+              "end_line": 1678,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1579,
+              "line": 1676,
               "nesting_depth": 0
             }
           ],
@@ -3135,9 +3231,9 @@ expression: pretty
             "qualified_name": "contributor_tests::match_arm_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1582,
+              "end_line": 1679,
               "start_column": 5,
-              "start_line": 1568
+              "start_line": 1665
             }
           }
         },
@@ -3159,9 +3255,9 @@ expression: pretty
             "qualified_name": "contributor_tests::try_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1590,
+              "end_line": 1687,
               "start_column": 5,
-              "start_line": 1584
+              "start_line": 1681
             }
           }
         },
@@ -3183,9 +3279,9 @@ expression: pretty
             "qualified_name": "contributor_tests::try_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1598,
+              "end_line": 1695,
               "start_column": 5,
-              "start_line": 1592
+              "start_line": 1689
             }
           }
         },
@@ -3207,9 +3303,9 @@ expression: pretty
             "qualified_name": "contributor_tests::let_else_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1606,
+              "end_line": 1703,
               "start_column": 5,
-              "start_line": 1600
+              "start_line": 1697
             }
           }
         },
@@ -3231,9 +3327,9 @@ expression: pretty
             "qualified_name": "contributor_tests::let_else_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1614,
+              "end_line": 1711,
               "start_column": 5,
-              "start_line": 1608
+              "start_line": 1705
             }
           }
         },
@@ -3255,9 +3351,9 @@ expression: pretty
             "qualified_name": "contributor_tests::loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1622,
+              "end_line": 1719,
               "start_column": 5,
-              "start_line": 1616
+              "start_line": 1713
             }
           }
         },
@@ -3279,9 +3375,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1630,
+              "end_line": 1727,
               "start_column": 5,
-              "start_line": 1624
+              "start_line": 1721
             }
           }
         },
@@ -3303,9 +3399,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1638,
+              "end_line": 1735,
               "start_column": 5,
-              "start_line": 1632
+              "start_line": 1729
             }
           }
         },
@@ -3327,9 +3423,9 @@ expression: pretty
             "qualified_name": "contributor_tests::while_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1646,
+              "end_line": 1743,
               "start_column": 5,
-              "start_line": 1640
+              "start_line": 1737
             }
           }
         },
@@ -3351,9 +3447,9 @@ expression: pretty
             "qualified_name": "contributor_tests::while_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1654,
+              "end_line": 1751,
               "start_column": 5,
-              "start_line": 1648
+              "start_line": 1745
             }
           }
         },
@@ -3375,9 +3471,9 @@ expression: pretty
             "qualified_name": "contributor_tests::logical_operator_same_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1670,
+              "end_line": 1767,
               "start_column": 5,
-              "start_line": 1656
+              "start_line": 1753
             }
           }
         },
@@ -3399,9 +3495,9 @@ expression: pretty
             "qualified_name": "contributor_tests::logical_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1685,
+              "end_line": 1782,
               "start_column": 5,
-              "start_line": 1672
+              "start_line": 1769
             }
           }
         },
@@ -3423,9 +3519,9 @@ expression: pretty
             "qualified_name": "contributor_tests::break_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1698,
+              "end_line": 1795,
               "start_column": 5,
-              "start_line": 1687
+              "start_line": 1784
             }
           }
         },
@@ -3447,9 +3543,9 @@ expression: pretty
             "qualified_name": "contributor_tests::continue_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1711,
+              "end_line": 1808,
               "start_column": 5,
-              "start_line": 1700
+              "start_line": 1797
             }
           }
         },
@@ -3471,9 +3567,9 @@ expression: pretty
             "qualified_name": "contributor_tests::unsafe_block_produces_no_unsafe_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1739,
+              "end_line": 1836,
               "start_column": 5,
-              "start_line": 1713
+              "start_line": 1810
             }
           }
         },
@@ -3495,9 +3591,9 @@ expression: pretty
             "qualified_name": "contributor_tests::closure_no_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1751,
+              "end_line": 1848,
               "start_column": 5,
-              "start_line": 1741
+              "start_line": 1838
             }
           }
         },
@@ -3519,9 +3615,9 @@ expression: pretty
             "qualified_name": "contributor_tests::nested_if_records_construct_end_line_and_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1784,
+              "end_line": 1881,
               "start_column": 5,
-              "start_line": 1755
+              "start_line": 1852
             }
           }
         },
@@ -3543,9 +3639,9 @@ expression: pretty
             "qualified_name": "contributor_tests::try_records_token_span_for_atomic_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1798,
+              "end_line": 1895,
               "start_column": 5,
-              "start_line": 1786
+              "start_line": 1883
             }
           }
         },
@@ -3567,9 +3663,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_with_continue_threads_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1820,
+              "end_line": 1917,
               "start_column": 5,
-              "start_line": 1800
+              "start_line": 1897
             }
           }
         },
@@ -3591,9 +3687,9 @@ expression: pretty
             "qualified_name": "contributor_tests::nested_if_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1839,
+              "end_line": 1936,
               "start_column": 5,
-              "start_line": 1822
+              "start_line": 1919
             }
           }
         },
@@ -3615,9 +3711,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_with_continue_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1859,
+              "end_line": 1956,
               "start_column": 5,
-              "start_line": 1841
+              "start_line": 1938
             }
           }
         },
@@ -3639,9 +3735,9 @@ expression: pretty
             "qualified_name": "contributor_tests::match_records_end_line_covering_arms_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1878,
+              "end_line": 1975,
               "start_column": 5,
-              "start_line": 1861
+              "start_line": 1958
             }
           }
         },
@@ -3655,10 +3751,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1898,
+              "end_line": 1995,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1889,
+              "line": 1986,
               "nesting_depth": 0
             }
           ],
@@ -3672,9 +3768,9 @@ expression: pretty
             "qualified_name": "contributor_tests::contributors_sorted_by_line",
             "span": {
               "end_column": 5,
-              "end_line": 1899,
+              "end_line": 1996,
               "start_column": 5,
-              "start_line": 1880
+              "start_line": 1977
             }
           }
         },
@@ -3885,9 +3981,9 @@ expression: pretty
         "threshold": 8.0
       },
       {
-        "exceeds": true,
+        "exceeds": false,
         "scored": {
-          "complexity": 10,
+          "complexity": 6,
           "complexity_metric": "cognitive",
           "contributors": [
             {
@@ -3900,7 +3996,7 @@ expression: pretty
             },
             {
               "column": 9,
-              "end_line": 235,
+              "end_line": 226,
               "increment": 1,
               "kind": "for-loop",
               "line": 221,
@@ -3916,50 +4012,116 @@ expression: pretty
             },
             {
               "column": 13,
-              "end_line": 226,
+              "end_line": 225,
               "increment": 2,
               "kind": "if-branch",
               "line": 223,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
-              "end_line": 225,
-              "increment": 1,
-              "kind": "continue",
-              "line": 225,
-              "nesting_depth": 2
-            },
-            {
-              "column": 13,
-              "end_line": 234,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 227,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
-              "end_line": 228,
-              "increment": 1,
-              "kind": "logical-operator",
-              "line": 228,
               "nesting_depth": 1
             }
           ],
           "coverage_percent": 100.0,
           "crap": {
-            "risk_level": "acceptable",
-            "value": 10.0
+            "risk_level": "low",
+            "value": 6.0
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "LcovParser::validate",
             "span": {
               "end_column": 5,
-              "end_line": 237,
+              "end_line": 228,
               "start_column": 5,
               "start_line": 203
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 3,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 241,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 238,
+              "nesting_depth": 0
+            },
+            {
+              "column": 18,
+              "end_line": 242,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 242,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 3.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "accepts_preflight_line",
+            "span": {
+              "end_column": 1,
+              "end_line": 243,
+              "start_column": 1,
+              "start_line": 231
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 4,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 47,
+              "end_line": 253,
+              "increment": 1,
+              "kind": "let-else",
+              "line": 251,
+              "nesting_depth": 0
+            },
+            {
+              "column": 54,
+              "end_line": 256,
+              "increment": 1,
+              "kind": "let-else",
+              "line": 254,
+              "nesting_depth": 0
+            },
+            {
+              "column": 9,
+              "end_line": 260,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 260,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 90.9090909090909,
+          "crap": {
+            "risk_level": "low",
+            "value": 4.01
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "is_well_formed_da",
+            "span": {
+              "end_column": 1,
+              "end_line": 261,
+              "start_column": 1,
+              "start_line": 245
             }
           }
         },
@@ -3973,26 +4135,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 244,
+              "end_line": 267,
               "increment": 1,
               "kind": "if-branch",
-              "line": 241,
+              "line": 264,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 249,
+              "end_line": 272,
               "increment": 1,
               "kind": "if-branch",
-              "line": 246,
+              "line": 269,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 253,
+              "end_line": 276,
               "increment": 1,
               "kind": "if-branch",
-              "line": 251,
+              "line": 274,
               "nesting_depth": 0
             }
           ],
@@ -4006,9 +4168,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 254,
+              "end_line": 277,
               "start_column": 1,
-              "start_line": 240
+              "start_line": 263
             }
           }
         },
@@ -4022,26 +4184,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 266,
+              "end_line": 289,
               "increment": 1,
               "kind": "if-branch",
-              "line": 259,
+              "line": 282,
               "nesting_depth": 0
             }
           ],
-          "coverage_percent": 87.5,
+          "coverage_percent": 100.0,
           "crap": {
             "risk_level": "low",
-            "value": 2.01
+            "value": 2.0
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 267,
+              "end_line": 290,
               "start_column": 1,
-              "start_line": 256
+              "start_line": 279
             }
           }
         },
@@ -4055,18 +4217,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 272,
+              "end_line": 295,
               "increment": 1,
               "kind": "if-branch",
-              "line": 270,
+              "line": 293,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 277,
+              "end_line": 300,
               "increment": 1,
               "kind": "match",
-              "line": 274,
+              "line": 297,
               "nesting_depth": 0
             }
           ],
@@ -4080,9 +4242,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 278,
+              "end_line": 301,
               "start_column": 1,
-              "start_line": 269
+              "start_line": 292
             }
           }
         },
@@ -4096,18 +4258,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 283,
+              "end_line": 306,
               "increment": 1,
               "kind": "if-branch",
-              "line": 281,
+              "line": 304,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 290,
+              "end_line": 313,
               "increment": 1,
               "kind": "match",
-              "line": 285,
+              "line": 308,
               "nesting_depth": 0
             }
           ],
@@ -4121,9 +4283,9 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 291,
+              "end_line": 314,
               "start_column": 1,
-              "start_line": 280
+              "start_line": 303
             }
           }
         },
@@ -4145,9 +4307,66 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 300,
+              "end_line": 323,
               "start_column": 1,
-              "start_line": 293
+              "start_line": 316
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 56,
+              "end_line": 328,
+              "increment": 1,
+              "kind": "try",
+              "line": 328,
+              "nesting_depth": 0
+            },
+            {
+              "column": 52,
+              "end_line": 330,
+              "increment": 1,
+              "kind": "try",
+              "line": 330,
+              "nesting_depth": 0
+            },
+            {
+              "column": 47,
+              "end_line": 331,
+              "increment": 1,
+              "kind": "try",
+              "line": 331,
+              "nesting_depth": 0
+            },
+            {
+              "column": 53,
+              "end_line": 332,
+              "increment": 1,
+              "kind": "try",
+              "line": 332,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 5.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "parse_da",
+            "span": {
+              "end_column": 1,
+              "end_line": 334,
+              "start_column": 1,
+              "start_line": 325
             }
           }
         },
@@ -4160,164 +4379,166 @@ expression: pretty
           "complexity_metric": "cognitive",
           "contributors": [
             {
-              "column": 56,
-              "end_line": 305,
+              "column": 79,
+              "end_line": 340,
               "increment": 1,
               "kind": "try",
-              "line": 305,
+              "line": 340,
               "nesting_depth": 0
             },
             {
-              "column": 52,
-              "end_line": 307,
+              "column": 47,
+              "end_line": 342,
               "increment": 1,
               "kind": "try",
-              "line": 307,
-              "nesting_depth": 0
-            },
-            {
-              "column": 58,
-              "end_line": 308,
-              "increment": 1,
-              "kind": "try",
-              "line": 308,
-              "nesting_depth": 0
-            },
-            {
-              "column": 5,
-              "end_line": 311,
-              "increment": 1,
-              "kind": "if-branch",
-              "line": 309,
-              "nesting_depth": 0
-            },
-            {
-              "column": 53,
-              "end_line": 312,
-              "increment": 1,
-              "kind": "try",
-              "line": 312,
-              "nesting_depth": 0
-            }
-          ],
-          "coverage_percent": 88.88888888888889,
-          "crap": {
-            "risk_level": "low",
-            "value": 6.05
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "parse_da",
-            "span": {
-              "end_column": 1,
-              "end_line": 314,
-              "start_column": 1,
-              "start_line": 302
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": true,
-        "scored": {
-          "complexity": 11,
-          "complexity_metric": "cognitive",
-          "contributors": [
-            {
-              "column": 42,
-              "end_line": 321,
-              "increment": 1,
-              "kind": "try",
-              "line": 321,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 322,
-              "increment": 1,
-              "kind": "try",
-              "line": 322,
-              "nesting_depth": 0
-            },
-            {
-              "column": 44,
-              "end_line": 323,
-              "increment": 1,
-              "kind": "try",
-              "line": 323,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 324,
-              "increment": 1,
-              "kind": "try",
-              "line": 324,
-              "nesting_depth": 0
-            },
-            {
-              "column": 58,
-              "end_line": 326,
-              "increment": 1,
-              "kind": "try",
-              "line": 326,
-              "nesting_depth": 0
-            },
-            {
-              "column": 5,
-              "end_line": 329,
-              "increment": 1,
-              "kind": "if-branch",
-              "line": 327,
+              "line": 342,
               "nesting_depth": 0
             },
             {
               "column": 55,
-              "end_line": 330,
+              "end_line": 343,
               "increment": 1,
               "kind": "try",
-              "line": 330,
+              "line": 343,
               "nesting_depth": 0
             },
             {
               "column": 57,
-              "end_line": 331,
+              "end_line": 344,
               "increment": 1,
               "kind": "try",
-              "line": 331,
+              "line": 344,
               "nesting_depth": 0
             },
             {
-              "column": 17,
-              "end_line": 336,
-              "increment": 1,
-              "kind": "if-branch",
-              "line": 332,
-              "nesting_depth": 0
-            },
-            {
-              "column": 54,
-              "end_line": 335,
+              "column": 44,
+              "end_line": 345,
               "increment": 1,
               "kind": "try",
-              "line": 335,
-              "nesting_depth": 1
+              "line": 345,
+              "nesting_depth": 0
             }
           ],
           "coverage_percent": 100.0,
           "crap": {
-            "risk_level": "acceptable",
-            "value": 11.0
+            "risk_level": "low",
+            "value": 6.0
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
             "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 339,
+              "end_line": 348,
               "start_column": 1,
-              "start_line": 316
+              "start_line": 336
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 357,
+              "increment": 1,
+              "kind": "match",
+              "line": 354,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "split_brda_fields",
+            "span": {
+              "end_column": 1,
+              "end_line": 358,
+              "start_column": 1,
+              "start_line": 350
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 3,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 51,
+              "end_line": 363,
+              "increment": 1,
+              "kind": "try",
+              "line": 363,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 364,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 364,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 3.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "parse_lcov_line_no",
+            "span": {
+              "end_column": 1,
+              "end_line": 365,
+              "start_column": 1,
+              "start_line": 360
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 375,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 371,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "parse_brda_taken",
+            "span": {
+              "end_column": 1,
+              "end_line": 376,
+              "start_column": 1,
+              "start_line": 367
             }
           }
         },
@@ -4331,10 +4552,10 @@ expression: pretty
           "contributors": [
             {
               "column": 52,
-              "end_line": 345,
+              "end_line": 382,
               "increment": 1,
               "kind": "let-else",
-              "line": 342,
+              "line": 379,
               "nesting_depth": 0
             }
           ],
@@ -4348,9 +4569,9 @@ expression: pretty
             "qualified_name": "flush_block",
             "span": {
               "end_column": 1,
-              "end_line": 350,
+              "end_line": 387,
               "start_column": 1,
-              "start_line": 341
+              "start_line": 378
             }
           }
         },
@@ -4364,18 +4585,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 359,
+              "end_line": 396,
               "increment": 1,
               "kind": "if-branch",
-              "line": 357,
+              "line": 394,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 364,
+              "end_line": 401,
               "increment": 1,
               "kind": "for-loop",
-              "line": 362,
+              "line": 399,
               "nesting_depth": 0
             }
           ],
@@ -4389,9 +4610,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 365,
+              "end_line": 402,
               "start_column": 1,
-              "start_line": 352
+              "start_line": 389
             }
           }
         },
@@ -4405,18 +4626,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 374,
+              "end_line": 411,
               "increment": 1,
               "kind": "if-branch",
-              "line": 372,
+              "line": 409,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 379,
+              "end_line": 416,
               "increment": 1,
               "kind": "for-loop",
-              "line": 377,
+              "line": 414,
               "nesting_depth": 0
             }
           ],
@@ -4430,9 +4651,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 380,
+              "end_line": 417,
               "start_column": 1,
-              "start_line": 367
+              "start_line": 404
             }
           }
         },
@@ -4454,9 +4675,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 387,
+              "end_line": 424,
               "start_column": 1,
-              "start_line": 382
+              "start_line": 419
             }
           }
         },
@@ -4478,9 +4699,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 398,
+              "end_line": 435,
               "start_column": 1,
-              "start_line": 389
+              "start_line": 426
             }
           }
         },
@@ -4494,10 +4715,10 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 406,
+              "end_line": 443,
               "increment": 1,
               "kind": "match",
-              "line": 401,
+              "line": 438,
               "nesting_depth": 0
             }
           ],
@@ -4511,9 +4732,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 407,
+              "end_line": 444,
               "start_column": 1,
-              "start_line": 400
+              "start_line": 437
             }
           }
         },
@@ -4535,9 +4756,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 412,
+              "end_line": 449,
               "start_column": 1,
-              "start_line": 409
+              "start_line": 446
             }
           }
         },
@@ -4559,9 +4780,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 440,
+              "end_line": 477,
               "start_column": 1,
-              "start_line": 414
+              "start_line": 451
             }
           }
         },
@@ -4583,9 +4804,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 447,
+              "end_line": 484,
               "start_column": 1,
-              "start_line": 442
+              "start_line": 479
             }
           }
         },
@@ -4607,9 +4828,9 @@ expression: pretty
             "qualified_name": "tests::parser",
             "span": {
               "end_column": 5,
-              "end_line": 456,
+              "end_line": 493,
               "start_column": 5,
-              "start_line": 454
+              "start_line": 491
             }
           }
         },
@@ -4631,9 +4852,9 @@ expression: pretty
             "qualified_name": "tests::parse",
             "span": {
               "end_column": 5,
-              "end_line": 460,
+              "end_line": 497,
               "start_column": 5,
-              "start_line": 458
+              "start_line": 495
             }
           }
         },
@@ -4655,9 +4876,9 @@ expression: pretty
             "qualified_name": "tests::empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 467,
+              "end_line": 504,
               "start_column": 5,
-              "start_line": 462
+              "start_line": 499
             }
           }
         },
@@ -4679,9 +4900,9 @@ expression: pretty
             "qualified_name": "tests::validate_str",
             "span": {
               "end_column": 5,
-              "end_line": 481,
+              "end_line": 518,
               "start_column": 5,
-              "start_line": 471
+              "start_line": 508
             }
           }
         },
@@ -4703,9 +4924,9 @@ expression: pretty
             "qualified_name": "tests::validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 486,
+              "end_line": 523,
               "start_column": 5,
-              "start_line": 483
+              "start_line": 520
             }
           }
         },
@@ -4727,9 +4948,9 @@ expression: pretty
             "qualified_name": "tests::validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 491,
+              "end_line": 528,
               "start_column": 5,
-              "start_line": 488
+              "start_line": 525
             }
           }
         },
@@ -4751,9 +4972,9 @@ expression: pretty
             "qualified_name": "tests::validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 496,
+              "end_line": 533,
               "start_column": 5,
-              "start_line": 493
+              "start_line": 530
             }
           }
         },
@@ -4775,9 +4996,33 @@ expression: pretty
             "qualified_name": "tests::validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 501,
+              "end_line": 538,
               "start_column": 5,
-              "start_line": 498
+              "start_line": 535
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "tests::validate_da_line_zero_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 547,
+              "start_column": 5,
+              "start_line": 540
             }
           }
         },
@@ -4799,9 +5044,9 @@ expression: pretty
             "qualified_name": "tests::validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 506,
+              "end_line": 552,
               "start_column": 5,
-              "start_line": 503
+              "start_line": 549
             }
           }
         },
@@ -4823,9 +5068,9 @@ expression: pretty
             "qualified_name": "tests::validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 516,
+              "end_line": 562,
               "start_column": 5,
-              "start_line": 508
+              "start_line": 554
             }
           }
         },
@@ -4847,9 +5092,9 @@ expression: pretty
             "qualified_name": "tests::validate_missing_path_returns_open_error",
             "span": {
               "end_column": 5,
-              "end_line": 528,
+              "end_line": 574,
               "start_column": 5,
-              "start_line": 518
+              "start_line": 564
             }
           }
         },
@@ -4871,9 +5116,9 @@ expression: pretty
             "qualified_name": "tests::single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 538,
+              "end_line": 584,
               "start_column": 5,
-              "start_line": 530
+              "start_line": 576
             }
           }
         },
@@ -4895,9 +5140,9 @@ expression: pretty
             "qualified_name": "tests::multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 548,
+              "end_line": 594,
               "start_column": 5,
-              "start_line": 540
+              "start_line": 586
             }
           }
         },
@@ -4919,9 +5164,9 @@ expression: pretty
             "qualified_name": "tests::multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 557,
+              "end_line": 603,
               "start_column": 5,
-              "start_line": 550
+              "start_line": 596
             }
           }
         },
@@ -4943,9 +5188,9 @@ expression: pretty
             "qualified_name": "tests::hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 565,
+              "end_line": 611,
               "start_column": 5,
-              "start_line": 559
+              "start_line": 605
             }
           }
         },
@@ -4967,9 +5212,9 @@ expression: pretty
             "qualified_name": "tests::path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 571,
+              "end_line": 617,
               "start_column": 5,
-              "start_line": 567
+              "start_line": 613
             }
           }
         },
@@ -4991,9 +5236,9 @@ expression: pretty
             "qualified_name": "tests::non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 577,
+              "end_line": 623,
               "start_column": 5,
-              "start_line": 573
+              "start_line": 619
             }
           }
         },
@@ -5015,9 +5260,9 @@ expression: pretty
             "qualified_name": "tests::backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 584,
+              "end_line": 630,
               "start_column": 5,
-              "start_line": 579
+              "start_line": 625
             }
           }
         },
@@ -5039,9 +5284,9 @@ expression: pretty
             "qualified_name": "tests::path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 590,
+              "end_line": 636,
               "start_column": 5,
-              "start_line": 586
+              "start_line": 632
             }
           }
         },
@@ -5063,9 +5308,9 @@ expression: pretty
             "qualified_name": "tests::parentdir_sf_path_does_not_take_fast_path_is_file_probe",
             "span": {
               "end_column": 5,
-              "end_line": 625,
+              "end_line": 671,
               "start_column": 5,
-              "start_line": 592
+              "start_line": 638
             }
           }
         },
@@ -5087,9 +5332,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 639,
+              "end_line": 685,
               "start_column": 5,
-              "start_line": 627
+              "start_line": 673
             }
           }
         },
@@ -5111,9 +5356,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 648,
+              "end_line": 694,
               "start_column": 5,
-              "start_line": 641
+              "start_line": 687
             }
           }
         },
@@ -5135,9 +5380,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 660,
+              "end_line": 706,
               "start_column": 5,
-              "start_line": 650
+              "start_line": 696
             }
           }
         },
@@ -5151,10 +5396,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 676,
+              "end_line": 722,
               "increment": 1,
               "kind": "match",
-              "line": 667,
+              "line": 713,
               "nesting_depth": 0
             }
           ],
@@ -5168,9 +5413,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 677,
+              "end_line": 723,
               "start_column": 5,
-              "start_line": 662
+              "start_line": 708
             }
           }
         },
@@ -5192,9 +5437,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 685,
+              "end_line": 731,
               "start_column": 5,
-              "start_line": 679
+              "start_line": 725
             }
           }
         },
@@ -5216,9 +5461,9 @@ expression: pretty
             "qualified_name": "tests::da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 695,
+              "end_line": 741,
               "start_column": 5,
-              "start_line": 687
+              "start_line": 733
             }
           }
         },
@@ -5240,9 +5485,9 @@ expression: pretty
             "qualified_name": "tests::da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 705,
+              "end_line": 751,
               "start_column": 5,
-              "start_line": 697
+              "start_line": 743
             }
           }
         },
@@ -5256,10 +5501,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 720,
+              "end_line": 766,
               "increment": 1,
               "kind": "match",
-              "line": 711,
+              "line": 757,
               "nesting_depth": 0
             }
           ],
@@ -5273,9 +5518,9 @@ expression: pretty
             "qualified_name": "tests::da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 721,
+              "end_line": 767,
               "start_column": 5,
-              "start_line": 707
+              "start_line": 753
             }
           }
         },
@@ -5297,9 +5542,9 @@ expression: pretty
             "qualified_name": "tests::end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 732,
+              "end_line": 778,
               "start_column": 5,
-              "start_line": 723
+              "start_line": 769
             }
           }
         },
@@ -5321,9 +5566,9 @@ expression: pretty
             "qualified_name": "tests::unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 739,
+              "end_line": 785,
               "start_column": 5,
-              "start_line": 734
+              "start_line": 780
             }
           }
         },
@@ -5345,9 +5590,9 @@ expression: pretty
             "qualified_name": "tests::empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 750,
+              "end_line": 796,
               "start_column": 5,
-              "start_line": 741
+              "start_line": 787
             }
           }
         },
@@ -5369,9 +5614,9 @@ expression: pretty
             "qualified_name": "tests::da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 759,
+              "end_line": 805,
               "start_column": 5,
-              "start_line": 752
+              "start_line": 798
             }
           }
         },
@@ -5393,9 +5638,9 @@ expression: pretty
             "qualified_name": "tests::non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 773,
+              "end_line": 819,
               "start_column": 5,
-              "start_line": 761
+              "start_line": 807
             }
           }
         },
@@ -5417,9 +5662,9 @@ expression: pretty
             "qualified_name": "tests::brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 785,
+              "end_line": 831,
               "start_column": 5,
-              "start_line": 777
+              "start_line": 823
             }
           }
         },
@@ -5441,9 +5686,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 792,
+              "end_line": 838,
               "start_column": 5,
-              "start_line": 787
+              "start_line": 833
             }
           }
         },
@@ -5465,9 +5710,9 @@ expression: pretty
             "qualified_name": "tests::brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 799,
+              "end_line": 845,
               "start_column": 5,
-              "start_line": 794
+              "start_line": 840
             }
           }
         },
@@ -5489,9 +5734,9 @@ expression: pretty
             "qualified_name": "tests::brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 806,
+              "end_line": 852,
               "start_column": 5,
-              "start_line": 801
+              "start_line": 847
             }
           }
         },
@@ -5513,9 +5758,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 816,
+              "end_line": 862,
               "start_column": 5,
-              "start_line": 808
+              "start_line": 854
             }
           }
         },
@@ -5537,9 +5782,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 824,
+              "end_line": 870,
               "start_column": 5,
-              "start_line": 818
+              "start_line": 864
             }
           }
         },
@@ -5553,10 +5798,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 839,
+              "end_line": 885,
               "increment": 1,
               "kind": "match",
-              "line": 830,
+              "line": 876,
               "nesting_depth": 0
             }
           ],
@@ -5570,9 +5815,9 @@ expression: pretty
             "qualified_name": "tests::malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 840,
+              "end_line": 886,
               "start_column": 5,
-              "start_line": 826
+              "start_line": 872
             }
           }
         },
@@ -5594,9 +5839,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 851,
+              "end_line": 897,
               "start_column": 5,
-              "start_line": 842
+              "start_line": 888
             }
           }
         },
@@ -5618,9 +5863,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 862,
+              "end_line": 908,
               "start_column": 5,
-              "start_line": 853
+              "start_line": 899
             }
           }
         },
@@ -5634,10 +5879,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 881,
+              "end_line": 927,
               "increment": 1,
               "kind": "for-loop",
-              "line": 879,
+              "line": 925,
               "nesting_depth": 0
             }
           ],
@@ -5651,9 +5896,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 891,
+              "end_line": 937,
               "start_column": 5,
-              "start_line": 864
+              "start_line": 910
             }
           }
         },
@@ -5675,9 +5920,9 @@ expression: pretty
             "qualified_name": "tests::brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 901,
+              "end_line": 947,
               "start_column": 5,
-              "start_line": 893
+              "start_line": 939
             }
           }
         },
@@ -5699,9 +5944,9 @@ expression: pretty
             "qualified_name": "tests::no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 907,
+              "end_line": 953,
               "start_column": 5,
-              "start_line": 903
+              "start_line": 949
             }
           }
         },
@@ -5723,9 +5968,9 @@ expression: pretty
             "qualified_name": "proptests::arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 917,
+              "end_line": 963,
               "start_column": 5,
-              "start_line": 915
+              "start_line": 961
             }
           }
         },
@@ -5739,10 +5984,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 925,
+              "end_line": 971,
               "increment": 2,
               "kind": "for-loop",
-              "line": 922,
+              "line": 968,
               "nesting_depth": 1
             }
           ],
@@ -5756,9 +6001,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 929,
+              "end_line": 975,
               "start_column": 5,
-              "start_line": 919
+              "start_line": 965
             }
           }
         },
@@ -5780,9 +6025,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 933,
+              "end_line": 979,
               "start_column": 5,
-              "start_line": 931
+              "start_line": 977
             }
           }
         },
@@ -5966,37 +6211,37 @@ expression: pretty
         "threshold": 8.0
       }
     ],
-    "passed": false,
+    "passed": true,
     "summary": {
-      "average_complexity": 1.5492957746478873,
-      "average_coverage": 95.21814615097222,
-      "average_crap": 1.610093896713615,
+      "average_complexity": 1.5201793721973094,
+      "average_coverage": 95.49769207254388,
+      "average_crap": 1.5780269058295966,
       "distribution": {
-        "acceptable": 2,
+        "acceptable": 0,
         "high": 0,
-        "low": 211,
+        "low": 223,
         "moderate": 0
       },
-      "exceeding_threshold": 2,
-      "max_complexity": 11,
+      "exceeding_threshold": 0,
+      "max_complexity": 8,
       "max_crap": {
-        "risk_level": "acceptable",
-        "value": 11.0
+        "risk_level": "low",
+        "value": 8.0
       },
       "median_complexity": 1.0,
       "median_coverage": 100.0,
       "median_crap": 1.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 213,
+      "total_functions": 223,
       "worst_function": {
-        "file_path": "adapters/coverage/mod.rs",
-        "qualified_name": "parse_brda",
+        "file_path": "adapters/complexity/mod.rs",
+        "qualified_name": "count_cognitive_binary_chain",
         "span": {
           "end_column": 1,
-          "end_line": 339,
+          "end_line": 666,
           "start_column": 1,
-          "start_line": 316
+          "start_line": 628
         }
       }
     }
@@ -6006,195 +6251,9 @@ expression: pretty
   "timestamp": "[STRIPPED:timestamp]",
   "tool_version": "[STRIPPED:tool_version]",
   "view": {
-    "eligible_count": 213,
+    "eligible_count": 223,
     "grouped": null,
     "shown": [
-      {
-        "exceeds": true,
-        "scored": {
-          "complexity": 11,
-          "complexity_metric": "cognitive",
-          "contributors": [
-            {
-              "column": 42,
-              "end_line": 321,
-              "increment": 1,
-              "kind": "try",
-              "line": 321,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 322,
-              "increment": 1,
-              "kind": "try",
-              "line": 322,
-              "nesting_depth": 0
-            },
-            {
-              "column": 44,
-              "end_line": 323,
-              "increment": 1,
-              "kind": "try",
-              "line": 323,
-              "nesting_depth": 0
-            },
-            {
-              "column": 43,
-              "end_line": 324,
-              "increment": 1,
-              "kind": "try",
-              "line": 324,
-              "nesting_depth": 0
-            },
-            {
-              "column": 58,
-              "end_line": 326,
-              "increment": 1,
-              "kind": "try",
-              "line": 326,
-              "nesting_depth": 0
-            },
-            {
-              "column": 5,
-              "end_line": 329,
-              "increment": 1,
-              "kind": "if-branch",
-              "line": 327,
-              "nesting_depth": 0
-            },
-            {
-              "column": 55,
-              "end_line": 330,
-              "increment": 1,
-              "kind": "try",
-              "line": 330,
-              "nesting_depth": 0
-            },
-            {
-              "column": 57,
-              "end_line": 331,
-              "increment": 1,
-              "kind": "try",
-              "line": 331,
-              "nesting_depth": 0
-            },
-            {
-              "column": 17,
-              "end_line": 336,
-              "increment": 1,
-              "kind": "if-branch",
-              "line": 332,
-              "nesting_depth": 0
-            },
-            {
-              "column": 54,
-              "end_line": 335,
-              "increment": 1,
-              "kind": "try",
-              "line": 335,
-              "nesting_depth": 1
-            }
-          ],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "acceptable",
-            "value": 11.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "parse_brda",
-            "span": {
-              "end_column": 1,
-              "end_line": 339,
-              "start_column": 1,
-              "start_line": 316
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": true,
-        "scored": {
-          "complexity": 10,
-          "complexity_metric": "cognitive",
-          "contributors": [
-            {
-              "column": 73,
-              "end_line": 218,
-              "increment": 1,
-              "kind": "try",
-              "line": 218,
-              "nesting_depth": 0
-            },
-            {
-              "column": 9,
-              "end_line": 235,
-              "increment": 1,
-              "kind": "for-loop",
-              "line": 221,
-              "nesting_depth": 0
-            },
-            {
-              "column": 68,
-              "end_line": 222,
-              "increment": 1,
-              "kind": "try",
-              "line": 222,
-              "nesting_depth": 1
-            },
-            {
-              "column": 13,
-              "end_line": 226,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 223,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
-              "end_line": 225,
-              "increment": 1,
-              "kind": "continue",
-              "line": 225,
-              "nesting_depth": 2
-            },
-            {
-              "column": 13,
-              "end_line": 234,
-              "increment": 2,
-              "kind": "if-branch",
-              "line": 227,
-              "nesting_depth": 1
-            },
-            {
-              "column": 17,
-              "end_line": 228,
-              "increment": 1,
-              "kind": "logical-operator",
-              "line": 228,
-              "nesting_depth": 1
-            }
-          ],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "acceptable",
-            "value": 10.0
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "LcovParser::validate",
-            "span": {
-              "end_column": 5,
-              "end_line": 237,
-              "start_column": 5,
-              "start_line": 203
-            }
-          }
-        },
-        "threshold": 8.0
-      },
       {
         "exceeds": false,
         "scored": {
@@ -6422,59 +6481,116 @@ expression: pretty
           "complexity_metric": "cognitive",
           "contributors": [
             {
-              "column": 56,
-              "end_line": 305,
+              "column": 73,
+              "end_line": 218,
               "increment": 1,
               "kind": "try",
-              "line": 305,
+              "line": 218,
               "nesting_depth": 0
             },
             {
-              "column": 52,
-              "end_line": 307,
+              "column": 9,
+              "end_line": 226,
               "increment": 1,
-              "kind": "try",
-              "line": 307,
+              "kind": "for-loop",
+              "line": 221,
               "nesting_depth": 0
             },
             {
-              "column": 58,
-              "end_line": 308,
+              "column": 68,
+              "end_line": 222,
               "increment": 1,
               "kind": "try",
-              "line": 308,
-              "nesting_depth": 0
+              "line": 222,
+              "nesting_depth": 1
             },
             {
-              "column": 5,
-              "end_line": 311,
-              "increment": 1,
+              "column": 13,
+              "end_line": 225,
+              "increment": 2,
               "kind": "if-branch",
-              "line": 309,
-              "nesting_depth": 0
-            },
-            {
-              "column": 53,
-              "end_line": 312,
-              "increment": 1,
-              "kind": "try",
-              "line": 312,
-              "nesting_depth": 0
+              "line": 223,
+              "nesting_depth": 1
             }
           ],
-          "coverage_percent": 88.88888888888889,
+          "coverage_percent": 100.0,
           "crap": {
             "risk_level": "low",
-            "value": 6.05
+            "value": 6.0
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "parse_da",
+            "qualified_name": "LcovParser::validate",
+            "span": {
+              "end_column": 5,
+              "end_line": 228,
+              "start_column": 5,
+              "start_line": 203
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 6,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 79,
+              "end_line": 340,
+              "increment": 1,
+              "kind": "try",
+              "line": 340,
+              "nesting_depth": 0
+            },
+            {
+              "column": 47,
+              "end_line": 342,
+              "increment": 1,
+              "kind": "try",
+              "line": 342,
+              "nesting_depth": 0
+            },
+            {
+              "column": 55,
+              "end_line": 343,
+              "increment": 1,
+              "kind": "try",
+              "line": 343,
+              "nesting_depth": 0
+            },
+            {
+              "column": 57,
+              "end_line": 344,
+              "increment": 1,
+              "kind": "try",
+              "line": 344,
+              "nesting_depth": 0
+            },
+            {
+              "column": 44,
+              "end_line": 345,
+              "increment": 1,
+              "kind": "try",
+              "line": 345,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 6.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "parse_brda",
             "span": {
               "end_column": 1,
-              "end_line": 314,
+              "end_line": 348,
               "start_column": 1,
-              "start_line": 302
+              "start_line": 336
             }
           }
         },
@@ -6508,6 +6624,112 @@ expression: pretty
               "end_line": 47,
               "start_column": 5,
               "start_line": 37
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 56,
+              "end_line": 328,
+              "increment": 1,
+              "kind": "try",
+              "line": 328,
+              "nesting_depth": 0
+            },
+            {
+              "column": 52,
+              "end_line": 330,
+              "increment": 1,
+              "kind": "try",
+              "line": 330,
+              "nesting_depth": 0
+            },
+            {
+              "column": 47,
+              "end_line": 331,
+              "increment": 1,
+              "kind": "try",
+              "line": 331,
+              "nesting_depth": 0
+            },
+            {
+              "column": 53,
+              "end_line": 332,
+              "increment": 1,
+              "kind": "try",
+              "line": 332,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 5.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "parse_da",
+            "span": {
+              "end_column": 1,
+              "end_line": 334,
+              "start_column": 1,
+              "start_line": 325
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 4,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 47,
+              "end_line": 253,
+              "increment": 1,
+              "kind": "let-else",
+              "line": 251,
+              "nesting_depth": 0
+            },
+            {
+              "column": 54,
+              "end_line": 256,
+              "increment": 1,
+              "kind": "let-else",
+              "line": 254,
+              "nesting_depth": 0
+            },
+            {
+              "column": 9,
+              "end_line": 260,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 260,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 90.9090909090909,
+          "crap": {
+            "risk_level": "low",
+            "value": 4.01
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "is_well_formed_da",
+            "span": {
+              "end_column": 1,
+              "end_line": 261,
+              "start_column": 1,
+              "start_line": 245
             }
           }
         },
@@ -6734,26 +6956,26 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 244,
+              "end_line": 267,
               "increment": 1,
               "kind": "if-branch",
-              "line": 241,
+              "line": 264,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 249,
+              "end_line": 272,
               "increment": 1,
               "kind": "if-branch",
-              "line": 246,
+              "line": 269,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 253,
+              "end_line": 276,
               "increment": 1,
               "kind": "if-branch",
-              "line": 251,
+              "line": 274,
               "nesting_depth": 0
             }
           ],
@@ -6767,9 +6989,9 @@ expression: pretty
             "qualified_name": "handle_parse_line",
             "span": {
               "end_column": 1,
-              "end_line": 254,
+              "end_line": 277,
               "start_column": 1,
-              "start_line": 240
+              "start_line": 263
             }
           }
         },
@@ -6939,18 +7161,18 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1469,
+              "end_line": 1566,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1463,
+              "line": 1560,
               "nesting_depth": 0
             },
             {
               "column": 9,
-              "end_line": 1476,
+              "end_line": 1573,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1470,
+              "line": 1567,
               "nesting_depth": 0
             }
           ],
@@ -6964,9 +7186,9 @@ expression: pretty
             "qualified_name": "tests::trait_default_and_concrete_override_have_disjoint_spans",
             "span": {
               "end_column": 5,
-              "end_line": 1477,
+              "end_line": 1574,
               "start_column": 5,
-              "start_line": 1436
+              "start_line": 1533
             }
           }
         },
@@ -6980,18 +7202,59 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 272,
+              "end_line": 241,
               "increment": 1,
               "kind": "if-branch",
-              "line": 270,
+              "line": 238,
+              "nesting_depth": 0
+            },
+            {
+              "column": 18,
+              "end_line": 242,
+              "increment": 1,
+              "kind": "logical-operator",
+              "line": 242,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 3.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "accepts_preflight_line",
+            "span": {
+              "end_column": 1,
+              "end_line": 243,
+              "start_column": 1,
+              "start_line": 231
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 3,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 295,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 293,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 277,
+              "end_line": 300,
               "increment": 1,
               "kind": "match",
-              "line": 274,
+              "line": 297,
               "nesting_depth": 0
             }
           ],
@@ -7005,9 +7268,9 @@ expression: pretty
             "qualified_name": "record_da",
             "span": {
               "end_column": 1,
-              "end_line": 278,
+              "end_line": 301,
               "start_column": 1,
-              "start_line": 269
+              "start_line": 292
             }
           }
         },
@@ -7021,18 +7284,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 283,
+              "end_line": 306,
               "increment": 1,
               "kind": "if-branch",
-              "line": 281,
+              "line": 304,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 290,
+              "end_line": 313,
               "increment": 1,
               "kind": "match",
-              "line": 285,
+              "line": 308,
               "nesting_depth": 0
             }
           ],
@@ -7046,9 +7309,50 @@ expression: pretty
             "qualified_name": "record_brda",
             "span": {
               "end_column": 1,
-              "end_line": 291,
+              "end_line": 314,
               "start_column": 1,
-              "start_line": 280
+              "start_line": 303
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 3,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 51,
+              "end_line": 363,
+              "increment": 1,
+              "kind": "try",
+              "line": 363,
+              "nesting_depth": 0
+            },
+            {
+              "column": 5,
+              "end_line": 364,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 364,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 3.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "parse_lcov_line_no",
+            "span": {
+              "end_column": 1,
+              "end_line": 365,
+              "start_column": 1,
+              "start_line": 360
             }
           }
         },
@@ -7062,18 +7366,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 359,
+              "end_line": 396,
               "increment": 1,
               "kind": "if-branch",
-              "line": 357,
+              "line": 394,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 364,
+              "end_line": 401,
               "increment": 1,
               "kind": "for-loop",
-              "line": 362,
+              "line": 399,
               "nesting_depth": 0
             }
           ],
@@ -7087,9 +7391,9 @@ expression: pretty
             "qualified_name": "merge_line_block",
             "span": {
               "end_column": 1,
-              "end_line": 365,
+              "end_line": 402,
               "start_column": 1,
-              "start_line": 352
+              "start_line": 389
             }
           }
         },
@@ -7103,18 +7407,18 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 374,
+              "end_line": 411,
               "increment": 1,
               "kind": "if-branch",
-              "line": 372,
+              "line": 409,
               "nesting_depth": 0
             },
             {
               "column": 5,
-              "end_line": 379,
+              "end_line": 416,
               "increment": 1,
               "kind": "for-loop",
-              "line": 377,
+              "line": 414,
               "nesting_depth": 0
             }
           ],
@@ -7128,9 +7432,9 @@ expression: pretty
             "qualified_name": "merge_branch_block",
             "span": {
               "end_column": 1,
-              "end_line": 380,
+              "end_line": 417,
               "start_column": 1,
-              "start_line": 367
+              "start_line": 404
             }
           }
         },
@@ -7144,10 +7448,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 925,
+              "end_line": 971,
               "increment": 2,
               "kind": "for-loop",
-              "line": 922,
+              "line": 968,
               "nesting_depth": 1
             }
           ],
@@ -7161,9 +7465,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_block",
             "span": {
               "end_column": 5,
-              "end_line": 929,
+              "end_line": 975,
               "start_column": 5,
-              "start_line": 919
+              "start_line": 965
             }
           }
         },
@@ -7296,39 +7600,6 @@ expression: pretty
               "end_line": 906,
               "start_column": 5,
               "start_line": 896
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 2,
-          "complexity_metric": "cognitive",
-          "contributors": [
-            {
-              "column": 5,
-              "end_line": 266,
-              "increment": 1,
-              "kind": "if-branch",
-              "line": 259,
-              "nesting_depth": 0
-            }
-          ],
-          "coverage_percent": 87.5,
-          "crap": {
-            "risk_level": "low",
-            "value": 2.01
-          },
-          "identity": {
-            "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "start_source_file",
-            "span": {
-              "end_column": 1,
-              "end_line": 267,
-              "start_column": 1,
-              "start_line": 256
             }
           }
         },
@@ -7738,10 +8009,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1505,
+              "end_line": 1602,
               "increment": 1,
               "kind": "match",
-              "line": 1502,
+              "line": 1599,
               "nesting_depth": 0
             }
           ],
@@ -7755,9 +8026,9 @@ expression: pretty
             "qualified_name": "tests::invalid_source_returns_error",
             "span": {
               "end_column": 5,
-              "end_line": 1506,
+              "end_line": 1603,
               "start_column": 5,
-              "start_line": 1498
+              "start_line": 1595
             }
           }
         },
@@ -7771,10 +8042,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1535,
+              "end_line": 1632,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1527,
+              "line": 1624,
               "nesting_depth": 0
             }
           ],
@@ -7788,9 +8059,9 @@ expression: pretty
             "qualified_name": "contributor_tests::base_fn_empty_contributors",
             "span": {
               "end_column": 5,
-              "end_line": 1536,
+              "end_line": 1633,
               "start_column": 5,
-              "start_line": 1525
+              "start_line": 1622
             }
           }
         },
@@ -7804,10 +8075,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1581,
+              "end_line": 1678,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1579,
+              "line": 1676,
               "nesting_depth": 0
             }
           ],
@@ -7821,9 +8092,9 @@ expression: pretty
             "qualified_name": "contributor_tests::match_arm_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1582,
+              "end_line": 1679,
               "start_column": 5,
-              "start_line": 1568
+              "start_line": 1665
             }
           }
         },
@@ -7837,10 +8108,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 1898,
+              "end_line": 1995,
               "increment": 1,
               "kind": "for-loop",
-              "line": 1889,
+              "line": 1986,
               "nesting_depth": 0
             }
           ],
@@ -7854,9 +8125,9 @@ expression: pretty
             "qualified_name": "contributor_tests::contributors_sorted_by_line",
             "span": {
               "end_column": 5,
-              "end_line": 1899,
+              "end_line": 1996,
               "start_column": 5,
-              "start_line": 1880
+              "start_line": 1977
             }
           }
         },
@@ -7935,11 +8206,11 @@ expression: pretty
           "complexity_metric": "cognitive",
           "contributors": [
             {
-              "column": 52,
-              "end_line": 345,
+              "column": 5,
+              "end_line": 289,
               "increment": 1,
-              "kind": "let-else",
-              "line": 342,
+              "kind": "if-branch",
+              "line": 282,
               "nesting_depth": 0
             }
           ],
@@ -7950,12 +8221,12 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/coverage/mod.rs",
-            "qualified_name": "flush_block",
+            "qualified_name": "start_source_file",
             "span": {
               "end_column": 1,
-              "end_line": 350,
+              "end_line": 290,
               "start_column": 1,
-              "start_line": 341
+              "start_line": 279
             }
           }
         },
@@ -7969,10 +8240,109 @@ expression: pretty
           "contributors": [
             {
               "column": 5,
-              "end_line": 406,
+              "end_line": 357,
               "increment": 1,
               "kind": "match",
-              "line": 401,
+              "line": 354,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "split_brda_fields",
+            "span": {
+              "end_column": 1,
+              "end_line": 358,
+              "start_column": 1,
+              "start_line": 350
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 375,
+              "increment": 1,
+              "kind": "if-branch",
+              "line": 371,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "parse_brda_taken",
+            "span": {
+              "end_column": 1,
+              "end_line": 376,
+              "start_column": 1,
+              "start_line": 367
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 52,
+              "end_line": 382,
+              "increment": 1,
+              "kind": "let-else",
+              "line": 379,
+              "nesting_depth": 0
+            }
+          ],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 2.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "flush_block",
+            "span": {
+              "end_column": 1,
+              "end_line": 387,
+              "start_column": 1,
+              "start_line": 378
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 2,
+          "complexity_metric": "cognitive",
+          "contributors": [
+            {
+              "column": 5,
+              "end_line": 443,
+              "increment": 1,
+              "kind": "match",
+              "line": 438,
               "nesting_depth": 0
             }
           ],
@@ -7986,9 +8356,9 @@ expression: pretty
             "qualified_name": "merge_taken",
             "span": {
               "end_column": 1,
-              "end_line": 407,
+              "end_line": 444,
               "start_column": 1,
-              "start_line": 400
+              "start_line": 437
             }
           }
         },
@@ -8002,10 +8372,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 676,
+              "end_line": 722,
               "increment": 1,
               "kind": "match",
-              "line": 667,
+              "line": 713,
               "nesting_depth": 0
             }
           ],
@@ -8019,9 +8389,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 677,
+              "end_line": 723,
               "start_column": 5,
-              "start_line": 662
+              "start_line": 708
             }
           }
         },
@@ -8035,10 +8405,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 720,
+              "end_line": 766,
               "increment": 1,
               "kind": "match",
-              "line": 711,
+              "line": 757,
               "nesting_depth": 0
             }
           ],
@@ -8052,9 +8422,9 @@ expression: pretty
             "qualified_name": "tests::da_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 721,
+              "end_line": 767,
               "start_column": 5,
-              "start_line": 707
+              "start_line": 753
             }
           }
         },
@@ -8068,10 +8438,10 @@ expression: pretty
           "contributors": [
             {
               "column": 9,
-              "end_line": 839,
+              "end_line": 885,
               "increment": 1,
               "kind": "match",
-              "line": 830,
+              "line": 876,
               "nesting_depth": 0
             }
           ],
@@ -8085,9 +8455,9 @@ expression: pretty
             "qualified_name": "tests::malformed_brda_produces_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 840,
+              "end_line": 886,
               "start_column": 5,
-              "start_line": 826
+              "start_line": 872
             }
           }
         },
@@ -8101,10 +8471,10 @@ expression: pretty
           "contributors": [
             {
               "column": 13,
-              "end_line": 881,
+              "end_line": 927,
               "increment": 1,
               "kind": "for-loop",
-              "line": 879,
+              "line": 925,
               "nesting_depth": 0
             }
           ],
@@ -8118,9 +8488,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_branch_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 891,
+              "end_line": 937,
               "start_column": 5,
-              "start_line": 864
+              "start_line": 910
             }
           }
         },
@@ -9003,12 +9373,36 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "test_helpers::extract_src",
+            "span": {
+              "end_column": 5,
+              "end_line": 955,
+              "start_column": 5,
+              "start_line": 948
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
             "qualified_name": "test_helpers::find_fn",
             "span": {
               "end_column": 5,
-              "end_line": 959,
+              "end_line": 968,
               "start_column": 5,
-              "start_line": 948
+              "start_line": 957
             }
           }
         },
@@ -9030,9 +9424,9 @@ expression: pretty
             "qualified_name": "tests::baseline_complexity_is_one_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 975,
+              "end_line": 984,
               "start_column": 5,
-              "start_line": 970
+              "start_line": 979
             }
           }
         },
@@ -9054,9 +9448,9 @@ expression: pretty
             "qualified_name": "tests::baseline_complexity_is_one_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 982,
+              "end_line": 991,
               "start_column": 5,
-              "start_line": 977
+              "start_line": 986
             }
           }
         },
@@ -9078,9 +9472,9 @@ expression: pretty
             "qualified_name": "tests::top_level_fn_identity",
             "span": {
               "end_column": 5,
-              "end_line": 993,
+              "end_line": 1002,
               "start_column": 5,
-              "start_line": 986
+              "start_line": 995
             }
           }
         },
@@ -9102,9 +9496,9 @@ expression: pretty
             "qualified_name": "tests::impl_method_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 1001,
+              "end_line": 1010,
               "start_column": 5,
-              "start_line": 995
+              "start_line": 1004
             }
           }
         },
@@ -9126,9 +9520,9 @@ expression: pretty
             "qualified_name": "tests::top_level_fn_in_nested_mods_fixture_is_unqualified",
             "span": {
               "end_column": 5,
-              "end_line": 1011,
+              "end_line": 1020,
               "start_column": 5,
-              "start_line": 1005
+              "start_line": 1014
             }
           }
         },
@@ -9150,9 +9544,9 @@ expression: pretty
             "qualified_name": "tests::one_level_mod_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 1017,
+              "end_line": 1026,
               "start_column": 5,
-              "start_line": 1013
+              "start_line": 1022
             }
           }
         },
@@ -9174,9 +9568,9 @@ expression: pretty
             "qualified_name": "tests::multi_level_mod_qualified_name",
             "span": {
               "end_column": 5,
-              "end_line": 1023,
+              "end_line": 1032,
               "start_column": 5,
-              "start_line": 1019
+              "start_line": 1028
             }
           }
         },
@@ -9198,9 +9592,9 @@ expression: pretty
             "qualified_name": "tests::impl_method_inside_mod_prepends_mod_path",
             "span": {
               "end_column": 5,
-              "end_line": 1032,
+              "end_line": 1041,
               "start_column": 5,
-              "start_line": 1025
+              "start_line": 1034
             }
           }
         },
@@ -9222,9 +9616,9 @@ expression: pretty
             "qualified_name": "tests::nested_fn_inside_mod_is_mod_scoped_not_fn_scoped",
             "span": {
               "end_column": 5,
-              "end_line": 1047,
+              "end_line": 1056,
               "start_column": 5,
-              "start_line": 1034
+              "start_line": 1043
             }
           }
         },
@@ -9246,9 +9640,9 @@ expression: pretty
             "qualified_name": "tests::mod_qualification_does_not_disturb_complexity",
             "span": {
               "end_column": 5,
-              "end_line": 1059,
+              "end_line": 1068,
               "start_column": 5,
-              "start_line": 1049
+              "start_line": 1058
             }
           }
         },
@@ -9270,9 +9664,9 @@ expression: pretty
             "qualified_name": "tests::span_accuracy",
             "span": {
               "end_column": 5,
-              "end_line": 1082,
+              "end_line": 1091,
               "start_column": 5,
-              "start_line": 1061
+              "start_line": 1070
             }
           }
         },
@@ -9294,9 +9688,9 @@ expression: pretty
             "qualified_name": "tests::span_carries_one_based_columns",
             "span": {
               "end_column": 5,
-              "end_line": 1103,
+              "end_line": 1112,
               "start_column": 5,
-              "start_line": 1084
+              "start_line": 1093
             }
           }
         },
@@ -9318,9 +9712,9 @@ expression: pretty
             "qualified_name": "tests::columns_are_exact_one_based_offsets_unindented",
             "span": {
               "end_column": 5,
-              "end_line": 1133,
+              "end_line": 1142,
               "start_column": 5,
-              "start_line": 1105
+              "start_line": 1114
             }
           }
         },
@@ -9342,9 +9736,9 @@ expression: pretty
             "qualified_name": "tests::columns_are_exact_one_based_offsets_indented",
             "span": {
               "end_column": 5,
-              "end_line": 1158,
+              "end_line": 1167,
               "start_column": 5,
-              "start_line": 1135
+              "start_line": 1144
             }
           }
         },
@@ -9366,9 +9760,9 @@ expression: pretty
             "qualified_name": "tests::multiple_fns_returns_all",
             "span": {
               "end_column": 5,
-              "end_line": 1164,
+              "end_line": 1173,
               "start_column": 5,
-              "start_line": 1160
+              "start_line": 1169
             }
           }
         },
@@ -9390,9 +9784,9 @@ expression: pretty
             "qualified_name": "tests::async_fn_detected",
             "span": {
               "end_column": 5,
-              "end_line": 1172,
+              "end_line": 1181,
               "start_column": 5,
-              "start_line": 1166
+              "start_line": 1175
             }
           }
         },
@@ -9414,9 +9808,9 @@ expression: pretty
             "qualified_name": "tests::if_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1182,
+              "end_line": 1191,
               "start_column": 5,
-              "start_line": 1176
+              "start_line": 1185
             }
           }
         },
@@ -9438,9 +9832,9 @@ expression: pretty
             "qualified_name": "tests::nested_if_cognitive_penalty",
             "span": {
               "end_column": 5,
-              "end_line": 1190,
+              "end_line": 1199,
               "start_column": 5,
-              "start_line": 1184
+              "start_line": 1193
             }
           }
         },
@@ -9462,9 +9856,9 @@ expression: pretty
             "qualified_name": "tests::else_is_not_counted_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1199,
+              "end_line": 1208,
               "start_column": 5,
-              "start_line": 1192
+              "start_line": 1201
             }
           }
         },
@@ -9486,9 +9880,9 @@ expression: pretty
             "qualified_name": "tests::match_flat_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1207,
+              "end_line": 1216,
               "start_column": 5,
-              "start_line": 1201
+              "start_line": 1210
             }
           }
         },
@@ -9510,9 +9904,9 @@ expression: pretty
             "qualified_name": "tests::if_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1217,
+              "end_line": 1226,
               "start_column": 5,
-              "start_line": 1211
+              "start_line": 1220
             }
           }
         },
@@ -9534,9 +9928,9 @@ expression: pretty
             "qualified_name": "tests::nested_if_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1225,
+              "end_line": 1234,
               "start_column": 5,
-              "start_line": 1219
+              "start_line": 1228
             }
           }
         },
@@ -9558,9 +9952,9 @@ expression: pretty
             "qualified_name": "tests::match_arms_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1233,
+              "end_line": 1242,
               "start_column": 5,
-              "start_line": 1227
+              "start_line": 1236
             }
           }
         },
@@ -9582,9 +9976,9 @@ expression: pretty
             "qualified_name": "tests::cognitive_gte_cyclomatic_for_nested",
             "span": {
               "end_column": 5,
-              "end_line": 1246,
+              "end_line": 1255,
               "start_column": 5,
-              "start_line": 1235
+              "start_line": 1244
             }
           }
         },
@@ -9606,9 +10000,9 @@ expression: pretty
             "qualified_name": "tests::bool_same_sequence_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1256,
+              "end_line": 1265,
               "start_column": 5,
-              "start_line": 1250
+              "start_line": 1259
             }
           }
         },
@@ -9630,9 +10024,9 @@ expression: pretty
             "qualified_name": "tests::bool_same_sequence_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1264,
+              "end_line": 1273,
               "start_column": 5,
-              "start_line": 1258
+              "start_line": 1267
             }
           }
         },
@@ -9654,9 +10048,9 @@ expression: pretty
             "qualified_name": "tests::bool_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1272,
+              "end_line": 1281,
               "start_column": 5,
-              "start_line": 1266
+              "start_line": 1275
             }
           }
         },
@@ -9678,9 +10072,9 @@ expression: pretty
             "qualified_name": "tests::bool_operator_switch_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1280,
+              "end_line": 1289,
               "start_column": 5,
-              "start_line": 1274
+              "start_line": 1283
             }
           }
         },
@@ -9702,9 +10096,9 @@ expression: pretty
             "qualified_name": "tests::bool_in_condition_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1288,
+              "end_line": 1297,
               "start_column": 5,
-              "start_line": 1282
+              "start_line": 1291
             }
           }
         },
@@ -9726,9 +10120,9 @@ expression: pretty
             "qualified_name": "tests::long_or_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1296,
+              "end_line": 1305,
               "start_column": 5,
-              "start_line": 1290
+              "start_line": 1299
             }
           }
         },
@@ -9750,9 +10144,9 @@ expression: pretty
             "qualified_name": "tests::alternating_operators_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1304,
+              "end_line": 1313,
               "start_column": 5,
-              "start_line": 1298
+              "start_line": 1307
             }
           }
         },
@@ -9774,9 +10168,9 @@ expression: pretty
             "qualified_name": "tests::closure_in_parent_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1317,
+              "end_line": 1326,
               "start_column": 5,
-              "start_line": 1308
+              "start_line": 1317
             }
           }
         },
@@ -9798,9 +10192,9 @@ expression: pretty
             "qualified_name": "tests::try_operator_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1327,
+              "end_line": 1336,
               "start_column": 5,
-              "start_line": 1321
+              "start_line": 1330
             }
           }
         },
@@ -9822,9 +10216,9 @@ expression: pretty
             "qualified_name": "tests::try_operator_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1335,
+              "end_line": 1344,
               "start_column": 5,
-              "start_line": 1329
+              "start_line": 1338
             }
           }
         },
@@ -9846,9 +10240,9 @@ expression: pretty
             "qualified_name": "tests::loop_with_break_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1345,
+              "end_line": 1354,
               "start_column": 5,
-              "start_line": 1339
+              "start_line": 1348
             }
           }
         },
@@ -9870,9 +10264,9 @@ expression: pretty
             "qualified_name": "tests::loop_with_break_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1353,
+              "end_line": 1362,
               "start_column": 5,
-              "start_line": 1347
+              "start_line": 1356
             }
           }
         },
@@ -9894,9 +10288,9 @@ expression: pretty
             "qualified_name": "tests::let_else_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1363,
+              "end_line": 1372,
               "start_column": 5,
-              "start_line": 1357
+              "start_line": 1366
             }
           }
         },
@@ -9918,9 +10312,81 @@ expression: pretty
             "qualified_name": "tests::let_else_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1371,
+              "end_line": 1380,
               "start_column": 5,
-              "start_line": 1365
+              "start_line": 1374
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::else_if_chain_cognitive_counts_each_continuation",
+            "span": {
+              "end_column": 5,
+              "end_line": 1423,
+              "start_column": 5,
+              "start_line": 1389
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::else_if_chain_cyclomatic_counts_each_arm",
+            "span": {
+              "end_column": 5,
+              "end_line": 1445,
+              "start_column": 5,
+              "start_line": 1425
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::else_if_chain_with_nested_decision_inside_arm",
+            "span": {
+              "end_column": 5,
+              "end_line": 1468,
+              "start_column": 5,
+              "start_line": 1447
             }
           }
         },
@@ -9942,9 +10408,9 @@ expression: pretty
             "qualified_name": "tests::chained_try_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1381,
+              "end_line": 1478,
               "start_column": 5,
-              "start_line": 1375
+              "start_line": 1472
             }
           }
         },
@@ -9966,9 +10432,9 @@ expression: pretty
             "qualified_name": "tests::chained_try_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1389,
+              "end_line": 1486,
               "start_column": 5,
-              "start_line": 1383
+              "start_line": 1480
             }
           }
         },
@@ -9988,150 +10454,6 @@ expression: pretty
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
             "qualified_name": "tests::for_iterator_try_cognitive",
-            "span": {
-              "end_column": 5,
-              "end_line": 1397,
-              "start_column": 5,
-              "start_line": 1391
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 1.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "tests::for_iterator_try_cyclomatic",
-            "span": {
-              "end_column": 5,
-              "end_line": 1405,
-              "start_column": 5,
-              "start_line": 1399
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 1.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "tests::match_scrutinee_try_cognitive",
-            "span": {
-              "end_column": 5,
-              "end_line": 1413,
-              "start_column": 5,
-              "start_line": 1407
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 1.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "tests::trait_default_method_found",
-            "span": {
-              "end_column": 5,
-              "end_line": 1423,
-              "start_column": 5,
-              "start_line": 1417
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 1.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "tests::trait_method_without_default_not_found",
-            "span": {
-              "end_column": 5,
-              "end_line": 1434,
-              "start_column": 5,
-              "start_line": 1425
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 1.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "tests::impl_method_no_branch",
-            "span": {
-              "end_column": 5,
-              "end_line": 1486,
-              "start_column": 5,
-              "start_line": 1481
-            }
-          }
-        },
-        "threshold": 8.0
-      },
-      {
-        "exceeds": false,
-        "scored": {
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "contributors": [],
-          "coverage_percent": 100.0,
-          "crap": {
-            "risk_level": "low",
-            "value": 1.0
-          },
-          "identity": {
-            "file_path": "adapters/complexity/mod.rs",
-            "qualified_name": "tests::impl_method_with_branch",
             "span": {
               "end_column": 5,
               "end_line": 1494,
@@ -10155,12 +10477,156 @@ expression: pretty
           },
           "identity": {
             "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::for_iterator_try_cyclomatic",
+            "span": {
+              "end_column": 5,
+              "end_line": 1502,
+              "start_column": 5,
+              "start_line": 1496
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::match_scrutinee_try_cognitive",
+            "span": {
+              "end_column": 5,
+              "end_line": 1510,
+              "start_column": 5,
+              "start_line": 1504
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::trait_default_method_found",
+            "span": {
+              "end_column": 5,
+              "end_line": 1520,
+              "start_column": 5,
+              "start_line": 1514
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::trait_method_without_default_not_found",
+            "span": {
+              "end_column": 5,
+              "end_line": 1531,
+              "start_column": 5,
+              "start_line": 1522
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::impl_method_no_branch",
+            "span": {
+              "end_column": 5,
+              "end_line": 1583,
+              "start_column": 5,
+              "start_line": 1578
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
+            "qualified_name": "tests::impl_method_with_branch",
+            "span": {
+              "end_column": 5,
+              "end_line": 1591,
+              "start_column": 5,
+              "start_line": 1585
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/complexity/mod.rs",
             "qualified_name": "contributor_tests::contributors_for",
             "span": {
               "end_column": 5,
-              "end_line": 1523,
+              "end_line": 1620,
               "start_column": 5,
-              "start_line": 1516
+              "start_line": 1613
             }
           }
         },
@@ -10182,9 +10648,9 @@ expression: pretty
             "qualified_name": "contributor_tests::if_branch_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1545,
+              "end_line": 1642,
               "start_column": 5,
-              "start_line": 1538
+              "start_line": 1635
             }
           }
         },
@@ -10206,9 +10672,9 @@ expression: pretty
             "qualified_name": "contributor_tests::nested_if_nesting_increment",
             "span": {
               "end_column": 5,
-              "end_line": 1557,
+              "end_line": 1654,
               "start_column": 5,
-              "start_line": 1547
+              "start_line": 1644
             }
           }
         },
@@ -10230,9 +10696,9 @@ expression: pretty
             "qualified_name": "contributor_tests::match_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1566,
+              "end_line": 1663,
               "start_column": 5,
-              "start_line": 1559
+              "start_line": 1656
             }
           }
         },
@@ -10254,9 +10720,9 @@ expression: pretty
             "qualified_name": "contributor_tests::try_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1590,
+              "end_line": 1687,
               "start_column": 5,
-              "start_line": 1584
+              "start_line": 1681
             }
           }
         },
@@ -10278,9 +10744,9 @@ expression: pretty
             "qualified_name": "contributor_tests::try_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1598,
+              "end_line": 1695,
               "start_column": 5,
-              "start_line": 1592
+              "start_line": 1689
             }
           }
         },
@@ -10302,9 +10768,9 @@ expression: pretty
             "qualified_name": "contributor_tests::let_else_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1606,
+              "end_line": 1703,
               "start_column": 5,
-              "start_line": 1600
+              "start_line": 1697
             }
           }
         },
@@ -10326,9 +10792,9 @@ expression: pretty
             "qualified_name": "contributor_tests::let_else_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1614,
+              "end_line": 1711,
               "start_column": 5,
-              "start_line": 1608
+              "start_line": 1705
             }
           }
         },
@@ -10350,9 +10816,9 @@ expression: pretty
             "qualified_name": "contributor_tests::loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1622,
+              "end_line": 1719,
               "start_column": 5,
-              "start_line": 1616
+              "start_line": 1713
             }
           }
         },
@@ -10374,9 +10840,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1630,
+              "end_line": 1727,
               "start_column": 5,
-              "start_line": 1624
+              "start_line": 1721
             }
           }
         },
@@ -10398,9 +10864,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1638,
+              "end_line": 1735,
               "start_column": 5,
-              "start_line": 1632
+              "start_line": 1729
             }
           }
         },
@@ -10422,9 +10888,9 @@ expression: pretty
             "qualified_name": "contributor_tests::while_loop_contributor_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1646,
+              "end_line": 1743,
               "start_column": 5,
-              "start_line": 1640
+              "start_line": 1737
             }
           }
         },
@@ -10446,9 +10912,9 @@ expression: pretty
             "qualified_name": "contributor_tests::while_loop_contributor_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1654,
+              "end_line": 1751,
               "start_column": 5,
-              "start_line": 1648
+              "start_line": 1745
             }
           }
         },
@@ -10470,9 +10936,9 @@ expression: pretty
             "qualified_name": "contributor_tests::logical_operator_same_chain_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1670,
+              "end_line": 1767,
               "start_column": 5,
-              "start_line": 1656
+              "start_line": 1753
             }
           }
         },
@@ -10494,9 +10960,9 @@ expression: pretty
             "qualified_name": "contributor_tests::logical_operator_switch_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1685,
+              "end_line": 1782,
               "start_column": 5,
-              "start_line": 1672
+              "start_line": 1769
             }
           }
         },
@@ -10518,9 +10984,9 @@ expression: pretty
             "qualified_name": "contributor_tests::break_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1698,
+              "end_line": 1795,
               "start_column": 5,
-              "start_line": 1687
+              "start_line": 1784
             }
           }
         },
@@ -10542,9 +11008,9 @@ expression: pretty
             "qualified_name": "contributor_tests::continue_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1711,
+              "end_line": 1808,
               "start_column": 5,
-              "start_line": 1700
+              "start_line": 1797
             }
           }
         },
@@ -10566,9 +11032,9 @@ expression: pretty
             "qualified_name": "contributor_tests::unsafe_block_produces_no_unsafe_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1739,
+              "end_line": 1836,
               "start_column": 5,
-              "start_line": 1713
+              "start_line": 1810
             }
           }
         },
@@ -10590,9 +11056,9 @@ expression: pretty
             "qualified_name": "contributor_tests::closure_no_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1751,
+              "end_line": 1848,
               "start_column": 5,
-              "start_line": 1741
+              "start_line": 1838
             }
           }
         },
@@ -10614,9 +11080,9 @@ expression: pretty
             "qualified_name": "contributor_tests::nested_if_records_construct_end_line_and_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1784,
+              "end_line": 1881,
               "start_column": 5,
-              "start_line": 1755
+              "start_line": 1852
             }
           }
         },
@@ -10638,9 +11104,9 @@ expression: pretty
             "qualified_name": "contributor_tests::try_records_token_span_for_atomic_contributor",
             "span": {
               "end_column": 5,
-              "end_line": 1798,
+              "end_line": 1895,
               "start_column": 5,
-              "start_line": 1786
+              "start_line": 1883
             }
           }
         },
@@ -10662,9 +11128,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_with_continue_threads_nesting_depth_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1820,
+              "end_line": 1917,
               "start_column": 5,
-              "start_line": 1800
+              "start_line": 1897
             }
           }
         },
@@ -10686,9 +11152,9 @@ expression: pretty
             "qualified_name": "contributor_tests::nested_if_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1839,
+              "end_line": 1936,
               "start_column": 5,
-              "start_line": 1822
+              "start_line": 1919
             }
           }
         },
@@ -10710,9 +11176,9 @@ expression: pretty
             "qualified_name": "contributor_tests::for_with_continue_records_nesting_depth_cyclomatic",
             "span": {
               "end_column": 5,
-              "end_line": 1859,
+              "end_line": 1956,
               "start_column": 5,
-              "start_line": 1841
+              "start_line": 1938
             }
           }
         },
@@ -10734,9 +11200,9 @@ expression: pretty
             "qualified_name": "contributor_tests::match_records_end_line_covering_arms_cognitive",
             "span": {
               "end_column": 5,
-              "end_line": 1878,
+              "end_line": 1975,
               "start_column": 5,
-              "start_line": 1861
+              "start_line": 1958
             }
           }
         },
@@ -10782,9 +11248,9 @@ expression: pretty
             "qualified_name": "push_malformed_record",
             "span": {
               "end_column": 1,
-              "end_line": 300,
+              "end_line": 323,
               "start_column": 1,
-              "start_line": 293
+              "start_line": 316
             }
           }
         },
@@ -10806,9 +11272,9 @@ expression: pretty
             "qualified_name": "merge_hits",
             "span": {
               "end_column": 1,
-              "end_line": 387,
+              "end_line": 424,
               "start_column": 1,
-              "start_line": 382
+              "start_line": 419
             }
           }
         },
@@ -10830,9 +11296,9 @@ expression: pretty
             "qualified_name": "merge_branch_value",
             "span": {
               "end_column": 1,
-              "end_line": 398,
+              "end_line": 435,
               "start_column": 1,
-              "start_line": 389
+              "start_line": 426
             }
           }
         },
@@ -10854,9 +11320,9 @@ expression: pretty
             "qualified_name": "clear_current_block",
             "span": {
               "end_column": 1,
-              "end_line": 412,
+              "end_line": 449,
               "start_column": 1,
-              "start_line": 409
+              "start_line": 446
             }
           }
         },
@@ -10878,9 +11344,9 @@ expression: pretty
             "qualified_name": "build_parse_output",
             "span": {
               "end_column": 1,
-              "end_line": 440,
+              "end_line": 477,
               "start_column": 1,
-              "start_line": 414
+              "start_line": 451
             }
           }
         },
@@ -10902,9 +11368,9 @@ expression: pretty
             "qualified_name": "to_line_coverage",
             "span": {
               "end_column": 1,
-              "end_line": 447,
+              "end_line": 484,
               "start_column": 1,
-              "start_line": 442
+              "start_line": 479
             }
           }
         },
@@ -10926,9 +11392,9 @@ expression: pretty
             "qualified_name": "tests::parser",
             "span": {
               "end_column": 5,
-              "end_line": 456,
+              "end_line": 493,
               "start_column": 5,
-              "start_line": 454
+              "start_line": 491
             }
           }
         },
@@ -10950,9 +11416,9 @@ expression: pretty
             "qualified_name": "tests::parse",
             "span": {
               "end_column": 5,
-              "end_line": 460,
+              "end_line": 497,
               "start_column": 5,
-              "start_line": 458
+              "start_line": 495
             }
           }
         },
@@ -10974,9 +11440,9 @@ expression: pretty
             "qualified_name": "tests::empty_input_returns_empty_output",
             "span": {
               "end_column": 5,
-              "end_line": 467,
+              "end_line": 504,
               "start_column": 5,
-              "start_line": 462
+              "start_line": 499
             }
           }
         },
@@ -10998,9 +11464,9 @@ expression: pretty
             "qualified_name": "tests::validate_str",
             "span": {
               "end_column": 5,
-              "end_line": 481,
+              "end_line": 518,
               "start_column": 5,
-              "start_line": 471
+              "start_line": 508
             }
           }
         },
@@ -11022,9 +11488,9 @@ expression: pretty
             "qualified_name": "tests::validate_empty_input_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 486,
+              "end_line": 523,
               "start_column": 5,
-              "start_line": 483
+              "start_line": 520
             }
           }
         },
@@ -11046,9 +11512,9 @@ expression: pretty
             "qualified_name": "tests::validate_no_da_lines_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 491,
+              "end_line": 528,
               "start_column": 5,
-              "start_line": 488
+              "start_line": 525
             }
           }
         },
@@ -11070,9 +11536,9 @@ expression: pretty
             "qualified_name": "tests::validate_da_outside_sf_block_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 496,
+              "end_line": 533,
               "start_column": 5,
-              "start_line": 493
+              "start_line": 530
             }
           }
         },
@@ -11094,9 +11560,33 @@ expression: pretty
             "qualified_name": "tests::validate_malformed_da_rejected",
             "span": {
               "end_column": 5,
-              "end_line": 501,
+              "end_line": 538,
               "start_column": 5,
-              "start_line": 498
+              "start_line": 535
+            }
+          }
+        },
+        "threshold": 8.0
+      },
+      {
+        "exceeds": false,
+        "scored": {
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "contributors": [],
+          "coverage_percent": 100.0,
+          "crap": {
+            "risk_level": "low",
+            "value": 1.0
+          },
+          "identity": {
+            "file_path": "adapters/coverage/mod.rs",
+            "qualified_name": "tests::validate_da_line_zero_rejected",
+            "span": {
+              "end_column": 5,
+              "end_line": 547,
+              "start_column": 5,
+              "start_line": 540
             }
           }
         },
@@ -11118,9 +11608,9 @@ expression: pretty
             "qualified_name": "tests::validate_single_da_inside_sf_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 506,
+              "end_line": 552,
               "start_column": 5,
-              "start_line": 503
+              "start_line": 549
             }
           }
         },
@@ -11142,9 +11632,9 @@ expression: pretty
             "qualified_name": "tests::validate_first_da_in_second_block_passes",
             "span": {
               "end_column": 5,
-              "end_line": 516,
+              "end_line": 562,
               "start_column": 5,
-              "start_line": 508
+              "start_line": 554
             }
           }
         },
@@ -11166,9 +11656,9 @@ expression: pretty
             "qualified_name": "tests::validate_missing_path_returns_open_error",
             "span": {
               "end_column": 5,
-              "end_line": 528,
+              "end_line": 574,
               "start_column": 5,
-              "start_line": 518
+              "start_line": 564
             }
           }
         },
@@ -11190,9 +11680,9 @@ expression: pretty
             "qualified_name": "tests::single_file_single_da",
             "span": {
               "end_column": 5,
-              "end_line": 538,
+              "end_line": 584,
               "start_column": 5,
-              "start_line": 530
+              "start_line": 576
             }
           }
         },
@@ -11214,9 +11704,9 @@ expression: pretty
             "qualified_name": "tests::multiple_da_lines",
             "span": {
               "end_column": 5,
-              "end_line": 548,
+              "end_line": 594,
               "start_column": 5,
-              "start_line": 540
+              "start_line": 586
             }
           }
         },
@@ -11238,9 +11728,9 @@ expression: pretty
             "qualified_name": "tests::multiple_source_files",
             "span": {
               "end_column": 5,
-              "end_line": 557,
+              "end_line": 603,
               "start_column": 5,
-              "start_line": 550
+              "start_line": 596
             }
           }
         },
@@ -11262,9 +11752,9 @@ expression: pretty
             "qualified_name": "tests::hit_count_preservation",
             "span": {
               "end_column": 5,
-              "end_line": 565,
+              "end_line": 611,
               "start_column": 5,
-              "start_line": 559
+              "start_line": 605
             }
           }
         },
@@ -11286,9 +11776,9 @@ expression: pretty
             "qualified_name": "tests::path_normalization_strips_prefix",
             "span": {
               "end_column": 5,
-              "end_line": 571,
+              "end_line": 617,
               "start_column": 5,
-              "start_line": 567
+              "start_line": 613
             }
           }
         },
@@ -11310,9 +11800,9 @@ expression: pretty
             "qualified_name": "tests::non_matching_path_passes_through",
             "span": {
               "end_column": 5,
-              "end_line": 577,
+              "end_line": 623,
               "start_column": 5,
-              "start_line": 573
+              "start_line": 619
             }
           }
         },
@@ -11334,9 +11824,9 @@ expression: pretty
             "qualified_name": "tests::backslash_normalized_to_forward_slash",
             "span": {
               "end_column": 5,
-              "end_line": 584,
+              "end_line": 630,
               "start_column": 5,
-              "start_line": 579
+              "start_line": 625
             }
           }
         },
@@ -11358,9 +11848,9 @@ expression: pretty
             "qualified_name": "tests::path_boundary_not_confused_by_prefix_substring",
             "span": {
               "end_column": 5,
-              "end_line": 590,
+              "end_line": 636,
               "start_column": 5,
-              "start_line": 586
+              "start_line": 632
             }
           }
         },
@@ -11382,9 +11872,9 @@ expression: pretty
             "qualified_name": "tests::parentdir_sf_path_does_not_take_fast_path_is_file_probe",
             "span": {
               "end_column": 5,
-              "end_line": 625,
+              "end_line": 671,
               "start_column": 5,
-              "start_line": 592
+              "start_line": 638
             }
           }
         },
@@ -11406,9 +11896,9 @@ expression: pretty
             "qualified_name": "tests::repeated_sf_blocks_merge_coverage",
             "span": {
               "end_column": 5,
-              "end_line": 639,
+              "end_line": 685,
               "start_column": 5,
-              "start_line": 627
+              "start_line": 673
             }
           }
         },
@@ -11430,9 +11920,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_lines_sum_hits",
             "span": {
               "end_column": 5,
-              "end_line": 648,
+              "end_line": 694,
               "start_column": 5,
-              "start_line": 641
+              "start_line": 687
             }
           }
         },
@@ -11454,9 +11944,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_da_multiple_lines_sum_correctly",
             "span": {
               "end_column": 5,
-              "end_line": 660,
+              "end_line": 706,
               "start_column": 5,
-              "start_line": 650
+              "start_line": 696
             }
           }
         },
@@ -11478,9 +11968,9 @@ expression: pretty
             "qualified_name": "tests::malformed_da_does_not_stop_parsing",
             "span": {
               "end_column": 5,
-              "end_line": 685,
+              "end_line": 731,
               "start_column": 5,
-              "start_line": 679
+              "start_line": 725
             }
           }
         },
@@ -11502,9 +11992,9 @@ expression: pretty
             "qualified_name": "tests::da_missing_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 695,
+              "end_line": 741,
               "start_column": 5,
-              "start_line": 687
+              "start_line": 733
             }
           }
         },
@@ -11526,9 +12016,9 @@ expression: pretty
             "qualified_name": "tests::da_negative_hit_count_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 705,
+              "end_line": 751,
               "start_column": 5,
-              "start_line": 697
+              "start_line": 743
             }
           }
         },
@@ -11550,9 +12040,9 @@ expression: pretty
             "qualified_name": "tests::end_of_record_is_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 732,
+              "end_line": 778,
               "start_column": 5,
-              "start_line": 723
+              "start_line": 769
             }
           }
         },
@@ -11574,9 +12064,9 @@ expression: pretty
             "qualified_name": "tests::unterminated_final_block_emits_data",
             "span": {
               "end_column": 5,
-              "end_line": 739,
+              "end_line": 785,
               "start_column": 5,
-              "start_line": 734
+              "start_line": 780
             }
           }
         },
@@ -11598,9 +12088,9 @@ expression: pretty
             "qualified_name": "tests::empty_sf_path_emits_diagnostic",
             "span": {
               "end_column": 5,
-              "end_line": 750,
+              "end_line": 796,
               "start_column": 5,
-              "start_line": 741
+              "start_line": 787
             }
           }
         },
@@ -11622,9 +12112,9 @@ expression: pretty
             "qualified_name": "tests::da_with_checksum_field_is_accepted",
             "span": {
               "end_column": 5,
-              "end_line": 759,
+              "end_line": 805,
               "start_column": 5,
-              "start_line": 752
+              "start_line": 798
             }
           }
         },
@@ -11646,9 +12136,9 @@ expression: pretty
             "qualified_name": "tests::non_coverage_records_are_ignored",
             "span": {
               "end_column": 5,
-              "end_line": 773,
+              "end_line": 819,
               "start_column": 5,
-              "start_line": 761
+              "start_line": 807
             }
           }
         },
@@ -11670,9 +12160,9 @@ expression: pretty
             "qualified_name": "tests::brda_and_da_records_parsed",
             "span": {
               "end_column": 5,
-              "end_line": 785,
+              "end_line": 831,
               "start_column": 5,
-              "start_line": 777
+              "start_line": 823
             }
           }
         },
@@ -11694,9 +12184,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_maps_to_none",
             "span": {
               "end_column": 5,
-              "end_line": 792,
+              "end_line": 838,
               "start_column": 5,
-              "start_line": 787
+              "start_line": 833
             }
           }
         },
@@ -11718,9 +12208,9 @@ expression: pretty
             "qualified_name": "tests::brda_numeric_maps_to_some",
             "span": {
               "end_column": 5,
-              "end_line": 799,
+              "end_line": 845,
               "start_column": 5,
-              "start_line": 794
+              "start_line": 840
             }
           }
         },
@@ -11742,9 +12232,9 @@ expression: pretty
             "qualified_name": "tests::brda_zero_maps_to_some_zero",
             "span": {
               "end_column": 5,
-              "end_line": 806,
+              "end_line": 852,
               "start_column": 5,
-              "start_line": 801
+              "start_line": 847
             }
           }
         },
@@ -11766,9 +12256,9 @@ expression: pretty
             "qualified_name": "tests::duplicate_brda_sum_taken",
             "span": {
               "end_column": 5,
-              "end_line": 816,
+              "end_line": 862,
               "start_column": 5,
-              "start_line": 808
+              "start_line": 854
             }
           }
         },
@@ -11790,9 +12280,9 @@ expression: pretty
             "qualified_name": "tests::brda_dash_and_numeric_merge",
             "span": {
               "end_column": 5,
-              "end_line": 824,
+              "end_line": 870,
               "start_column": 5,
-              "start_line": 818
+              "start_line": 864
             }
           }
         },
@@ -11814,9 +12304,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_fields_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 851,
+              "end_line": 897,
               "start_column": 5,
-              "start_line": 842
+              "start_line": 888
             }
           }
         },
@@ -11838,9 +12328,9 @@ expression: pretty
             "qualified_name": "tests::brda_missing_taken_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 862,
+              "end_line": 908,
               "start_column": 5,
-              "start_line": 853
+              "start_line": 899
             }
           }
         },
@@ -11862,9 +12352,9 @@ expression: pretty
             "qualified_name": "tests::brda_line_zero_is_malformed",
             "span": {
               "end_column": 5,
-              "end_line": 901,
+              "end_line": 947,
               "start_column": 5,
-              "start_line": 893
+              "start_line": 939
             }
           }
         },
@@ -11886,9 +12376,9 @@ expression: pretty
             "qualified_name": "tests::no_brda_produces_none_branches",
             "span": {
               "end_column": 5,
-              "end_line": 907,
+              "end_line": 953,
               "start_column": 5,
-              "start_line": 903
+              "start_line": 949
             }
           }
         },
@@ -11910,9 +12400,9 @@ expression: pretty
             "qualified_name": "proptests::arb_da_line",
             "span": {
               "end_column": 5,
-              "end_line": 917,
+              "end_line": 963,
               "start_column": 5,
-              "start_line": 915
+              "start_line": 961
             }
           }
         },
@@ -11934,9 +12424,9 @@ expression: pretty
             "qualified_name": "proptests::arb_lcov_input",
             "span": {
               "end_column": 5,
-              "end_line": 933,
+              "end_line": 979,
               "start_column": 5,
-              "start_line": 931
+              "start_line": 977
             }
           }
         },
@@ -11968,35 +12458,35 @@ expression: pretty
       }
     ],
     "shown_summary": {
-      "average_complexity": 1.5492957746478873,
-      "average_coverage": 95.21814615097222,
-      "average_crap": 1.610093896713615,
+      "average_complexity": 1.5201793721973094,
+      "average_coverage": 95.49769207254388,
+      "average_crap": 1.5780269058295966,
       "distribution": {
-        "acceptable": 2,
+        "acceptable": 0,
         "high": 0,
-        "low": 211,
+        "low": 223,
         "moderate": 0
       },
-      "exceeding_threshold": 2,
-      "max_complexity": 11,
+      "exceeding_threshold": 0,
+      "max_complexity": 8,
       "max_crap": {
-        "risk_level": "acceptable",
-        "value": 11.0
+        "risk_level": "low",
+        "value": 8.0
       },
       "median_complexity": 1.0,
       "median_coverage": 100.0,
       "median_crap": 1.0,
       "min_coverage": 0.0,
       "total_files": 5,
-      "total_functions": 213,
+      "total_functions": 223,
       "worst_function": {
-        "file_path": "adapters/coverage/mod.rs",
-        "qualified_name": "parse_brda",
+        "file_path": "adapters/complexity/mod.rs",
+        "qualified_name": "count_cognitive_binary_chain",
         "span": {
           "end_column": 1,
-          "end_line": 339,
+          "end_line": 666,
           "start_column": 1,
-          "start_line": 316
+          "start_line": 628
         }
       }
     },

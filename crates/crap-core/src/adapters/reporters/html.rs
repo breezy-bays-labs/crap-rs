@@ -3,11 +3,11 @@
 //!
 //! Produces a single document with inline CSS + inline `<script>` and
 //! no external assets — no CDN, no font URLs, no `<link>` to anything
-//! external. Layout follows the **Sakura Reports** design system
-//! (crap-rs#260): a verdict-stamped header, 4 KPI tiles, a risk
-//! distribution bar, up to 4 worst offenders, a `<details>` card per
-//! file with a function-level table, and a per-adapter footer carrying
-//! metric / coverage / threshold provenance.
+//! external. Layout follows the **Sakura Reports** design system:
+//! a verdict-stamped header, 4 KPI tiles, a risk distribution bar, up
+//! to 4 worst offenders, a `<details>` card per file with a
+//! function-level table, and a per-adapter footer carrying metric /
+//! coverage / threshold provenance.
 //!
 //! Color-coded risk levels map onto the Sakura ordinal `--risk-1` …
 //! `--risk-4` token ladder (low → high) so light + optional dark mode
@@ -40,33 +40,30 @@ use std::collections::BTreeMap;
 /// footer renders this verbatim so users can see which metric a
 /// report was scored under.
 ///
-/// The signature widened from `(view, threshold, &str, &str)` to
-/// `(view, threshold, &AdapterMeta, ComplexityMetric)` in crap-rs#260
-/// (locked plan deviation #1) so the template can render the per-
-/// adapter footer without reading domain state — the dispatcher in
-/// `cli/mod.rs` already holds both in scope.
+/// `meta` and `effective_metric` are passed (rather than read from
+/// domain state) so the template can render the per-adapter footer
+/// without reaching inward — the dispatcher in `cli/mod.rs` already
+/// holds both in scope.
 ///
-/// The signature widened again in crap-rs#306 to accept an optional
-/// `&DeltaView<'_>`. When `delta` is `None` the output is byte-
-/// identical to the v0.5.0 single-tab render (no tabs nav, no second
-/// panel — preserves the contract every existing consumer relies on).
-/// When `delta` is `Some(_)`, a `<nav class="tabs">` is emitted between
-/// the header and the body, and a second `<div class="tab-panel"
-/// data-tab="delta">` follows the Current panel with the delta KPI
-/// grid + per-category change tables. The Current tab opens by default
-/// so first-time users see the Sakura summary; the delta tab is one
-/// click away and reachable directly via the `#delta` URL hash (the
-/// inline `<script>` hook honors `location.hash` for CI sticky-comment
-/// deep links).
+/// `delta` is optional. When `delta` is `None` the output is the
+/// single-tab render (no tabs nav, no second panel — the contract every
+/// existing consumer relies on). When `delta` is `Some(_)`, a `<nav
+/// class="tabs">` is emitted between the header and the body, and a
+/// second `<div class="tab-panel" data-tab="delta">` follows the
+/// Current panel with the delta KPI grid + per-category change tables.
+/// The Current tab opens by default so first-time users see the Sakura
+/// summary; the delta tab is one click away and reachable directly via
+/// the `#delta` URL hash (the inline `<script>` hook honors
+/// `location.hash` for CI sticky-comment deep links).
 /// `report_title` and `subtitle` are the optional `[output] title` /
-/// `subtitle` config labels (crap-rs#352). When `report_title` is
-/// `Some`, the configured label replaces the `<h1>tool report</h1>`
-/// scorecard heading and is also folded into the `<title>` document
-/// element; when `subtitle` is `Some`, it renders on a line beneath the
-/// heading. Both default to `None`, in which case the header is
-/// byte-identical to the unlabeled default — no empty subtitle element
-/// is emitted. (Single-card path only — the multi-language unified
-/// renderer composes its own header and never threads these, per D20.)
+/// `subtitle` config labels. When `report_title` is `Some`, the
+/// configured label replaces the `<h1>tool report</h1>` scorecard
+/// heading and is also folded into the `<title>` document element; when
+/// `subtitle` is `Some`, it renders on a line beneath the heading. Both
+/// default to `None`, in which case the header is byte-identical to the
+/// unlabeled default — no empty subtitle element is emitted.
+/// (Single-card path only — the multi-language unified renderer
+/// composes its own header and never threads these.)
 #[allow(clippy::too_many_arguments)]
 pub fn format_html(
     view: &AnalysisView<'_>,
@@ -110,8 +107,8 @@ fn format_html_inner(
 ) -> String {
     let summary = &view.full.summary;
     // The `<title>` document element folds in the configured scorecard
-    // title when set (crap-rs#352); otherwise it keeps the unlabeled
-    // tool/version default verbatim (byte-identical absent path).
+    // title when set; otherwise it keeps the unlabeled tool/version
+    // default verbatim (byte-identical absent path).
     let title = match report_title {
         Some(t) => format!("{} — {} v{}", t, tool_name, tool_version),
         None => format!("{} v{} — CRAP score analysis", tool_name, tool_version),
@@ -148,8 +145,8 @@ fn format_html_inner(
     // The delta panel is boxed because it carries several owned
     // `Vec<DeltaRow>` fields. Boxing keeps the `Option::None` arm
     // cheap (the no-baseline byte-identical contract is the dominant
-    // path) and mirrors #260's `MarkdownBody::Filled.summary` pattern
-    // for the same `large_enum_variant` reason.
+    // path) and mirrors the markdown reporter's `MarkdownBody::Filled`
+    // boxing for the same `large_enum_variant` reason.
     let delta_panel = delta.map(|d| Box::new(build_delta_panel(d)));
     let has_delta = delta_panel.is_some();
     let current_tab_count = if is_empty { 0 } else { summary.total_functions };
@@ -194,9 +191,9 @@ fn format_html_inner(
 #[template(path = "html_report.html")]
 struct HtmlReport<'a> {
     title: String,
-    /// Configured scorecard title (`[output] title`, crap-rs#352). When
-    /// `Some`, the template renders it as the `<h1>` heading in place of
-    /// the default `<tool> report` label. `None` keeps the default.
+    /// Configured scorecard title (`[output] title`). When `Some`, the
+    /// template renders it as the `<h1>` heading in place of the default
+    /// `<tool> report` label. `None` keeps the default.
     report_title: Option<&'a str>,
     /// Configured scorecard subtitle (`[output] subtitle`), rendered as a
     /// line beneath the heading. `None` emits no element.
@@ -237,18 +234,18 @@ struct HtmlReport<'a> {
     /// was supplied. Boxed because the populated case carries several
     /// owned `Vec<DeltaRow>` fields and `large_enum_variant` would
     /// otherwise penalize the dominant `None` arm — same boxing
-    /// pattern as the markdown reporter's `MarkdownBody::Filled.summary`.
+    /// pattern as the markdown reporter's `MarkdownBody::Filled`.
     delta_panel: Option<Box<DeltaPanel>>,
 }
 
 /// Per-tab projection of a `DeltaView` into render-ready row + KPI
 /// data. Pure presentation — no domain types leak into the template.
 ///
-/// The four-KPI lock matches the Current-tab convention from the
-/// Sakura design (chat1.md trim). The five-tile "Functions" KPI from
-/// the mock is dropped: the change-counts already show added /
-/// removed / modified inline above the tables, and the per-section
-/// counts are visible in each table header.
+/// Exactly four KPI tiles, matching the Current-tab convention from the
+/// Sakura design. A fifth "Functions" tile is deliberately dropped: the
+/// change-counts already show added / removed / modified inline above
+/// the tables, and the per-section counts are visible in each table
+/// header.
 struct DeltaPanel {
     /// Aggregate counts mirroring `DeltaSummary` (copied so the
     /// template doesn't import a domain type). Drives the verdict
@@ -279,11 +276,11 @@ struct DeltaPanel {
     /// `unchanged_count` is the count of baseline functions whose
     /// identity persists in current and whose CRAP score moved less
     /// than 0.005 (`Modified` with zero-ish delta). Rendered as a
-    /// single-line note per the chat1.md trim — no full table.
+    /// single-line note — no full table.
     unchanged_count: u32,
     /// Display label for the baseline reference. Today this is always
-    /// "baseline" because `DeltaView.baseline_ref` is `None` reserved
-    /// until F2; once a `--baseline-ref <label>` CLI flag lands, this
+    /// "baseline" because `DeltaView.baseline_ref` is reserved for a
+    /// future `--baseline-ref <label>` CLI flag; once that lands, this
     /// field carries the label verbatim (e.g. "main@a1f3c2b").
     baseline_ref: &'static str,
 }
@@ -495,41 +492,7 @@ fn worst_offenders_top4_from_files(files: &[FileCard]) -> Vec<OffenderRow> {
 
 fn file_cards(view: &AnalysisView<'_>, threshold: f64) -> Vec<FileCard> {
     let fns_by_file = group_by_file(&view.shown);
-
-    // Resolve file order: with grouping, honor the grouped order; else
-    // sort files by max-CRAP descending so the worst offenders surface
-    // at the top of the file list (matches the Sakura design).
-    let file_order: Vec<String> = if let Some(grouped) = view.grouped.as_ref() {
-        grouped.files.iter().map(|f| f.file_path.clone()).collect()
-    } else {
-        let mut paths: Vec<String> = fns_by_file.keys().map(|k| k.to_string()).collect();
-        paths.sort_by(|a, b| {
-            let ma = fns_by_file
-                .get(a.as_str())
-                .and_then(|v| {
-                    v.iter().map(|f| f.scored.crap.value).fold(None, |acc, x| {
-                        Some(match acc {
-                            Some(y) if y > x => y,
-                            _ => x,
-                        })
-                    })
-                })
-                .unwrap_or(f64::NEG_INFINITY);
-            let mb = fns_by_file
-                .get(b.as_str())
-                .and_then(|v| {
-                    v.iter().map(|f| f.scored.crap.value).fold(None, |acc, x| {
-                        Some(match acc {
-                            Some(y) if y > x => y,
-                            _ => x,
-                        })
-                    })
-                })
-                .unwrap_or(f64::NEG_INFINITY);
-            mb.partial_cmp(&ma).unwrap_or(std::cmp::Ordering::Equal)
-        });
-        paths
-    };
+    let file_order = resolve_file_order(view, &fns_by_file);
 
     file_order
         .into_iter()
@@ -538,6 +501,40 @@ fn file_cards(view: &AnalysisView<'_>, threshold: f64) -> Vec<FileCard> {
             Some(build_file_card(file, &fns, threshold))
         })
         .collect()
+}
+
+/// Resolve the file render order. With `--group-by` the grouped order
+/// is honored verbatim; otherwise files are sorted by max-CRAP
+/// descending so the worst offenders surface at the top of the file
+/// list (matches the Sakura design).
+fn resolve_file_order(
+    view: &AnalysisView<'_>,
+    fns_by_file: &BTreeMap<&str, Vec<&FunctionVerdict>>,
+) -> Vec<String> {
+    if let Some(grouped) = view.grouped.as_ref() {
+        return grouped.files.iter().map(|f| f.file_path.clone()).collect();
+    }
+    let mut paths: Vec<String> = fns_by_file.keys().map(|k| k.to_string()).collect();
+    paths.sort_by(|a, b| {
+        let ma = max_crap_in_file(fns_by_file, a);
+        let mb = max_crap_in_file(fns_by_file, b);
+        mb.partial_cmp(&ma).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    paths
+}
+
+/// Largest CRAP value among the functions grouped under `file`, or
+/// `f64::NEG_INFINITY` when the file has no entries (so an empty bucket
+/// sorts last under the descending order).
+fn max_crap_in_file(fns_by_file: &BTreeMap<&str, Vec<&FunctionVerdict>>, file: &str) -> f64 {
+    fns_by_file
+        .get(file)
+        .map(|v| {
+            v.iter()
+                .map(|f| f.scored.crap.value)
+                .fold(f64::NEG_INFINITY, f64::max)
+        })
+        .unwrap_or(f64::NEG_INFINITY)
 }
 
 fn build_file_card(file: String, fns: &[&FunctionVerdict], threshold: f64) -> FileCard {
@@ -737,9 +734,9 @@ pub fn format_html_multi(
         // which `&block.tool_name` etc. already guarantee.
         // No `[output]` title/subtitle on the multi-language passthrough:
         // the unified renderer composes its own header and the envelope
-        // carries no per-language scorecard label (crap-rs#352, D20). The
-        // `None, None` here keeps single-language passthrough output
-        // byte-identical to the unlabeled `format_html` default.
+        // carries no per-language scorecard label. The `None, None` here
+        // keeps single-language passthrough output byte-identical to the
+        // unlabeled `format_html` default.
         return format_html_inner(
             &block.view,
             block.delta.as_ref(),
@@ -1304,6 +1301,87 @@ fn build_combined_delta_panel(cd: crate::domain::multi_lang::CombinedDelta) -> C
 // (e.g. when a function's surrounding LOC changed but its body
 // didn't).
 
+/// The three rendered row buckets of a delta panel, partitioned from
+/// the shaped change list.
+struct DeltaRowBuckets {
+    regressions: Vec<DeltaRow>,
+    improvements: Vec<DeltaRow>,
+    new_functions: Vec<DeltaRow>,
+}
+
+/// Partition the shaped change list into rendered row buckets.
+///
+/// `shown` is sort-by-signed-impact descending by default, so
+/// regressions lead and improvements trail; each bucket preserves that
+/// order (largest-impact-first) so the most consequential changes lead.
+/// Removed functions are intentionally not surfaced — the
+/// regression-focused scorecard treats them as out of scope; their
+/// count still rides in the summary line.
+fn partition_delta_rows(shown: &[&FunctionChange]) -> DeltaRowBuckets {
+    let mut buckets = DeltaRowBuckets {
+        regressions: Vec::new(),
+        improvements: Vec::new(),
+        new_functions: Vec::new(),
+    };
+    for change in shown.iter().copied() {
+        match change {
+            FunctionChange::Added { current } => {
+                buckets.new_functions.push(added_row(current));
+            }
+            FunctionChange::Removed { .. } => {}
+            FunctionChange::Modified { baseline, current } => {
+                push_modified_row(&mut buckets, baseline, current);
+            }
+        }
+    }
+    buckets
+}
+
+/// Route a `Modified` change into the regressions or improvements
+/// bucket by the sign of its CRAP delta. Sub-0.005 moves (which round
+/// to "+0.00" in `{:.2}` output) land in neither — they're counted as
+/// unchanged by `count_unchanged`.
+fn push_modified_row(
+    buckets: &mut DeltaRowBuckets,
+    baseline: &FunctionVerdict,
+    current: &FunctionVerdict,
+) {
+    let delta = current.scored.crap.value - baseline.scored.crap.value;
+    if delta >= 0.005 {
+        buckets.regressions.push(modified_row(baseline, current));
+    } else if delta <= -0.005 {
+        buckets.improvements.push(modified_row(baseline, current));
+    }
+}
+
+/// Count `Modified` functions whose CRAP barely moved (|delta| < 0.005).
+///
+/// Counts from the FULL delta (pre-truncate, pre-sort) so a `--top N`
+/// cap doesn't silently lop them off — under the default signed-impact
+/// sort, near-zero-delta entries land at the bottom of the list and are
+/// the first to drop on truncation. Respects the user's `change_kinds`
+/// filter so a deliberate exclusion of Modified entries doesn't get
+/// re-surfaced in the footer line.
+fn count_unchanged(view: &DeltaView<'_>) -> u32 {
+    view.full
+        .changes
+        .iter()
+        .filter(|c| {
+            view.spec
+                .filters
+                .change_kinds
+                .as_ref()
+                .is_none_or(|kinds| kinds.contains(&c.kind()))
+        })
+        .filter(|c| match c {
+            FunctionChange::Modified { baseline, current } => {
+                (current.scored.crap.value - baseline.scored.crap.value).abs() < 0.005
+            }
+            _ => false,
+        })
+        .count() as u32
+}
+
 fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
     let summary = view.full.summary;
     let baseline_summary = &view.full.baseline.summary;
@@ -1325,62 +1403,13 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
 
     let kpis = build_delta_kpis(&summary, baseline_summary, current_summary);
 
-    let mut regressions: Vec<DeltaRow> = Vec::new();
-    let mut improvements: Vec<DeltaRow> = Vec::new();
-    let mut new_functions: Vec<DeltaRow> = Vec::new();
+    let DeltaRowBuckets {
+        regressions,
+        improvements,
+        new_functions,
+    } = partition_delta_rows(&view.shown);
 
-    // The shaped `view.shown` is sort-by-signed-impact descending by
-    // default, so we get regressions first → improvements last under
-    // the default spec. Within each bucket we preserve that order
-    // (largest-impact-first) so the most consequential changes lead.
-    for change in view.shown.iter().copied() {
-        match change {
-            FunctionChange::Added { current } => {
-                new_functions.push(added_row(current));
-            }
-            FunctionChange::Removed { .. } => {
-                // v1 design intentionally drops the Removed-zero
-                // panel per chat1.md simplification, and the regular
-                // case (Removed > 0) isn't surfaced in this iteration
-                // either — the chat1.md trim treats removed functions
-                // as out of scope for a regression-focused scorecard.
-                // Counts still ride in the summary line.
-            }
-            FunctionChange::Modified { baseline, current } => {
-                let delta = current.scored.crap.value - baseline.scored.crap.value;
-                if delta >= 0.005 {
-                    regressions.push(modified_row(baseline, current));
-                } else if delta <= -0.005 {
-                    improvements.push(modified_row(baseline, current));
-                }
-            }
-        }
-    }
-
-    // Count unchanged from the FULL delta (pre-truncate, pre-sort) so a
-    // `--top N` cap doesn't silently lop them off — under the default
-    // signed-impact sort, near-zero-delta entries land at the bottom of
-    // the list and are the first to drop on truncation. Respect the
-    // user's `change_kinds` filter so a deliberate exclusion of Modified
-    // entries doesn't get re-surfaced in the footer line.
-    let unchanged_count: u32 = view
-        .full
-        .changes
-        .iter()
-        .filter(|c| {
-            view.spec
-                .filters
-                .change_kinds
-                .as_ref()
-                .is_none_or(|kinds| kinds.contains(&c.kind()))
-        })
-        .filter(|c| match c {
-            FunctionChange::Modified { baseline, current } => {
-                (current.scored.crap.value - baseline.scored.crap.value).abs() < 0.005
-            }
-            _ => false,
-        })
-        .count() as u32;
+    let unchanged_count = count_unchanged(view);
 
     DeltaPanel {
         summary: panel_summary,
@@ -1392,9 +1421,9 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
         improvements,
         new_functions,
         unchanged_count,
-        // F2 follow-up: when `--baseline-ref <label>` lands, thread
-        // the label through `DeltaView.baseline_ref` and surface it
-        // here. Until then the honest label is the literal "baseline."
+        // When a `--baseline-ref <label>` flag lands, thread the label
+        // through `DeltaView.baseline_ref` and surface it here. Until
+        // then the honest label is the literal "baseline."
         baseline_ref: "baseline",
     }
 }
@@ -1677,7 +1706,7 @@ mod tests {
         )
     }
 
-    // ── [output] title / subtitle labeling (crap-rs#352) ────────────────
+    // ── [output] title / subtitle labeling ─────────────────────────────
 
     #[test]
     fn title_labels_the_html_heading() {
@@ -2013,7 +2042,7 @@ mod tests {
     }
 
     /// Byte-level snapshot lock for the HTML reporter under the
-    /// Sakura design (crap-rs#260).
+    /// Sakura design.
     #[test]
     fn full_html_snapshot() {
         let result = make_multi_function_result();
@@ -2021,7 +2050,7 @@ mod tests {
         insta::assert_snapshot!(out);
     }
 
-    // ── Delta tab (crap-rs#306) ───────────────────────────────────────
+    // ── Delta tab ─────────────────────────────────────────────────────
 
     use crate::adapters::reporters::test_fixtures::{make_delta_view_default, make_sample_delta};
 
@@ -2057,8 +2086,8 @@ mod tests {
             out.contains("<nav class=\"tabs\""),
             "tabs nav should render when delta is supplied"
         );
-        // Current tab opens by default (default-open lock from
-        // orchestrator pre-resolved Discovery #1)
+        // Current tab opens by default so first-time readers see the
+        // summary before the delta.
         assert!(
             out.contains("data-tab=\"current\" data-active"),
             "Current tab should open by default"
@@ -2079,7 +2108,8 @@ mod tests {
         assert!(out.contains("data-tab=\"current\""));
         assert!(out.contains("data-tab=\"delta\""));
         // The Delta tab label is anchored on the literal baseline-ref
-        // string until F2 introduces `--baseline-ref <label>`.
+        // string until a `--baseline-ref <label>` flag introduces a
+        // configurable label.
         assert!(
             out.contains("Delta vs baseline"),
             "delta tab label should anchor on the baseline-ref literal"
@@ -2088,9 +2118,9 @@ mod tests {
 
     #[test]
     fn delta_panel_has_exactly_4_kpi_tiles() {
-        // 4-tile lock from orchestrator pre-resolved Discovery #2 —
-        // matches the Current tab's 4-KPI convention. Mirrors the
-        // playwright assertion (`.delta-kpi-grid .kpi` count == 4).
+        // Exactly 4 KPI tiles, matching the Current tab's 4-KPI
+        // convention. Mirrors the playwright assertion
+        // (`.delta-kpi-grid .kpi` count == 4).
         let delta = make_sample_delta();
         let dview = make_delta_view_default(&delta);
         let out = html_with_delta(&make_view_default(&delta.current), &dview);
@@ -2115,7 +2145,7 @@ mod tests {
         // the report — we anchor on the tile structure).
         assert!(
             !out.contains("<span class=\"delta-kpi-label\">Functions</span>"),
-            "the 5th 'Functions' tile from the mock is intentionally dropped per orchestrator-locked Discovery #2"
+            "the 5th 'Functions' tile from the mock is intentionally dropped"
         );
     }
 
@@ -2178,7 +2208,7 @@ mod tests {
         let out = html_with_delta(&make_view_default(&delta.current), &dview);
         assert!(
             out.contains("delta-unchanged"),
-            "unchanged count should render as a single-line note (the chat1.md trim)"
+            "unchanged count should render as a single-line note, not a table"
         );
         assert!(
             !out.contains("delta-table unchanged"),
@@ -2326,7 +2356,7 @@ mod tests {
     }
 
     /// Byte-level snapshot lock for the HTML reporter's delta-tab
-    /// render (crap-rs#306).
+    /// render.
     #[test]
     fn full_html_with_delta_snapshot() {
         let delta = make_sample_delta();
@@ -2509,8 +2539,9 @@ mod tests {
         let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
 
         // The Rust High-risk function must appear BEFORE the TS
-        // Moderate-risk function in the ranked-CRAP table — the D2d
-        // dimensional-consistency-aware sort rule.
+        // Moderate-risk function in the ranked-CRAP table — the
+        // dimensional-consistency-aware sort ranks by risk band
+        // descending first, then CRAP/threshold ratio within band.
         let high_pos = out
             .find("rs::high_fn")
             .expect("Rust high-risk row should render");
@@ -2519,7 +2550,7 @@ mod tests {
             .expect("TS moderate-risk row should render");
         assert!(
             high_pos < moderate_pos,
-            "expected High-risk before Moderate-risk in ranked table (D2d sort)"
+            "expected High-risk before Moderate-risk in ranked table"
         );
     }
 
@@ -3181,7 +3212,7 @@ mod tests {
             .expect("TypeScript Moderate-risk regression must surface in Combined Delta");
         assert!(
             rs_pos < ts_pos,
-            "Rust High-risk regression must rank ahead of TypeScript Moderate-risk regression in Combined Delta (D2d sort: risk band desc, ratio desc)"
+            "Rust High-risk regression must rank ahead of TypeScript Moderate-risk regression in Combined Delta (sort: risk band desc, ratio desc)"
         );
     }
 

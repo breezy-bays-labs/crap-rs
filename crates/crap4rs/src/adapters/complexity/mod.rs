@@ -945,6 +945,15 @@ mod test_helpers {
             .unwrap()
     }
 
+    /// Extract complexity from an inline source string — for control-flow
+    /// shapes (e.g. multi-arm `else if` chains) the committed fixtures
+    /// don't cover.
+    pub fn extract_src(source: &str, metric: ComplexityMetric) -> Vec<FunctionComplexity> {
+        adapter()
+            .extract(source, "tests/inline.rs", metric)
+            .unwrap()
+    }
+
     pub fn find_fn<'a>(fns: &'a [FunctionComplexity], name: &str) -> &'a FunctionComplexity {
         fns.iter()
             .find(|f| f.identity.qualified_name == name)
@@ -1368,6 +1377,94 @@ mod tests {
         let f = find_fn(&fns, "let_else_early_exit");
         // base(1) + let-else(+1) = 2
         assert_eq!(f.complexity, 2);
+    }
+
+    // ── else-if chains ─────────────────────────────────────────────────
+    //
+    // A multi-arm `else if … else if … else { … }` is the only shape that
+    // routes through `count_cognitive_else`'s recursive `Expr::If` arm
+    // (and its inner-else recursion) plus the terminating `Expr::Block`
+    // arm — the committed fixtures stop at a single `if/else`.
+
+    #[test]
+    fn else_if_chain_cognitive_counts_each_continuation() {
+        let src = r#"
+            fn classify(x: i32) -> &'static str {
+                if x < 0 {
+                    "neg"
+                } else if x == 0 {
+                    "zero"
+                } else if x < 10 {
+                    "small"
+                } else {
+                    "big"
+                }
+            }
+        "#;
+        let fns = extract_src(src, ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "classify");
+        // base(1) + if(+1) + 2×(else if continuation, +1 each, no nesting)
+        // + else block(+0) = 4. Each `else if` is a flat continuation, so
+        // the chain stays linear — never nesting-penalized.
+        assert_eq!(f.complexity, 4);
+        // Three `IfBranch` contributors (the `if` + two `else if`), all at
+        // nesting depth 0 (continuations don't deepen nesting).
+        let if_branches: Vec<_> = f
+            .contributors
+            .iter()
+            .filter(|c| c.kind == ContributorKind::IfBranch)
+            .collect();
+        assert_eq!(if_branches.len(), 3, "got: {:?}", f.contributors);
+        assert!(
+            if_branches.iter().all(|c| c.nesting_depth == 0),
+            "else-if continuations must not deepen nesting: {:?}",
+            if_branches
+        );
+    }
+
+    #[test]
+    fn else_if_chain_cyclomatic_counts_each_arm() {
+        let src = r#"
+            fn classify(x: i32) -> &'static str {
+                if x < 0 {
+                    "neg"
+                } else if x == 0 {
+                    "zero"
+                } else if x < 10 {
+                    "small"
+                } else {
+                    "big"
+                }
+            }
+        "#;
+        let fns = extract_src(src, ComplexityMetric::Cyclomatic);
+        let f = find_fn(&fns, "classify");
+        // base(1) + if(+1) + else if(+1) + else if(+1) = 4; the bare `else`
+        // is not a decision point.
+        assert_eq!(f.complexity, 4);
+    }
+
+    #[test]
+    fn else_if_chain_with_nested_decision_inside_arm() {
+        // A decision point *inside* a later `else if` arm proves the
+        // recursive `Expr::If` arm descends into the arm's then-block
+        // (`count_cognitive_block`), charging the inner `if` at depth 1.
+        let src = r#"
+            fn f(x: i32, y: i32) -> i32 {
+                if x < 0 {
+                    1
+                } else if x == 0 {
+                    if y > 0 { 2 } else { 3 }
+                } else {
+                    4
+                }
+            }
+        "#;
+        let fns = extract_src(src, ComplexityMetric::Cognitive);
+        let f = find_fn(&fns, "f");
+        // base(1) + if(+1, d0) + else if(+1, d0) + inner if(+1+1 nesting, d1)
+        // + else blocks(+0) = 5.
+        assert_eq!(f.complexity, 5, "got contributors: {:?}", f.contributors);
     }
 
     // ── Chained ? and nested expressions ──────────────────────────────

@@ -5,7 +5,7 @@
 //! documentation.
 //!
 //! Rendering goes through an askama compile-time template
-//! (`crates/crap-core/templates/markdown_report.txt`, crap-rs#260).
+//! (`crates/crap-core/templates/markdown_report.txt`).
 //! Width-aligned numeric fields are pre-formatted in Rust because
 //! askama's `{{ }}` interpolation does not honor Rust format
 //! specifiers; the template is composition-only.
@@ -41,17 +41,16 @@ use askama::Template;
 ///
 /// `meta` carries the calling binary's identity (the literal
 /// `env!("CARGO_PKG_NAME")` value resolves to `crap-core` here, not
-/// the adapter binary's name — so the binary supplies its own). The
-/// signature widened from `(&str, &str)` to `&AdapterMeta` in
-/// crap-rs#260 to thread `display_name` + `default_metric` through
-/// to the HTML reporter's per-adapter footer; the markdown reporter
-/// only consumes `tool_name` + `tool_version` but takes the bundle
-/// for signature symmetry with `format_html`. `effective_metric` is
-/// the runtime-resolved metric (post-CLI/config merge); see
-/// `EffectiveInputs.metric`.
+/// the adapter binary's name — so the binary supplies its own). `meta`
+/// is the full `&AdapterMeta` bundle: the markdown reporter only
+/// consumes `tool_name` and `tool_version`, but takes the whole bundle
+/// for signature symmetry with `format_html` (which threads
+/// `display_name` and `default_metric` into the HTML per-adapter
+/// footer). `effective_metric` is the runtime-resolved metric
+/// (post-CLI/config merge); see `EffectiveInputs.metric`.
 ///
 /// `title` and `subtitle` are the optional `[output] title` / `subtitle`
-/// config labels (crap-rs#352). When `title` is `Some`, it renders as a
+/// config labels. When `title` is `Some`, it renders as a
 /// `## <title>` line above the tool/version H1; when `subtitle` is
 /// `Some`, it renders on the line beneath. Both default to `None`, in
 /// which case the output is byte-identical to the unlabeled default — no
@@ -100,9 +99,8 @@ pub fn format_markdown(
     let mut out = tmpl
         .render()
         .expect("markdown template render is total — all fields owned");
-    // POSIX text files end with `\n`. Pre-PR-#260 the hand-rolled
-    // reporter always emitted a trailing newline; askama's `{%-` ws
-    // operator strips it in the template, and `insta` snapshot
+    // POSIX text files end with `\n`. askama's `{%-` ws operator strips
+    // the trailing newline in the template, and `insta` snapshot
     // assertions trim trailing whitespace on compare so the drift is
     // invisible to in-process tests. The composite scorecard action's
     // `cat <file>` + `echo "<EOF>"` heredoc emission relies on the
@@ -427,70 +425,81 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
         new_violations = summary.new_violations,
     ));
 
-    // Filter threshold matches the `{:.2}` cell-rendering precision:
-    // a delta below 0.005 rounds to "+0.00" in the table and looks
-    // like a falsely-flagged regression. Anything that rounds up to
-    // ≥ +0.01 is admitted. (CrapScore values are themselves
-    // 2-decimal rounded, so this gate rarely fires in practice — but
-    // float arithmetic can produce sub-0.005 noise on identity
-    // comparisons.)
+    push_regressions_table(&mut out, view);
+    push_new_violations_table(&mut out, view);
+
+    out
+}
+
+/// True when a change is a `Modified` whose CRAP rose by at least 0.005.
+///
+/// The 0.005 cutoff matches the `{:.2}` cell-rendering precision: a
+/// delta below it rounds to "+0.00" in the table and looks like a
+/// falsely-flagged regression. (CrapScore values are themselves
+/// 2-decimal rounded, so this gate rarely fires in practice — but float
+/// arithmetic can produce sub-0.005 noise on identity comparisons.)
+fn is_md_regression(change: &FunctionChange) -> bool {
+    matches!(change, FunctionChange::Modified { .. })
+        && change.score_delta().unwrap_or(0.0) >= 0.005
+}
+
+/// True when a change first crosses the threshold in the current run —
+/// a newly-added violator or an existing function that just broke the
+/// gate. Removed functions never count.
+fn is_new_violation(change: &FunctionChange) -> bool {
+    match change {
+        FunctionChange::Added { current } => current.exceeds,
+        FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
+        FunctionChange::Removed { .. } => false,
+    }
+}
+
+fn push_regressions_table(out: &mut String, view: &DeltaView<'_>) {
     let regressions: Vec<&FunctionChange> = view
         .shown
         .iter()
         .copied()
-        .filter(|c| {
-            matches!(c, FunctionChange::Modified { .. }) && c.score_delta().unwrap_or(0.0) >= 0.005
-        })
+        .filter(|c| is_md_regression(c))
         .collect();
-    if !regressions.is_empty() {
-        out.push_str("\n### Regressions\n\n");
-        out.push_str("| File | Function | Baseline CRAP | Current CRAP | Δ |\n");
-        out.push_str("|------|----------|--------------:|-------------:|--:|\n");
-        for change in regressions {
-            let baseline = change.baseline_score().unwrap_or(0.0);
-            let current = change.current_score().unwrap_or(0.0);
-            let delta = change.score_delta().unwrap_or(0.0);
-            out.push_str(&format!(
-                "| {} | {} | {:.2} | {:.2} | +{:.2} |\n",
-                escape_cell(change.file_path()),
-                escape_cell(change.qualified_name()),
-                baseline,
-                current,
-                delta,
-            ));
-        }
+    if regressions.is_empty() {
+        return;
     }
+    out.push_str("\n### Regressions\n\n");
+    out.push_str("| File | Function | Baseline CRAP | Current CRAP | Δ |\n");
+    out.push_str("|------|----------|--------------:|-------------:|--:|\n");
+    for change in regressions {
+        out.push_str(&format!(
+            "| {} | {} | {:.2} | {:.2} | +{:.2} |\n",
+            escape_cell(change.file_path()),
+            escape_cell(change.qualified_name()),
+            change.baseline_score().unwrap_or(0.0),
+            change.current_score().unwrap_or(0.0),
+            change.score_delta().unwrap_or(0.0),
+        ));
+    }
+}
 
+fn push_new_violations_table(out: &mut String, view: &DeltaView<'_>) {
     let new_violations: Vec<&FunctionChange> = view
         .shown
         .iter()
         .copied()
-        .filter(|c| match c {
-            FunctionChange::Added { current } => current.exceeds,
-            FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
-            FunctionChange::Removed { .. } => false,
-            // `FunctionChange` has `#[non_exhaustive]` paused per ADR
-            // D10 (restored at v1.0). In-crate match is exhaustive —
-            // no wildcard arm needed. v1.0 new variants will require
-            // an explicit arm here.
-        })
+        .filter(|c| is_new_violation(c))
         .collect();
-    if !new_violations.is_empty() {
-        out.push_str("\n### New violations\n\n");
-        out.push_str("| File | Function | Current CRAP |\n");
-        out.push_str("|------|----------|-------------:|\n");
-        for change in new_violations {
-            let current = change.current_score().unwrap_or(0.0);
-            out.push_str(&format!(
-                "| {} | {} | {:.2} |\n",
-                escape_cell(change.file_path()),
-                escape_cell(change.qualified_name()),
-                current,
-            ));
-        }
+    if new_violations.is_empty() {
+        return;
     }
-
-    out
+    out.push_str("\n### New violations\n\n");
+    out.push_str("| File | Function | Current CRAP |\n");
+    out.push_str("|------|----------|-------------:|\n");
+    for change in new_violations {
+        out.push_str(&format!(
+            "| {} | {} | {:.2} |\n",
+            escape_cell(change.file_path()),
+            escape_cell(change.qualified_name()),
+            change.current_score().unwrap_or(0.0),
+        ));
+    }
 }
 
 /// Escape characters with special meaning inside a GFM table cell.
@@ -556,7 +565,7 @@ mod tests {
         )
     }
 
-    // ── [output] title / subtitle labeling (crap-rs#352) ────────────────
+    // ── [output] title / subtitle labeling ─────────────────────────────
 
     fn md_labeled(view: &AnalysisView<'_>, title: Option<&str>, subtitle: Option<&str>) -> String {
         format_markdown(
@@ -858,7 +867,7 @@ mod tests {
         insta::assert_snapshot!(out);
     }
 
-    // ── Delta scorecard (VS5) ───────────────────────────────────────
+    // ── Delta scorecard ─────────────────────────────────────────────
 
     #[test]
     fn delta_scorecard_includes_status_and_counts() {

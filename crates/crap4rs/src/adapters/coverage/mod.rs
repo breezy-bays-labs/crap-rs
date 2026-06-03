@@ -60,13 +60,13 @@ impl LcovParser {
     ///    lexically strip, so the lexical result keeps the full
     ///    workspace-relative path. The walker keys by the src-relative
     ///    basename, so the two never matched and coverage silently
-    ///    dropped to 0 (crap-rs#331). A filesystem-validated
-    ///    longest-suffix match rescues this case.
+    ///    dropped to 0. A filesystem-validated longest-suffix match
+    ///    rescues this case.
     ///
     /// The suffix match does bounded `.is_file()` I/O — this parser is
     /// no longer pure strip-prefix; it now converges with crap4ts's
     /// `IstanbulCoverage::normalize_path`, which made the same trade for
-    /// cross-form portability (#215/#216).
+    /// cross-form portability.
     fn normalize_path(&self, path: &str) -> String {
         let fwd = path.replace('\\', "/");
         let root_fwd = self.root_path.to_string_lossy().replace('\\', "/");
@@ -78,8 +78,8 @@ impl LcovParser {
         // the source root (shapes 1 and 2 above). Keep it verbatim — no
         // suffix scan needed.
         //
-        // Traversal guard (mirrors crap4ts #216, ported into the
-        // suffix-match below too): `strip_prefix` is lexical, so a
+        // Traversal guard (mirrors the crap4ts adapter's guard, applied
+        // in the suffix-match below too): `strip_prefix` is lexical, so a
         // user-supplied `SF:/root/../outside/secret.rs` strips to
         // `../outside/secret.rs` and `root.join(..).is_file()` would
         // resolve — and thus probe the existence of — a file *outside*
@@ -93,9 +93,9 @@ impl LcovParser {
             return lexical.to_string_lossy().replace('\\', "/");
         }
 
-        // Rescue path (#331): a workspace-relative `SF:` line couldn't
-        // strip the canonical absolute root. Recover the walker's key
-        // as the longest path suffix that resolves to a real file.
+        // Rescue path: a workspace-relative `SF:` line couldn't strip
+        // the canonical absolute root. Recover the walker's key as the
+        // longest path suffix that resolves to a real file.
         if let Some(suffix) = suffix_match_under(root, p) {
             return suffix;
         }
@@ -115,13 +115,13 @@ impl LcovParser {
 /// Iterates longest → shortest so a leaf filename that exists in
 /// multiple directories is disambiguated by the longest shared path —
 /// the structural truth, not the machine-specific prefix. Mirrors
-/// `crap4ts`'s `IstanbulCoverage::suffix_match_under` (#215).
+/// `crap4ts`'s `IstanbulCoverage::suffix_match_under`.
 ///
 /// `.is_file()` (one syscall, not `.exists()`) avoids a directory
 /// false-positive. Any suffix containing a `..` component is skipped
 /// before the syscall: `SF:` records are user-supplied, so a `..` that
 /// lexically passes `starts_with(root)` would resolve a real file
-/// *outside* `root` (mirrors crap4ts's #216 traversal guard).
+/// *outside* `root` (mirrors the crap4ts adapter's traversal guard).
 fn suffix_match_under(root: &Path, path: &Path) -> Option<String> {
     let components: Vec<_> = path.components().collect();
     for start in 0..components.len() {
@@ -220,21 +220,44 @@ impl CoveragePort for LcovParser {
         let mut in_sf_block = false;
         for line in reader.lines() {
             let line = line.map_err(|e| format!("read error: {e}"))?;
-            if line.starts_with("SF:") {
-                in_sf_block = true;
-                continue;
-            }
-            if in_sf_block
-                && let Some(rest) = line.strip_prefix("DA:")
-                && let Some((line_no, hits)) = rest.split_once(',')
-                && line_no.parse::<usize>().is_ok()
-                && hits.split(',').next().unwrap_or("").parse::<u64>().is_ok()
-            {
+            if accepts_preflight_line(&line, &mut in_sf_block) {
                 return Ok(());
             }
         }
         Err("no SF/DA records".to_string())
     }
+}
+
+/// Classify one pre-flight line. Returns `true` only when the line is
+/// the first well-formed `DA:` record inside an `SF:` block — the
+/// signal that the file carries usable coverage. An `SF:` line opens a
+/// block (mutating `in_sf_block`) but is never itself an accept. The
+/// gate short-circuits on the first `true`, so this never needs to read
+/// past the first usable record.
+fn accepts_preflight_line(line: &str, in_sf_block: &mut bool) -> bool {
+    if line.starts_with("SF:") {
+        *in_sf_block = true;
+        return false;
+    }
+    *in_sf_block && is_well_formed_da(line)
+}
+
+/// True when `line` is a well-formed `DA:line,hits` record: a `DA:`
+/// prefix, a comma-split into a parseable line number and a parseable
+/// (checksum-tolerant) hit count. The pre-flight gate short-circuits on
+/// the first match, so this only needs to recognize structural
+/// well-formedness, not the full parse `parse_da` performs.
+fn is_well_formed_da(line: &str) -> bool {
+    let Some(rest) = line.strip_prefix("DA:") else {
+        return false;
+    };
+    let Some((line_no, hits)) = rest.split_once(',') else {
+        return false;
+    };
+    // Share the record parser's line-number rule (1-based; line 0 is
+    // malformed) so the preflight never accepts a DA the parser rejects.
+    parse_lcov_line_no(line_no).is_ok()
+        && hits.split(',').next().unwrap_or("").parse::<u64>().is_ok()
 }
 
 fn handle_parse_line(parser: &LcovParser, state: &mut ParseState, line: &str, line_number: usize) {
@@ -305,10 +328,7 @@ fn parse_da(da: &str) -> Result<(usize, u64), ()> {
     let (line_str, rest) = da.split_once(',').ok_or(())?;
     // DA format: line,hits[,checksum] — ignore optional checksum field
     let hits_str = rest.split(',').next().ok_or(())?;
-    let line_no: usize = line_str.parse().map_err(|_| ())?;
-    if line_no == 0 {
-        return Err(());
-    }
+    let line_no = parse_lcov_line_no(line_str)?;
     let hits: u64 = hits_str.parse().map_err(|_| ())?;
     Ok((line_no, hits))
 }
@@ -317,25 +337,42 @@ fn parse_da(da: &str) -> Result<(usize, u64), ()> {
 /// Format: line,block,branch,taken where taken is "-" or a non-negative integer.
 /// Line 0 is treated as malformed (LCOV is 1-based).
 fn parse_brda(brda: &str) -> Result<(usize, u32, u32, Option<u64>), ()> {
-    let mut parts = brda.splitn(4, ',');
-    let line_str = parts.next().ok_or(())?;
-    let block_str = parts.next().ok_or(())?;
-    let branch_str = parts.next().ok_or(())?;
-    let taken_str = parts.next().ok_or(())?;
+    let (line_str, block_str, branch_str, taken_str) = split_brda_fields(brda)?;
 
-    let line_no: usize = line_str.parse().map_err(|_| ())?;
-    if line_no == 0 {
-        return Err(());
-    }
+    let line_no = parse_lcov_line_no(line_str)?;
     let block: u32 = block_str.parse().map_err(|_| ())?;
     let branch: u32 = branch_str.parse().map_err(|_| ())?;
-    let taken = if taken_str == "-" {
-        None
-    } else {
-        Some(taken_str.parse::<u64>().map_err(|_| ())?)
-    };
+    let taken = parse_brda_taken(taken_str)?;
 
     Ok((line_no, block, branch, taken))
+}
+
+/// Split a BRDA value into its four comma-separated fields
+/// (`line,block,branch,taken`). Fewer than four fields is malformed.
+fn split_brda_fields(brda: &str) -> Result<(&str, &str, &str, &str), ()> {
+    let mut parts = brda.splitn(4, ',');
+    match (parts.next(), parts.next(), parts.next(), parts.next()) {
+        (Some(l), Some(bl), Some(br), Some(t)) => Ok((l, bl, br, t)),
+        _ => Err(()),
+    }
+}
+
+/// Parse a 1-based LCOV line number. Line 0 is rejected — LCOV line
+/// numbers are 1-based, so a 0 signals a malformed record.
+fn parse_lcov_line_no(s: &str) -> Result<usize, ()> {
+    let line_no: usize = s.parse().map_err(|_| ())?;
+    if line_no == 0 { Err(()) } else { Ok(line_no) }
+}
+
+/// Parse the `taken` field of a BRDA record: `"-"` means the branch was
+/// never reached (`None`); any other value must be a non-negative
+/// integer hit count (`Some`).
+fn parse_brda_taken(taken_str: &str) -> Result<Option<u64>, ()> {
+    if taken_str == "-" {
+        Ok(None)
+    } else {
+        taken_str.parse::<u64>().map(Some).map_err(|_| ())
+    }
 }
 
 fn flush_block(state: &mut ParseState) {
@@ -501,6 +538,15 @@ mod tests {
     }
 
     #[test]
+    fn validate_da_line_zero_rejected() {
+        // LCOV line numbers are 1-based, so `DA:0,...` is malformed. The
+        // preflight must agree with the record parser, which rejects line
+        // 0 — otherwise validate() green-lights a file the parser then
+        // discards, yielding empty coverage instead of a loud error.
+        assert!(validate_str("SF:src/main.rs\nDA:0,5\nend_of_record\n").is_err());
+    }
+
+    #[test]
     fn validate_single_da_inside_sf_block_passes() {
         assert!(validate_str("SF:src/main.rs\nDA:1,5\nend_of_record\n").is_ok());
     }
@@ -591,14 +637,14 @@ mod tests {
 
     #[test]
     fn parentdir_sf_path_does_not_take_fast_path_is_file_probe() {
-        // crap-rs#333 / mirrors crap4ts #216. `SF:` records are
-        // user-supplied; a `..` makes the lexical `strip_prefix` succeed
-        // with a `..`-bearing relative result that `root.join(..).is_file()`
-        // resolves OUTSIDE the root — a traversal-escape existence oracle
-        // on the fast path. The fast path must reject `..` and fall
-        // through to the guarded suffix match, which re-anchors the clean
-        // tail under the root. Needs real on-disk files so the `is_file()`
-        // behaviour is actually exercised.
+        // `SF:` records are user-supplied; a `..` makes the lexical
+        // `strip_prefix` succeed with a `..`-bearing relative result
+        // that `root.join(..).is_file()` resolves OUTSIDE the root — a
+        // traversal-escape existence oracle on the fast path. The fast
+        // path must reject `..` and fall through to the guarded suffix
+        // match, which re-anchors the clean tail under the root. Needs
+        // real on-disk files so the `is_file()` behaviour is actually
+        // exercised.
         let tmp = tempfile::tempdir().expect("tempdir");
         let root = tmp.path().canonicalize().expect("canonicalize tempdir");
         std::fs::write(root.join("secret.rs"), "fn x() {}").expect("write secret.rs");
@@ -606,8 +652,8 @@ mod tests {
         let parser = LcovParser::new(root.clone());
 
         // `<root>/../<leaf>/secret.rs` lexically strips to
-        // `../<leaf>/secret.rs`; the pre-#333 fast path resolved that and
-        // returned the unusable `..` key.
+        // `../<leaf>/secret.rs`; an unguarded fast path would resolve
+        // that and return the unusable `..` key.
         let sf = format!("{}/../{leaf}/secret.rs", root.display());
         let output = parser.parse_str(&format!("SF:{sf}\nDA:1,1\nend_of_record\n"));
 
