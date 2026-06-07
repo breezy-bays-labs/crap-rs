@@ -218,11 +218,23 @@ pub struct DeltaSummary {
     /// gate — we want to fail PRs that *introduce* risk, not PRs that
     /// merely touch already-failing functions. A *pure* relocation has an
     /// identical score on both sides, so `baseline.exceeds ==
-    /// current.exceeds` and it can never contribute a new violation —
+    /// current.exceeds` and it never contributes a new violation —
     /// migrations sail through the gate. A relocation that also crossed
     /// the threshold still counts (the relocation was not the only
-    /// change), and even a mis-paired relocation tallies under these
-    /// rules, so a bad match can never hide a real regression.
+    /// change).
+    ///
+    /// Pairing only ever *lowers* `new_violations` versus scoring the
+    /// leftovers as Add+Remove (pinned by
+    /// `proptests::prop_renamed_never_raises_new_violations`). That is the
+    /// migration-friendly guarantee — enabling rename detection can never
+    /// newly fail a PR. The flip side is the honest limitation: a *false*
+    /// pairing also lowers the count, so a coincidental match CAN lower
+    /// `new_violations` below the true figure. The 1:1 + name/signature
+    /// guards make false pairings rare, but a genuinely-unrelated function
+    /// whose signature exactly matches a removed one (and is its only
+    /// signature-mate) is indistinguishable from a real rename at the
+    /// verdict level and will pair. See
+    /// `tests::compute_documented_limitation_coincidental_signature_pairs_as_renamed`.
     pub new_violations: u32,
     /// `new_violations == 0`. Drives the optional `--delta-gate`.
     pub passed: bool,
@@ -458,17 +470,26 @@ fn struct_sig(verdict: &FunctionVerdict) -> StructSig {
 /// Two tiers, each a 1:1-unambiguous match (an entry pairs only when
 /// exactly one entry on each side shares its key — any ambiguous key
 /// stays Added + Removed):
-/// - Tier A keys on the retained `qualified_name` — a cross-file move
-///   that kept its name (a top-level fn, or an `impl` method whose type
-///   is unchanged).
-/// - Tier B keys on the structural signature — a rename, or a move that
-///   also changed the module-qualified name.
+/// - Tier A keys on **both** the retained `qualified_name` AND the
+///   structural signature — a cross-file move whose body is unchanged
+///   (a top-level fn, or an `impl` method whose type is unchanged).
+///   Requiring the signature too means a same-named-but-different-body
+///   coincidence (two unrelated `run` / `new` functions) does NOT pair,
+///   and a moved-*and-edited* function falls through to Add+Remove where
+///   its edit is scrutinized — more faithful to "was relocation the only
+///   change?".
+/// - Tier B keys on the structural signature alone — a rename, or a
+///   move that also changed the module-qualified name (body unchanged).
 ///
-/// The 1:1 guard is both the false-positive defense (trivial
-/// signature-colliding functions never pair) and the cost ceiling
-/// (HashMap bucketing, no O(n²) scan). Returns the `Renamed` pairs plus
-/// the still-unmatched baseline-only / current-only leftovers, each in
-/// input order.
+/// The 1:1 guard is both the false-positive defense (signature-colliding
+/// functions never pair) and the cost ceiling (HashMap bucketing, no
+/// O(n²) scan). It does **not** make the matcher sound: working from
+/// verdicts (no source text), two genuinely-unrelated functions with an
+/// identical signature that are the only leftover on each side are
+/// indistinguishable from a real rename and WILL pair — see
+/// `tests::compute_documented_limitation_coincidental_signature_pairs_as_renamed`.
+/// Returns the `Renamed` pairs plus the still-unmatched baseline-only /
+/// current-only leftovers, each in input order.
 fn pair_relocations<'a>(
     baseline_only: Vec<&'a FunctionVerdict>,
     current_only: Vec<&'a FunctionVerdict>,
@@ -477,11 +498,12 @@ fn pair_relocations<'a>(
     Vec<&'a FunctionVerdict>,
     Vec<&'a FunctionVerdict>,
 ) {
-    // Tier A — retained qualified name. The name is the signal, so this
-    // applies at any complexity (a trivial getter moved to another file
-    // keeping its name is still a confident match).
+    // Tier A — retained qualified name AND matching structural signature.
+    // The strongest signal (same name, same body, different file) and
+    // applies at any complexity. Keying on name+signature rejects an
+    // unrelated function that merely reused a common name.
     let (mut paired, baseline_only, current_only) = pair_by_key(baseline_only, current_only, |v| {
-        v.scored.identity.qualified_name.as_str()
+        (v.scored.identity.qualified_name.as_str(), struct_sig(v))
     });
 
     // Tier B — structural signature, restricted to structurally
@@ -1044,6 +1066,36 @@ mod tests {
         assert_eq!(delta.summary.regressions, 1);
         assert_eq!(delta.summary.new_violations, 1);
         assert!(!delta.summary.passed);
+    }
+
+    /// DOCUMENTED LIMITATION (not a guarantee). The matcher works from
+    /// verdicts, not source text, so two genuinely-unrelated functions
+    /// with an identical structural signature — one removed, one added,
+    /// each the only signature-mate on its side — are indistinguishable
+    /// from a real rename and WILL pair as `Renamed`. When both already
+    /// exceed the threshold, the new function inherits the baseline's
+    /// "already failing" status, so a genuinely new violation is NOT
+    /// flagged. The 1:1 + name/signature guards make this rare, but it is
+    /// irreducible without source-level matching. Captured here so the
+    /// behavior is a known, tested property — the delta gate never
+    /// *raises* new violations (migrations pass) but a coincidental match
+    /// can lower the count; it does not "never hide" a violation.
+    #[test]
+    fn compute_documented_limitation_coincidental_signature_pairs_as_renamed() {
+        // `alpha` (already failing) is removed; `beta` (genuinely new,
+        // also failing) is added — different names, identical distinctive
+        // signature, one each side. Tier B pairs them on signature alone.
+        let baseline = make_result(vec![make_verdict_cx("a.rs", "alpha", 47.0, true, 5)]);
+        let current = make_result(vec![make_verdict_cx("b.rs", "beta", 47.0, true, 5)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        // The accepted consequence: because the baseline side already
+        // exceeded, the coincidental pairing hides what would otherwise be
+        // a new violation. This documents the limitation; it is NOT a
+        // claim that relocation can never mask a violation.
+        assert_eq!(delta.summary.new_violations, 0);
+        assert!(delta.summary.passed);
     }
 
     /// Ambiguity guard: two leftovers per side sharing a structural
