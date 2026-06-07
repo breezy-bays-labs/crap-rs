@@ -236,50 +236,133 @@ pub struct DeltaSummary {
     /// verdict level and will pair. See
     /// `tests::compute_documented_limitation_coincidental_signature_pairs_as_renamed`.
     pub new_violations: u32,
+    /// Would-be new violations that were NOT counted because the
+    /// transition happened entirely inside the threshold *border band*
+    /// (`|crap.value - threshold| < epsilon`), surfaced so a suppressed
+    /// count is visible rather than silent. Zero unless `--threshold-epsilon`
+    /// / `[delta] epsilon` is set above `0.0`.
+    ///
+    /// Honest limitation (do not "fix" by claiming noise-only safety):
+    /// epsilon only ever *moves* a would-be new violation out of
+    /// `new_violations` and into this bucket — it never adds one. So a
+    /// genuinely-new over-threshold function that happens to land in the
+    /// band IS hidden here by design. This is a threshold-border *jitter*
+    /// knob, not a "suppresses noise only" guarantee.
+    /// `new_violations + border_jitter_suppressed` is invariant under
+    /// epsilon (pinned by `proptests::prop_border_band_conserves_new_violations`).
+    pub border_jitter_suppressed: u32,
     /// `new_violations == 0`. Drives the optional `--delta-gate`.
     pub passed: bool,
 }
 
 impl DeltaSummary {
+    /// Convenience for `compute_with_epsilon(changes, 0.0)` — the exact
+    /// pre-epsilon behavior, kept for the many in-crate callers and tests
+    /// that don't exercise the border band.
+    ///
+    /// PRODUCTION CODE MUST USE [`DeltaSummary::compute_with_epsilon`]:
+    /// a bare `compute` silently runs at `epsilon = 0.0`, disabling
+    /// border-band suppression.
     pub fn compute(changes: &[FunctionChange]) -> Self {
+        Self::compute_with_epsilon(changes, 0.0)
+    }
+
+    /// Tally `changes`, suppressing would-be new violations whose
+    /// transition stays inside the threshold border band of half-width
+    /// `epsilon` (see [`change_is_new_violation`]). `epsilon == 0.0`
+    /// reproduces [`compute`] byte-for-byte.
+    pub fn compute_with_epsilon(changes: &[FunctionChange], epsilon: f64) -> Self {
         let mut summary = Self::default();
         for change in changes {
-            tally(&mut summary, change);
+            tally(&mut summary, change, epsilon);
         }
         summary.passed = summary.new_violations == 0;
         summary
     }
 }
 
-fn tally(summary: &mut DeltaSummary, change: &FunctionChange) {
+/// True iff `verdict`'s CRAP score sits inside the threshold *border
+/// band* — within `epsilon` (absolute, unitless CRAP points) of its
+/// own per-function threshold.
+///
+/// `epsilon == 0.0` is always `false` (the strict `<` never admits a
+/// zero-width band), which is what makes the default a byte-identical
+/// no-op. A non-finite or negative `epsilon` must never reach here — it
+/// is rejected at the config / CLI boundary — but if one did, `< NaN`
+/// is always false and a negative band is empty, so the worst case is
+/// "no suppression," never a panic or a widened gate.
+fn within_band(verdict: &FunctionVerdict, epsilon: f64) -> bool {
+    (verdict.scored.crap.value - verdict.threshold).abs() < epsilon
+}
+
+/// Does this change introduce a delta-gate *new violation*, after
+/// threshold-border-band suppression of half-width `epsilon`?
+///
+/// - `Removed` never counts.
+/// - `Added`: `current` breaches its threshold AND is not in the band.
+/// - `Modified` / `Renamed`: `baseline` was clean and `current`
+///   breaches, AND the transition is not fully inside the band (i.e.
+///   NOT both sides within epsilon of threshold).
+///
+/// ASYMMETRY (documented behavior, not a bug): `Modified` / `Renamed`
+/// require BOTH readings in the band — genuine oscillation across the
+/// line. `Added` has only one reading and no prior state to "jitter"
+/// from, so an `Added`-in-band is a *soft threshold bypass*, not jitter
+/// suppression: brand-new code landing at 25.01 with threshold 25.0 and
+/// epsilon 0.5 is forgiven. Stated here verbatim so no reader equates
+/// "jitter" with "oscillation" for the `Added` case.
+///
+/// This is the single source of truth for the new-violation rule — the
+/// summary tally (the count) and the markdown reporter's per-row
+/// new-violations table both route through it, so the summary count can
+/// never drift from the rendered table.
+pub fn change_is_new_violation(change: &FunctionChange, epsilon: f64) -> bool {
     match change {
-        FunctionChange::Added { current } => {
-            summary.added += 1;
-            if current.exceeds {
-                summary.new_violations += 1;
-            }
+        FunctionChange::Added { current } => current.exceeds && !within_band(current, epsilon),
+        FunctionChange::Modified { baseline, current }
+        | FunctionChange::Renamed { baseline, current } => {
+            !baseline.exceeds
+                && current.exceeds
+                && !(within_band(baseline, epsilon) && within_band(current, epsilon))
         }
-        FunctionChange::Removed { .. } => {
-            summary.removed += 1;
-        }
-        FunctionChange::Modified { baseline, current } => {
-            summary.modified += 1;
-            tally_modified(summary, baseline, current);
-        }
-        FunctionChange::Renamed { baseline, current } => {
-            summary.renamed += 1;
-            // Score-movement, regression/improvement, and new-violation
-            // accounting are identical to `Modified` — a relocation is
-            // the same function under a new identity. A pure relocation
-            // has a zero delta and matching `exceeds`, so it contributes
-            // nothing here; only a relocation that *also* changed the
-            // score moves these counters.
-            tally_modified(summary, baseline, current);
-        }
+        FunctionChange::Removed { .. } => false,
     }
 }
 
-fn tally_modified(
+fn tally(summary: &mut DeltaSummary, change: &FunctionChange, epsilon: f64) {
+    // Per-variant kind tally + score movement (regressions / improvements).
+    match change {
+        FunctionChange::Added { .. } => summary.added += 1,
+        FunctionChange::Removed { .. } => summary.removed += 1,
+        FunctionChange::Modified { baseline, current } => {
+            summary.modified += 1;
+            tally_movement(summary, baseline, current);
+        }
+        FunctionChange::Renamed { baseline, current } => {
+            summary.renamed += 1;
+            // A relocation is the same function under a new identity, so
+            // its score movement is accounted exactly like `Modified`. A
+            // pure relocation has a zero delta and matching `exceeds`, so
+            // it moves neither counter.
+            tally_movement(summary, baseline, current);
+        }
+    }
+
+    // New-violation / border-jitter accounting is uniform across every
+    // kind, routed through the single `change_is_new_violation` predicate.
+    // The else-if relies on `change_is_new_violation(_, eps)` being a
+    // subset of `change_is_new_violation(_, 0.0)` — epsilon only ever
+    // *removes* violations — so the two buckets partition the would-be
+    // violations exactly: `new_violations + border_jitter_suppressed` is
+    // invariant under epsilon (the conservation proptest).
+    if change_is_new_violation(change, epsilon) {
+        summary.new_violations += 1;
+    } else if change_is_new_violation(change, 0.0) {
+        summary.border_jitter_suppressed += 1;
+    }
+}
+
+fn tally_movement(
     summary: &mut DeltaSummary,
     baseline: &FunctionVerdict,
     current: &FunctionVerdict,
@@ -296,9 +379,6 @@ fn tally_modified(
         summary.regressions += 1;
     } else if delta <= -0.005 {
         summary.improvements += 1;
-    }
-    if !baseline.exceeds && current.exceeds {
-        summary.new_violations += 1;
     }
 }
 
@@ -329,6 +409,14 @@ pub struct AnalysisDelta {
     /// (in [`compute`]) so reporters and the delta gate share a
     /// single source of truth — pre-shape, view-independent.
     pub summary: DeltaSummary,
+    /// Effective threshold-border-band half-width used to compute
+    /// `summary`. In-memory only (`#[serde(skip)]`): the wire envelope's
+    /// AC-required surface is `summary.border_jitter_suppressed`. The
+    /// markdown reporter re-derives a per-row new-violation verdict and
+    /// reads this (via the `DeltaView`'s `full` borrow) so it applies the
+    /// exact same band the summary used. `0.0` when no epsilon was set.
+    #[serde(skip)]
+    pub epsilon: f64,
 }
 
 // ── compute: pair → classify ────────────────────────────────────────
@@ -356,13 +444,31 @@ fn identity_key(identity: &FunctionIdentity) -> IdentityKey<'_> {
 /// public surface declarative and to localize the HashMap construction
 /// for testing.
 pub fn compute(baseline: AnalysisResult, current: AnalysisResult) -> AnalysisDelta {
+    compute_with_epsilon(baseline, current, 0.0)
+}
+
+/// Like [`compute`] but suppresses would-be new violations whose
+/// transition stays inside the threshold border band of half-width
+/// `epsilon` (see [`change_is_new_violation`]). `epsilon == 0.0`
+/// reproduces [`compute`] byte-for-byte.
+///
+/// PRODUCTION CODE MUST CALL THIS (the bare [`compute`] silently runs at
+/// `epsilon = 0.0`). The effective `epsilon` is stored on the returned
+/// [`AnalysisDelta`] so reporters that re-derive a per-row new-violation
+/// verdict apply the exact same band the summary used.
+pub fn compute_with_epsilon(
+    baseline: AnalysisResult,
+    current: AnalysisResult,
+    epsilon: f64,
+) -> AnalysisDelta {
     let changes = pair_identities(&baseline, &current);
-    let summary = DeltaSummary::compute(&changes);
+    let summary = DeltaSummary::compute_with_epsilon(&changes, epsilon);
     AnalysisDelta {
         baseline,
         current,
         changes,
         summary,
+        epsilon,
     }
 }
 
@@ -1371,6 +1477,139 @@ mod tests {
         assert!(!with_new.passed);
     }
 
+    // ── threshold-border epsilon (#277) ──
+
+    #[test]
+    fn within_band_uses_strict_less_than_and_zero_is_empty() {
+        // threshold is 25.0 in make_verdict.
+        let on_line = make_verdict("a.rs", "f", 25.0, true);
+        let just_inside = make_verdict("a.rs", "f", 25.4, true);
+        let on_edge = make_verdict("a.rs", "f", 25.5, true); // distance == epsilon
+        let just_outside = make_verdict("a.rs", "f", 25.6, true);
+
+        assert!(within_band(&on_line, 0.5), "distance 0 < 0.5");
+        assert!(within_band(&just_inside, 0.5), "distance 0.4 < 0.5");
+        assert!(
+            !within_band(&on_edge, 0.5),
+            "distance 0.5 is NOT < 0.5 (strict)"
+        );
+        assert!(!within_band(&just_outside, 0.5), "distance 0.6 >= 0.5");
+        // epsilon 0.0 admits nothing — not even a score exactly on the line.
+        assert!(!within_band(&on_line, 0.0), "zero-width band is empty");
+    }
+
+    #[test]
+    fn epsilon_zero_is_byte_identical_to_bare_compute() {
+        // A representative mix: a crossing Modified (new violation), a
+        // regressing-but-passing Modified, an Added violator, a Removed.
+        let changes = vec![
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "cross", 24.99, false),
+                current: make_verdict("a.rs", "cross", 25.01, true),
+            },
+            FunctionChange::Modified {
+                baseline: make_verdict("a.rs", "still_ok", 8.0, false),
+                current: make_verdict("a.rs", "still_ok", 20.0, false),
+            },
+            FunctionChange::Added {
+                current: make_verdict("a.rs", "new_bad", 31.0, true),
+            },
+            FunctionChange::Removed {
+                baseline: make_verdict("a.rs", "gone", 47.0, true),
+            },
+        ];
+        let bare = DeltaSummary::compute(&changes);
+        let eps0 = DeltaSummary::compute_with_epsilon(&changes, 0.0);
+        assert_eq!(eps0.added, bare.added);
+        assert_eq!(eps0.removed, bare.removed);
+        assert_eq!(eps0.modified, bare.modified);
+        assert_eq!(eps0.regressions, bare.regressions);
+        assert_eq!(eps0.improvements, bare.improvements);
+        assert_eq!(eps0.new_violations, bare.new_violations);
+        assert_eq!(eps0.passed, bare.passed);
+        // The new bucket is inert at epsilon 0.
+        assert_eq!(eps0.border_jitter_suppressed, 0);
+        assert_eq!(bare.border_jitter_suppressed, 0);
+        // Sanity: the crossing Modified + the Added violator both counted.
+        assert_eq!(bare.new_violations, 2);
+    }
+
+    #[test]
+    fn border_band_suppresses_modified_oscillation() {
+        // 24.99 → 25.01 across threshold 25.0, both within epsilon 0.5.
+        let changes = vec![FunctionChange::Modified {
+            baseline: make_verdict("a.rs", "jitter", 24.99, false),
+            current: make_verdict("a.rs", "jitter", 25.01, true),
+        }];
+        let summary = DeltaSummary::compute_with_epsilon(&changes, 0.5);
+        assert_eq!(summary.new_violations, 0);
+        assert_eq!(summary.border_jitter_suppressed, 1);
+        assert!(
+            summary.passed,
+            "a suppressed border-jitter PR passes the gate"
+        );
+    }
+
+    #[test]
+    fn border_band_modified_one_side_outside_still_counts() {
+        // baseline far below the band (clean), current just over: only one
+        // side is in the band, so this is a genuine crossing, not jitter.
+        let changes = vec![FunctionChange::Modified {
+            baseline: make_verdict("a.rs", "real", 5.0, false),
+            current: make_verdict("a.rs", "real", 25.01, true),
+        }];
+        let summary = DeltaSummary::compute_with_epsilon(&changes, 0.5);
+        assert_eq!(summary.new_violations, 1);
+        assert_eq!(summary.border_jitter_suppressed, 0);
+        assert!(!summary.passed);
+    }
+
+    #[test]
+    fn border_band_suppresses_added_in_band() {
+        // Added asymmetry (one-sided soft bypass): a brand-new function
+        // landing inside the band is forgiven per the AC.
+        let changes = vec![FunctionChange::Added {
+            current: make_verdict("a.rs", "new_borderline", 25.01, true),
+        }];
+        let summary = DeltaSummary::compute_with_epsilon(&changes, 0.5);
+        assert_eq!(summary.added, 1);
+        assert_eq!(summary.new_violations, 0);
+        assert_eq!(summary.border_jitter_suppressed, 1);
+    }
+
+    #[test]
+    fn border_band_added_outside_band_still_counts() {
+        let changes = vec![FunctionChange::Added {
+            current: make_verdict("a.rs", "new_bad", 31.0, true),
+        }];
+        let summary = DeltaSummary::compute_with_epsilon(&changes, 0.5);
+        assert_eq!(summary.new_violations, 1);
+        assert_eq!(summary.border_jitter_suppressed, 0);
+    }
+
+    #[test]
+    fn border_band_renamed_takes_the_same_dual_sided_check_as_modified() {
+        // Relocate-and-regress straddling the line within the band → suppressed.
+        let both_in_band = vec![FunctionChange::Renamed {
+            baseline: make_verdict("a.rs", "old", 24.99, false),
+            current: make_verdict("b.rs", "new", 25.01, true),
+        }];
+        let s = DeltaSummary::compute_with_epsilon(&both_in_band, 0.5);
+        assert_eq!(s.renamed, 1);
+        assert_eq!(s.new_violations, 0);
+        assert_eq!(s.border_jitter_suppressed, 1);
+
+        // One side far outside the band → genuine crossing, still counts.
+        let one_side_out = vec![FunctionChange::Renamed {
+            baseline: make_verdict("a.rs", "old", 5.0, false),
+            current: make_verdict("b.rs", "new", 25.01, true),
+        }];
+        let s2 = DeltaSummary::compute_with_epsilon(&one_side_out, 0.5);
+        assert_eq!(s2.renamed, 1);
+        assert_eq!(s2.new_violations, 1);
+        assert_eq!(s2.border_jitter_suppressed, 0);
+    }
+
     // ── change accessors ──
 
     #[test]
@@ -1462,6 +1701,7 @@ mod tests {
             current: make_result(vec![]),
             summary: DeltaSummary::compute(&changes),
             changes,
+            epsilon: 0.0,
         }
     }
 
@@ -1812,6 +2052,38 @@ mod proptests {
                 })
                 .sum();
             prop_assert!(delta.summary.new_violations <= without_pairing);
+        }
+
+        /// The threshold-border epsilon conserves would-be new violations:
+        /// for any change set and any finite epsilon ≥ 0,
+        /// `new_violations(eps) + border_jitter_suppressed(eps)` equals
+        /// `new_violations(0)`. This is the honest claim — epsilon only
+        /// ever *moves* a would-be violation into the suppressed bucket,
+        /// never adds or drops one (the #274 "never raises ≠ never hides"
+        /// shape, pinned). It follows that epsilon never *raises* the
+        /// gate count, and that suppression is bounded by the eps-0 count.
+        #[test]
+        fn prop_border_band_conserves_new_violations(
+            baseline in arb_analysis_result(),
+            current in arb_analysis_result(),
+            epsilon in 0.0f64..50.0,
+        ) {
+            let delta = compute(baseline, current);
+            let at_zero = DeltaSummary::compute(&delta.changes);
+            let with_eps = DeltaSummary::compute_with_epsilon(&delta.changes, epsilon);
+            prop_assert_eq!(
+                with_eps.new_violations + with_eps.border_jitter_suppressed,
+                at_zero.new_violations
+            );
+            prop_assert!(with_eps.new_violations <= at_zero.new_violations);
+            prop_assert!(with_eps.border_jitter_suppressed <= at_zero.new_violations);
+            // The non-gate counters are independent of epsilon.
+            prop_assert_eq!(with_eps.added, at_zero.added);
+            prop_assert_eq!(with_eps.removed, at_zero.removed);
+            prop_assert_eq!(with_eps.modified, at_zero.modified);
+            prop_assert_eq!(with_eps.renamed, at_zero.renamed);
+            prop_assert_eq!(with_eps.regressions, at_zero.regressions);
+            prop_assert_eq!(with_eps.improvements, at_zero.improvements);
         }
 
         /// View shaping never adds rows. `view.shown.len() <= eligible_count

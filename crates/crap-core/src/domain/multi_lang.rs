@@ -225,6 +225,9 @@ pub struct CombinedDeltaSummary {
     pub regressions: u32,
     pub improvements: u32,
     pub new_violations: u32,
+    /// Would-be new violations suppressed by the threshold-border epsilon,
+    /// summed across adapters (crap-rs#277).
+    pub border_jitter_suppressed: u32,
     /// True only when every contributing language passed (no new
     /// violations on any adapter). AND-aggregated across contributing
     /// blocks; starts `true` (vacuous AND over zero contributors).
@@ -241,6 +244,7 @@ impl Default for CombinedDeltaSummary {
             regressions: 0,
             improvements: 0,
             new_violations: 0,
+            border_jitter_suppressed: 0,
             passed: true,
         }
     }
@@ -322,6 +326,7 @@ impl CombinedDeltaSummary {
         self.regressions += other.regressions;
         self.improvements += other.improvements;
         self.new_violations += other.new_violations;
+        self.border_jitter_suppressed += other.border_jitter_suppressed;
         self.passed = self.passed && other.passed;
     }
 }

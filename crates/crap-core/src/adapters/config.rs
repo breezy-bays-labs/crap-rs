@@ -28,7 +28,7 @@ use crate::domain::view::{CoverageRange, CoverageRangeError, GroupKey, SortKey};
 // keep importing them from `adapters::config` unchanged. The
 // wire/schema family below (`ConfigSchema` et al., schemars + documented)
 // stays in this adapter layer.
-pub use crate::domain::config::{FileConfig, LangConfig, OutputConfig, ViewPreset};
+pub use crate::domain::config::{DeltaConfig, FileConfig, LangConfig, OutputConfig, ViewPreset};
 
 // ── Config schema — the public, documented WIRE type ───────────────
 //
@@ -105,6 +105,10 @@ pub struct ConfigSchema {
     /// title, and subtitle.
     #[serde(default)]
     pub output: OutputSchema,
+    /// Delta-gate settings (`[delta]`): the threshold-border epsilon for
+    /// `--delta-gate` jitter suppression.
+    #[serde(default)]
+    pub delta: DeltaSchema,
 }
 
 /// Source-root specification — a single path or a list of paths.
@@ -142,6 +146,21 @@ pub struct OutputSchema {
     pub title: Option<String>,
     /// Scorecard subtitle, rendered beneath the title.
     pub subtitle: Option<String>,
+}
+
+/// Delta-gate settings (the `[delta]` table) on the wire type.
+#[derive(Debug, Default, Deserialize, JsonSchema, DocumentedFields)]
+#[serde(deny_unknown_fields)]
+pub struct DeltaSchema {
+    /// Threshold-border epsilon (absolute, unitless CRAP points) for the
+    /// `--delta-gate`. A would-be new violation whose CRAP score crosses
+    /// the threshold but stays within `epsilon` of it — on BOTH the
+    /// baseline and current side — is treated as border jitter and not
+    /// counted. Default `0.0` disables suppression entirely. Must be
+    /// finite and non-negative. This is a threshold-border *jitter* knob,
+    /// not a "noise-only" guarantee: a genuinely-new in-band violation is
+    /// suppressed too. A CLI `--threshold-epsilon` flag wins over this.
+    pub epsilon: Option<f64>,
 }
 
 /// A single per-path threshold override (a `[[overrides]]` block).
@@ -266,6 +285,11 @@ pub enum ConfigError {
         "output.annotation_limit must be in 1..=100, got: {value}\n  hint: matches the CLI `--annotation-limit` range; 0 disables emission, > 100 floods the GH Actions per-step cap"
     )]
     InvalidAnnotationLimit { value: u32 },
+    /// A `[delta] epsilon` that is not a finite, non-negative number.
+    #[error(
+        "delta.epsilon must be a finite non-negative number, got: {value}\n  hint: epsilon is an absolute CRAP-point border-band half-width; 0.0 disables suppression"
+    )]
+    InvalidEpsilon { value: f64 },
     /// An unrecognized `preset` string.
     #[error("unknown preset: {value}\n  valid values: strict, default, lenient")]
     UnknownPreset { value: String },
@@ -480,6 +504,9 @@ fn parse_config(content: &str) -> Result<FileConfig, ConfigError> {
             title: raw.output.title,
             subtitle: raw.output.subtitle,
         },
+        delta: DeltaConfig {
+            epsilon: raw.delta.epsilon,
+        },
     })
 }
 
@@ -555,6 +582,7 @@ fn validate_raw_config(raw: &ConfigSchema) -> Result<(), ConfigError> {
     check_top_level_threshold_range(raw)?;
     check_override_thresholds(raw)?;
     check_annotation_limit(raw)?;
+    check_delta_epsilon(raw)?;
     Ok(())
 }
 
@@ -611,6 +639,30 @@ fn check_annotation_limit(raw: &ConfigSchema) -> Result<(), ConfigError> {
         return Err(ConfigError::InvalidAnnotationLimit { value: limit });
     }
     Ok(())
+}
+
+/// `[delta] epsilon`, when set, must be finite and non-negative.
+///
+/// TOML's float scalar admits `nan` and `inf`, and a negative number is
+/// a valid `f64` literal — so without this check a `[delta] epsilon =
+/// nan` would silently disable suppression (`x.abs() < NaN` is always
+/// false) and `epsilon = -1.0` would define an empty band. Mirror the
+/// CLI's `--threshold-epsilon` validation so config and CLI agree.
+fn check_delta_epsilon(raw: &ConfigSchema) -> Result<(), ConfigError> {
+    if let Some(epsilon) = raw.delta.epsilon
+        && !is_valid_epsilon(epsilon)
+    {
+        return Err(ConfigError::InvalidEpsilon { value: epsilon });
+    }
+    Ok(())
+}
+
+/// An epsilon is valid iff it is finite and non-negative. Unlike
+/// `is_valid_threshold` (strictly positive — a zero threshold is
+/// meaningless), `epsilon == 0.0` is the legitimate default that
+/// disables suppression.
+pub(crate) fn is_valid_epsilon(epsilon: f64) -> bool {
+    epsilon.is_finite() && epsilon >= 0.0
 }
 
 fn parse_view_preset(name: &str, raw: ViewPresetSchema) -> Result<ViewPreset, ConfigError> {
@@ -820,6 +872,7 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
         views,
         language,
         output,
+        delta,
     } = example;
 
     // `preset` is the commented mutually-exclusive alternative to the live
@@ -849,6 +902,7 @@ pub fn render_example_config(meta: &AdapterMeta) -> String {
     emit_views_block(root, views);
     emit_language_block(root, language);
     emit_output_block(root, output);
+    emit_delta_block(root, delta);
 
     doc.to_string()
 }
@@ -1065,6 +1119,29 @@ fn emit_output_block(root: &mut toml_edit::Table, output: OutputSchema) {
     root.insert("output", Item::Table(t));
 }
 
+/// Emit the `[delta]` table — `epsilon`, with its `///` doc, and the
+/// `delta` field doc as the table header.
+fn emit_delta_block(root: &mut toml_edit::Table, delta: DeltaSchema) {
+    use toml_edit::{Item, Table, value};
+
+    // Exhaustive destructure (no `..`) — extends the compile guard to
+    // DeltaSchema: a new field breaks this until it is emitted.
+    let DeltaSchema { epsilon } = delta;
+    let mut t = Table::new();
+    t.insert("epsilon", value(epsilon.expect("epsilon")));
+    comment_key(
+        &mut t,
+        "epsilon",
+        field_doc::<DeltaSchema>("epsilon"),
+        false,
+    );
+    t.decor_mut().set_prefix(format!(
+        "\n{}",
+        doc_comment(field_doc::<ConfigSchema>("delta"))
+    ));
+    root.insert("delta", Item::Table(t));
+}
+
 /// Insert every field of a [`ViewPresetSchema`] into `table`, each with
 /// its `///` doc as a leading comment. Exhaustive (no `..`) so a new
 /// view-preset field fails to compile until it is emitted here.
@@ -1251,6 +1328,7 @@ fn exhaustive_example(meta: &AdapterMeta) -> ConfigSchema {
             title: Some("My Project CRAP Report".to_string()),
             subtitle: Some("coverage + complexity gate".to_string()),
         },
+        delta: DeltaSchema { epsilon: Some(0.5) },
     }
 }
 
@@ -1271,6 +1349,7 @@ pub fn all_schema_field_docs() -> Vec<(String, &'static str)> {
     let mut out = Vec::new();
     out.extend(docs::<ConfigSchema>("ConfigSchema"));
     out.extend(docs::<OutputSchema>("OutputSchema"));
+    out.extend(docs::<DeltaSchema>("DeltaSchema"));
     out.extend(docs::<OverrideSchema>("OverrideSchema"));
     out.extend(docs::<ViewPresetSchema>("ViewPresetSchema"));
     out.extend(docs::<LangSchema>("LangSchema"));
@@ -1335,6 +1414,55 @@ mod tests {
     fn parse_config_missing_coverage_policy_absent_is_none() {
         let config = parse_config("threshold = 10.0\n").unwrap();
         assert_eq!(config.missing_coverage_policy, None);
+    }
+
+    // ── [delta] epsilon (#277) ──
+
+    #[test]
+    fn parse_config_parses_delta_epsilon() {
+        let config = parse_config("[delta]\nepsilon = 0.5\n").unwrap();
+        assert_eq!(config.delta.epsilon, Some(0.5));
+    }
+
+    #[test]
+    fn parse_config_delta_epsilon_zero_is_valid() {
+        // 0.0 is the legitimate default (disables suppression) — unlike
+        // `threshold`, which must be strictly positive.
+        let config = parse_config("[delta]\nepsilon = 0.0\n").unwrap();
+        assert_eq!(config.delta.epsilon, Some(0.0));
+    }
+
+    #[test]
+    fn parse_config_delta_epsilon_absent_is_none() {
+        let config = parse_config("threshold = 10.0\n").unwrap();
+        assert_eq!(config.delta.epsilon, None);
+    }
+
+    #[test]
+    fn parse_config_returns_typed_invalid_epsilon_negative() {
+        let err = parse_config("[delta]\nepsilon = -0.1\n").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::InvalidEpsilon { value } if value == -0.1),
+            "expected InvalidEpsilon, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn parse_config_returns_typed_invalid_epsilon_nan() {
+        let err = parse_config("[delta]\nepsilon = nan\n").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::InvalidEpsilon { value } if value.is_nan()),
+            "expected InvalidEpsilon for NaN, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn parse_config_returns_typed_invalid_epsilon_infinity() {
+        let err = parse_config("[delta]\nepsilon = inf\n").unwrap_err();
+        assert!(
+            matches!(err, ConfigError::InvalidEpsilon { value } if value.is_infinite()),
+            "expected InvalidEpsilon for infinity, got: {err:?}"
+        );
     }
 
     #[test]

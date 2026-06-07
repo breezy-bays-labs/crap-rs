@@ -4,6 +4,10 @@
   "description": "The crap config schema — the documented wire shape of `crap.toml`.\n\nEvery field carries a `///` doc that is the single prose location for\nthat option; schemars renders each as the JSON Schema property\n`description`, and the same text surfaces on docs.rs. Deserializes\nwith `deny_unknown_fields` so a typo or a stale key fails loudly at\nload time rather than being silently ignored.",
   "type": "object",
   "properties": {
+    "delta": {
+      "description": "Delta-gate settings (`[delta]`): the threshold-border epsilon for\n`--delta-gate` jitter suppression.",
+      "$ref": "#/$defs/DeltaSchema"
+    },
     "exclude": {
       "description": "Glob patterns matched against project-relative file paths;\nmatching files are excluded from analysis.",
       "type": [
@@ -82,6 +86,21 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "DeltaSchema": {
+      "description": "Delta-gate settings (the `[delta]` table) on the wire type.",
+      "type": "object",
+      "properties": {
+        "epsilon": {
+          "description": "Threshold-border epsilon (absolute, unitless CRAP points) for the\n`--delta-gate`. A would-be new violation whose CRAP score crosses\nthe threshold but stays within `epsilon` of it — on BOTH the\nbaseline and current side — is treated as border jitter and not\ncounted. Default `0.0` disables suppression entirely. Must be\nfinite and non-negative. This is a threshold-border *jitter* knob,\nnot a \"noise-only\" guarantee: a genuinely-new in-band violation is\nsuppressed too. A CLI `--threshold-epsilon` flag wins over this.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
     "LangSchema": {
       "description": "A per-language override section (a `[language.<name>]` block) on the\nwire type. May assert any subset of the shared per-language knobs.",
       "type": "object",

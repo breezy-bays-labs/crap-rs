@@ -468,3 +468,145 @@ fn relocated_function_is_renamed_and_adds_no_new_violation() {
         "renamed carries the baseline (pre-move) location: {renamed}"
     );
 }
+
+// ── Threshold-border epsilon (#277) ─────────────────────────────────
+
+/// A complexity-4 function. Fully covered it scores CRAP `4.0`; fully
+/// uncovered it scores `4² + 4 = 20.0`. Reused byte-identically between
+/// baseline and current so the only thing that moves is coverage —
+/// driving the CRAP score across a chosen threshold.
+const CLASSIFY_FN: &str = "\
+pub fn classify(x: i32) -> i32 {
+    if x > 0 {
+        if x > 5 { 1 } else { 2 }
+    } else {
+        3
+    }
+}
+";
+
+/// LCOV for [`CLASSIFY_FN`] with every line marked covered (`hits = 1`)
+/// or uncovered (`hits = 0`), so the same source scores `4.0` or `20.0`.
+fn classify_lcov(file: &str, hits: u32) -> String {
+    let mut s = format!("SF:{file}\n");
+    for line in 1..=7 {
+        s.push_str(&format!("DA:{line},{hits}\n"));
+    }
+    s.push_str("end_of_record\n");
+    s
+}
+
+/// End-to-end: a function whose CRAP oscillates across the threshold
+/// (4.0 → 20.0 at threshold 12, both within ±10) is treated as
+/// threshold-border jitter — it does NOT register as a new violation, so
+/// the delta gate (`delta.summary.passed`) stays green and the suppressed
+/// count surfaces it. We assert the delta summary (not the process exit
+/// code): a real crossing means the current run IS over threshold, so the
+/// independent whole-project analysis gate fails regardless — exactly why
+/// the #274 relocation test also reads the summary under `--no-fail`.
+#[test]
+fn border_jitter_crossing_within_epsilon_is_suppressed() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    write_single_fn_file(
+        tmp.path(),
+        "lib.rs",
+        CLASSIFY_FN,
+        &classify_lcov("lib.rs", 1),
+    );
+    let baseline = capture_baseline(tmp.path(), "12");
+
+    // Current: same source, now fully uncovered → CRAP jumps 4.0 → 20.0,
+    // crossing threshold 12. With epsilon 10 both readings (4 and 20) sit
+    // within ±10 of 12, so the crossing is suppressed.
+    write_single_fn_file(
+        tmp.path(),
+        "lib.rs",
+        CLASSIFY_FN,
+        &classify_lcov("lib.rs", 0),
+    );
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "12",
+            "--threshold-epsilon",
+            "10",
+            "--baseline",
+            baseline.to_str().unwrap(),
+            "--delta-gate",
+            "--format",
+            "json",
+            "--no-fail",
+        ],
+    );
+    let body = stdout_str(&output);
+    let v: serde_json::Value = serde_json::from_str(&body)
+        .unwrap_or_else(|e| panic!("stdout not valid JSON: {e}\nraw:\n{body}"));
+    let summary = &v["delta"]["summary"];
+    assert_eq!(
+        summary["new_violations"].as_u64(),
+        Some(0),
+        "border-jitter crossing must not count as a new violation: {summary}"
+    );
+    assert_eq!(
+        summary["border_jitter_suppressed"].as_u64(),
+        Some(1),
+        "the suppressed crossing must be surfaced: {summary}"
+    );
+    assert_eq!(
+        summary["passed"], true,
+        "delta gate stays green when the only crossing is border jitter: {summary}"
+    );
+}
+
+/// Negative control: the identical 4.0 → 20.0 crossing with no epsilon
+/// (default 0.0) is a genuine new violation — the delta gate goes red.
+#[test]
+fn threshold_crossing_outside_epsilon_still_counts() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    write_single_fn_file(
+        tmp.path(),
+        "lib.rs",
+        CLASSIFY_FN,
+        &classify_lcov("lib.rs", 1),
+    );
+    let baseline = capture_baseline(tmp.path(), "12");
+
+    write_single_fn_file(
+        tmp.path(),
+        "lib.rs",
+        CLASSIFY_FN,
+        &classify_lcov("lib.rs", 0),
+    );
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "12",
+            "--baseline",
+            baseline.to_str().unwrap(),
+            "--delta-gate",
+            "--format",
+            "json",
+            "--no-fail",
+        ],
+    );
+    let body = stdout_str(&output);
+    let v: serde_json::Value = serde_json::from_str(&body)
+        .unwrap_or_else(|e| panic!("stdout not valid JSON: {e}\nraw:\n{body}"));
+    let summary = &v["delta"]["summary"];
+    assert_eq!(
+        summary["new_violations"].as_u64(),
+        Some(1),
+        "a real crossing with no epsilon is a new violation: {summary}"
+    );
+    assert_eq!(
+        summary["border_jitter_suppressed"].as_u64(),
+        Some(0),
+        "nothing is suppressed at epsilon 0: {summary}"
+    );
+    assert_eq!(
+        summary["passed"], false,
+        "delta gate is red on a genuine new violation: {summary}"
+    );
+}

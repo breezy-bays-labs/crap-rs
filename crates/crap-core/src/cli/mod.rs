@@ -135,6 +135,22 @@ fn parse_format_spec(s: &str) -> Result<FormatSpec, String> {
     s.parse()
 }
 
+/// clap `value_parser` for `--threshold-epsilon`: parse an `f64` and
+/// reject NaN / infinity / negatives at the CLI boundary so they never
+/// reach the delta math (where `x.abs() < NaN` would silently disable
+/// suppression and a negative would define an empty band). Mirrors the
+/// `[delta] epsilon` config validation (`config::is_valid_epsilon`).
+fn parse_threshold_epsilon(s: &str) -> Result<f64, String> {
+    let value: f64 = s.parse().map_err(|_| format!("not a number: {s}"))?;
+    if config::is_valid_epsilon(value) {
+        Ok(value)
+    } else {
+        Err(format!(
+            "threshold-epsilon must be a finite non-negative number, got: {value}"
+        ))
+    }
+}
+
 /// Sort key for the displayed view.
 ///
 /// CLI-side wrapper that keeps `clap::ValueEnum` out of the domain.
@@ -433,6 +449,33 @@ pub struct OutputArgs {
     /// overrides BOTH gates).
     #[arg(long, requires = "baseline")]
     pub delta_gate: bool,
+
+    /// Threshold-border epsilon for `--baseline` delta jitter suppression.
+    ///
+    /// Absolute, unitless CRAP points. A would-be new violation whose
+    /// CRAP score crosses the threshold but stays within `epsilon` of it
+    /// — on BOTH the baseline and current side — is treated as border
+    /// jitter and not counted (surfaced as
+    /// `delta.summary.border_jitter_suppressed`). Default `0.0` disables
+    /// suppression entirely. Must be finite and non-negative.
+    ///
+    /// This is a threshold-border *jitter* knob, not a "noise-only"
+    /// guarantee: a genuinely-new function that lands in the band is
+    /// suppressed too (for `Added` rows there is only the current
+    /// reading, so an in-band new function is a soft threshold bypass).
+    /// Only meaningful with `--baseline`. Configurable per project via
+    /// `[delta] epsilon`; this flag wins when both are set.
+    // allow_hyphen_values: lets clap pass a negative like `-0.5` to the
+    // parser so it returns the actionable range error instead of clap's
+    // generic "unexpected argument" (mirrors `--threshold`).
+    #[arg(
+        long,
+        value_name = "EPS",
+        requires = "baseline",
+        allow_hyphen_values = true,
+        value_parser = parse_threshold_epsilon
+    )]
+    pub threshold_epsilon: Option<f64>,
 
     /// Omit the denormalized `view.shown` row array from JSON output.
     ///
@@ -1158,6 +1201,13 @@ struct EffectiveInputs {
     /// Configured scorecard subtitle from `[output] subtitle`. `None`
     /// emits no subtitle line. Threaded alongside `title`.
     subtitle: Option<String>,
+    /// Resolved threshold-border epsilon for the `--baseline` delta gate
+    /// (crap-rs#277). CLI `--threshold-epsilon` wins over `[delta]
+    /// epsilon`; defaults to `0.0` (suppression disabled — byte-identical
+    /// to the pre-epsilon behavior). Threaded into `load_delta_state` →
+    /// `delta::compute_with_epsilon`. Validated finite / non-negative at
+    /// both boundaries before it reaches here.
+    threshold_epsilon: f64,
 }
 
 /// In-flight pipeline state assembled by `prepare_pipeline`. Owns the
@@ -1237,6 +1287,15 @@ fn merge_effective_inputs(
     // means the reporters render the unlabeled header.
     let title = file_config.as_ref().and_then(|c| c.output.title.clone());
     let subtitle = file_config.as_ref().and_then(|c| c.output.subtitle.clone());
+    // Threshold-border epsilon (crap-rs#277): CLI flag wins over the
+    // `[delta] epsilon` config key, then `0.0` (suppression off). Both
+    // sources are validated finite / non-negative before reaching here,
+    // so the unwrap to a plain `f64` carries an always-valid value.
+    let threshold_epsilon = cli
+        .output
+        .threshold_epsilon
+        .or_else(|| file_config.as_ref().and_then(|c| c.delta.epsilon))
+        .unwrap_or(0.0);
     EffectiveInputs {
         src,
         metric,
@@ -1247,6 +1306,7 @@ fn merge_effective_inputs(
         annotation_limit,
         title,
         subtitle,
+        threshold_epsilon,
     }
 }
 
@@ -1528,7 +1588,12 @@ where
     // envelope and compute the AnalysisDelta. None when --baseline is
     // absent — the JSON envelope omits the `delta` block entirely so
     // existing consumers see byte-identical output.
-    let delta_state = load_delta_state(cli, &analysis.result, options.missing_coverage_policy)?;
+    let delta_state = load_delta_state(
+        cli,
+        &analysis.result,
+        options.missing_coverage_policy,
+        inputs.threshold_epsilon,
+    )?;
 
     Ok(PipelinePrep {
         inputs,
@@ -1758,6 +1823,7 @@ fn load_delta_state<P: ParseDiagnostic>(
     cli: &Cli,
     current: &crate::domain::types::AnalysisResult,
     current_policy: MissingCoveragePolicy,
+    epsilon: f64,
 ) -> Result<Option<DeltaState<P>>> {
     let Some(path) = cli.input.baseline.as_ref() else {
         return Ok(None);
@@ -1766,9 +1832,12 @@ fn load_delta_state<P: ParseDiagnostic>(
     if let Some(msg) = policy_mismatch_warning(snapshot.missing_coverage_policy, current_policy) {
         eprintln!("{msg}");
     }
-    // delta::compute consumes both — we own snapshot.result, clone the
-    // current analysis so the surrounding pipeline keeps its handle.
-    let delta = delta::compute(snapshot.result.clone(), current.clone());
+    // compute_with_epsilon consumes both — we own snapshot.result, clone
+    // the current analysis so the surrounding pipeline keeps its handle.
+    // The bare `delta::compute` would silently run at epsilon 0.0; the
+    // production path always threads the resolved border-band epsilon
+    // (crap-rs#277). `epsilon == 0.0` is byte-identical to the old call.
+    let delta = delta::compute_with_epsilon(snapshot.result.clone(), current.clone(), epsilon);
     Ok(Some(DeltaState { snapshot, delta }))
 }
 
@@ -3494,6 +3563,7 @@ mod tests {
             annotation_limit: 10,
             title: None,
             subtitle: None,
+            threshold_epsilon: 0.0,
         }
     }
 
@@ -3673,6 +3743,76 @@ mod tests {
             inputs.missing_coverage_policy,
             MissingCoveragePolicy::Skip
         ));
+    }
+
+    // ── threshold-border epsilon resolution (#277) ──
+
+    #[test]
+    fn merge_effective_inputs_default_threshold_epsilon_is_zero() {
+        // No CLI flag, no config key → 0.0 (suppression disabled,
+        // byte-identical to the pre-epsilon delta gate).
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let inputs = merge_effective_inputs(&cli, &None, &fake_meta());
+        assert_eq!(inputs.threshold_epsilon, 0.0);
+    }
+
+    #[test]
+    fn merge_effective_inputs_config_sets_threshold_epsilon() {
+        let cli = parse(&["--coverage", "lcov.info"]).unwrap();
+        let file_config = Some(FileConfig {
+            delta: crate::domain::config::DeltaConfig { epsilon: Some(0.5) },
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
+        assert_eq!(inputs.threshold_epsilon, 0.5);
+    }
+
+    #[test]
+    fn merge_effective_inputs_cli_threshold_epsilon_overrides_config() {
+        // CLI flag wins over `[delta] epsilon` (cascade CLI > config > 0.0).
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--baseline",
+            "base.json",
+            "--threshold-epsilon",
+            "1.0",
+        ])
+        .unwrap();
+        let file_config = Some(FileConfig {
+            delta: crate::domain::config::DeltaConfig { epsilon: Some(0.5) },
+            ..FileConfig::default()
+        });
+        let inputs = merge_effective_inputs(&cli, &file_config, &fake_meta());
+        assert_eq!(inputs.threshold_epsilon, 1.0);
+    }
+
+    #[test]
+    fn threshold_epsilon_flag_requires_baseline() {
+        // clap `requires = "baseline"` — the flag alone is a parse error,
+        // surfacing the misuse rather than silently ignoring epsilon.
+        let result = parse(&["--coverage", "lcov.info", "--threshold-epsilon", "0.5"]);
+        assert!(
+            result.is_err(),
+            "expected --threshold-epsilon to require --baseline"
+        );
+    }
+
+    #[test]
+    fn parse_threshold_epsilon_accepts_finite_nonnegative() {
+        assert_eq!(parse_threshold_epsilon("0").unwrap(), 0.0);
+        assert_eq!(parse_threshold_epsilon("0.5").unwrap(), 0.5);
+        assert_eq!(parse_threshold_epsilon("25").unwrap(), 25.0);
+    }
+
+    #[test]
+    fn parse_threshold_epsilon_rejects_nonfinite_and_negative() {
+        // NaN / inf / negative reach the parser (allow_hyphen_values), and
+        // it rejects them before they could disable the gate silently.
+        assert!(parse_threshold_epsilon("-0.5").is_err());
+        assert!(parse_threshold_epsilon("nan").is_err());
+        assert!(parse_threshold_epsilon("inf").is_err());
+        assert!(parse_threshold_epsilon("notanumber").is_err());
     }
 
     #[test]

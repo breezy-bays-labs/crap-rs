@@ -294,6 +294,15 @@ struct DeltaPanelSummary {
     regressions: u32,
     improvements: u32,
     new_violations: u32,
+    /// Would-be new violations suppressed by the threshold-border epsilon
+    /// (crap-rs#277).
+    border_jitter_suppressed: u32,
+    /// Whether to render the border-jitter line at all: true when the
+    /// epsilon band was active (`view.full.epsilon > 0`) OR a non-zero
+    /// count survived a wire-sourced re-render where epsilon was not
+    /// persisted. False on the common epsilon-off path, so the default
+    /// report is unchanged.
+    show_border_jitter: bool,
 }
 
 struct DeltaKpi {
@@ -977,6 +986,9 @@ struct CombinedDeltaPanelSummary {
     regressions: u32,
     improvements: u32,
     new_violations: u32,
+    /// Cross-adapter sum of per-language `border_jitter_suppressed`
+    /// (crap-rs#277). Rendered only when `> 0`.
+    border_jitter_suppressed: u32,
 }
 
 /// One row of the Combined Delta ranked table — same shape as
@@ -1224,6 +1236,7 @@ fn build_combined_delta_panel(cd: crate::domain::multi_lang::CombinedDelta) -> C
         regressions: cd.summary.regressions,
         improvements: cd.summary.improvements,
         new_violations: cd.summary.new_violations,
+        border_jitter_suppressed: cd.summary.border_jitter_suppressed,
     };
 
     let (verdict_class, verdict_label, verdict_glyph) = if cd.summary.passed {
@@ -1405,6 +1418,8 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
         regressions: summary.regressions,
         improvements: summary.improvements,
         new_violations: summary.new_violations,
+        border_jitter_suppressed: summary.border_jitter_suppressed,
+        show_border_jitter: view.full.epsilon > 0.0 || summary.border_jitter_suppressed > 0,
     };
 
     let (verdict_class, verdict_label, verdict_glyph) = if summary.passed {

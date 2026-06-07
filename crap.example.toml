@@ -99,3 +99,16 @@ annotation_limit = 10
 title = "My Project CRAP Report"
 # Scorecard subtitle, rendered beneath the title.
 subtitle = "coverage + complexity gate"
+
+# Delta-gate settings (`[delta]`): the threshold-border epsilon for
+# `--delta-gate` jitter suppression.
+[delta]
+# Threshold-border epsilon (absolute, unitless CRAP points) for the
+# `--delta-gate`. A would-be new violation whose CRAP score crosses
+# the threshold but stays within `epsilon` of it — on BOTH the
+# baseline and current side — is treated as border jitter and not
+# counted. Default `0.0` disables suppression entirely. Must be
+# finite and non-negative. This is a threshold-border *jitter* knob,
+# not a "noise-only" guarantee: a genuinely-new in-band violation is
+# suppressed too. A CLI `--threshold-epsilon` flag wins over this.
+epsilon = 0.5

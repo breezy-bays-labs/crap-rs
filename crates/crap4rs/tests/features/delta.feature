@@ -171,6 +171,60 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     And `delta.summary.new_violations` is `0`
     # Pre-existing debt isn't this PR's regression
 
+  # ── Domain: threshold-border epsilon (#277) ────────────────────────
+  # epsilon is an absolute, unitless CRAP-point border-band half-width.
+  # It only ever MOVES a would-be new violation into
+  # `border_jitter_suppressed`; it never adds one. Honest limitation: a
+  # genuinely-new in-band violation is suppressed too.
+
+  @unwired
+  Scenario: A threshold crossing within epsilon on both sides is suppressed
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
+    Given threshold is 12
+    And threshold-epsilon is 10
+    And baseline contains `noise::flaky` with score 4 (passing)
+    And current contains `noise::flaky` with score 20 (failing)
+    When the delta is computed
+    Then `delta.summary.new_violations` is `0`
+    And `delta.summary.border_jitter_suppressed` is `1`
+    And `delta.summary.passed` is `true`
+
+  @unwired
+  Scenario: A crossing with only one side inside the band still counts
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
+    Given threshold is 12
+    And threshold-epsilon is 5
+    And baseline contains `real::regress` with score 4 (passing, far below the band)
+    And current contains `real::regress` with score 14 (failing, inside the band)
+    When the delta is computed
+    Then `delta.summary.new_violations` is `1`
+    And `delta.summary.border_jitter_suppressed` is `0`
+
+  @unwired
+  Scenario: An Added function inside the band is suppressed (one-sided soft bypass)
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
+    # Added has only the current reading — there is no prior state to
+    # "jitter" from, so an in-band new function is a documented soft
+    # threshold bypass, not oscillation suppression.
+    Given threshold is 12
+    And threshold-epsilon is 5
+    And baseline does not contain `fresh::borderline`
+    And current contains `fresh::borderline` with score 13 (failing, inside the band)
+    When the delta is computed
+    Then `delta.summary.new_violations` is `0`
+    And `delta.summary.border_jitter_suppressed` is `1`
+
+  @unwired
+  Scenario: The default epsilon of 0 suppresses nothing
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
+    Given threshold is 12
+    And threshold-epsilon is not set
+    And baseline contains `noise::flaky` with score 4 (passing)
+    And current contains `noise::flaky` with score 20 (failing)
+    When the delta is computed
+    Then `delta.summary.new_violations` is `1`
+    And `delta.summary.border_jitter_suppressed` is `0`
+
   # ── DeltaViewSpec: filter, sort, truncate ──────────────────────────
 
   @unwired

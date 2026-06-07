@@ -76,6 +76,25 @@ pub struct FileConfig {
     /// rather than polluting the top-level table. Missing `[output]`
     /// blocks deserialize to `OutputConfig::default()`.
     pub output: OutputConfig,
+    /// Delta-gate settings under `[delta]`.
+    ///
+    /// `--baseline` / `--delta-gate` knobs (the threshold-border
+    /// `epsilon`) live here so they share a single TOML namespace and a
+    /// future family of delta-gate options stays grouped. Missing
+    /// `[delta]` blocks deserialize to `DeltaConfig::default()`.
+    pub delta: DeltaConfig,
+}
+
+/// Delta-gate settings (TOML `[delta]` table).
+///
+/// All fields are optional — missing fields mean "use CLI default."
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DeltaConfig {
+    /// Threshold-border epsilon (absolute, unitless CRAP points). `None`
+    /// defers to the CLI default (`0.0` — suppression disabled); a CLI
+    /// `--threshold-epsilon` flag always wins over this value when both
+    /// are set.
+    pub epsilon: Option<f64>,
 }
 
 /// Reporter-level output settings (TOML `[output]` table).
