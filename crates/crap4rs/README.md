@@ -176,6 +176,25 @@ A function that is **moved to another file, renamed, or moved between modules** 
 
 The match is conservative: a function is paired across the move only when the match is unambiguous — the same name *and* the same structure, or (for a rename) a distinctive structure with exactly one candidate on each side. Ambiguous or trivial functions stay `added` + `removed`. Enabling rename detection can only ever *lower* the new-violation count, never raise it, so it can never newly fail a PR the old behavior would have passed — that is the migration-friendly guarantee. The honest limitation: because matching works from the analysis output rather than source text, a genuinely-unrelated function whose structure happens to exactly match a removed one (and is its only structural twin) is indistinguishable from a real rename and will pair — which can lower the count below the true figure. The guards make that rare, but it is not impossible. The `renamed` count appears in every delta report (table, markdown, JSON, CSV, HTML), and the JSON envelope's `delta` block carries both the baseline and current sides of each `renamed` row for the full from → to audit trail.
 
+### Threshold-border jitter suppression (opt-in)
+
+A function whose CRAP score sits right on the threshold line can flip across it on pure measurement noise — coverage rounding, or surrounding-code edits shifting per-line attribution. Set a **threshold-border epsilon** to stop that jitter from tripping the delta gate:
+
+```bash
+crap4rs --coverage pr-lcov.info --baseline baseline.json --delta-gate --threshold-epsilon 0.5
+```
+
+or in `crap.toml`:
+
+```toml
+[delta]
+epsilon = 0.5
+```
+
+`epsilon` is an **absolute, unitless CRAP-point** band half-width (not a percentage of the threshold — so the same value is a tighter *relative* band at threshold 25 than at 8). A would-be new violation whose transition stays within `epsilon` of the threshold — on **both** the baseline and current side — is treated as border jitter and not counted; the count of what was suppressed surfaces as `border_jitter_suppressed` in the delta summary (JSON always; table/markdown/HTML when non-zero). The default `0.0` disables suppression entirely, so output is byte-identical to a run without the flag.
+
+This is deliberately **narrow** — it tolerates oscillation *across the threshold line*, not delta magnitude or coverage flakiness in general. And it is a *jitter* knob, **not** a "noise-only" guarantee: like rename detection it can only ever lower the new-violation count, so a genuinely-new function that happens to land inside the band is suppressed too. For an `Added` row there is only the current reading — no prior state to jitter from — so an in-band new function is a one-sided *soft threshold bypass*. Keep `epsilon` small.
+
 ## Library use
 
 ```toml

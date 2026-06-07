@@ -172,6 +172,17 @@ A function above-threshold on main doesn't fail the PR; only functions newly int
 
 A function that is **moved to another file, renamed, or moved between modules** — body otherwise unchanged — is recognized as a single `renamed` change rather than an unrelated `removed` + `added` pair, so a pure relocation contributes **zero new violations** and large migrations sail through the delta gate. A relocation that *also* worsens the score still counts. The matching is conservative (the same name *and* structure, or a distinctive structure with exactly one candidate per side). Enabling rename detection can only *lower* the new-violation count, never raise it (it never newly fails a PR) — but, since matching works from analysis output rather than source text, a genuinely-unrelated function whose structure coincidentally matches a removed one can pair and thereby lower the count below the true figure; the guards make that rare, not impossible. This is the same `crap-core` delta engine `crap4rs` uses, so the behavior — and the `renamed` count in every report format — is identical across both adapters.
 
+### Threshold-border jitter suppression (opt-in)
+
+A function whose CRAP score sits on the threshold line can flip across it on measurement noise. Set a **threshold-border epsilon** to stop that jitter from tripping the delta gate, via `--threshold-epsilon 0.5` or a `crap.toml` (or legacy `crap4ts.toml`) `[delta]` table:
+
+```toml
+[delta]
+epsilon = 0.5
+```
+
+`epsilon` is an **absolute, unitless CRAP-point** band half-width. A would-be new violation whose transition stays within `epsilon` of the threshold — on **both** sides — is treated as border jitter and not counted; what was suppressed surfaces as `border_jitter_suppressed` in the delta summary. The default `0.0` disables it (byte-identical output). It is deliberately narrow (oscillation across the line, not delta magnitude) and is a *jitter* knob, **not** a noise-only guarantee: like rename detection it only lowers the count, so a genuinely-new in-band violation is suppressed too (an in-band `Added` row is a one-sided soft threshold bypass). Same `crap-core` engine as `crap4rs` — identical behavior across both adapters. Keep `epsilon` small.
+
 ## What this is (architecture)
 
 `crap4ts` is the TypeScript / JavaScript adapter in the [`crap-rs`](https://github.com/breezy-bays-labs/crap-rs) workspace. It compiles to two artifacts from one crate:
