@@ -26,7 +26,7 @@ expression: out
 ## CRAP Scorecard
 
 - **Delta status:** FAIL
-- **Changes:** +1 added, 1 removed, 2 modified
+- **Changes:** +1 added, 1 removed, 2 modified, 0 renamed
 - **Regressions:** 1 · **Improvements:** 0 · **New violations:** 1
 
 ### Regressions

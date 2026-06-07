@@ -152,7 +152,7 @@ fn format_html_inner(
     let current_tab_count = if is_empty { 0 } else { summary.total_functions };
     let delta_tab_count = delta_panel
         .as_ref()
-        .map(|p| p.summary.added + p.summary.removed + p.summary.modified)
+        .map(|p| p.summary.added + p.summary.removed + p.summary.modified + p.summary.renamed)
         .unwrap_or(0);
     let delta_has_news = delta_panel
         .as_ref()
@@ -290,6 +290,7 @@ struct DeltaPanelSummary {
     added: u32,
     removed: u32,
     modified: u32,
+    renamed: u32,
     regressions: u32,
     improvements: u32,
     new_violations: u32,
@@ -972,6 +973,7 @@ struct CombinedDeltaPanelSummary {
     added: u32,
     removed: u32,
     modified: u32,
+    renamed: u32,
     regressions: u32,
     improvements: u32,
     new_violations: u32,
@@ -1124,7 +1126,9 @@ fn build_language_panels(
             let current_tab_count = if is_empty { 0 } else { summary.total_functions };
             let delta_tab_count = delta_panel
                 .as_ref()
-                .map(|p| p.summary.added + p.summary.removed + p.summary.modified)
+                .map(|p| {
+                    p.summary.added + p.summary.removed + p.summary.modified + p.summary.renamed
+                })
                 .unwrap_or(0);
             let delta_has_news = delta_panel
                 .as_ref()
@@ -1216,6 +1220,7 @@ fn build_combined_delta_panel(cd: crate::domain::multi_lang::CombinedDelta) -> C
         added: cd.summary.added,
         removed: cd.summary.removed,
         modified: cd.summary.modified,
+        renamed: cd.summary.renamed,
         regressions: cd.summary.regressions,
         improvements: cd.summary.improvements,
         new_violations: cd.summary.new_violations,
@@ -1329,7 +1334,13 @@ fn partition_delta_rows(shown: &[&FunctionChange]) -> DeltaRowBuckets {
                 buckets.new_functions.push(added_row(current));
             }
             FunctionChange::Removed { .. } => {}
-            FunctionChange::Modified { baseline, current } => {
+            // A relocated function is the same function under a new
+            // identity, so a relocation that changed the score routes
+            // by delta sign exactly like `Modified`; a pure relocation
+            // (zero delta) lands in neither bucket and rides the
+            // summary's `renamed` count.
+            FunctionChange::Modified { baseline, current }
+            | FunctionChange::Renamed { baseline, current } => {
                 push_modified_row(&mut buckets, baseline, current);
             }
         }
@@ -1390,6 +1401,7 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
         added: summary.added,
         removed: summary.removed,
         modified: summary.modified,
+        renamed: summary.renamed,
         regressions: summary.regressions,
         improvements: summary.improvements,
         new_violations: summary.new_violations,
@@ -1495,8 +1507,8 @@ fn build_delta_kpis(
         direction: direction_f64(avg_delta),
         is_regression: avg_delta > 0.005,
         note: format!(
-            "{} added · {} removed · {} modified",
-            summary.added, summary.removed, summary.modified
+            "{} added · {} removed · {} modified · {} renamed",
+            summary.added, summary.removed, summary.modified, summary.renamed
         ),
     };
 

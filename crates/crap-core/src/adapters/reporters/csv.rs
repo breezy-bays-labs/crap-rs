@@ -71,7 +71,9 @@ fn row_for_change(change: &FunctionChange, metric: ComplexityMetric) -> String {
     // wildcard arm needed. v1.0 new variants will require explicit
     // arms here.
     let baseline_cells = match change {
-        FunctionChange::Removed { baseline } | FunctionChange::Modified { baseline, .. } => {
+        FunctionChange::Removed { baseline }
+        | FunctionChange::Modified { baseline, .. }
+        | FunctionChange::Renamed { baseline, .. } => {
             let s = &baseline.scored;
             format!(
                 "{},{:.1},{:.2}",
@@ -81,7 +83,9 @@ fn row_for_change(change: &FunctionChange, metric: ComplexityMetric) -> String {
         FunctionChange::Added { .. } => ",,".to_string(),
     };
     let current_cells = match change {
-        FunctionChange::Added { current } | FunctionChange::Modified { current, .. } => {
+        FunctionChange::Added { current }
+        | FunctionChange::Modified { current, .. }
+        | FunctionChange::Renamed { current, .. } => {
             let s = &current.scored;
             format!(
                 "{},{:.1},{:.2}",

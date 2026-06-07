@@ -1835,7 +1835,7 @@ footer.report-footer {
         REGRESSED
       </span>
       <span class="meta">
-        1 added · 1 removed · 2 modified ·
+        1 added · 1 removed · 2 modified · 0 renamed ·
         1 regression ·
         0 improvements ·
         1 new violation
@@ -1889,7 +1889,7 @@ footer.report-footer {
       </span>
       
       
-      <span class="delta-kpi-foot">1 added · 1 removed · 2 modified</span>
+      <span class="delta-kpi-foot">1 added · 1 removed · 2 modified · 0 renamed</span>
       
     </div>
     

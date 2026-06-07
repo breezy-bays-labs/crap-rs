@@ -413,10 +413,11 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
     out.push_str("## CRAP Scorecard\n\n");
     out.push_str(&format!("- **Delta status:** {status}\n"));
     out.push_str(&format!(
-        "- **Changes:** +{added} added, {removed} removed, {modified} modified\n",
+        "- **Changes:** +{added} added, {removed} removed, {modified} modified, {renamed} renamed\n",
         added = summary.added,
         removed = summary.removed,
         modified = summary.modified,
+        renamed = summary.renamed,
     ));
     out.push_str(&format!(
         "- **Regressions:** {regressions} · **Improvements:** {improvements} · **New violations:** {new_violations}\n",
@@ -439,17 +440,23 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
 /// 2-decimal rounded, so this gate rarely fires in practice — but float
 /// arithmetic can produce sub-0.005 noise on identity comparisons.)
 fn is_md_regression(change: &FunctionChange) -> bool {
-    matches!(change, FunctionChange::Modified { .. })
-        && change.score_delta().unwrap_or(0.0) >= 0.005
+    matches!(
+        change,
+        FunctionChange::Modified { .. } | FunctionChange::Renamed { .. }
+    ) && change.score_delta().unwrap_or(0.0) >= 0.005
 }
 
 /// True when a change first crosses the threshold in the current run —
-/// a newly-added violator or an existing function that just broke the
-/// gate. Removed functions never count.
+/// a newly-added violator, or an existing/relocated function that just
+/// broke the gate. Removed functions never count; a relocated function
+/// counts on the same rule as `Modified` (a pure relocation has matching
+/// `exceeds` on both sides, so only a relocation that *also* crossed
+/// counts).
 fn is_new_violation(change: &FunctionChange) -> bool {
     match change {
         FunctionChange::Added { current } => current.exceeds,
-        FunctionChange::Modified { baseline, current } => !baseline.exceeds && current.exceeds,
+        FunctionChange::Modified { baseline, current }
+        | FunctionChange::Renamed { baseline, current } => !baseline.exceeds && current.exceeds,
         FunctionChange::Removed { .. } => false,
     }
 }

@@ -594,7 +594,7 @@ footer.report-footer {
         {{ panel.verdict_label }}
       </span>
       <span class="meta">
-        {{ panel.summary.added }} added · {{ panel.summary.removed }} removed · {{ panel.summary.modified }} modified ·
+        {{ panel.summary.added }} added · {{ panel.summary.removed }} removed · {{ panel.summary.modified }} modified · {{ panel.summary.renamed }} renamed ·
         {{ panel.summary.regressions }} {% if panel.summary.regressions == 1 %}regression{% else %}regressions{% endif %} ·
         {{ panel.summary.improvements }} {% if panel.summary.improvements == 1 %}improvement{% else %}improvements{% endif %} ·
         {{ panel.summary.new_violations }} new {% if panel.summary.new_violations == 1 %}violation{% else %}violations{% endif %}

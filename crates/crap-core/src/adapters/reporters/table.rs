@@ -273,10 +273,11 @@ fn append_delta_block(output: &mut String, view: &DeltaView<'_>) {
     let summary = view.full.summary;
     output.push_str("\nDelta vs baseline:\n");
     output.push_str(&format!(
-        "  +{added} added, {removed} removed, {modified} modified · {regressions} regressions, {improvements} improvements, {new_violations} new violations\n",
+        "  +{added} added, {removed} removed, {modified} modified, {renamed} renamed · {regressions} regressions, {improvements} improvements, {new_violations} new violations\n",
         added = summary.added,
         removed = summary.removed,
         modified = summary.modified,
+        renamed = summary.renamed,
         regressions = summary.regressions,
         improvements = summary.improvements,
         new_violations = summary.new_violations,
