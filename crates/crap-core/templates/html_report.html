@@ -598,6 +598,7 @@ footer.report-footer {
         {{ panel.summary.regressions }} {% if panel.summary.regressions == 1 %}regression{% else %}regressions{% endif %} ·
         {{ panel.summary.improvements }} {% if panel.summary.improvements == 1 %}improvement{% else %}improvements{% endif %} ·
         {{ panel.summary.new_violations }} new {% if panel.summary.new_violations == 1 %}violation{% else %}violations{% endif %}
+        {%- if panel.summary.border_jitter_suppressed > 0 %} · {{ panel.summary.border_jitter_suppressed }} border-jitter suppressed{% endif %}
       </span>
     </p>
   </section>

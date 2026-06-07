@@ -282,6 +282,14 @@ fn append_delta_block(output: &mut String, view: &DeltaView<'_>) {
         improvements = summary.improvements,
         new_violations = summary.new_violations,
     ));
+    // Surfaced only when the border-band epsilon actually suppressed a
+    // crossing — a zero count is noise on the common (epsilon-off) path.
+    if summary.border_jitter_suppressed > 0 {
+        output.push_str(&format!(
+            "  {n} border-jitter suppressed (threshold crossings within ±epsilon)\n",
+            n = summary.border_jitter_suppressed,
+        ));
+    }
 
     if view.shown.is_empty() {
         output.push_str("  (no changes to display)\n");

@@ -11,7 +11,7 @@
 //! specifiers; the template is composition-only.
 
 use crate::cli::AdapterMeta;
-use crate::domain::delta::{DeltaView, FunctionChange};
+use crate::domain::delta::{DeltaView, FunctionChange, change_is_new_violation};
 use crate::domain::types::{ComplexityMetric, FunctionVerdict};
 use crate::domain::view::AnalysisView;
 use askama::Template;
@@ -425,6 +425,14 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
         improvements = summary.improvements,
         new_violations = summary.new_violations,
     ));
+    // Surfaced only when the border-band epsilon actually suppressed
+    // something — a zero count is noise on the common (epsilon-off) path.
+    if summary.border_jitter_suppressed > 0 {
+        out.push_str(&format!(
+            "- **Border-jitter suppressed:** {n} (threshold crossings within ±epsilon, not counted as new violations)\n",
+            n = summary.border_jitter_suppressed,
+        ));
+    }
 
     push_regressions_table(&mut out, view);
     push_new_violations_table(&mut out, view);
@@ -444,21 +452,6 @@ fn is_md_regression(change: &FunctionChange) -> bool {
         change,
         FunctionChange::Modified { .. } | FunctionChange::Renamed { .. }
     ) && change.score_delta().unwrap_or(0.0) >= 0.005
-}
-
-/// True when a change first crosses the threshold in the current run —
-/// a newly-added violator, or an existing/relocated function that just
-/// broke the gate. Removed functions never count; a relocated function
-/// counts on the same rule as `Modified` (a pure relocation has matching
-/// `exceeds` on both sides, so only a relocation that *also* crossed
-/// counts).
-fn is_new_violation(change: &FunctionChange) -> bool {
-    match change {
-        FunctionChange::Added { current } => current.exceeds,
-        FunctionChange::Modified { baseline, current }
-        | FunctionChange::Renamed { baseline, current } => !baseline.exceeds && current.exceeds,
-        FunctionChange::Removed { .. } => false,
-    }
 }
 
 fn push_regressions_table(out: &mut String, view: &DeltaView<'_>) {
@@ -487,11 +480,16 @@ fn push_regressions_table(out: &mut String, view: &DeltaView<'_>) {
 }
 
 fn push_new_violations_table(out: &mut String, view: &DeltaView<'_>) {
+    // Route through the shared domain predicate with the run's effective
+    // epsilon (the same one the summary tally used) so this table can
+    // never disagree with `summary.new_violations` — a border-jitter
+    // suppressed crossing is absent from both.
+    let epsilon = view.full.epsilon;
     let new_violations: Vec<&FunctionChange> = view
         .shown
         .iter()
         .copied()
-        .filter(|c| is_new_violation(c))
+        .filter(|c| change_is_new_violation(c, epsilon))
         .collect();
     if new_violations.is_empty() {
         return;
@@ -948,6 +946,50 @@ mod tests {
         let out = md(&make_view_default(&result));
         assert!(!out.contains("CRAP Scorecard"));
         assert!(!out.contains("Delta status"));
+    }
+
+    #[test]
+    fn delta_scorecard_border_jitter_suppressed_is_consistent_with_summary() {
+        // A function oscillating across threshold 8.0 within epsilon 0.5
+        // (7.8 → 8.2) is suppressed. The summary must show 0 new
+        // violations + 1 border-jitter suppressed, AND the "New
+        // violations" table must be ABSENT — the table re-derives via the
+        // SAME shared predicate (with view.full.epsilon), so it cannot
+        // disagree with the count (#277, the tally-vs-reporter axis that
+        // bit #274).
+        let baseline =
+            make_single_function_result("f", "a.rs", 5, 50.0, 7.8, RiskLevel::Acceptable, 8.0);
+        let current =
+            make_single_function_result("f", "a.rs", 5, 48.0, 8.2, RiskLevel::Acceptable, 8.0);
+        let delta = crate::domain::delta::compute_with_epsilon(baseline, current, 0.5);
+        assert_eq!(delta.summary.new_violations, 0);
+        assert_eq!(delta.summary.border_jitter_suppressed, 1);
+        let dview = make_delta_view_default(&delta);
+        let out = format_markdown(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            8.0,
+            false,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+        assert!(
+            out.contains("**New violations:** 0"),
+            "summary must show 0 new violations:\n{out}"
+        );
+        assert!(
+            out.contains("Border-jitter suppressed:** 1"),
+            "summary must surface the suppressed count:\n{out}"
+        );
+        assert!(
+            !out.contains("### New violations"),
+            "a border-jitter suppressed crossing must NOT appear in the new-violations table:\n{out}"
+        );
     }
 
     #[test]
