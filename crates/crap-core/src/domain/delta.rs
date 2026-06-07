@@ -312,10 +312,10 @@ fn within_band(verdict: &FunctionVerdict, epsilon: f64) -> bool {
 /// epsilon 0.5 is forgiven. Stated here verbatim so no reader equates
 /// "jitter" with "oscillation" for the `Added` case.
 ///
-/// This is the single source of truth for the new-violation rule —
-/// [`tally`] (the count) and the markdown reporter's per-row new-violations
-/// table both route through it, so the summary count can never drift from
-/// the rendered table.
+/// This is the single source of truth for the new-violation rule — the
+/// summary tally (the count) and the markdown reporter's per-row
+/// new-violations table both route through it, so the summary count can
+/// never drift from the rendered table.
 pub fn change_is_new_violation(change: &FunctionChange, epsilon: f64) -> bool {
     match change {
         FunctionChange::Added { current } => current.exceeds && !within_band(current, epsilon),
