@@ -425,9 +425,12 @@ fn format_markdown_delta(view: &DeltaView<'_>) -> String {
         improvements = summary.improvements,
         new_violations = summary.new_violations,
     ));
-    // Surfaced only when the border-band epsilon actually suppressed
-    // something — a zero count is noise on the common (epsilon-off) path.
-    if summary.border_jitter_suppressed > 0 {
+    // Shown whenever the border-band epsilon is active, so an opt-in run
+    // always confirms the band (even "0 suppressed" reassures the operator
+    // nothing slipped through). The `|| > 0` fallback covers wire-sourced
+    // re-renders where the in-memory epsilon was not persisted but a
+    // non-zero count survived; the epsilon-off path (0 / 0) stays silent.
+    if view.full.epsilon > 0.0 || summary.border_jitter_suppressed > 0 {
         out.push_str(&format!(
             "- **Border-jitter suppressed:** {n} (threshold crossings within ±epsilon, not counted as new violations)\n",
             n = summary.border_jitter_suppressed,
@@ -989,6 +992,63 @@ mod tests {
         assert!(
             !out.contains("### New violations"),
             "a border-jitter suppressed crossing must NOT appear in the new-violations table:\n{out}"
+        );
+    }
+
+    #[test]
+    fn border_jitter_line_shown_at_zero_when_epsilon_is_set() {
+        // An opt-in epsilon run with NO crossing still surfaces the line
+        // (count 0) — confirming the band is active and nothing slipped
+        // through. A function that stays well under threshold on both
+        // sides: no crossing, nothing suppressed, but epsilon > 0.
+        let baseline = make_single_function_result("f", "a.rs", 5, 90.0, 4.0, RiskLevel::Low, 12.0);
+        let current = make_single_function_result("f", "a.rs", 5, 90.0, 4.0, RiskLevel::Low, 12.0);
+        let delta = crate::domain::delta::compute_with_epsilon(baseline, current, 0.5);
+        assert_eq!(delta.summary.border_jitter_suppressed, 0);
+        let dview = make_delta_view_default(&delta);
+        let out = format_markdown(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            12.0,
+            false,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+        assert!(
+            out.contains("Border-jitter suppressed:** 0"),
+            "an active epsilon run shows the line even at 0:\n{out}"
+        );
+    }
+
+    #[test]
+    fn border_jitter_line_absent_when_epsilon_off() {
+        // The common path: no epsilon, no suppression → no line (output
+        // byte-identical to the pre-#277 report).
+        let baseline = make_single_function_result("f", "a.rs", 5, 90.0, 4.0, RiskLevel::Low, 12.0);
+        let current = make_single_function_result("f", "a.rs", 5, 90.0, 4.0, RiskLevel::Low, 12.0);
+        let delta = crate::domain::delta::compute(baseline, current);
+        let dview = make_delta_view_default(&delta);
+        let out = format_markdown(
+            &make_view_default(&delta.current),
+            Some(&dview),
+            12.0,
+            false,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+        assert!(
+            !out.contains("Border-jitter suppressed"),
+            "epsilon-off reports must not mention border jitter:\n{out}"
         );
     }
 
