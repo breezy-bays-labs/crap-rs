@@ -284,10 +284,17 @@ fn tally_modified(
     baseline: &FunctionVerdict,
     current: &FunctionVerdict,
 ) {
+    // Use the same 0.005 cutoff the reporters apply when rendering
+    // regression / improvement rows (it matches the `{:.2}` display
+    // precision and absorbs float-subtraction noise on otherwise-equal
+    // 2-decimal CRAP scores). Counting on a bare `> 0.0` would let a
+    // sub-precision delta inflate `regressions` / `improvements` with a
+    // row that never actually renders — keeping the summary counts and
+    // the rendered tables in agreement.
     let delta = current.scored.crap.value - baseline.scored.crap.value;
-    if delta > 0.0 {
+    if delta >= 0.005 {
         summary.regressions += 1;
-    } else if delta < 0.0 {
+    } else if delta <= -0.005 {
         summary.improvements += 1;
     }
     if !baseline.exceeds && current.exceeds {
