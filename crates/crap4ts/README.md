@@ -168,6 +168,10 @@ crap4ts --coverage pr-coverage/coverage-final.json --src src --baseline baseline
 
 A function above-threshold on main doesn't fail the PR; only functions newly introduced or newly elevated do. Lets teams ratchet quality forward without blocking every PR on pre-existing debt.
 
+### Relocations don't count as new violations
+
+A function that is **moved to another file, renamed, or moved between modules** — body otherwise unchanged — is recognized as a single `renamed` change rather than an unrelated `removed` + `added` pair, so a pure relocation contributes **zero new violations** and large migrations sail through the delta gate. A relocation that *also* worsens the score still counts. The matching is conservative (a retained name, or a distinctive structural signature with exactly one candidate per side), so a relocation can never mask a genuine new violation. This is the same `crap-core` delta engine `crap4rs` uses, so the behavior — and the `renamed` count in every report format — is identical across both adapters.
+
 ## What this is (architecture)
 
 `crap4ts` is the TypeScript / JavaScript adapter in the [`crap-rs`](https://github.com/breezy-bays-labs/crap-rs) workspace. It compiles to two artifacts from one crate:

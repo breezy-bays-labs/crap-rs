@@ -170,6 +170,12 @@ crap4rs --coverage pr-lcov.info --baseline baseline.json --delta-gate
 
 A function above-threshold on main doesn't fail the PR; only functions newly introduced or newly elevated do. Lets teams ratchet quality forward without blocking every PR on pre-existing debt.
 
+### Relocations don't count as new violations
+
+A function that is **moved to another file, renamed, or moved between modules** — with its body otherwise unchanged — is recognized as a single `renamed` change rather than an unrelated `removed` + `added` pair. Because the relocated function carries its baseline score forward, a pure relocation contributes **zero new violations**, so large migrations and refactors sail through the delta gate even when the moved function was already over threshold. A relocation that *also* worsens the score (e.g. coverage drops as it moves) still counts — the relocation wasn't the only change.
+
+The match is conservative: a function is paired across the move only when the match is unambiguous (a retained name, or a distinctive structural signature with exactly one candidate on each side). Ambiguous or trivial functions stay `added` + `removed`, so a relocation can never mask a genuine new violation. The `renamed` count appears in every delta report (table, markdown, JSON, CSV, HTML), and the JSON envelope's `delta` block carries both the baseline and current sides of each `renamed` row for the full from → to audit trail.
+
 ## Library use
 
 ```toml
