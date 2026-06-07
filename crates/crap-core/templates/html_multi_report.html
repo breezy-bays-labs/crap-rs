@@ -360,7 +360,7 @@
           {{ cd.verdict_label }}
         </span>
         <span class="meta">
-          {{ cd.summary.added }} added · {{ cd.summary.removed }} removed · {{ cd.summary.modified }} modified ·
+          {{ cd.summary.added }} added · {{ cd.summary.removed }} removed · {{ cd.summary.modified }} modified · {{ cd.summary.renamed }} renamed ·
           {{ cd.summary.regressions }} {% if cd.summary.regressions == 1 %}regression{% else %}regressions{% endif %} ·
           {{ cd.summary.improvements }} {% if cd.summary.improvements == 1 %}improvement{% else %}improvements{% endif %} ·
           {{ cd.summary.new_violations }} new {% if cd.summary.new_violations == 1 %}violation{% else %}violations{% endif %}
@@ -574,7 +574,7 @@
           {{ dp.verdict_label }}
         </span>
         <span class="meta">
-          {{ dp.summary.added }} added · {{ dp.summary.removed }} removed · {{ dp.summary.modified }} modified ·
+          {{ dp.summary.added }} added · {{ dp.summary.removed }} removed · {{ dp.summary.modified }} modified · {{ dp.summary.renamed }} renamed ·
           {{ dp.summary.regressions }} {% if dp.summary.regressions == 1 %}regression{% else %}regressions{% endif %} ·
           {{ dp.summary.improvements }} {% if dp.summary.improvements == 1 %}improvement{% else %}improvements{% endif %} ·
           {{ dp.summary.new_violations }} new {% if dp.summary.new_violations == 1 %}violation{% else %}violations{% endif %}

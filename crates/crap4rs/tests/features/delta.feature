@@ -83,23 +83,51 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     Then the function is `Modified` (matched), not `Added`+`Removed`
 
   @unwired
-  Scenario: Same name in different files counts as separate functions
+  Scenario: Same name in different files is classified Renamed (cross-file move)
     # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given baseline contains `src/a.rs::helpers::log`
     And current contains `src/b.rs::helpers::log` (file moved, same name)
     When the delta is computed
-    Then there is one `Removed` change for `src/a.rs::helpers::log`
-    And one `Added` change for `src/b.rs::helpers::log`
-    # Rename/move detection is a v0.3.0 follow-up
+    Then there is one `Renamed` change pairing the two
+    And there is no `Added` or `Removed` change for `helpers::log`
 
   @unwired
-  Scenario: Same-file rename produces Add+Remove
+  Scenario: Same-file rename is classified Renamed
     # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
     Given baseline contains `src/foo.rs::utils::compute_v1`
-    And current contains `src/foo.rs::utils::compute_v2` (renamed)
+    And current contains `src/foo.rs::utils::compute_v2` (renamed, body unchanged)
     When the delta is computed
-    Then `compute_v1` is `Removed`
-    And `compute_v2` is `Added`
+    Then there is one `Renamed` change pairing `compute_v1` → `compute_v2`
+
+  @unwired
+  Scenario: A relocated function over threshold does not trip the delta gate
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
+    Given threshold is 5
+    And baseline contains `src/old.rs::process` with score 20 (failing)
+    And current contains `src/new.rs::process` with score 20 (relocated, unchanged)
+    When the delta is computed
+    Then there is one `Renamed` change
+    And `delta.summary.new_violations` is `0`
+    And `delta.summary.passed` is `true`
+
+  @unwired
+  Scenario: A relocation that also crosses the threshold still counts as a new violation
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
+    Given threshold is 25
+    And baseline contains `src/old.rs::process` with score 8 (passing)
+    And current contains `src/new.rs::process` with score 47 (relocated and worsened)
+    When the delta is computed
+    Then there is one `Renamed` change
+    And `delta.summary.new_violations` is `1`
+
+  @unwired
+  Scenario: Ambiguous structural matches stay Added and Removed
+    # tracked: crap-rs#169 — delta.feature is spec-only; no cucumber harness wires --baseline delta scenarios yet
+    Given baseline contains two functions with the same structural signature
+    And current contains two relocated functions with that same signature
+    When the delta is computed
+    Then neither side is paired as `Renamed`
+    And they remain `Added` and `Removed`
 
   # ── Domain: new_violations gate counting ───────────────────────────
 

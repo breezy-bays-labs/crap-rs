@@ -184,7 +184,12 @@ fn collect_ranked_rows(
     // truncation is presentational, not authoritative.
     for change in &delta_view.full.changes {
         match change {
-            FunctionChange::Modified { baseline, current } => {
+            // A relocated function ranks by score movement exactly like
+            // `Modified` — a relocation that worsened the score is a
+            // regression; a pure relocation (sub-0.005 delta) drops here
+            // just like a zero-delta modification.
+            FunctionChange::Modified { baseline, current }
+            | FunctionChange::Renamed { baseline, current } => {
                 let crap_delta = current.scored.crap.value - baseline.scored.crap.value;
                 // Regression threshold matches the per-language
                 // reporter's 0.005 cutoff — a smaller delta rounds

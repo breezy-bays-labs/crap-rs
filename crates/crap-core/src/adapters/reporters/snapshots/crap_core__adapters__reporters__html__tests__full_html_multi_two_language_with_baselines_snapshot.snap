@@ -1,6 +1,5 @@
 ---
 source: crates/crap-core/src/adapters/reporters/html.rs
-assertion_line: 2936
 expression: out
 ---
 <!doctype html>
@@ -1582,7 +1581,7 @@ pre code { background: transparent; padding: 0; }
           REGRESSED
         </span>
         <span class="meta">
-          1 added · 0 removed · 3 modified ·
+          1 added · 0 removed · 3 modified · 0 renamed ·
           2 regressions ·
           1 improvement ·
           2 new violations
@@ -1825,7 +1824,7 @@ pre code { background: transparent; padding: 0; }
           REGRESSED
         </span>
         <span class="meta">
-          1 added · 0 removed · 2 modified ·
+          1 added · 0 removed · 2 modified · 0 renamed ·
           1 regression ·
           1 improvement ·
           1 new violation
@@ -1883,7 +1882,7 @@ pre code { background: transparent; padding: 0; }
         </span>
         
         
-        <span class="delta-kpi-foot">1 added · 0 removed · 2 modified</span>
+        <span class="delta-kpi-foot">1 added · 0 removed · 2 modified · 0 renamed</span>
         
       </div>
       
@@ -2107,7 +2106,7 @@ pre code { background: transparent; padding: 0; }
           REGRESSED
         </span>
         <span class="meta">
-          0 added · 0 removed · 1 modified ·
+          0 added · 0 removed · 1 modified · 0 renamed ·
           1 regression ·
           0 improvements ·
           1 new violation
@@ -2165,7 +2164,7 @@ pre code { background: transparent; padding: 0; }
         </span>
         
         
-        <span class="delta-kpi-foot">0 added · 0 removed · 1 modified</span>
+        <span class="delta-kpi-foot">0 added · 0 removed · 1 modified · 0 renamed</span>
         
       </div>
       

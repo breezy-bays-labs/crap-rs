@@ -18,6 +18,7 @@ use crate::domain::types::{AnalysisResult, FunctionIdentity, FunctionVerdict};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
+use std::hash::Hash;
 
 // ── Change kinds ─────────────────────────────────────────────────────
 
@@ -27,8 +28,7 @@ use std::collections::{BTreeSet, HashMap};
 /// Tag-only enum used in `DeltaSummary` and the JSON envelope. The
 /// per-function payload lives on [`FunctionChange`]; this enum is for
 /// shaping (filter / sort) and presentation. `#[non_exhaustive]`
-/// reserves namespace for future variants like `Renamed` (ADR D7
-/// §Future Compat — rename detection is a v0.3.0 candidate).
+/// leaves room for further variants without breaking downstream matches.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -36,12 +36,25 @@ pub enum ChangeKind {
     Added,
     Removed,
     Modified,
+    /// A function present in both analyses under a different identity —
+    /// moved to another file, renamed, or moved between modules — whose
+    /// body is otherwise unchanged. Paired out of the leftover
+    /// Added/Removed sets by a 1:1 structural match, so a pure
+    /// relocation reads as one change instead of an unrelated
+    /// Removed + Added pair (and therefore never trips the delta gate
+    /// on its own).
+    Renamed,
 }
 
 impl ChangeKind {
     /// All known variants, in canonical order. Used by CLI parsers and
     /// serializers that enumerate the universe.
-    pub const ALL: [ChangeKind; 3] = [ChangeKind::Added, ChangeKind::Removed, ChangeKind::Modified];
+    pub const ALL: [ChangeKind; 4] = [
+        ChangeKind::Added,
+        ChangeKind::Removed,
+        ChangeKind::Modified,
+        ChangeKind::Renamed,
+    ];
 
     pub fn as_str(&self) -> &'static str {
         self.as_wire_str()
@@ -56,6 +69,7 @@ impl ChangeKind {
             ChangeKind::Added => "added",
             ChangeKind::Removed => "removed",
             ChangeKind::Modified => "modified",
+            ChangeKind::Renamed => "renamed",
         }
     }
 }
@@ -74,6 +88,11 @@ impl ChangeKind {
 /// `Unchanged` is *not* a variant. The View pipeline only surfaces
 /// changes; if downstream tooling needs to enumerate all current
 /// functions it consumes `current.functions` directly.
+///
+/// [`Renamed`](FunctionChange::Renamed) carries both sides like
+/// `Modified` — it is the same function under a new identity (file /
+/// qualified name), so reporters render the old → new relocation and
+/// the gate treats its score movement exactly like `Modified`.
 #[non_exhaustive]
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
@@ -88,6 +107,10 @@ pub enum FunctionChange {
         baseline: FunctionVerdict,
         current: FunctionVerdict,
     },
+    Renamed {
+        baseline: FunctionVerdict,
+        current: FunctionVerdict,
+    },
 }
 
 impl FunctionChange {
@@ -96,6 +119,7 @@ impl FunctionChange {
             FunctionChange::Added { .. } => ChangeKind::Added,
             FunctionChange::Removed { .. } => ChangeKind::Removed,
             FunctionChange::Modified { .. } => ChangeKind::Modified,
+            FunctionChange::Renamed { .. } => ChangeKind::Renamed,
         }
     }
 
@@ -103,6 +127,7 @@ impl FunctionChange {
         match self {
             FunctionChange::Added { current } => Some(current.scored.crap.value),
             FunctionChange::Modified { current, .. } => Some(current.scored.crap.value),
+            FunctionChange::Renamed { current, .. } => Some(current.scored.crap.value),
             FunctionChange::Removed { .. } => None,
         }
     }
@@ -111,14 +136,19 @@ impl FunctionChange {
         match self {
             FunctionChange::Removed { baseline } => Some(baseline.scored.crap.value),
             FunctionChange::Modified { baseline, .. } => Some(baseline.scored.crap.value),
+            FunctionChange::Renamed { baseline, .. } => Some(baseline.scored.crap.value),
             FunctionChange::Added { .. } => None,
         }
     }
 
-    /// `current - baseline` for `Modified`; `None` for `Added` / `Removed`.
+    /// `current - baseline` for `Modified` / `Renamed`; `None` for
+    /// `Added` / `Removed`. A relocated function carries both sides, so
+    /// a relocation that *also* changed the score exposes that movement
+    /// here just like an in-place modification.
     pub fn score_delta(&self) -> Option<f64> {
         match self {
-            FunctionChange::Modified { baseline, current } => {
+            FunctionChange::Modified { baseline, current }
+            | FunctionChange::Renamed { baseline, current } => {
                 Some(current.scored.crap.value - baseline.scored.crap.value)
             }
             _ => None,
@@ -126,21 +156,26 @@ impl FunctionChange {
     }
 
     /// File path associated with this change. For Modified, baseline
-    /// and current share the same path (matching keys on file_path).
+    /// and current share the same path (matching keys on file_path);
+    /// for Renamed the path changed, so this reports the *current*
+    /// (post-relocation) location.
     pub fn file_path(&self) -> &str {
         match self {
             FunctionChange::Added { current } => &current.scored.identity.file_path,
             FunctionChange::Removed { baseline } => &baseline.scored.identity.file_path,
             FunctionChange::Modified { current, .. } => &current.scored.identity.file_path,
+            FunctionChange::Renamed { current, .. } => &current.scored.identity.file_path,
         }
     }
 
-    /// Qualified name associated with this change.
+    /// Qualified name associated with this change. For Renamed this is
+    /// the *current* (post-relocation) name.
     pub fn qualified_name(&self) -> &str {
         match self {
             FunctionChange::Added { current } => &current.scored.identity.qualified_name,
             FunctionChange::Removed { baseline } => &baseline.scored.identity.qualified_name,
             FunctionChange::Modified { current, .. } => &current.scored.identity.qualified_name,
+            FunctionChange::Renamed { current, .. } => &current.scored.identity.qualified_name,
         }
     }
 }
@@ -159,18 +194,47 @@ pub struct DeltaSummary {
     pub added: u32,
     pub removed: u32,
     pub modified: u32,
-    /// Modified rows where `score_delta > 0` (current got worse).
+    /// Relocated functions (moved file / renamed / moved module) paired
+    /// as a single change. A distinct, non-overlapping bucket — a
+    /// `Renamed` row is counted here and never in `added`, `removed`, or
+    /// `modified`, so `added + removed + modified + renamed` accounts for
+    /// every change row exactly once.
+    pub renamed: u32,
+    /// `Modified` / `Renamed` rows where `score_delta > 0` (current got
+    /// worse). A pure relocation has zero score delta and so is neither
+    /// a regression nor an improvement; a relocation that also worsened
+    /// the score is counted here.
     pub regressions: u32,
-    /// Modified rows where `score_delta < 0` (current got better).
+    /// `Modified` / `Renamed` rows where `score_delta < 0` (current got
+    /// better).
     pub improvements: u32,
     /// Threshold breaches *introduced* by this delta:
     /// - `Added` rows whose `current.exceeds == true`
-    /// - `Modified` rows where `baseline.exceeds == false` AND `current.exceeds == true`
+    /// - `Modified` / `Renamed` rows where `baseline.exceeds == false`
+    ///   AND `current.exceeds == true`
     ///
-    /// Pre-existing violations (Modified rows where `baseline.exceeds`
-    /// was already true) do NOT contribute. This distinction matters
-    /// for the delta gate — we want to fail PRs that *introduce* risk,
-    /// not PRs that merely touch already-failing functions.
+    /// Pre-existing violations (rows where `baseline.exceeds` was already
+    /// true) do NOT contribute. This distinction matters for the delta
+    /// gate — we want to fail PRs that *introduce* risk, not PRs that
+    /// merely touch already-failing functions. A *pure* relocation has an
+    /// identical score on both sides, so `baseline.exceeds ==
+    /// current.exceeds` and it never contributes a new violation —
+    /// migrations sail through the gate. A relocation that also crossed
+    /// the threshold still counts (the relocation was not the only
+    /// change).
+    ///
+    /// Pairing only ever *lowers* `new_violations` versus scoring the
+    /// leftovers as Add+Remove (pinned by
+    /// `proptests::prop_renamed_never_raises_new_violations`). That is the
+    /// migration-friendly guarantee — enabling rename detection can never
+    /// newly fail a PR. The flip side is the honest limitation: a *false*
+    /// pairing also lowers the count, so a coincidental match CAN lower
+    /// `new_violations` below the true figure. The 1:1 + name/signature
+    /// guards make false pairings rare, but a genuinely-unrelated function
+    /// whose signature exactly matches a removed one (and is its only
+    /// signature-mate) is indistinguishable from a real rename at the
+    /// verdict level and will pair. See
+    /// `tests::compute_documented_limitation_coincidental_signature_pairs_as_renamed`.
     pub new_violations: u32,
     /// `new_violations == 0`. Drives the optional `--delta-gate`.
     pub passed: bool,
@@ -202,6 +266,16 @@ fn tally(summary: &mut DeltaSummary, change: &FunctionChange) {
             summary.modified += 1;
             tally_modified(summary, baseline, current);
         }
+        FunctionChange::Renamed { baseline, current } => {
+            summary.renamed += 1;
+            // Score-movement, regression/improvement, and new-violation
+            // accounting are identical to `Modified` — a relocation is
+            // the same function under a new identity. A pure relocation
+            // has a zero delta and matching `exceeds`, so it contributes
+            // nothing here; only a relocation that *also* changed the
+            // score moves these counters.
+            tally_modified(summary, baseline, current);
+        }
     }
 }
 
@@ -210,10 +284,17 @@ fn tally_modified(
     baseline: &FunctionVerdict,
     current: &FunctionVerdict,
 ) {
+    // Use the same 0.005 cutoff the reporters apply when rendering
+    // regression / improvement rows (it matches the `{:.2}` display
+    // precision and absorbs float-subtraction noise on otherwise-equal
+    // 2-decimal CRAP scores). Counting on a bare `> 0.0` would let a
+    // sub-precision delta inflate `regressions` / `improvements` with a
+    // row that never actually renders — keeping the summary counts and
+    // the rendered tables in agreement.
     let delta = current.scored.crap.value - baseline.scored.crap.value;
-    if delta > 0.0 {
+    if delta >= 0.005 {
         summary.regressions += 1;
-    } else if delta < 0.0 {
+    } else if delta <= -0.005 {
         summary.improvements += 1;
     }
     if !baseline.exceeds && current.exceeds {
@@ -252,13 +333,14 @@ pub struct AnalysisDelta {
 
 // ── compute: pair → classify ────────────────────────────────────────
 
-/// Identity tuple used to match functions across the baseline → current
-/// transition. **Span (line range) is intentionally excluded** — line
-/// numbers shift when surrounding code is edited, and we want a
+/// Identity tuple used for the exact-match pass across the baseline →
+/// current transition. **Span (line range) is intentionally excluded** —
+/// line numbers shift when surrounding code is edited, and we want a
 /// minor edit to `foo` to register as `Modified`, not `Removed` +
-/// `Added`. Renames within a file (different `qualified_name`) and
-/// moves across files (different `file_path`) both fall through as
-/// `Removed` + `Added` until rename detection ships (v0.3.0+).
+/// `Added`. A function whose identity changed (renamed, or moved across
+/// files / modules) misses this exact match and falls to the relocation
+/// pass in [`pair_relocations`], which re-pairs it as `Renamed` when the
+/// match is structurally unambiguous.
 type IdentityKey<'a> = (&'a str, &'a str);
 
 fn identity_key(identity: &FunctionIdentity) -> IdentityKey<'_> {
@@ -266,8 +348,9 @@ fn identity_key(identity: &FunctionIdentity) -> IdentityKey<'_> {
 }
 
 /// Compare two analyses, classifying every function as Added, Removed,
-/// or Modified. Stable: `current`'s order is preserved for matched +
-/// added rows, then baseline-only (`Removed`) rows trail.
+/// Modified, or Renamed (relocated). Stable: `current`'s order is
+/// preserved for matched + added rows, then renamed and baseline-only
+/// (`Removed`) rows trail in sorted order.
 ///
 /// Decomposed into a private helper `pair_identities` to keep the
 /// public surface declarative and to localize the HashMap construction
@@ -284,39 +367,78 @@ pub fn compute(baseline: AnalysisResult, current: AnalysisResult) -> AnalysisDel
 }
 
 fn pair_identities(baseline: &AnalysisResult, current: &AnalysisResult) -> Vec<FunctionChange> {
-    // Index baseline by identity key, single pass. We track which
-    // baseline entries we've matched so the leftover can be emitted as
-    // `Removed` rows after the current sweep.
+    // Pass 1 — exact `(file, qualified_name)` match. We index the
+    // baseline, then sweep current: a hit is `Modified` (emitted in
+    // current order); a miss is a current-only candidate for the
+    // relocation pass. Whatever the sweep doesn't remove is baseline-only.
     let mut baseline_index: HashMap<IdentityKey<'_>, &FunctionVerdict> =
         HashMap::with_capacity(baseline.functions.len());
     for verdict in &baseline.functions {
         baseline_index.insert(identity_key(&verdict.scored.identity), verdict);
     }
 
-    let mut changes: Vec<FunctionChange> =
-        Vec::with_capacity(current.functions.len() + baseline.functions.len());
-
+    let mut modified: Vec<FunctionChange> = Vec::new();
+    let mut current_only: Vec<&FunctionVerdict> = Vec::with_capacity(current.functions.len());
     for current_verdict in &current.functions {
-        let key = identity_key(&current_verdict.scored.identity);
-        match baseline_index.remove(&key) {
-            Some(baseline_verdict) => changes.push(FunctionChange::Modified {
+        match baseline_index.remove(&identity_key(&current_verdict.scored.identity)) {
+            Some(baseline_verdict) => modified.push(FunctionChange::Modified {
                 baseline: baseline_verdict.clone(),
                 current: current_verdict.clone(),
             }),
-            None => changes.push(FunctionChange::Added {
-                current: current_verdict.clone(),
-            }),
+            None => current_only.push(current_verdict),
         }
     }
+    let baseline_only: Vec<&FunctionVerdict> = baseline_index.into_values().collect();
 
-    // Leftover baseline entries are Removed. `HashMap` iteration order
-    // is unspecified, so we sort by identity key before emission —
-    // otherwise consumers that iterate `delta.changes` directly (or
-    // apply a sort that doesn't break ties on identity) observe
-    // run-to-run flakiness. Identity-key sort is cheap, deterministic,
-    // and gives a stable presentation order that mirrors the lexical
-    // ordering most operators expect.
-    let mut leftover: Vec<&FunctionVerdict> = baseline_index.into_values().collect();
+    // Pass 2 — re-pair relocated functions out of the leftovers.
+    let (renamed_pairs, baseline_only, current_only) =
+        pair_relocations(baseline_only, current_only);
+
+    // Pass 3 — assemble in canonical order: Modified (current order) →
+    // Added (current order) → Renamed (sorted) → Removed (sorted). Raw
+    // order is internal (reporters and the JSON envelope consume a
+    // sorted `DeltaView`), but pinning it keeps direct `changes`
+    // consumers and unit tests deterministic.
+    let mut changes: Vec<FunctionChange> = Vec::with_capacity(
+        modified.len() + current_only.len() + renamed_pairs.len() + baseline_only.len(),
+    );
+    changes.append(&mut modified);
+    for current_verdict in current_only {
+        changes.push(FunctionChange::Added {
+            current: current_verdict.clone(),
+        });
+    }
+    push_renamed_sorted(&mut changes, renamed_pairs);
+    push_removed_sorted(&mut changes, baseline_only);
+    changes
+}
+
+/// A baseline → current pairing of the same function under two
+/// identities.
+type VerdictPair<'a> = (&'a FunctionVerdict, &'a FunctionVerdict);
+
+/// Append `Renamed` rows, sorted by the *current* (post-relocation)
+/// identity key with a stable sort so output is byte-deterministic
+/// across platforms.
+fn push_renamed_sorted(changes: &mut Vec<FunctionChange>, mut pairs: Vec<VerdictPair<'_>>) {
+    pairs.sort_by(|a, b| {
+        identity_key(&a.1.scored.identity).cmp(&identity_key(&b.1.scored.identity))
+    });
+    for (baseline, current) in pairs {
+        changes.push(FunctionChange::Renamed {
+            baseline: baseline.clone(),
+            current: current.clone(),
+        });
+    }
+}
+
+/// Append leftover baseline functions as `Removed`. `HashMap` iteration
+/// order is unspecified, so we sort by identity key before emission —
+/// otherwise consumers that iterate `delta.changes` directly (or apply a
+/// sort that doesn't break ties on identity) observe run-to-run
+/// flakiness. The identity-key sort is cheap, deterministic, and mirrors
+/// the lexical ordering most operators expect.
+fn push_removed_sorted(changes: &mut Vec<FunctionChange>, mut leftover: Vec<&FunctionVerdict>) {
     leftover
         .sort_by(|a, b| identity_key(&a.scored.identity).cmp(&identity_key(&b.scored.identity)));
     for baseline_verdict in leftover {
@@ -324,8 +446,179 @@ fn pair_identities(baseline: &AnalysisResult, current: &AnalysisResult) -> Vec<F
             baseline: baseline_verdict.clone(),
         });
     }
+}
 
-    changes
+/// Structural signature of a function — invariant under a pure
+/// relocation. Captures complexity + metric + the ordered
+/// `(kind, increment, nesting)` fingerprint of its contributors.
+/// Deliberately excludes coverage, CRAP score, and source positions
+/// (file / line / column): those move when a function relocates or its
+/// file's coverage shifts, but the structure does not. `ContributorKind`
+/// and `ComplexityMetric` are `Eq` but not `Hash`, so they enter the key
+/// via their pinned `as_wire_str()` — a `&'static str`, which is `Hash`.
+type StructSig = (u32, &'static str, Vec<(&'static str, u32, u32)>);
+
+fn struct_sig(verdict: &FunctionVerdict) -> StructSig {
+    let scored = &verdict.scored;
+    let contributors = scored
+        .contributors
+        .iter()
+        .map(|c| (c.kind.as_wire_str(), c.increment, c.nesting_depth))
+        .collect();
+    (
+        scored.complexity,
+        scored.complexity_metric.as_wire_str(),
+        contributors,
+    )
+}
+
+/// Re-pair relocated functions out of the leftover Added/Removed sets.
+///
+/// Two tiers, each a 1:1-unambiguous match (an entry pairs only when
+/// exactly one entry on each side shares its key — any ambiguous key
+/// stays Added + Removed):
+/// - Tier A keys on **both** the retained `qualified_name` AND the
+///   structural signature — a cross-file move whose body is unchanged
+///   (a top-level fn, or an `impl` method whose type is unchanged).
+///   Requiring the signature too means a same-named-but-different-body
+///   coincidence (two unrelated `run` / `new` functions) does NOT pair,
+///   and a moved-*and-edited* function falls through to Add+Remove where
+///   its edit is scrutinized — more faithful to "was relocation the only
+///   change?".
+/// - Tier B keys on the structural signature alone — a rename, or a
+///   move that also changed the module-qualified name (body unchanged).
+///
+/// The 1:1 guard is both the false-positive defense (signature-colliding
+/// functions never pair) and the cost ceiling (HashMap bucketing, no
+/// O(n²) scan). It does **not** make the matcher sound: working from
+/// verdicts (no source text), two genuinely-unrelated functions with an
+/// identical signature that are the only leftover on each side are
+/// indistinguishable from a real rename and WILL pair — see
+/// `tests::compute_documented_limitation_coincidental_signature_pairs_as_renamed`.
+/// Returns the `Renamed` pairs plus the still-unmatched baseline-only /
+/// current-only leftovers, each in input order.
+fn pair_relocations<'a>(
+    baseline_only: Vec<&'a FunctionVerdict>,
+    current_only: Vec<&'a FunctionVerdict>,
+) -> (
+    Vec<VerdictPair<'a>>,
+    Vec<&'a FunctionVerdict>,
+    Vec<&'a FunctionVerdict>,
+) {
+    // Tier A — retained qualified name AND matching structural signature.
+    // The strongest signal (same name, same body, different file) and
+    // applies at any complexity. Keying on name+signature rejects an
+    // unrelated function that merely reused a common name.
+    let (mut paired, baseline_only, current_only) = pair_by_key(baseline_only, current_only, |v| {
+        (v.scored.identity.qualified_name.as_str(), struct_sig(v))
+    });
+
+    // Tier B — structural signature, restricted to structurally
+    // distinctive functions. A complexity-1 body has no decision points,
+    // so its signature is degenerate and shared by every trivial
+    // function; pairing on it would mis-link two unrelated stubs that
+    // merely happen to be the only leftover on each side. Trivial
+    // leftovers pass straight through to Added / Removed.
+    let (distinctive_baseline, trivial_baseline): (Vec<_>, Vec<_>) =
+        baseline_only.into_iter().partition(|v| is_distinctive(v));
+    let (distinctive_current, trivial_current): (Vec<_>, Vec<_>) =
+        current_only.into_iter().partition(|v| is_distinctive(v));
+    let (more, mut baseline_only, mut current_only) =
+        pair_by_key(distinctive_baseline, distinctive_current, struct_sig);
+    paired.extend(more);
+    baseline_only.extend(trivial_baseline);
+    current_only.extend(trivial_current);
+    (paired, baseline_only, current_only)
+}
+
+/// Whether a function's structural signature is distinctive enough to be
+/// a reliable relocation signal on its own. A complexity-1 function has
+/// no decision points — its [`struct_sig`] is degenerate and matches
+/// every other trivial function — so it is paired only by retained name
+/// (Tier A), never by signature alone (Tier B).
+fn is_distinctive(verdict: &FunctionVerdict) -> bool {
+    verdict.scored.complexity > 1
+}
+
+/// Count how many entries carry each key.
+fn count_by_key<'a, K, F>(items: &[&'a FunctionVerdict], key_of: &F) -> HashMap<K, u32>
+where
+    K: Eq + Hash,
+    F: Fn(&'a FunctionVerdict) -> K,
+{
+    let mut counts: HashMap<K, u32> = HashMap::with_capacity(items.len());
+    for verdict in items {
+        *counts.entry(key_of(verdict)).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Pair baseline-only and current-only entries that share a key 1:1.
+///
+/// A key pairs only when exactly one baseline AND one current entry
+/// carry it; any key with more than one entry on either side is
+/// ambiguous and its entries pass through to the leftovers unpaired (in
+/// input order). Generic over the key so the relocation tiers supply
+/// `qualified_name` or the structural signature.
+fn pair_by_key<'a, K, F>(
+    baseline_only: Vec<&'a FunctionVerdict>,
+    current_only: Vec<&'a FunctionVerdict>,
+    key_of: F,
+) -> (
+    Vec<VerdictPair<'a>>,
+    Vec<&'a FunctionVerdict>,
+    Vec<&'a FunctionVerdict>,
+)
+where
+    K: Eq + Hash,
+    F: Fn(&'a FunctionVerdict) -> K,
+{
+    let baseline_counts = count_by_key(&baseline_only, &key_of);
+    let current_counts = count_by_key(&current_only, &key_of);
+    let pairable = |verdict: &'a FunctionVerdict| {
+        let key = key_of(verdict);
+        baseline_counts.get(&key) == Some(&1) && current_counts.get(&key) == Some(&1)
+    };
+
+    // Uniquely-keyed baseline entries are looked up by current entries;
+    // everything else passes straight to the leftovers. `partition`
+    // preserves input order.
+    let (unique, leftover_baseline): (Vec<_>, Vec<_>) =
+        baseline_only.into_iter().partition(|&v| pairable(v));
+    let mut unique_baseline: HashMap<K, &'a FunctionVerdict> =
+        unique.into_iter().map(|v| (key_of(v), v)).collect();
+
+    let mut leftover_current: Vec<&'a FunctionVerdict> = Vec::new();
+    let paired: Vec<VerdictPair<'a>> = current_only
+        .into_iter()
+        .filter_map(|v| pair_or_stash(&mut unique_baseline, &mut leftover_current, &key_of, v))
+        .collect();
+    // Every uniquely-keyed baseline entry has exactly one current match
+    // by construction, so `unique_baseline` is now empty.
+    debug_assert!(unique_baseline.is_empty());
+
+    (paired, leftover_baseline, leftover_current)
+}
+
+/// Pull this current entry's 1:1 baseline partner, or stash it as a
+/// leftover and yield `None`.
+fn pair_or_stash<'a, K, F>(
+    unique_baseline: &mut HashMap<K, &'a FunctionVerdict>,
+    leftover_current: &mut Vec<&'a FunctionVerdict>,
+    key_of: &F,
+    current: &'a FunctionVerdict,
+) -> Option<VerdictPair<'a>>
+where
+    K: Eq + Hash,
+    F: Fn(&'a FunctionVerdict) -> K,
+{
+    match unique_baseline.remove(&key_of(current)) {
+        Some(baseline) => Some((baseline, current)),
+        None => {
+            leftover_current.push(current);
+            None
+        }
+    }
 }
 
 // ── DeltaView (filter / sort / truncate) ─────────────────────────────
@@ -501,7 +794,8 @@ fn cmp_by_score_delta_desc(a: &&FunctionChange, b: &&FunctionChange) -> Ordering
 
 fn signed_impact(change: &FunctionChange) -> f64 {
     match change {
-        FunctionChange::Modified { baseline, current } => {
+        FunctionChange::Modified { baseline, current }
+        | FunctionChange::Renamed { baseline, current } => {
             current.scored.crap.value - baseline.scored.crap.value
         }
         FunctionChange::Added { current } => current.scored.crap.value,
@@ -612,6 +906,21 @@ mod tests {
         }
     }
 
+    /// Like [`make_verdict`] but with an explicit complexity, so a test
+    /// can control the [`struct_sig`] used by the relocation pass's
+    /// Tier B (structural-signature) matching.
+    fn make_verdict_cx(
+        file: &str,
+        name: &str,
+        score: f64,
+        exceeds: bool,
+        complexity: u32,
+    ) -> FunctionVerdict {
+        let mut verdict = make_verdict(file, name, score, exceeds);
+        verdict.scored.complexity = complexity;
+        verdict
+    }
+
     fn make_result(verdicts: Vec<FunctionVerdict>) -> AnalysisResult {
         let exceeding = verdicts.iter().filter(|v| v.exceeds).count();
         let total = verdicts.len();
@@ -689,26 +998,199 @@ mod tests {
         assert_eq!(delta.changes[0].score_delta(), Some(16.0));
     }
 
+    /// Cross-file move that keeps the qualified name → a single
+    /// `Renamed`, paired by Tier A (retained name). Previously this
+    /// surfaced as an unrelated Added + Removed pair.
     #[test]
-    fn compute_same_name_different_files_are_separate() {
+    fn compute_same_name_different_files_pairs_as_renamed() {
         let baseline = make_result(vec![make_verdict("a.rs", "log", 5.0, false)]);
         let current = make_result(vec![make_verdict("b.rs", "log", 5.0, false)]);
         let delta = compute(baseline, current);
-        assert_eq!(delta.changes.len(), 2);
-        let kinds: Vec<_> = delta.changes.iter().map(|c| c.kind()).collect();
-        assert!(kinds.contains(&ChangeKind::Added));
-        assert!(kinds.contains(&ChangeKind::Removed));
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        // The relocation reports the current (post-move) location.
+        assert_eq!(delta.changes[0].file_path(), "b.rs");
+        assert_eq!(delta.changes[0].qualified_name(), "log");
     }
 
+    /// In-file rename (name changed, structure identical) → a single
+    /// `Renamed`, paired by Tier B (structural signature). Previously
+    /// this surfaced as an unrelated Added + Removed pair.
     #[test]
-    fn compute_same_file_rename_produces_add_remove() {
+    fn compute_same_file_rename_pairs_as_renamed() {
         let baseline = make_result(vec![make_verdict("a.rs", "v1", 5.0, false)]);
         let current = make_result(vec![make_verdict("a.rs", "v2", 5.0, false)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        assert_eq!(delta.changes[0].qualified_name(), "v2");
+    }
+
+    /// Module move (both file and qualified name change) → a single
+    /// `Renamed`, paired by Tier B on the structural signature.
+    #[test]
+    fn compute_module_move_pairs_as_renamed() {
+        let baseline = make_result(vec![make_verdict("a.rs", "mod_a::foo", 5.0, false)]);
+        let current = make_result(vec![make_verdict("b.rs", "mod_b::foo", 5.0, false)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        assert_eq!(delta.changes[0].file_path(), "b.rs");
+        assert_eq!(delta.changes[0].qualified_name(), "mod_b::foo");
+    }
+
+    /// Tier B pairs only on a *matching* structural signature — two
+    /// leftovers with different complexities are NOT a relocation, even
+    /// though each side has exactly one entry.
+    #[test]
+    fn compute_relocation_requires_matching_signature() {
+        let baseline = make_result(vec![make_verdict_cx("a.rs", "alpha", 5.0, false, 5)]);
+        let current = make_result(vec![make_verdict_cx("a.rs", "beta", 5.0, false, 9)]);
         let delta = compute(baseline, current);
         assert_eq!(delta.changes.len(), 2);
         let kinds: Vec<_> = delta.changes.iter().map(|c| c.kind()).collect();
         assert!(kinds.contains(&ChangeKind::Added));
         assert!(kinds.contains(&ChangeKind::Removed));
+        assert!(!kinds.contains(&ChangeKind::Renamed));
+    }
+
+    /// A relocation that *also* worsened the score is still a `Renamed`,
+    /// and it exposes the score movement just like `Modified` — coverage
+    /// dropped, so CRAP rose and the function crossed the threshold.
+    /// This is the "the rename was not the only change" case: it DOES
+    /// count as a new violation.
+    #[test]
+    fn compute_renamed_with_regression_counts_as_new_violation() {
+        // baseline: passing (under threshold); current: same fn moved
+        // and now over threshold.
+        let baseline = make_result(vec![make_verdict("a.rs", "foo", 7.0, false)]);
+        let current = make_result(vec![make_verdict("b.rs", "foo", 47.0, true)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        assert_eq!(delta.changes[0].score_delta(), Some(40.0));
+        assert_eq!(delta.summary.renamed, 1);
+        assert_eq!(delta.summary.regressions, 1);
+        assert_eq!(delta.summary.new_violations, 1);
+        assert!(!delta.summary.passed);
+    }
+
+    /// DOCUMENTED LIMITATION (not a guarantee). The matcher works from
+    /// verdicts, not source text, so two genuinely-unrelated functions
+    /// with an identical structural signature — one removed, one added,
+    /// each the only signature-mate on its side — are indistinguishable
+    /// from a real rename and WILL pair as `Renamed`. When both already
+    /// exceed the threshold, the new function inherits the baseline's
+    /// "already failing" status, so a genuinely new violation is NOT
+    /// flagged. The 1:1 + name/signature guards make this rare, but it is
+    /// irreducible without source-level matching. Captured here so the
+    /// behavior is a known, tested property — the delta gate never
+    /// *raises* new violations (migrations pass) but a coincidental match
+    /// can lower the count; it does not "never hide" a violation.
+    #[test]
+    fn compute_documented_limitation_coincidental_signature_pairs_as_renamed() {
+        // `alpha` (already failing) is removed; `beta` (genuinely new,
+        // also failing) is added — different names, identical distinctive
+        // signature, one each side. Tier B pairs them on signature alone.
+        let baseline = make_result(vec![make_verdict_cx("a.rs", "alpha", 47.0, true, 5)]);
+        let current = make_result(vec![make_verdict_cx("b.rs", "beta", 47.0, true, 5)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        // The accepted consequence: because the baseline side already
+        // exceeded, the coincidental pairing hides what would otherwise be
+        // a new violation. This documents the limitation; it is NOT a
+        // claim that relocation can never mask a violation.
+        assert_eq!(delta.summary.new_violations, 0);
+        assert!(delta.summary.passed);
+    }
+
+    /// Ambiguity guard: two leftovers per side sharing a structural
+    /// signature (a name-swap, or two functions relocated together)
+    /// stay Added + Removed — the 1:1 rule declines to guess which maps
+    /// to which.
+    #[test]
+    fn compute_ambiguous_signature_stays_add_remove() {
+        let baseline = make_result(vec![
+            make_verdict("a.rs", "foo", 5.0, false),
+            make_verdict("a.rs", "bar", 5.0, false),
+        ]);
+        // Same file, swapped names, identical signatures, plus a move.
+        let current = make_result(vec![
+            make_verdict("a.rs", "baz", 5.0, false),
+            make_verdict("a.rs", "qux", 5.0, false),
+        ]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 4);
+        assert_eq!(delta.summary.renamed, 0);
+        assert_eq!(delta.summary.added, 2);
+        assert_eq!(delta.summary.removed, 2);
+    }
+
+    /// Trivial zero-contributor stubs all share the complexity-1 empty
+    /// signature, so a file of relocated stubs collides on every side
+    /// and none are arbitrarily paired — they stay Added + Removed.
+    #[test]
+    fn compute_zero_contributor_stubs_do_not_pair() {
+        let baseline = make_result(vec![
+            make_verdict_cx("a.rs", "s1", 1.0, false, 1),
+            make_verdict_cx("a.rs", "s2", 1.0, false, 1),
+        ]);
+        let current = make_result(vec![
+            make_verdict_cx("b.rs", "s3", 1.0, false, 1),
+            make_verdict_cx("b.rs", "s4", 1.0, false, 1),
+        ]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.summary.renamed, 0);
+        assert_eq!(delta.summary.added, 2);
+        assert_eq!(delta.summary.removed, 2);
+    }
+
+    /// A single trivial (complexity-1) function removed and a single
+    /// trivial function added — different names — are NOT paired by
+    /// signature, even though each is the only leftover on its side. A
+    /// degenerate empty signature is no relocation signal; this is the
+    /// real-world `first()` → `third()` stub case a naive 1:1 match
+    /// would mis-link.
+    #[test]
+    fn compute_single_trivial_functions_do_not_pair_by_signature() {
+        let baseline = make_result(vec![make_verdict_cx("a.rs", "first", 1.0, false, 1)]);
+        let current = make_result(vec![make_verdict_cx("b.rs", "third", 1.0, false, 1)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 2);
+        assert_eq!(delta.summary.renamed, 0);
+        assert_eq!(delta.summary.added, 1);
+        assert_eq!(delta.summary.removed, 1);
+    }
+
+    /// A trivial (complexity-1) function moved to another file but
+    /// keeping its name still pairs as `Renamed` — Tier A keys on the
+    /// retained name, a confident signal at any complexity, so the
+    /// distinctiveness gate (which only restricts Tier B) does not block
+    /// it.
+    #[test]
+    fn compute_trivial_function_moved_keeping_name_pairs_via_tier_a() {
+        let baseline = make_result(vec![make_verdict_cx("a.rs", "helper", 1.0, false, 1)]);
+        let current = make_result(vec![make_verdict_cx("b.rs", "helper", 1.0, false, 1)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        assert_eq!(delta.summary.renamed, 1);
+    }
+
+    /// A pure relocation (identical score) never contributes a new
+    /// violation — even when the function was already over threshold on
+    /// both sides. This is the headline migration-friendly behavior.
+    #[test]
+    fn compute_pure_relocation_of_failing_fn_is_not_a_new_violation() {
+        let baseline = make_result(vec![make_verdict("a.rs", "big", 47.0, true)]);
+        let current = make_result(vec![make_verdict("b.rs", "big", 47.0, true)]);
+        let delta = compute(baseline, current);
+        assert_eq!(delta.changes.len(), 1);
+        assert!(matches!(delta.changes[0], FunctionChange::Renamed { .. }));
+        assert_eq!(delta.summary.renamed, 1);
+        assert_eq!(delta.summary.new_violations, 0);
+        assert!(delta.summary.passed);
     }
 
     #[test]
@@ -905,14 +1387,19 @@ mod tests {
             serde_json::to_string(&ChangeKind::Removed).unwrap(),
             "\"removed\""
         );
+        assert_eq!(
+            serde_json::to_string(&ChangeKind::Renamed).unwrap(),
+            "\"renamed\""
+        );
     }
 
     #[test]
     fn change_kind_all_contains_every_variant() {
-        assert_eq!(ChangeKind::ALL.len(), 3);
+        assert_eq!(ChangeKind::ALL.len(), 4);
         assert!(ChangeKind::ALL.contains(&ChangeKind::Added));
         assert!(ChangeKind::ALL.contains(&ChangeKind::Removed));
         assert!(ChangeKind::ALL.contains(&ChangeKind::Modified));
+        assert!(ChangeKind::ALL.contains(&ChangeKind::Renamed));
     }
 
     #[test]
@@ -1263,7 +1750,8 @@ mod proptests {
             // matched can be 0; both-only appears as Add+Remove which
             // sums to baseline+current.)
             prop_assert!(n <= baseline_len + current_len);
-            // Modified can't exceed either side.
+            // Modified and Renamed each consume one baseline and one
+            // current entry, so neither can exceed either side.
             let modified_count = delta
                 .changes
                 .iter()
@@ -1271,10 +1759,18 @@ mod proptests {
                 .count();
             prop_assert!(modified_count <= baseline_len);
             prop_assert!(modified_count <= current_len);
+            let renamed_count = delta
+                .changes
+                .iter()
+                .filter(|c| matches!(c, FunctionChange::Renamed { .. }))
+                .count();
+            prop_assert!(renamed_count <= baseline_len);
+            prop_assert!(renamed_count <= current_len);
         }
 
         /// new_violations is bounded by the count of Added rows that
-        /// exceed plus Modified rows that crossed the threshold.
+        /// exceed plus Modified / Renamed rows that crossed the
+        /// threshold.
         #[test]
         fn prop_new_violations_well_bounded(
             baseline in arb_analysis_result(),
@@ -1282,8 +1778,40 @@ mod proptests {
         ) {
             let delta = compute(baseline, current);
             let summary = DeltaSummary::compute(&delta.changes);
-            prop_assert!(summary.new_violations <= summary.added + summary.modified);
+            prop_assert!(
+                summary.new_violations <= summary.added + summary.modified + summary.renamed
+            );
             prop_assert_eq!(summary.passed, summary.new_violations == 0);
+        }
+
+        /// Pairing a relocation never *raises* `new_violations` versus
+        /// the pre-feature Add+Remove behavior. A `Renamed` row uses the
+        /// `Modified` rule (`!baseline.exceeds && current.exceeds`),
+        /// which is always ≤ the `Added` rule (`current.exceeds`) the
+        /// unpaired half would have used — so enabling rename detection
+        /// can only hold or lower the count, never newly fail a PR the
+        /// old behavior would have passed.
+        #[test]
+        fn prop_renamed_never_raises_new_violations(
+            baseline in arb_analysis_result(),
+            current in arb_analysis_result(),
+        ) {
+            let delta = compute(baseline, current);
+            let without_pairing: u32 = delta
+                .changes
+                .iter()
+                .map(|change| match change {
+                    FunctionChange::Added { current } => u32::from(current.exceeds),
+                    FunctionChange::Modified { baseline, current } => {
+                        u32::from(!baseline.exceeds && current.exceeds)
+                    }
+                    // Counted as the bare Added its current half would
+                    // have been without the relocation pass.
+                    FunctionChange::Renamed { current, .. } => u32::from(current.exceeds),
+                    FunctionChange::Removed { .. } => 0,
+                })
+                .sum();
+            prop_assert!(delta.summary.new_violations <= without_pairing);
         }
 
         /// View shaping never adds rows. `view.shown.len() <= eligible_count

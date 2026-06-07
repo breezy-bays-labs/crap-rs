@@ -18,7 +18,7 @@ Summary: 3 functions | 2 above threshold (8) | worst: 30.0 | FAIL
          avg: 18.3 | median: 22.0 | low: 1 | acceptable: 0 | moderate: 0 | high: 2
 
 Delta vs baseline:
-  +1 added, 1 removed, 2 modified · 1 regressions, 0 improvements, 1 new violations
+  +1 added, 1 removed, 2 modified, 0 renamed · 1 regressions, 0 improvements, 1 new violations
 
 +----------+------------------------------+--------------+----------+---------+-------+
 | Kind     | File                         | Function     | Baseline | Current | Δ     |

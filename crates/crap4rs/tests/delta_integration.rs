@@ -351,3 +351,120 @@ fn baseline_unsupported_schema_version_exits_2() {
         "stderr should specifically signal version mismatch (not a parse error): {stderr}"
     );
 }
+
+// ── Relocation (Renamed) ────────────────────────────────────────────
+
+/// A branchy, fully-uncovered function — CRAP `c² + c`, comfortably over
+/// a threshold of 5 on both sides of the delta. Reused byte-identically
+/// across files so the relocation pass pairs it as a single change.
+const RELOCATED_FN: &str = "\
+pub fn process(x: i32) -> i32 {
+    if x > 0 {
+        if x > 5 { 1 } else { 2 }
+    } else {
+        3
+    }
+}
+";
+
+/// LCOV marking every line of [`RELOCATED_FN`] uncovered for the given
+/// source file, so the function scores identically (and over threshold)
+/// wherever it lives.
+fn relocated_lcov(file: &str) -> String {
+    format!("SF:{file}\nDA:1,0\nDA:2,0\nDA:3,0\nDA:4,0\nDA:5,0\nDA:6,0\nDA:7,0\nend_of_record\n")
+}
+
+fn write_single_fn_file(dir: &Path, file_name: &str, src: &str, lcov: &str) {
+    let src_dir = dir.join("src");
+    std::fs::create_dir_all(&src_dir).expect("create src dir");
+    std::fs::write(src_dir.join(file_name), src).expect("write src file");
+    std::fs::write(dir.join("lcov.info"), lcov).expect("write lcov.info");
+}
+
+/// End-to-end: a function moved to a different file (body byte-identical,
+/// over threshold on both sides) is classified as a single `Renamed` —
+/// not an unrelated Added + Removed pair — and contributes NO new
+/// violation, so the delta gate stays green. This is the headline
+/// migration-friendly behavior: relocating an already-complex function
+/// does not trip the delta. (The whole-project analysis still flags it —
+/// it is genuinely over threshold — but that is the separate analysis
+/// gate, not the delta gate.)
+#[test]
+fn relocated_function_is_renamed_and_adds_no_new_violation() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+
+    // Baseline: `process` lives in old_mod.rs, over threshold.
+    write_single_fn_file(
+        tmp.path(),
+        "old_mod.rs",
+        RELOCATED_FN,
+        &relocated_lcov("old_mod.rs"),
+    );
+    let baseline = capture_baseline(tmp.path(), "5");
+
+    // Current: identical `process` relocated to new_mod.rs; old file gone.
+    std::fs::remove_file(tmp.path().join("src").join("old_mod.rs")).expect("remove old file");
+    write_single_fn_file(
+        tmp.path(),
+        "new_mod.rs",
+        RELOCATED_FN,
+        &relocated_lcov("new_mod.rs"),
+    );
+
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--baseline",
+            baseline.to_str().unwrap(),
+            "--format",
+            "json",
+            "--no-fail",
+        ],
+    );
+    let body = stdout_str(&output);
+    let v: serde_json::Value = serde_json::from_str(&body)
+        .unwrap_or_else(|e| panic!("stdout not valid JSON: {e}\nraw:\n{body}"));
+
+    let summary = &v["delta"]["summary"];
+    // One relocation, classified as Renamed — never Added + Removed.
+    assert_eq!(
+        summary["renamed"].as_u64(),
+        Some(1),
+        "expected exactly one renamed: {summary}"
+    );
+    assert_eq!(summary["added"].as_u64(), Some(0), "no added: {summary}");
+    assert_eq!(
+        summary["removed"].as_u64(),
+        Some(0),
+        "no removed: {summary}"
+    );
+    // The headline: a pure relocation of an already-failing function
+    // introduces no new violation, so the delta gate stays green.
+    assert_eq!(
+        summary["new_violations"].as_u64(),
+        Some(0),
+        "relocation must not be a new violation: {summary}"
+    );
+    assert_eq!(summary["passed"], true, "delta gate stays green: {summary}");
+
+    // The single shown row is a renamed row carrying BOTH sides: the
+    // current (post-move) and baseline (pre-move) locations — the
+    // old → new audit trail.
+    let shown = v["delta"]["shown"]
+        .as_array()
+        .expect("delta.shown is array");
+    let renamed = shown
+        .iter()
+        .find(|c| c["kind"] == "renamed")
+        .unwrap_or_else(|| panic!("a renamed change is present: {shown:?}"));
+    assert_eq!(
+        renamed["current"]["scored"]["identity"]["file_path"], "new_mod.rs",
+        "renamed reports the current location: {renamed}"
+    );
+    assert_eq!(
+        renamed["baseline"]["scored"]["identity"]["file_path"], "old_mod.rs",
+        "renamed carries the baseline (pre-move) location: {renamed}"
+    );
+}

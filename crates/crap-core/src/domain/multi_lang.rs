@@ -220,6 +220,8 @@ pub struct CombinedDeltaSummary {
     pub added: u32,
     pub removed: u32,
     pub modified: u32,
+    /// Relocated (moved / renamed) functions, summed across adapters.
+    pub renamed: u32,
     pub regressions: u32,
     pub improvements: u32,
     pub new_violations: u32,
@@ -235,6 +237,7 @@ impl Default for CombinedDeltaSummary {
             added: 0,
             removed: 0,
             modified: 0,
+            renamed: 0,
             regressions: 0,
             improvements: 0,
             new_violations: 0,
@@ -315,6 +318,7 @@ impl CombinedDeltaSummary {
         self.added += other.added;
         self.removed += other.removed;
         self.modified += other.modified;
+        self.renamed += other.renamed;
         self.regressions += other.regressions;
         self.improvements += other.improvements;
         self.new_violations += other.new_violations;
