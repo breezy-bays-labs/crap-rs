@@ -753,6 +753,111 @@ jobs:
             `crap-examples` (an intentionally bad teaching sample), not
             production.
 
+  publish-production-report:
+    # ----------------------------------------------------------------
+    # Hosted-reports walking skeleton (crap-rs#378, epic #377). On
+    # push to main ONLY, render the production CRAP HTML report and
+    # publish it to the GitHub Pages root, plus write the production
+    # analysis envelope to gh-pages:/baselines/main.json — the baseline
+    # every future per-PR report will diff against. Main report only;
+    # per-PR / delta wiring is a later wave.
+    #
+    # This is REPORT-ONLY, never a gate: the threshold gate is owned by
+    # `scorecard-production` (gate-on-analysis) on the PR. This job only
+    # `needs: [coverage]` and so runs even if a strict-8 regression
+    # reached main — exactly when the hosted report matters most — so
+    # the render uses `--no-fail` (the same flag the composite action
+    # uses to capture truth into its envelope) to keep the analyzer's
+    # threshold exit code from skipping the publish.
+    #
+    # The analysis half mirrors `scorecard-production` byte-for-byte:
+    # same pinned actions, same `lcov` artifact, and the published
+    # crap4rs predates the repeatable-`--src` this repo's `crap.toml`
+    # needs, so the report MUST run THIS commit's freshly built binary.
+    # Analysis knobs (`src` / `threshold` / `metric`) are NOT passed —
+    # the repo-root `crap.toml` owns them via auto-discovery, identical
+    # to `scorecard-production`.
+    # ----------------------------------------------------------------
+    name: Publish production report → gh-pages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: [coverage]
+    permissions:
+      # Elevate ONLY here: contents: write to push the rendered report
+      # and baseline envelope to the gh-pages branch. The top-level
+      # workflow default stays contents: read.
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # The publish step uses a separate tokened clone of gh-pages,
+          # never this checkout's persisted credentials — keep them off
+          # the runner's .git/config (artipacked audit).
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lcov
+
+      - name: Build crap4rs from source
+        # The published crap4rs lacks the repeatable `--src` this repo's
+        # crap.toml needs (3 prod crate roots) — same rationale as
+        # scorecard-production's "Build PR binary" step.
+        run: cargo build --release --package crap4rs
+
+      - name: Render production HTML report + baseline envelope
+        # No analysis flags — crap.toml owns src/threshold/metric via
+        # auto-discovery from the repo root. Multi-format fan-out writes
+        # both shapes in one pass: HTML is the hosted report, JSON is
+        # the baseline envelope. No `--baseline`: main IS the baseline,
+        # so the root report has no delta tab (correct for Wave 0).
+        # `--no-fail` makes this report-only — a threshold violation on
+        # main must not skip publication (gating is scorecard-production).
+        run: |
+          set -euo pipefail
+          ./target/release/crap4rs \
+            --coverage lcov.info \
+            --no-fail \
+            --format html:report.html,json:envelope.json
+          # Empty-file guard (AGENTS.md release-envelope rule): a silent
+          # render failure surfaces here, not as an opaque downstream
+          # parse error on the published asset.
+          [ -s report.html ] || { echo "::error::render produced an empty report.html"; exit 1; }
+          [ -s envelope.json ] || { echo "::error::render produced an empty envelope.json"; exit 1; }
+
+      - name: Publish to gh-pages
+        # Plain git push (no third-party action — supply-chain
+        # conventions). A separate shallow tokened clone of gh-pages
+        # avoids relying on the main checkout's (deliberately absent)
+        # persisted credentials. Existing gh-pages content — notably
+        # `.nojekyll` — is preserved because we copy files in rather
+        # than wiping the tree. The no-op guard skips an empty commit;
+        # in practice the envelope's embedded timestamp changes every
+        # run, so it is a safety net, not a deduplicator.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --branch gh-pages --single-branch --depth 1 \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages-pub
+          # Root report → Pages index.html; envelope → baselines/main.json.
+          cp report.html gh-pages-pub/index.html
+          mkdir -p gh-pages-pub/baselines
+          cp envelope.json gh-pages-pub/baselines/main.json
+          cd gh-pages-pub
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "gh-pages already up to date — nothing to publish"
+            exit 0
+          fi
+          git add index.html baselines/main.json
+          git \
+            -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "ci(pages): publish production report + baseline envelope (${GITHUB_SHA})"
+          git push origin HEAD:gh-pages
+
   scorecard-smoke-ts:
     # Sibling of `scorecard-smoke-rust` for the TypeScript dispatch
     # path. Build crap4ts from the PR, stage it on PATH (the only
