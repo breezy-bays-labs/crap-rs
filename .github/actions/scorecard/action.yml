@@ -1743,8 +1743,11 @@ runs:
         # persist-credentials: false. The token is in the URL via the
         # env var, never echoed. REMOTE_URL is built here in the script
         # from the two env vars (token + repo) so the secret never flows
-        # through `${{ }}` interpolation and the two clone forms below
-        # share one definition.
+        # through workflow-expression interpolation and the two clone forms
+        # below share one definition. (Do not write a literal GitHub
+        # expression here: GitHub scans run-block text — including bash
+        # comments — for expressions, so an empty/invalid one fails the
+        # action manifest load.)
         REMOTE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         # Branch-exists path (the steady state for any repo that has
         # published before — e.g. crap-rs, where gh-pages already exists):
