@@ -1,0 +1,214 @@
+# ============================================================================
+# COPYABLE REFERENCE RECIPE — hosted per-PR CRAP report on GitHub Pages
+# ============================================================================
+#
+# Copy this file into YOUR repo at `.github/workflows/hosted-pr-report.yml`
+# and replace the placeholders:
+#
+#   * OWNER/REPO            → your repo slug (e.g. acme/widgets)
+#   * OWNER.github.io/REPO  → your Pages base URL (project Pages). For a
+#                             USER/org Pages site or a custom domain the URL
+#                             differs — set `pages-url` to whatever serves the
+#                             gh-pages branch in YOUR setup.
+#   * @<pin-to-a-release-sha> on the scorecard action self-ref → a 40-char
+#                             commit SHA of a crap-rs release (resolve with
+#                             `gh api repos/breezy-bays-labs/crap-rs/commits/<tag> --jq .sha`).
+#
+# This is a TEMPLATE, not a live workflow — it lives under
+# `.github/actions/scorecard/examples/` (NOT `.github/workflows/`) so it does
+# not actually run in the crap-rs repo. crap-rs's own production wiring lives
+# in `.github/workflows/ci.yml` (job `scorecard-production`); this file is that
+# wiring generalized for a third-party consumer.
+#
+# WHAT IT GIVES YOU
+#   * A sticky PR comment with the CRAP scorecard.
+#   * A clickable LIVE hosted report on GitHub Pages at `…/pr-<N>/`, whose
+#     Delta tab diffs the PR branch against your published `main` baseline.
+#   * Automatic teardown of `pr-<N>/` when the PR closes.
+#
+# PREREQUISITE — enable GitHub Pages (one-time, manual)
+#   The action AUTO-CREATES the `gh-pages` branch on its first publish, so you
+#   do NOT need to pre-create it. BUT creating the branch does not make GitHub
+#   serve it. After the first run creates `gh-pages` (or before, if you
+#   pre-create it yourself), enable Pages on that branch:
+#       Settings → Pages → Build and deployment → Deploy from a branch →
+#       Branch: gh-pages → / (root) → Save
+#   The hosted link 404s until Pages is enabled AND has built once. The
+#   "publish before post" ordering guarantees the file was PUSHED, not that
+#   Pages is serving it yet — so on the very first PR the sticky link may 404
+#   for a few minutes (or until you enable Pages). Subsequent runs resolve.
+#
+# SAME-REPO ONLY (fork limitation)
+#   Fork PRs get a read-only GITHUB_TOKEN regardless of `permissions:`, so the
+#   gh-pages push would 403. `pages-publish` below is gated to same-repo PRs;
+#   on a fork PR the action degrades to summary-only (no hosted link), never a
+#   red X and never a dead link. Full fork-PR hosted reports (a privileged
+#   `workflow_run` topology) are tracked as a separate follow-up in crap-rs#386.
+# ============================================================================
+
+name: Hosted PR report
+
+on:
+  pull_request:
+    branches: [main]
+
+# Least-privilege default: read-only at the workflow level. The publish job
+# below elevates only itself.
+permissions:
+  contents: read
+
+jobs:
+  hosted-pr-report:
+    name: Hosted per-PR CRAP report → gh-pages
+    runs-on: ubuntu-latest
+    permissions:
+      # contents: write — the action's publish step pushes the rendered HTML
+      # to the gh-pages branch using THIS job's GITHUB_TOKEN.
+      # pull-requests: write — for the sticky scorecard comment.
+      contents: write
+      pull-requests: write
+    # Serialize every job that can push to gh-pages onto one named group so
+    # their pushes can't collide on the branch tip. Concurrency group names
+    # are repo-global, so the cleanup workflow (below) and any push-to-main
+    # publisher you run must share THIS group name. cancel-in-progress: false
+    # so an in-flight publish is queued behind — never aborted mid-push.
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # The action publishes via a SEPARATE tokened clone of gh-pages,
+          # never this checkout's persisted credentials — keep them off the
+          # runner's .git/config (artipacked hardening).
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      # ----------------------------------------------------------------------
+      # Build coverage. Adjust to your project's coverage tool. The example
+      # uses cargo-llvm-cov (LCOV) — the Rust adapter input. If you already
+      # produce the LCOV in an upstream job, download it via
+      # actions/download-artifact instead (see crap-rs ci.yml for that shape):
+      #   - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      #     with: { name: lcov }
+      # ----------------------------------------------------------------------
+      - name: Build coverage (LCOV)
+        run: |
+          set -euo pipefail
+          cargo install cargo-llvm-cov --locked
+          cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      # ----------------------------------------------------------------------
+      # Fetch the main baseline so the Delta tab renders. DEGRADE, NEVER FAIL:
+      # before your first push-to-main publish there is no baseline yet, and a
+      # missing baseline must render analysis-only — never red the PR. The
+      # whole fetch+show+size chain is inside the `if`, so `set -e` cannot
+      # propagate a failure; a non-zero anywhere takes the else branch and the
+      # step exits 0 with an empty baseline path.
+      #
+      # This reads gh-pages:baselines/main.json — the baseline a push-to-main
+      # publisher writes. Wire that publisher separately (mirror crap-rs's
+      # `publish-production-report` job in ci.yml: on push to main, render
+      # `--format html:report.html,json:envelope.json`, copy report.html to the
+      # Pages root index.html and envelope.json to baselines/main.json).
+      # ----------------------------------------------------------------------
+      - name: Fetch main baseline (degrade-not-fail)
+        id: baseline
+        run: |
+          set -euo pipefail
+          if git fetch origin gh-pages --depth 1 \
+            && git show FETCH_HEAD:baselines/main.json > baseline.json 2>/dev/null \
+            && [ -s baseline.json ]; then
+            echo "path=baseline.json" >> "$GITHUB_OUTPUT"
+            echo "Fetched main baseline — Delta tab will render."
+          else
+            echo "::warning::No non-empty gh-pages:baselines/main.json yet; rendering WITHOUT a Delta tab (expected before the first push-to-main publish)."
+            echo "path=" >> "$GITHUB_OUTPUT"
+            rm -f baseline.json
+          fi
+
+      # ----------------------------------------------------------------------
+      # The scorecard action. Renders HTML, publishes it to gh-pages:pr-<N>/
+      # for SAME-REPO PRs, and links the live page from the sticky comment.
+      # ----------------------------------------------------------------------
+      - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<pin-to-a-release-sha> # SHA-pin to a crap-rs release commit
+        with:
+          languages: rust
+          coverage: lcov.info
+          # Baseline path (or empty) from the degrade-not-fail fetch above.
+          # When set, the action forwards --baseline and the HTML gains a Delta
+          # tab (PR vs main). run-mode is LEFT UNSET on purpose: run-mode:
+          # delta/both would HARD-ERROR on an empty baseline and fail the PR,
+          # violating degrade-not-fail. With run-mode empty the action forwards
+          # --baseline only when non-empty and renders analysis-only otherwise.
+          baseline: ${{ steps.baseline.outputs.path }}
+          # html-report: true is REQUIRED by pages-publish — there must be a
+          # rendered report to host. The Delta tab activates automatically when
+          # a baseline is present; no extra toggle.
+          html-report: true
+          # Publish the hosted per-PR report for SAME-REPO PRs only. A fork
+          # PR's token is read-only (the push would 403), so this resolves
+          # false on forks and the action degrades to summary-only (no link).
+          pages-publish: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          pages-deploy-path: pr-${{ github.event.number }}
+          # Full public URL the report is reachable at. The action does NOT
+          # derive this from pages-deploy-path — set it to YOUR Pages base URL
+          # (project Pages shown; user/org Pages and custom domains differ).
+          pages-url: https://OWNER.github.io/REPO/pr-${{ github.event.number }}/
+          gate-mode: gate-on-analysis
+          comment-mode: sticky
+          comment-header: crap-scorecard
+
+  # ==========================================================================
+  # COMPANION CLEANUP — remove pr-<N>/ from gh-pages when the PR closes.
+  # ==========================================================================
+  # This is a generalized inline copy of crap-rs's
+  # `.github/workflows/pages-cleanup.yml`. You can either copy that file
+  # wholesale into your own `.github/workflows/` (recommended — it is a
+  # self-contained dedicated workflow) OR keep this block. NOTE: cleanup must
+  # trigger on `pull_request: types: [closed]`, which is a DIFFERENT trigger
+  # than this file's top-level `on:` — so if you keep it here, change the
+  # top-level `on:` to include closed, or (cleaner) split cleanup into its own
+  # file. The dedicated-file approach avoids re-running the whole build on
+  # every PR close. See pages-cleanup.yml for the full, self-contained shape.
+  #
+  # cleanup-pr-report:
+  #   name: Remove closed PR's report from gh-pages
+  #   runs-on: ubuntu-latest
+  #   if: github.event.action == 'closed'
+  #   permissions:
+  #     contents: write
+  #   concurrency:
+  #     group: gh-pages-publish        # SAME group as the publish job above
+  #     cancel-in-progress: false
+  #   steps:
+  #     - name: Remove pr-<N> from gh-pages
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         PR_NUMBER: ${{ github.event.number }}
+  #       run: |
+  #         set -euo pipefail
+  #         # Missing-branch tolerance: a fresh repo that never published has
+  #         # no gh-pages branch — treat the clone failure as nothing-to-clean.
+  #         if ! git clone --branch gh-pages --single-branch --depth 1 \
+  #           "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+  #           gh-pages-cleanup 2>/dev/null; then
+  #           echo "No gh-pages branch yet — nothing to clean (no-op)."
+  #           exit 0
+  #         fi
+  #         cd gh-pages-cleanup
+  #         if [ -d "pr-${PR_NUMBER}" ]; then
+  #           git rm -r "pr-${PR_NUMBER}"
+  #           if [ -z "$(git status --porcelain)" ]; then
+  #             echo "Nothing staged — no-op."; exit 0
+  #           fi
+  #           git \
+  #             -c user.name="github-actions[bot]" \
+  #             -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+  #             commit -m "ci(pages): remove per-PR report for closed PR #${PR_NUMBER}"
+  #           git push origin HEAD:gh-pages
+  #         else
+  #           echo "No pr-${PR_NUMBER}/ on gh-pages — nothing to clean (no-op)."
+  #           exit 0
+  #         fi

@@ -334,7 +334,14 @@ inputs:
     description: |
       The Pages branch to publish to. Default `gh-pages` (the
       deploy-from-branch convention). Consulted only when
-      `pages-publish: true`.
+      `pages-publish: true`. When the branch does not exist yet (a
+      fresh consumer repo's first publish), the action creates it as an
+      orphan branch (empty tree + a `.nojekyll` marker) so the first run
+      does not fatally fail — the consumer does NOT need to pre-create
+      the branch. Creating the branch does not, by itself, make GitHub
+      Pages serve it: the consumer must still enable Pages on this branch
+      (Settings → Pages → Deploy from a branch) for the hosted link to
+      resolve. See the action README's "Hosted per-PR report" section.
     required: false
     default: 'gh-pages'
 
@@ -1734,10 +1741,40 @@ runs:
         # (not the workflow checkout) keeps the push self-contained and
         # works even though the caller's checkout sets
         # persist-credentials: false. The token is in the URL via the
-        # env var, never echoed.
-        git clone --branch "$PAGES_BRANCH" --single-branch --depth 1 \
-          "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-          gh-pages-pr-pub
+        # env var, never echoed. REMOTE_URL is built here in the script
+        # from the two env vars (token + repo) so the secret never flows
+        # through `${{ }}` interpolation and the two clone forms below
+        # share one definition.
+        REMOTE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        # Branch-exists path (the steady state for any repo that has
+        # published before — e.g. crap-rs, where gh-pages already exists):
+        # the --branch clone succeeds and the orphan block is NEVER
+        # entered, so the publish flow below is byte-identical to before
+        # this fallback existed (no regression).
+        #
+        # First-run path (a fresh consumer repo whose gh-pages does not
+        # exist yet): the --branch clone fails, so we clone the default
+        # branch instead and create gh-pages as an ORPHAN (no history,
+        # empty tree). The trailing `git push HEAD:$PAGES_BRANCH` below
+        # creates the branch on the remote. We seed `.nojekyll` so Pages
+        # serves the raw HTML without Jekyll processing (a gh-pages branch
+        # missing it can mis-serve files whose names Jekyll treats
+        # specially) AND stage it here — the main-flow `git add` further
+        # down stages only the report's index.html, so without this
+        # explicit add the orphan branch would ship without `.nojekyll`.
+        # `git add` keeps it in the index across the `cd ..` round-trip,
+        # so the existing commit picks up both files.
+        if ! git clone --branch "$PAGES_BRANCH" --single-branch --depth 1 \
+          "$REMOTE_URL" gh-pages-pr-pub 2>/dev/null; then
+          echo "Pages branch '$PAGES_BRANCH' not found — creating it (orphan)."
+          git clone --depth 1 "$REMOTE_URL" gh-pages-pr-pub
+          cd gh-pages-pr-pub
+          git checkout --orphan "$PAGES_BRANCH"
+          git rm -rf . >/dev/null 2>&1 || true
+          : > .nojekyll
+          git add .nojekyll
+          cd ..
+        fi
         # Copy the report to <deploy-path>/index.html. mkdir -p creates
         # the per-PR directory; existing Pages content outside it
         # (root index.html, .nojekyll, baselines/, other PR dirs) is
