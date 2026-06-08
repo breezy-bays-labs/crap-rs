@@ -689,10 +689,24 @@ jobs:
     name: Scorecard — production crates (gated)
     runs-on: ubuntu-latest
     needs: [coverage]
+    # Shared gh-pages publish lock (epic #377, Wave 1). The per-PR
+    # publish here and the push-to-main publish in
+    # `publish-production-report` sit in DIFFERENT top-level concurrency
+    # groups (the workflow group is `ci-${{ github.ref }}`, so a PR run
+    # and a main run never share it). Without this job-level group, a
+    # merge-to-main publish and an in-flight PR publish could push to
+    # gh-pages concurrently and collide on the branch tip. A shared
+    # named group with cancel-in-progress: false serializes the two.
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
     permissions:
-      # contents: read for checkout; pull-requests: write for the
-      # distinct `crap-scorecard-production` sticky comment on PRs.
-      contents: read
+      # contents: write to push the per-PR HTML report to the gh-pages
+      # branch (epic #377, Wave 1 — the action's pages-publish step uses
+      # the job's GITHUB_TOKEN); pull-requests: write for the distinct
+      # `crap-scorecard-production` sticky comment on PRs. The top-level
+      # workflow default stays contents: read.
+      contents: write
       pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -721,6 +735,49 @@ jobs:
           install -m 0755 ./target/release/crap4rs "$HOME/.cargo/bin/crap4rs"
           crap4rs --version
 
+      - name: Fetch main baseline (degrade-not-fail)
+        id: baseline
+        # The per-PR Delta tab diffs this PR against the production
+        # baseline Wave 0 publishes to gh-pages:/baselines/main.json on
+        # every push to main. Fetch it via `git show` off a shallow
+        # `gh-pages` fetch — the branch tip avoids the Pages CDN's
+        # propagation lag, and a public-repo fetch needs no token.
+        #
+        # DEGRADE, NEVER FAIL (epic #377 AC): if the fetch fails OR the
+        # file is empty (first run before any main publish, a transient
+        # ref glitch, etc.), emit a `::warning::` and leave the baseline
+        # path empty. An empty `baseline:` makes the action render
+        # analysis-only (no Delta tab) — the PR must NEVER red over a
+        # missing baseline. The whole fetch+show+size-check chain is
+        # inside the `if` so `set -e` cannot propagate a failure: a
+        # non-zero anywhere takes the else branch and the step exits 0.
+        run: |
+          set -euo pipefail
+          if git fetch origin gh-pages --depth 1 \
+            && git show FETCH_HEAD:baselines/main.json > baseline.json 2>/dev/null \
+            && [ -s baseline.json ]; then
+            echo "path=baseline.json" >> "$GITHUB_OUTPUT"
+            echo "Fetched main baseline ($(wc -c < baseline.json) bytes) — Delta tab will render."
+          else
+            echo "::warning::Could not fetch a non-empty gh-pages:baselines/main.json; rendering the per-PR report WITHOUT a Delta tab (degrade-not-fail). This is expected before the first push-to-main publish."
+            echo "path=" >> "$GITHUB_OUTPUT"
+            rm -f baseline.json
+          fi
+
+      - name: Note fork-PR Pages degradation
+        # On a fork PR the GITHUB_TOKEN is read-only regardless of the
+        # job's permissions: block, so the gh-pages push would 403. The
+        # pages-publish input below is computed false for fork PRs, so
+        # the action degrades to summary-only (no hosted link) — never a
+        # red X, never a dead link. Surface that decision in the log so a
+        # reviewer on a fork PR knows the missing link is by design.
+        # Full fork-PR publishing (a privileged workflow_run topology) is
+        # a later, separate deliverable of this epic.
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          set -euo pipefail
+          echo "::notice::Fork PR detected — the hosted per-PR report link is omitted because a fork's GITHUB_TOKEN is read-only and cannot publish to GitHub Pages. The scorecard summary is unaffected. Full fork-PR hosted reports are a planned follow-up."
+
       - name: Production scorecard (gate-on-analysis)
         uses: ./.github/actions/scorecard
         with:
@@ -743,6 +800,34 @@ jobs:
           # artifact); `gate-mode` / `comment-*` shape how the wrapper
           # gates and renders the PR comment.
           coverage: lcov.info
+          # Baseline path (or empty) from the degrade-not-fail fetch
+          # above. When set, the action forwards `--baseline` and the
+          # rendered HTML gains a Delta tab (PR vs main); when empty, the
+          # report is analysis-only. `run-mode` is deliberately LEFT
+          # UNSET: setting `run-mode: delta`/`both` would make the
+          # action HARD-ERROR when the baseline degrades to empty, which
+          # would fail the PR and violate degrade-not-fail. With run-mode
+          # empty the action forwards `--baseline` iff non-empty and
+          # silently runs analysis-only otherwise — exactly the degrade
+          # contract. gate-mode: gate-on-analysis below keeps the GATE
+          # whole-project (the baseline only feeds the Delta VIEW, never
+          # the gate), and an empty run-mode means no spurious
+          # baseline/run-mode warning is emitted.
+          baseline: ${{ steps.baseline.outputs.path }}
+          # Render HTML so there is a report to host (required by
+          # pages-publish). The Delta tab activates automatically when
+          # baseline is non-empty — no extra toggle.
+          html-report: true
+          # Publish the hosted per-PR report for SAME-REPO PRs only. A
+          # fork PR's token is read-only (the push would 403), so this
+          # resolves false on forks and the action degrades to
+          # summary-only (no link). On push:main this is also false (the
+          # expression is pull_request-only), so this job never
+          # double-publishes — Wave 0's `publish-production-report` owns
+          # the push:main root publish.
+          pages-publish: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          pages-deploy-path: pr-${{ github.event.number }}
+          pages-url: https://breezy-bays-labs.github.io/crap-rs/pr-${{ github.event.number }}/
           gate-mode: gate-on-analysis
           comment-mode: sticky
           comment-header: crap-scorecard-production
@@ -782,6 +867,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     needs: [coverage]
+    # Shared gh-pages publish lock (epic #377, Wave 1). This push-to-main
+    # publish and the per-PR publish in `scorecard-production` are in
+    # different top-level concurrency groups (the workflow group is
+    # `ci-${{ github.ref }}`), so without a shared job-level group their
+    # gh-pages pushes could race and collide on the branch tip. The
+    # named group + cancel-in-progress: false serializes them.
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
     permissions:
       # Elevate ONLY here: contents: write to push the rendered report
       # and baseline envelope to the gh-pages branch. The top-level

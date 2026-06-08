@@ -506,6 +506,70 @@ GitHub** (per the GH API contract on artifact download URLs), so the
 links are meant for human-followable surfaces (sticky comments,
 Check Run summaries) — not in-job `curl` retrieval.
 
+## Hosted per-PR report on GitHub Pages
+
+A workflow-artifact link makes the reviewer download a zip and open
+it locally. `pages-publish: true` instead pushes the rendered HTML to
+a GitHub Pages branch and links the **live hosted page** in the
+sticky comment — one click, no download. Pair it with `baseline:` to
+host a per-PR report whose Delta tab diffs the PR branch against a
+published baseline.
+
+```yaml
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # required for the gh-pages push
+      pull-requests: write  # required for the sticky comment
+    steps:
+      - uses: actions/checkout@<sha>
+        with:
+          persist-credentials: false
+      # ... build coverage + (optionally) fetch a baseline ...
+      - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@<sha>
+        with:
+          coverage: lcov.info
+          baseline: baseline.json          # optional — enables the Delta tab
+          html-report: true                # required for pages-publish
+          comment-mode: sticky
+          # Publish ONLY on same-repo PRs — a fork PR's GITHUB_TOKEN is
+          # read-only and the push would 403. On a fork PR this resolves
+          # to false and the card degrades to summary-only (no link).
+          pages-publish: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          pages-deploy-path: pr-${{ github.event.number }}
+          pages-url: https://acme.github.io/my-repo/pr-${{ github.event.number }}/
+```
+
+**Publish before post (no dead links).** The publish step runs BEFORE
+the sticky comment is composed, under `set -euo pipefail`, so a push
+failure fails the whole job (red X) rather than posting a link to a
+page that was never written. The sticky link (`📊 [Open report](…)`)
+is emitted only when `pages-publish: true`; with it off the action's
+body is byte-identical to the artifact-link / no-link behavior.
+
+**`contents: write` and fork PRs.** The publish is a plain `git push`
+to the Pages branch from within the caller's job, authorized by the
+job's `GITHUB_TOKEN` — so the caller must grant `contents: write`.
+GitHub issues a **read-only** `GITHUB_TOKEN` for fork-triggered
+`pull_request` events regardless of the `permissions:` block, so the
+push would 403 on a fork. Gate `pages-publish` to same-repo events
+(as above); on a fork PR the action falls back to the existing
+artifact-link / no-link path and the card stays green. Full fork-PR
+publishing (a `workflow_run` topology that publishes in a privileged
+context) is a separate, later deliverable.
+
+**Existing Pages content is preserved.** The publish copies the
+report into `<pages-deploy-path>/index.html`; it does not wipe the
+branch tree. A root `index.html`, `.nojekyll`, a `baselines/`
+directory, and other PRs' deploy paths all survive untouched.
+
+**Concurrency.** If more than one job in your workflows can push to
+the Pages branch (e.g. a per-PR publish and a push-to-main publish),
+give them a shared `concurrency: { group: <pages-group>,
+cancel-in-progress: false }` so their pushes serialize and can't
+collide on the branch tip.
+
 ## Patterns
 
 The three standard integration shapes. Pattern 1 is what the [Quick
@@ -705,6 +769,10 @@ row; the aggregator owns the comment.
 | `annotation-limit` | `''` | Cap on emitted annotations when `annotations: true`. Empty defers to the adapter's default (10) or `[output] annotation_limit` from `config`. Range 1..=100 |
 | `html-report` | `false` | When `true`, render `<bin> --format html` as a workflow artifact and (sticky-only) append a download link to the comment body. Per-language in multi-language mode. See [HTML report](#html-report) |
 | `html-artifact-name-suffix` | `''` (→ `-${{ runner.os }}`) | Suffix appended to the HTML artifact name(s) to disambiguate matrix-strategy uploads. See [HTML report — Artifact naming + retention](#artifact-naming--retention) |
+| `pages-publish` | `false` | When `true`, publish the rendered HTML to a GitHub Pages branch and use the hosted URL as the sticky link (replacing the artifact-download link). Requires `html-report: true`, `pages-deploy-path`, `pages-url`, and the caller's job granting `contents: write`. Set `false` on fork PRs (read-only token can't push). See [Hosted per-PR report](#hosted-per-pr-report-on-github-pages) |
+| `pages-deploy-path` | `''` | Path within the Pages branch to deploy to (e.g. `pr-123`). Report is written to `<path>/index.html`; existing Pages content outside the path is preserved. Required when `pages-publish: true` |
+| `pages-url` | `''` | Public URL the deployed report is reachable at (e.g. `https://acme.github.io/my-repo/pr-123/`). Used verbatim as the sticky link. Required when `pages-publish: true` — the action does not derive it from `pages-deploy-path` |
+| `pages-branch` | `gh-pages` | The Pages branch to publish to. Consulted only when `pages-publish: true` |
 | `threshold-preset` | `''` | (preset) `strict` (8) \| `default` (15) \| `lenient` (25). Derives `threshold`; raw `threshold:` wins on conflict + warning. See [Presets](#presets) |
 | `run-mode` | `''` | (preset) `full` \| `delta` \| `both` — drives baseline expectations. `delta`/`both` require `baseline:` set. See [Presets](#presets) |
 | `gate-mode` | `''` | (preset) `report-only` \| `gate-on-analysis` \| `gate-on-delta` \| `gate-on-both`. Atomic `analysis-gate` + `delta-gate` pair; raw inputs win on conflict + warning. See [Presets](#presets) |
