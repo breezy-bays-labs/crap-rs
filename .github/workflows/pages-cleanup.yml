@@ -1,0 +1,102 @@
+# Pages cleanup — Wave 2a of the hosted per-PR HTML scorecard reports
+# epic. When a PR against main closes (merged OR not), this removes that
+# PR's report directory (`pr-<N>/`) from the gh-pages branch so per-PR
+# reports don't accumulate forever on the Pages branch as PRs come and
+# go. Wave 1 (the per-PR publish step in
+# `.github/actions/scorecard/action.yml`) creates `pr-<N>/`; this is the
+# matching teardown.
+#
+# DEDICATED workflow, deliberately NOT folded into ci.yml: adding
+# `closed` to ci.yml's `pull_request:` types would run the entire CI
+# suite (fmt/clippy/test matrix/coverage/mutants/scorecards) on every
+# PR close — wasteful. This workflow runs ONE tiny git operation.
+name: Pages cleanup
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+# Least-privilege default: read-only at the workflow level. The single
+# job below elevates to `contents: write` only for itself (it needs to
+# push the deletion commit to gh-pages).
+permissions:
+  contents: read
+
+jobs:
+  cleanup-pr-report:
+    name: Remove closed PR's report from gh-pages
+    runs-on: ubuntu-latest
+    permissions:
+      # Elevate ONLY here: contents: write authorizes the push of the
+      # deletion commit to the gh-pages branch. The top-level workflow
+      # default stays contents: read.
+      contents: write
+    # Shared gh-pages publish lock (epic #377). This cleanup push and the
+    # publish pushes in ci.yml (`scorecard-production` per-PR publish and
+    # `publish-production-report` push-to-main publish) all use the SAME
+    # named group. Concurrency group names are repo-global, so a same-named
+    # group serializes the gh-pages tip across separate workflow files —
+    # a cleanup push can't collide with a publish push. cancel-in-progress
+    # is false so an in-flight publish is never aborted mid-push by a
+    # cleanup (and vice versa); the second one queues and runs after.
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
+    steps:
+      # Single bash step. No `actions/checkout` of the PR branch is
+      # needed — the cleanup clones gh-pages separately via a tokened
+      # clone (the same self-contained plain-git mechanism Wave 0/1 use),
+      # so this workflow has ZERO `uses:` references and therefore no
+      # action-pinning / persist-credentials surface to maintain.
+      #
+      # Template-injection hygiene: the PR number flows through the `env:`
+      # block (PR_NUMBER), never via `${{ }}` interpolation inside the
+      # `run:` script. The token is `secrets.GITHUB_TOKEN` — correct here
+      # because this is a workflow job (composite ACTIONS must use
+      # `github.token` instead, which is why the action.yml publish step
+      # differs). $GITHUB_REPOSITORY is shell-quoted.
+      - name: Remove pr-${{ github.event.number }} from gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          # Shallow tokened clone of gh-pages. $GITHUB_REPOSITORY is the
+          # BASE repo even on a fork-PR close, so this always targets the
+          # canonical gh-pages branch. A read-only token (fork PR) can
+          # still CLONE a public repo; the only operation a fork token
+          # can't do is PUSH — and on a fork PR the no-op exit below
+          # happens BEFORE any push is reached (see the fork-safe note).
+          git clone --branch gh-pages --single-branch --depth 1 \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages-cleanup
+          cd gh-pages-cleanup
+          # Fork-safe / degrade-not-fail by construction: Wave 1 publishes
+          # `pr-<N>/` for SAME-REPO PRs only, so a closed fork PR never
+          # created the directory → the else-branch no-ops and exits 0
+          # BEFORE any push (which a read-only fork token couldn't do
+          # anyway). The same absent-dir no-op covers a re-run, an
+          # already-clean state, or a same-repo PR that simply never
+          # published. No same-repo `if:` gate is needed — the dir-
+          # existence check is the whole fork-safety story, and skipping
+          # the gate keeps the workflow shape simplest.
+          if [ -d "pr-${PR_NUMBER}" ]; then
+            git rm -r "pr-${PR_NUMBER}"
+            # No-op guard: if nothing is actually staged (e.g. the dir was
+            # already empty / untracked), skip an empty commit and exit
+            # clean rather than failing on `git commit`.
+            if [ -z "$(git status --porcelain)" ]; then
+              echo "pr-${PR_NUMBER}/ matched no tracked files — nothing to commit (no-op)"
+              exit 0
+            fi
+            git \
+              -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "ci(pages): remove per-PR report for closed PR #${PR_NUMBER}"
+            git push origin HEAD:gh-pages
+            echo "Removed pr-${PR_NUMBER}/ from gh-pages."
+          else
+            echo "No pr-${PR_NUMBER}/ on gh-pages — nothing to clean (no-op)."
+            exit 0
+          fi
