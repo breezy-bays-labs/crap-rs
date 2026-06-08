@@ -515,6 +515,45 @@ sticky comment — one click, no download. Pair it with `baseline:` to
 host a per-PR report whose Delta tab diffs the PR branch against a
 published baseline.
 
+> **Copyable reference recipe.** A complete, ready-to-adapt workflow
+> for this — the per-PR publish job, the degrade-not-fail baseline
+> fetch, the same-repo `pages-publish` gate, and a companion cleanup
+> job — lives at
+> [`examples/hosted-pr-report.yml`](./examples/hosted-pr-report.yml).
+> Copy it into your repo's `.github/workflows/`, replace the
+> `OWNER/REPO` + `OWNER.github.io/REPO` placeholders, and pin the
+> action self-ref to a release SHA. The snippet below is the minimal
+> shape; the example file is the full setup.
+
+### Prerequisite: enable GitHub Pages on the branch (one-time)
+
+This is the prerequisite the section originally omitted. Two things
+must be true before the hosted link resolves, and they happen in this
+order:
+
+1. **The Pages branch must exist.** You do **not** need to pre-create
+   it: when `pages-branch` (default `gh-pages`) does not exist yet, the
+   action creates it as an **orphan branch** on its first publish —
+   empty tree, plus a `.nojekyll` marker so Pages serves the raw HTML
+   without Jekyll processing. (If you prefer, you can pre-create the
+   branch by hand instead; the action's first run is then a normal
+   additive publish.)
+
+2. **Pages must be enabled on that branch.** Creating the branch does
+   **not** make GitHub serve it. After the first run creates `gh-pages`
+   (or after you pre-create it), turn Pages on:
+   **Settings → Pages → Build and deployment → Deploy from a branch →
+   Branch: `gh-pages` → `/ (root)` → Save.**
+
+So the clean first-time ordering is: **first run creates `gh-pages` →
+you enable Pages on it → the link resolves from the next run** (or
+pre-create + enable, then run, so the very first run's link resolves).
+On that very first PR, the sticky link will **404 until Pages is
+enabled and has built once** — the "publish before post" guarantee
+(below) means the file was *pushed*, not that Pages is *serving* it
+yet. That candor is the point: the push succeeding is necessary but
+not sufficient for the link to be live.
+
 ```yaml
 jobs:
   scorecard:
@@ -548,27 +587,41 @@ page that was never written. The sticky link (`📊 [Open report](…)`)
 is emitted only when `pages-publish: true`; with it off the action's
 body is byte-identical to the artifact-link / no-link behavior.
 
-**`contents: write` and fork PRs.** The publish is a plain `git push`
-to the Pages branch from within the caller's job, authorized by the
-job's `GITHUB_TOKEN` — so the caller must grant `contents: write`.
-GitHub issues a **read-only** `GITHUB_TOKEN` for fork-triggered
-`pull_request` events regardless of the `permissions:` block, so the
-push would 403 on a fork. Gate `pages-publish` to same-repo events
-(as above); on a fork PR the action falls back to the existing
-artifact-link / no-link path and the card stays green. Full fork-PR
-publishing (a `workflow_run` topology that publishes in a privileged
-context) is a separate, later deliverable.
+**`contents: write` and the same-repo-only fork limitation.** The
+publish is a plain `git push` to the Pages branch from within the
+caller's job, authorized by the job's `GITHUB_TOKEN` — so the caller
+must grant `contents: write`. GitHub issues a **read-only**
+`GITHUB_TOKEN` for fork-triggered `pull_request` events regardless of
+the `permissions:` block, so the push would 403 on a fork. **Hosted
+per-PR reports therefore publish for same-repo PRs only.** Gate
+`pages-publish` to same-repo events (as above); on a fork PR the
+action falls back to the existing artifact-link / no-link path — the
+scorecard summary still posts, the card stays green, and the only
+thing missing is the hosted link. Full fork-PR hosted reports (a
+privileged `workflow_run` topology that publishes the fork's rendered
+artifact from the base repo's context) are tracked as a separate
+follow-up in crap-rs#386.
 
 **Existing Pages content is preserved.** The publish copies the
 report into `<pages-deploy-path>/index.html`; it does not wipe the
 branch tree. A root `index.html`, `.nojekyll`, a `baselines/`
 directory, and other PRs' deploy paths all survive untouched.
 
+**Cleanup on PR close.** Per-PR directories would otherwise accumulate
+on the branch forever. crap-rs ships a companion teardown workflow
+([`pages-cleanup.yml`](../../workflows/pages-cleanup.yml)) that removes
+`pr-<N>/` from the Pages branch when a PR closes (merged or not). Copy
+it alongside the publish workflow — it is a dedicated `pull_request:
+types: [closed]` workflow so PR close runs one tiny git operation
+rather than your whole build. It also tolerates a not-yet-created Pages
+branch (a fresh repo that never published): the clone-or-no-op exits
+clean rather than red-X'ing the close.
+
 **Concurrency.** If more than one job in your workflows can push to
-the Pages branch (e.g. a per-PR publish and a push-to-main publish),
-give them a shared `concurrency: { group: <pages-group>,
-cancel-in-progress: false }` so their pushes serialize and can't
-collide on the branch tip.
+the Pages branch (e.g. a per-PR publish, a push-to-main publish, and
+the cleanup-on-close), give them all a shared `concurrency: { group:
+<pages-group>, cancel-in-progress: false }` so their pushes serialize
+and can't collide on the branch tip.
 
 ## Patterns
 

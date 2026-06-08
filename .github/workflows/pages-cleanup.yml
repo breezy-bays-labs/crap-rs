@@ -68,9 +68,21 @@ jobs:
           # still CLONE a public repo; the only operation a fork token
           # can't do is PUSH — and on a fork PR the no-op exit below
           # happens BEFORE any push is reached (see the fork-safe note).
-          git clone --branch gh-pages --single-branch --depth 1 \
+          #
+          # Missing-branch tolerance (consumer robustness): a fresh
+          # consumer repo that has never published a per-PR report has no
+          # gh-pages branch, so the --branch clone would fail fatally and
+          # red-X this cleanup for a PR that never created anything to
+          # clean. Treat a clone failure as "nothing to clean" and exit 0
+          # — there is no per-PR directory to remove when the branch
+          # itself does not exist. (For crap-rs gh-pages always exists, so
+          # this path is never taken here; it benefits fresh consumers.)
+          if ! git clone --branch gh-pages --single-branch --depth 1 \
             "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            gh-pages-cleanup
+            gh-pages-cleanup 2>/dev/null; then
+            echo "No gh-pages branch yet — nothing to clean (no-op)."
+            exit 0
+          fi
           cd gh-pages-cleanup
           # Fork-safe / degrade-not-fail by construction: Wave 1 publishes
           # `pr-<N>/` for SAME-REPO PRs only, so a closed fork PR never
