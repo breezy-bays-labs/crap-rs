@@ -260,11 +260,13 @@ pub struct DeltaSummary {
     /// nothing suppressed". Reporters render the border-jitter line when
     /// `border_jitter_active || border_jitter_suppressed > 0`.
     ///
-    /// Serialized (additive, no `schema_version` bump) so a downstream
-    /// consumer that recomputes the delta from result envelopes — e.g.
-    /// `crap-render`'s combined multi-language panel — has the signal too;
-    /// the recompute carries the effective epsilon from the envelope, so
-    /// this flag is set identically there (crap-rs#379).
+    /// Serialized in the delta block (additive, no `schema_version` bump),
+    /// consistent with `border_jitter_suppressed`, for external consumers
+    /// that read the delta as data. Note: `crap-render`'s combined panel does
+    /// NOT read this serialized field — it recomputes the delta carrying the
+    /// envelope's effective epsilon, which sets this flag identically. The
+    /// serialized value and the recomputed value therefore agree by
+    /// construction (crap-rs#379).
     pub border_jitter_active: bool,
     /// `new_violations == 0`. Drives the optional `--delta-gate`.
     pub passed: bool,

@@ -578,3 +578,62 @@ fn crap_render_warns_on_language_key_mismatch_but_succeeds() {
         "a matching key must not warn; got: {stderr_ok}"
     );
 }
+
+/// crap-rs#379 on its literal surface: TWO languages through `crap-render`
+/// with an active epsilon band must produce a **combined** panel that shows
+/// the border-jitter line even at zero suppressed. The unit tests cover each
+/// link (epsilon transport for one language; the in-memory combined render);
+/// this guards the exact composition — two `--input` + two `--baseline` +
+/// combined panel — that was the reported bug.
+#[test]
+fn crap_render_combined_panel_shows_border_jitter_band_across_languages() {
+    let tmp = TempDir::new().unwrap();
+    // Inputs carry an active band; baselines are identical → zero suppressed,
+    // band active → every panel (both per-language + the combined one) shows
+    // the line. The combined render is the one #379 was about.
+    let with_eps = |env: &str| {
+        env.replace(
+            "\"schema_version\": 2,",
+            "\"schema_version\": 2,\n  \"epsilon\": 0.5,",
+        )
+    };
+    let rs_in = tmp.path().join("rs_in.json");
+    let ts_in = tmp.path().join("ts_in.json");
+    let rs_base = tmp.path().join("rs_base.json");
+    let ts_base = tmp.path().join("ts_base.json");
+    fs::write(&rs_in, with_eps(MINIMAL_ENVELOPE_V2)).unwrap();
+    fs::write(&ts_in, with_eps(MINIMAL_ENVELOPE_TS_V2)).unwrap();
+    fs::write(&rs_base, MINIMAL_ENVELOPE_V2).unwrap();
+    fs::write(&ts_base, MINIMAL_ENVELOPE_TS_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .args([
+            "--input",
+            &format!("rust={}", rs_in.display()),
+            "--input",
+            &format!("typescript={}", ts_in.display()),
+            "--baseline",
+            &format!("rust={}", rs_base.display()),
+            "--baseline",
+            &format!("typescript={}", ts_base.display()),
+            "--format",
+            "html",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "two-language render should succeed; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let html = String::from_utf8(out.stdout).unwrap();
+    // Three occurrences: one per language panel (2) PLUS the combined panel.
+    // If the combined panel regressed to the count-only rule, only the two
+    // per-language lines would render and this drops to 2.
+    let occurrences = html.matches("border-jitter suppressed").count();
+    assert!(
+        occurrences >= 3,
+        "combined + both per-language panels must each show the border-jitter line at an active band; found {occurrences}"
+    );
+}
