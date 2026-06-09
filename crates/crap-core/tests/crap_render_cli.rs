@@ -468,3 +468,113 @@ fn crap_render_rejects_duplicate_baseline() {
         "stderr should name the duplicate baseline; got: {stderr}"
     );
 }
+
+/// crap-rs#379: the effective `epsilon` travels on the input envelope, so
+/// `crap-render`'s recomputed delta carries the active band and the rendered
+/// report shows the border-jitter line even when nothing was suppressed.
+/// Without epsilon on the envelope the line stays hidden — a byte-level
+/// contrast proving the signal comes from the wire, not a default.
+#[test]
+fn crap_render_shows_border_jitter_line_when_envelope_carries_epsilon() {
+    let tmp = TempDir::new().unwrap();
+
+    // Input envelope WITH an active band; the baseline pairs by language so a
+    // delta is recomputed. Identical results on both sides → zero suppressed,
+    // band active → the line must still render (the #379 case).
+    let input_with_eps = MINIMAL_ENVELOPE_V2.replace(
+        "\"schema_version\": 2,",
+        "\"schema_version\": 2,\n  \"epsilon\": 0.5,",
+    );
+    let in_path = tmp.path().join("input.json");
+    let base_path = tmp.path().join("baseline.json");
+    fs::write(&in_path, &input_with_eps).unwrap();
+    fs::write(&base_path, MINIMAL_ENVELOPE_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", in_path.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", base_path.display()))
+        .arg("--format")
+        .arg("html")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "render should succeed; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let html = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        html.contains("border-jitter suppressed"),
+        "an envelope-carried active epsilon must surface the border-jitter line"
+    );
+
+    // Contrast: no epsilon on the envelope → band off → line hidden.
+    let in_no_eps = tmp.path().join("input_no_eps.json");
+    fs::write(&in_no_eps, MINIMAL_ENVELOPE_V2).unwrap();
+    let out0 = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", in_no_eps.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", base_path.display()))
+        .arg("--format")
+        .arg("html")
+        .output()
+        .unwrap();
+    assert!(out0.status.success());
+    let html0 = String::from_utf8(out0.stdout).unwrap();
+    assert!(
+        !html0.contains("border-jitter suppressed"),
+        "no envelope epsilon → the border-jitter line stays hidden"
+    );
+}
+
+/// crap-rs#390: when an `--input <KEY>=` envelope's own `language` field
+/// disagrees with the KEY, `crap-render` warns (non-fatally) and renders
+/// using the key — catching a swapped / mislabeled file without breaking the
+/// legitimate "key is just a label" usage.
+#[test]
+fn crap_render_warns_on_language_key_mismatch_but_succeeds() {
+    let tmp = TempDir::new().unwrap();
+    // A rust envelope (language: "rust") passed under the `typescript=` key.
+    let path = tmp.path().join("rust_envelope.json");
+    fs::write(&path, MINIMAL_ENVELOPE_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("typescript={}", path.display()))
+        .arg("--format")
+        .arg("html")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "a language/key mismatch warns but does not fail the render; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        stderr.contains("declares language 'rust'") && stderr.contains("typescript"),
+        "stderr should warn naming both the envelope language and the key; got: {stderr}"
+    );
+
+    // Match: the same envelope under the matching `rust=` key → no warning.
+    let out_ok = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", path.display()))
+        .arg("--format")
+        .arg("html")
+        .output()
+        .unwrap();
+    assert!(out_ok.status.success());
+    let stderr_ok = String::from_utf8(out_ok.stderr).unwrap();
+    assert!(
+        !stderr_ok.contains("declares language"),
+        "a matching key must not warn; got: {stderr_ok}"
+    );
+}

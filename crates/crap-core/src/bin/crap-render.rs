@@ -47,7 +47,7 @@
 
 use std::fs::{self, File};
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -125,6 +125,11 @@ struct ParsedEnvelope {
     result: AnalysisResult,
     metric: ComplexityMetric,
     threshold: f64,
+    /// Effective threshold-border epsilon carried from the envelope
+    /// (crap-rs#379). Applied when this envelope is the *input* side of a
+    /// recomputed delta, so the combined panel's border-jitter signal
+    /// matches the gate that produced the envelope. `0.0` ⇒ band off.
+    epsilon: f64,
     tool_version: String,
 }
 
@@ -136,8 +141,20 @@ struct WireEnvelope {
     schema_version: u32,
     #[serde(default)]
     tool_version: String,
+    /// Adapter's own wire language tag. Informational here — the renderer
+    /// labels by the `--input <LANG>=` key — but read so a mismatch between
+    /// the key and the envelope can be warned about (crap-rs#390). Absent on
+    /// envelopes that predate the field → empty string → no warning.
+    #[serde(default)]
+    language: String,
     metric: ComplexityMetric,
     threshold: f64,
+    /// Effective threshold-border epsilon the emitting run was configured
+    /// with (crap-rs#379). `serde(default)` → `0.0` for envelopes that omit
+    /// it (every pre-#379 envelope, and any epsilon-off run), so the
+    /// recomputed delta stays byte-identical to the old behavior there.
+    #[serde(default)]
+    epsilon: f64,
     result: AnalysisResult,
 }
 
@@ -179,7 +196,17 @@ fn run(cli: Cli) -> Result<()> {
             baselines
                 .iter()
                 .find(|b| b.language == env.language)
-                .map(|b| delta::compute(b.result.clone(), env.result.clone()))
+                // Recompute the delta carrying the *input* envelope's
+                // effective epsilon (crap-rs#379) — the current run's
+                // configured border band, not the baseline's. With epsilon
+                // threaded, the recomputed `DeltaSummary.border_jitter_active`
+                // / `border_jitter_suppressed` match the gate that produced
+                // the envelope, so the combined panel can show an active band
+                // even at zero suppressed. `epsilon == 0.0` (the common case)
+                // is byte-identical to the old bare `delta::compute`.
+                .map(|b| {
+                    delta::compute_with_epsilon(b.result.clone(), env.result.clone(), env.epsilon)
+                })
         })
         .collect();
 
@@ -290,6 +317,23 @@ fn guard_unique_languages(envelopes: &[ParsedEnvelope], kind: &str) -> Result<()
     Ok(())
 }
 
+/// crap-rs#390: warn (non-fatally) when an `--input <KEY>=` envelope's own
+/// `language` field disagrees with the KEY — a swapped / mislabeled file —
+/// while still rendering under the operator-supplied key. The KEY is what the
+/// renderer labels and pairs by; the envelope's `language` is informational, so
+/// an external consumer may legitimately use a different key vocabulary (hence
+/// a warning, not a hard error). An empty `envelope_language` (envelopes that
+/// predate the field) never warns. Kept out of `parse_input_spec` so that
+/// function stays under the strict CRAP-8 gate.
+fn warn_on_language_key_mismatch(kind: &str, key: &str, envelope_language: &str, path: &Path) {
+    if !envelope_language.is_empty() && envelope_language != key {
+        eprintln!(
+            "warning: --{kind} envelope at {} declares language '{envelope_language}', but it was passed under the '{key}' key; rendering it as '{key}'",
+            path.display(),
+        );
+    }
+}
+
 fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
     let (language, path_str) = spec
         .split_once('=')
@@ -323,11 +367,14 @@ fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
         );
     }
 
+    warn_on_language_key_mismatch(kind, language, &envelope.language, &path);
+
     Ok(ParsedEnvelope {
         language: language.to_string(),
         result: envelope.result,
         metric: envelope.metric,
         threshold: envelope.threshold,
+        epsilon: envelope.epsilon,
         tool_version: envelope.tool_version,
     })
 }

@@ -1624,6 +1624,7 @@ fn format_as_json<P: ParseDiagnostic>(
         metric: inputs.metric,
         missing_coverage_policy: inputs.missing_coverage_policy,
         threshold: inputs.threshold,
+        epsilon: inputs.threshold_epsilon,
         timestamp: now_unix_epoch(),
         diagnostics: cli.display.verbose.then_some(&analysis.diagnostics),
         diff_ref: cli.filter.diff.as_deref(),

@@ -69,6 +69,7 @@ fn diagnostics_included_when_present() {
         metric: ComplexityMetric::Cognitive,
         missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
         threshold: 8.0,
+        epsilon: 0.0,
         timestamp: "2026-03-28T12:00:00Z".to_string(),
         diagnostics: Some(&diag),
         diff_ref: None,

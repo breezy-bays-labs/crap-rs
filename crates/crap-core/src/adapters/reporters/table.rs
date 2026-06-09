@@ -282,13 +282,14 @@ fn append_delta_block(output: &mut String, view: &DeltaView<'_>) {
         improvements = summary.improvements,
         new_violations = summary.new_violations,
     ));
-    // Shown whenever the border-band epsilon is active (so an opt-in run
-    // always confirms the band — even "0 suppressed" tells the operator
-    // nothing slipped through). The `|| > 0` fallback covers wire-sourced
-    // re-renders where the in-memory epsilon was not persisted but a
-    // non-zero count survived; the common epsilon-off path (epsilon 0,
-    // count 0) stays silent.
-    if view.full.epsilon > 0.0 || summary.border_jitter_suppressed > 0 {
+    // Shown whenever the border band was active — an opt-in run always
+    // confirms the band, since even "0 suppressed" tells the operator nothing
+    // slipped through. Keyed off the serialized `border_jitter_active` flag so
+    // every reporter shares one display rule (crap-rs#379); on this in-memory
+    // path the flag equals `epsilon > 0.0`, so the output is byte-identical.
+    // `|| > 0` is a belt-and-suspenders if a count ever outlives the flag. The
+    // common epsilon-off path (inactive, 0 count) stays silent.
+    if summary.border_jitter_active || summary.border_jitter_suppressed > 0 {
         output.push_str(&format!(
             "  {n} border-jitter suppressed (threshold crossings within ±epsilon)\n",
             n = summary.border_jitter_suppressed,

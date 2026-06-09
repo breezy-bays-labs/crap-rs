@@ -228,6 +228,15 @@ pub struct CombinedDeltaSummary {
     /// Would-be new violations suppressed by the threshold-border epsilon,
     /// summed across adapters (crap-rs#277).
     pub border_jitter_suppressed: u32,
+    /// True when the threshold-border band was active on *any* contributing
+    /// language (OR-aggregated). The display source of truth for the
+    /// combined panel's border-jitter line — rendered when
+    /// `border_jitter_active || border_jitter_suppressed > 0`, so an active
+    /// band with zero suppressed still shows (crap-rs#379). Each language's
+    /// `DeltaSummary.border_jitter_active` is set from the effective epsilon
+    /// the recompute carried, so this is correct on the wire-sourced
+    /// `crap-render` path too.
+    pub border_jitter_active: bool,
     /// True only when every contributing language passed (no new
     /// violations on any adapter). AND-aggregated across contributing
     /// blocks; starts `true` (vacuous AND over zero contributors).
@@ -245,6 +254,7 @@ impl Default for CombinedDeltaSummary {
             improvements: 0,
             new_violations: 0,
             border_jitter_suppressed: 0,
+            border_jitter_active: false,
             passed: true,
         }
     }
@@ -327,6 +337,7 @@ impl CombinedDeltaSummary {
         self.improvements += other.improvements;
         self.new_violations += other.new_violations;
         self.border_jitter_suppressed += other.border_jitter_suppressed;
+        self.border_jitter_active |= other.border_jitter_active;
         self.passed = self.passed && other.passed;
     }
 }

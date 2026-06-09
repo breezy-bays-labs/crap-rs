@@ -251,6 +251,21 @@ pub struct DeltaSummary {
     /// `new_violations + border_jitter_suppressed` is invariant under
     /// epsilon (pinned by `proptests::prop_border_band_conserves_new_violations`).
     pub border_jitter_suppressed: u32,
+    /// Whether the threshold-border band was active for this delta, i.e.
+    /// `epsilon > 0.0`. This is the *display* source of truth for "should
+    /// the border-jitter line render" — distinct from
+    /// `border_jitter_suppressed`, which is a count. The band can be active
+    /// while suppressing nothing (no transition landed inside it), and a
+    /// reader needs to tell "epsilon disabled" from "epsilon enabled,
+    /// nothing suppressed". Reporters render the border-jitter line when
+    /// `border_jitter_active || border_jitter_suppressed > 0`.
+    ///
+    /// Serialized (additive, no `schema_version` bump) so a downstream
+    /// consumer that recomputes the delta from result envelopes — e.g.
+    /// `crap-render`'s combined multi-language panel — has the signal too;
+    /// the recompute carries the effective epsilon from the envelope, so
+    /// this flag is set identically there (crap-rs#379).
+    pub border_jitter_active: bool,
     /// `new_violations == 0`. Drives the optional `--delta-gate`.
     pub passed: bool,
 }
@@ -276,6 +291,13 @@ impl DeltaSummary {
         for change in changes {
             tally(&mut summary, change, epsilon);
         }
+        // Record whether the border band was active independently of
+        // whether anything landed in it — the display rule keys off this,
+        // not the suppressed count (crap-rs#379). `epsilon > 0.0` is false
+        // for the `0.0` default and for any non-finite / negative value
+        // (those are rejected upstream, but a defensive `> 0.0` keeps a
+        // stray value as "band off" rather than panicking).
+        summary.border_jitter_active = epsilon > 0.0;
         summary.passed = summary.new_violations == 0;
         summary
     }
@@ -1530,8 +1552,31 @@ mod tests {
         // The new bucket is inert at epsilon 0.
         assert_eq!(eps0.border_jitter_suppressed, 0);
         assert_eq!(bare.border_jitter_suppressed, 0);
+        // And the display flag is off on both epsilon-0 entry points.
+        assert!(!eps0.border_jitter_active);
+        assert!(!bare.border_jitter_active);
         // Sanity: the crossing Modified + the Added violator both counted.
         assert_eq!(bare.new_violations, 2);
+    }
+
+    #[test]
+    fn border_jitter_active_tracks_epsilon_positivity_independent_of_suppression() {
+        // The #379 case: an active band that suppresses nothing must still
+        // report `border_jitter_active == true`, so a reporter can show the
+        // border-jitter line at zero suppressed (distinguishing "epsilon
+        // disabled" from "epsilon enabled, nothing landed in the band").
+        let changes = vec![FunctionChange::Added {
+            current: make_verdict("a.rs", "clean", 5.0, false),
+        }];
+        let active = DeltaSummary::compute_with_epsilon(&changes, 0.5);
+        assert!(active.border_jitter_active);
+        assert_eq!(
+            active.border_jitter_suppressed, 0,
+            "nothing crosses the band here — the flag must not depend on the count"
+        );
+        // Band off: flag false through both entry points (byte-identical default).
+        assert!(!DeltaSummary::compute_with_epsilon(&changes, 0.0).border_jitter_active);
+        assert!(!DeltaSummary::compute(&changes).border_jitter_active);
     }
 
     #[test]

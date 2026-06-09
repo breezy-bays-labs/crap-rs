@@ -31,6 +31,11 @@ pub struct JsonConfig<'a, P: ParseDiagnostic> {
     /// mismatch.
     pub missing_coverage_policy: MissingCoveragePolicy,
     pub threshold: f64,
+    /// Resolved threshold-border epsilon (`--threshold-epsilon` /
+    /// `[delta] epsilon`; `0.0` when unset). Recorded on the envelope so a
+    /// downstream consumer that recomputes the delta from result envelopes
+    /// (`crap-render`) applies the same band the gate used (crap-rs#379).
+    pub epsilon: f64,
     pub timestamp: String,
     /// When present, diagnostics are included in the JSON output (--verbose).
     pub diagnostics: Option<&'a AnalysisDiagnostics<P>>,
@@ -100,6 +105,17 @@ struct JsonEnvelope<'a, P: ParseDiagnostic> {
     /// unchanged).
     #[serde(skip_serializing_if = "is_pessimistic")]
     missing_coverage_policy: MissingCoveragePolicy,
+    /// Effective threshold-border epsilon (`--threshold-epsilon` /
+    /// `[delta] epsilon`) this run was configured with. Carried on the
+    /// envelope — even on a baseline-less run that computes no delta — so a
+    /// downstream consumer that recomputes the delta from result envelopes
+    /// (`crap-render`) applies the same band the gate would (crap-rs#379).
+    /// Additive: does NOT bump `schema_version`, and is elided when `0.0`
+    /// (the suppression-off default) so every existing envelope stays
+    /// byte-identical. Declared last to preserve the load-bearing order of
+    /// the leading keys asserted by `cli_ergonomics.feature`.
+    #[serde(skip_serializing_if = "is_zero_epsilon")]
+    epsilon: f64,
 }
 
 /// `skip_serializing_if` predicate: elide the envelope's
@@ -108,6 +124,15 @@ struct JsonEnvelope<'a, P: ParseDiagnostic> {
 /// existed.
 fn is_pessimistic(policy: &MissingCoveragePolicy) -> bool {
     *policy == MissingCoveragePolicy::Pessimistic
+}
+
+/// `skip_serializing_if` predicate: elide the envelope's `epsilon` key when
+/// it is `0.0` (suppression off — the default), so every existing envelope
+/// stays byte-identical. `0.0 == -0.0` in IEEE-754, and the resolved epsilon
+/// is always a finite value `>= 0.0` (validated at the CLI / config
+/// boundary), so `== 0.0` is the exact "off" test.
+fn is_zero_epsilon(epsilon: &f64) -> bool {
+    *epsilon == 0.0
 }
 
 /// On-the-wire delta representation. Mirrors the `delta` envelope key
@@ -217,6 +242,7 @@ pub fn format_json<P: ParseDiagnostic>(
         delta: delta_wire,
         diagnostics: config.diagnostics,
         missing_coverage_policy: config.missing_coverage_policy,
+        epsilon: config.epsilon,
     };
     serde_json::to_string_pretty(&envelope)
 }
@@ -241,6 +267,7 @@ mod tests {
             metric: ComplexityMetric::Cognitive,
             missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold: 8.0,
+            epsilon: 0.0,
             timestamp: "2026-03-28T12:00:00Z".to_string(),
             diagnostics: None,
             diff_ref: None,
@@ -256,6 +283,23 @@ mod tests {
         let view = make_view_default(result);
         let json_str = format_json(&view, config).expect("format_json should succeed");
         serde_json::from_str(&json_str).expect("output should be valid JSON")
+    }
+
+    #[test]
+    fn envelope_omits_epsilon_when_zero_and_emits_when_set() {
+        let result = make_empty_result();
+        // Default (epsilon 0.0): key elided so existing envelopes stay
+        // byte-identical (crap-rs#379, additive — no schema_version bump).
+        let v0 = parse_json(&result, &default_config());
+        assert!(
+            v0.get("epsilon").is_none(),
+            "epsilon key must be elided at 0.0"
+        );
+        // Set: key present with the resolved value, for crap-render to read.
+        let mut cfg = default_config();
+        cfg.epsilon = 0.5;
+        let v = parse_json(&result, &cfg);
+        assert_eq!(v["epsilon"], serde_json::json!(0.5));
     }
 
     #[test]
@@ -656,17 +700,22 @@ mod proptests {
     use proptest::prelude::*;
 
     fn arb_config() -> impl Strategy<Value = JsonConfig<'static, DummyParseDiagnostic>> {
-        (1.0..100.0f64,).prop_map(|(threshold,)| JsonConfig {
-            tool_version: "0.1.0".to_string(),
-            metric: ComplexityMetric::Cognitive,
-            missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
-            threshold,
-            timestamp: "2026-01-01T00:00:00Z".to_string(),
-            diagnostics: None,
-            diff_ref: None,
-            minimal_view: false,
-            delta: None,
-        })
+        // Generate epsilon across both the elided (0.0) and present (>0)
+        // branches so the new `skip_serializing_if` field is exercised.
+        (1.0..100.0f64, prop_oneof![Just(0.0f64), 0.001..2.0f64]).prop_map(
+            |(threshold, epsilon)| JsonConfig {
+                tool_version: "0.1.0".to_string(),
+                metric: ComplexityMetric::Cognitive,
+                missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
+                threshold,
+                epsilon,
+                timestamp: "2026-01-01T00:00:00Z".to_string(),
+                diagnostics: None,
+                diff_ref: None,
+                minimal_view: false,
+                delta: None,
+            },
+        )
     }
 
     proptest! {

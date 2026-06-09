@@ -987,8 +987,14 @@ struct CombinedDeltaPanelSummary {
     improvements: u32,
     new_violations: u32,
     /// Cross-adapter sum of per-language `border_jitter_suppressed`
-    /// (crap-rs#277). Rendered only when `> 0`.
+    /// (crap-rs#277).
     border_jitter_suppressed: u32,
+    /// Whether to render the combined border-jitter line: true when the
+    /// band was active on any contributing language OR a non-zero count was
+    /// suppressed. Mirrors the per-language `DeltaPanelSummary` rule so the
+    /// combined panel shows the line at zero suppressed when epsilon is on
+    /// (crap-rs#379) instead of hiding it.
+    show_border_jitter: bool,
 }
 
 /// One row of the Combined Delta ranked table — same shape as
@@ -1237,6 +1243,8 @@ fn build_combined_delta_panel(cd: crate::domain::multi_lang::CombinedDelta) -> C
         improvements: cd.summary.improvements,
         new_violations: cd.summary.new_violations,
         border_jitter_suppressed: cd.summary.border_jitter_suppressed,
+        show_border_jitter: cd.summary.border_jitter_active
+            || cd.summary.border_jitter_suppressed > 0,
     };
 
     let (verdict_class, verdict_label, verdict_glyph) = if cd.summary.passed {
@@ -1419,7 +1427,13 @@ fn build_delta_panel(view: &DeltaView<'_>) -> DeltaPanel {
         improvements: summary.improvements,
         new_violations: summary.new_violations,
         border_jitter_suppressed: summary.border_jitter_suppressed,
-        show_border_jitter: view.full.epsilon > 0.0 || summary.border_jitter_suppressed > 0,
+        // Display rule keys off the serialized `border_jitter_active` flag,
+        // not `view.full.epsilon` — the in-memory crap4rs path has a live
+        // epsilon, but a wire-sourced re-render (crap-render) does not, so
+        // the flag is the single source of truth on both paths (crap-rs#379).
+        // Byte-identical to the old `epsilon > 0.0` form on the in-memory
+        // path, where `border_jitter_active == (epsilon > 0.0)`.
+        show_border_jitter: summary.border_jitter_active || summary.border_jitter_suppressed > 0,
     };
 
     let (verdict_class, verdict_label, verdict_glyph) = if summary.passed {
@@ -2876,6 +2890,74 @@ mod tests {
         assert!(
             out.contains("rs::regressing"),
             "Rust regression row must surface in the Rust Delta panel"
+        );
+    }
+
+    /// Build a two-language combined report from pre-computed deltas and
+    /// return the rendered HTML. Borrows the current results + deltas for
+    /// the duration of the render, so callers keep them alive.
+    fn render_two_lang_combined(
+        rs_c: &crate::domain::types::AnalysisResult,
+        ts_c: &crate::domain::types::AnalysisResult,
+        rs_delta: &crate::domain::delta::AnalysisDelta,
+        ts_delta: &crate::domain::delta::AnalysisDelta,
+    ) -> String {
+        use crate::domain::delta::{DeltaViewSpec, apply};
+        let rs_block = LanguageBlock {
+            tool_name: "crap4rs".to_string(),
+            display_name: "Rust".to_string(),
+            language: "rust".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cognitive,
+            threshold: 8.0,
+            view: make_view_default(rs_c),
+            delta: Some(apply(rs_delta, DeltaViewSpec::default())),
+        };
+        let ts_block = LanguageBlock {
+            tool_name: "crap4ts".to_string(),
+            display_name: "TypeScript".to_string(),
+            language: "typescript".to_string(),
+            tool_version: TEST_TOOL_VERSION.to_string(),
+            metric: ComplexityMetric::Cyclomatic,
+            threshold: 8.0,
+            view: make_view_default(ts_c),
+            delta: Some(apply(ts_delta, DeltaViewSpec::default())),
+        };
+        let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
+        format_html_multi(&multi, 8.0, HtmlMultiOptions::default())
+    }
+
+    /// crap-rs#379: the combined multi-language panel must render the
+    /// border-jitter line when the epsilon band is active even with **zero**
+    /// suppressed — distinguishing "epsilon disabled" from "epsilon enabled,
+    /// nothing landed in the band". None of the two-language fixtures sit
+    /// within 0.5 of threshold 8.0, so the suppressed count is 0 while the
+    /// band is active.
+    #[test]
+    fn multi_lang_combined_panel_shows_border_jitter_at_zero_suppressed_when_band_active() {
+        use crate::domain::delta::{compute, compute_with_epsilon};
+
+        // Band active (epsilon 0.5), nothing suppressed.
+        let (rs_b, rs_c, ts_b, ts_c) = two_lang_baseline_current_fixtures();
+        let rs_delta = compute_with_epsilon(rs_b, rs_c.clone(), 0.5);
+        let ts_delta = compute_with_epsilon(ts_b, ts_c.clone(), 0.5);
+        assert_eq!(rs_delta.summary.border_jitter_suppressed, 0);
+        assert_eq!(ts_delta.summary.border_jitter_suppressed, 0);
+        assert!(rs_delta.summary.border_jitter_active);
+        let active = render_two_lang_combined(&rs_c, &ts_c, &rs_delta, &ts_delta);
+        assert!(
+            active.contains("border-jitter suppressed"),
+            "combined panel must show the border-jitter line when the band is active, even at 0 suppressed"
+        );
+
+        // Band off (epsilon 0): the line is hidden — byte-level contrast.
+        let (rs_b0, rs_c0, ts_b0, ts_c0) = two_lang_baseline_current_fixtures();
+        let rs_delta0 = compute(rs_b0, rs_c0.clone());
+        let ts_delta0 = compute(ts_b0, ts_c0.clone());
+        let off = render_two_lang_combined(&rs_c0, &ts_c0, &rs_delta0, &ts_delta0);
+        assert!(
+            !off.contains("border-jitter suppressed"),
+            "combined panel must hide the border-jitter line when epsilon is off"
         );
     }
 
