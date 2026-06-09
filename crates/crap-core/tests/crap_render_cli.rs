@@ -532,53 +532,6 @@ fn crap_render_shows_border_jitter_line_when_envelope_carries_epsilon() {
     );
 }
 
-/// crap-rs#390: when an `--input <KEY>=` envelope's own `language` field
-/// disagrees with the KEY, `crap-render` warns (non-fatally) and renders
-/// using the key — catching a swapped / mislabeled file without breaking the
-/// legitimate "key is just a label" usage.
-#[test]
-fn crap_render_warns_on_language_key_mismatch_but_succeeds() {
-    let tmp = TempDir::new().unwrap();
-    // A rust envelope (language: "rust") passed under the `typescript=` key.
-    let path = tmp.path().join("rust_envelope.json");
-    fs::write(&path, MINIMAL_ENVELOPE_V2).unwrap();
-
-    let out = Command::cargo_bin("crap-render")
-        .unwrap()
-        .arg("--input")
-        .arg(format!("typescript={}", path.display()))
-        .arg("--format")
-        .arg("html")
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "a language/key mismatch warns but does not fail the render; stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(
-        stderr.contains("declares language 'rust'") && stderr.contains("typescript"),
-        "stderr should warn naming both the envelope language and the key; got: {stderr}"
-    );
-
-    // Match: the same envelope under the matching `rust=` key → no warning.
-    let out_ok = Command::cargo_bin("crap-render")
-        .unwrap()
-        .arg("--input")
-        .arg(format!("rust={}", path.display()))
-        .arg("--format")
-        .arg("html")
-        .output()
-        .unwrap();
-    assert!(out_ok.status.success());
-    let stderr_ok = String::from_utf8(out_ok.stderr).unwrap();
-    assert!(
-        !stderr_ok.contains("declares language"),
-        "a matching key must not warn; got: {stderr_ok}"
-    );
-}
-
 /// crap-rs#379 on its literal surface: TWO languages through `crap-render`
 /// with an active epsilon band must produce a **combined** panel that shows
 /// the border-jitter line even at zero suppressed. The unit tests cover each
@@ -628,12 +581,20 @@ fn crap_render_combined_panel_shows_border_jitter_band_across_languages() {
         String::from_utf8_lossy(&out.stderr)
     );
     let html = String::from_utf8(out.stdout).unwrap();
-    // Three occurrences: one per language panel (2) PLUS the combined panel.
-    // If the combined panel regressed to the count-only rule, only the two
-    // per-language lines would render and this drops to 2.
-    let occurrences = html.matches("border-jitter suppressed").count();
+    // Scope the assertion to the COMBINED panel specifically — its verdict
+    // span carries aria-label "Combined Delta verdict", and the border-jitter
+    // text lives in the sibling `<span class="meta">` inside the same `<p>`
+    // (closed by the next `</p>`). A whole-document count could be satisfied
+    // by the per-language panels alone; this pins the combined one.
+    let combined_start = html
+        .find("Combined Delta verdict")
+        .expect("a two-language render must include the combined panel");
+    let combined_meta = &html[combined_start..];
+    let combined_meta = combined_meta
+        .find("</p>")
+        .map_or(combined_meta, |end| &combined_meta[..end]);
     assert!(
-        occurrences >= 3,
-        "combined + both per-language panels must each show the border-jitter line at an active band; found {occurrences}"
+        combined_meta.contains("border-jitter suppressed"),
+        "the COMBINED panel must show the border-jitter line at an active band; combined block was: {combined_meta}"
     );
 }

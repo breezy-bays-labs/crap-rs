@@ -47,7 +47,7 @@
 
 use std::fs::{self, File};
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -141,12 +141,6 @@ struct WireEnvelope {
     schema_version: u32,
     #[serde(default)]
     tool_version: String,
-    /// Adapter's own wire language tag. Informational here — the renderer
-    /// labels by the `--input <LANG>=` key — but read so a mismatch between
-    /// the key and the envelope can be warned about (crap-rs#390). Absent on
-    /// envelopes that predate the field → empty string → no warning.
-    #[serde(default)]
-    language: String,
     metric: ComplexityMetric,
     threshold: f64,
     /// Effective threshold-border epsilon the emitting run was configured
@@ -317,23 +311,6 @@ fn guard_unique_languages(envelopes: &[ParsedEnvelope], kind: &str) -> Result<()
     Ok(())
 }
 
-/// crap-rs#390: warn (non-fatally) when an `--input <KEY>=` envelope's own
-/// `language` field disagrees with the KEY — a swapped / mislabeled file —
-/// while still rendering under the operator-supplied key. The KEY is what the
-/// renderer labels and pairs by; the envelope's `language` is informational, so
-/// an external consumer may legitimately use a different key vocabulary (hence
-/// a warning, not a hard error). An empty `envelope_language` (envelopes that
-/// predate the field) never warns. Kept out of `parse_input_spec` so that
-/// function stays under the strict CRAP-8 gate.
-fn warn_on_language_key_mismatch(kind: &str, key: &str, envelope_language: &str, path: &Path) {
-    if !envelope_language.is_empty() && envelope_language != key {
-        eprintln!(
-            "warning: --{kind} envelope at {} declares language '{envelope_language}', but it was passed under the '{key}' key; rendering it as '{key}'",
-            path.display(),
-        );
-    }
-}
-
 fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
     let (language, path_str) = spec
         .split_once('=')
@@ -366,8 +343,6 @@ fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
             SUPPORTED_SCHEMA_VERSIONS
         );
     }
-
-    warn_on_language_key_mismatch(kind, language, &envelope.language, &path);
 
     Ok(ParsedEnvelope {
         language: language.to_string(),
