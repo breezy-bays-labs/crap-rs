@@ -468,3 +468,133 @@ fn crap_render_rejects_duplicate_baseline() {
         "stderr should name the duplicate baseline; got: {stderr}"
     );
 }
+
+/// crap-rs#379: the effective `epsilon` travels on the input envelope, so
+/// `crap-render`'s recomputed delta carries the active band and the rendered
+/// report shows the border-jitter line even when nothing was suppressed.
+/// Without epsilon on the envelope the line stays hidden — a byte-level
+/// contrast proving the signal comes from the wire, not a default.
+#[test]
+fn crap_render_shows_border_jitter_line_when_envelope_carries_epsilon() {
+    let tmp = TempDir::new().unwrap();
+
+    // Input envelope WITH an active band; the baseline pairs by language so a
+    // delta is recomputed. Identical results on both sides → zero suppressed,
+    // band active → the line must still render (the #379 case).
+    let input_with_eps = MINIMAL_ENVELOPE_V2.replace(
+        "\"schema_version\": 2,",
+        "\"schema_version\": 2,\n  \"epsilon\": 0.5,",
+    );
+    let in_path = tmp.path().join("input.json");
+    let base_path = tmp.path().join("baseline.json");
+    fs::write(&in_path, &input_with_eps).unwrap();
+    fs::write(&base_path, MINIMAL_ENVELOPE_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", in_path.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", base_path.display()))
+        .arg("--format")
+        .arg("html")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "render should succeed; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let html = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        html.contains("border-jitter suppressed"),
+        "an envelope-carried active epsilon must surface the border-jitter line"
+    );
+
+    // Contrast: no epsilon on the envelope → band off → line hidden.
+    let in_no_eps = tmp.path().join("input_no_eps.json");
+    fs::write(&in_no_eps, MINIMAL_ENVELOPE_V2).unwrap();
+    let out0 = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", in_no_eps.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", base_path.display()))
+        .arg("--format")
+        .arg("html")
+        .output()
+        .unwrap();
+    assert!(out0.status.success());
+    let html0 = String::from_utf8(out0.stdout).unwrap();
+    assert!(
+        !html0.contains("border-jitter suppressed"),
+        "no envelope epsilon → the border-jitter line stays hidden"
+    );
+}
+
+/// crap-rs#379 on its literal surface: TWO languages through `crap-render`
+/// with an active epsilon band must produce a **combined** panel that shows
+/// the border-jitter line even at zero suppressed. The unit tests cover each
+/// link (epsilon transport for one language; the in-memory combined render);
+/// this guards the exact composition — two `--input` + two `--baseline` +
+/// combined panel — that was the reported bug.
+#[test]
+fn crap_render_combined_panel_shows_border_jitter_band_across_languages() {
+    let tmp = TempDir::new().unwrap();
+    // Inputs carry an active band; baselines are identical → zero suppressed,
+    // band active → every panel (both per-language + the combined one) shows
+    // the line. The combined render is the one #379 was about.
+    let with_eps = |env: &str| {
+        env.replace(
+            "\"schema_version\": 2,",
+            "\"schema_version\": 2,\n  \"epsilon\": 0.5,",
+        )
+    };
+    let rs_in = tmp.path().join("rs_in.json");
+    let ts_in = tmp.path().join("ts_in.json");
+    let rs_base = tmp.path().join("rs_base.json");
+    let ts_base = tmp.path().join("ts_base.json");
+    fs::write(&rs_in, with_eps(MINIMAL_ENVELOPE_V2)).unwrap();
+    fs::write(&ts_in, with_eps(MINIMAL_ENVELOPE_TS_V2)).unwrap();
+    fs::write(&rs_base, MINIMAL_ENVELOPE_V2).unwrap();
+    fs::write(&ts_base, MINIMAL_ENVELOPE_TS_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .args([
+            "--input",
+            &format!("rust={}", rs_in.display()),
+            "--input",
+            &format!("typescript={}", ts_in.display()),
+            "--baseline",
+            &format!("rust={}", rs_base.display()),
+            "--baseline",
+            &format!("typescript={}", ts_base.display()),
+            "--format",
+            "html",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "two-language render should succeed; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let html = String::from_utf8(out.stdout).unwrap();
+    // Scope the assertion to the COMBINED panel specifically — its verdict
+    // span carries aria-label "Combined Delta verdict", and the border-jitter
+    // text lives in the sibling `<span class="meta">` inside the same `<p>`
+    // (closed by the next `</p>`). A whole-document count could be satisfied
+    // by the per-language panels alone; this pins the combined one.
+    let combined_start = html
+        .find("Combined Delta verdict")
+        .expect("a two-language render must include the combined panel");
+    let combined_meta = &html[combined_start..];
+    let combined_meta = combined_meta
+        .find("</p>")
+        .map_or(combined_meta, |end| &combined_meta[..end]);
+    assert!(
+        combined_meta.contains("border-jitter suppressed"),
+        "the COMBINED panel must show the border-jitter line at an active band; combined block was: {combined_meta}"
+    );
+}

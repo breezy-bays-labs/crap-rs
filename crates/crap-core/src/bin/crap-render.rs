@@ -125,6 +125,11 @@ struct ParsedEnvelope {
     result: AnalysisResult,
     metric: ComplexityMetric,
     threshold: f64,
+    /// Effective threshold-border epsilon carried from the envelope
+    /// (crap-rs#379). Applied when this envelope is the *input* side of a
+    /// recomputed delta, so the combined panel's border-jitter signal
+    /// matches the gate that produced the envelope. `0.0` ⇒ band off.
+    epsilon: f64,
     tool_version: String,
 }
 
@@ -138,6 +143,12 @@ struct WireEnvelope {
     tool_version: String,
     metric: ComplexityMetric,
     threshold: f64,
+    /// Effective threshold-border epsilon the emitting run was configured
+    /// with (crap-rs#379). `serde(default)` → `0.0` for envelopes that omit
+    /// it (every pre-#379 envelope, and any epsilon-off run), so the
+    /// recomputed delta stays byte-identical to the old behavior there.
+    #[serde(default)]
+    epsilon: f64,
     result: AnalysisResult,
 }
 
@@ -179,7 +190,17 @@ fn run(cli: Cli) -> Result<()> {
             baselines
                 .iter()
                 .find(|b| b.language == env.language)
-                .map(|b| delta::compute(b.result.clone(), env.result.clone()))
+                // Recompute the delta carrying the *input* envelope's
+                // effective epsilon (crap-rs#379) — the current run's
+                // configured border band, not the baseline's. With epsilon
+                // threaded, the recomputed `DeltaSummary.border_jitter_active`
+                // / `border_jitter_suppressed` match the gate that produced
+                // the envelope, so the combined panel can show an active band
+                // even at zero suppressed. `epsilon == 0.0` (the common case)
+                // is byte-identical to the old bare `delta::compute`.
+                .map(|b| {
+                    delta::compute_with_epsilon(b.result.clone(), env.result.clone(), env.epsilon)
+                })
         })
         .collect();
 
@@ -328,6 +349,7 @@ fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
         result: envelope.result,
         metric: envelope.metric,
         threshold: envelope.threshold,
+        epsilon: envelope.epsilon,
         tool_version: envelope.tool_version,
     })
 }

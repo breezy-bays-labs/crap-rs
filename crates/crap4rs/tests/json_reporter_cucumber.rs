@@ -58,6 +58,7 @@ impl JsonWorld {
             metric,
             missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold,
+            epsilon: 0.0,
             timestamp: "2026-05-04T00:00:00Z".to_string(),
             diagnostics: None,
             diff_ref: None,
