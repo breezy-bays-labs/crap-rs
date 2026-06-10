@@ -29,13 +29,13 @@ use askama::Template;
 /// calling adapter's `tool_name`, so each adapter's scorecard can
 /// sticky to its own comment on the same PR.
 ///
-/// `breakdown` injects an indented bullet list of complexity
-/// contributors under each exceeding function in the spotlight (or
-/// the full table when `full_table` is set), wrapped in a
-/// `<details><summary>Show breakdown</summary>` collapsible so the
-/// default PR-comment view stays compact. `explain` adds a trailing
-/// legend describing increment semantics (only meaningful when
-/// `breakdown` is set).
+/// `breakdown` collects the per-line complexity contributors of every
+/// above-threshold function into one `<details><summary>Show
+/// breakdown</summary>` collapsible rendered BELOW the table (spotlight
+/// or full table) so the default PR-comment view stays compact and the
+/// GFM table stays intact — an inline `<details>` would terminate it.
+/// `explain` adds a trailing legend describing increment semantics
+/// (only meaningful when `breakdown` is set).
 ///
 /// `full_table` switches the body to the legacy row-per-function table
 /// rendered after the summary — useful when piping into a longer
@@ -1003,7 +1003,15 @@ mod tests {
     fn backtick_in_name_does_not_break_the_code_span() {
         use crate::domain::types::{AnalysisResult, ComplexityContributor, ContributorKind};
         let verdict = make_verdict_with_contributors(
-            make_verdict("ns`weird.fn", "src/a`b.ts", 9, 30.0, 30.0, RiskLevel::High, 8.0),
+            make_verdict(
+                "ns`weird.fn",
+                "src/a`b.ts",
+                9,
+                30.0,
+                30.0,
+                RiskLevel::High,
+                8.0,
+            ),
             vec![ComplexityContributor {
                 kind: ContributorKind::IfBranch,
                 line: 12,
