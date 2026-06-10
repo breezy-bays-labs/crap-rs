@@ -23,8 +23,18 @@
    pre-#352 render (existing snapshots untouched). The fixed heading
    offset the scorecard composite action applies (`# `→`#### `, `## `→
    `##### `) is content-agnostic, so the title/tool levels nest cleanly
-   under the action's `### Rust (crap4rs)` wrapper either way. -#}
-{%- if let Some(title) = title -%}
+   under the action's `### Rust (crap4rs)` wrapper either way.
+
+   The hidden `<!-- {tool_name}:scorecard -->` first line is a
+   machine-readable dedupe anchor for sticky-PR-comment actions —
+   invisible in rendered GFM, distinct per adapter so crap4rs and
+   crap4ts can sticky to separate comments on the same PR, and immune
+   to the action's heading-offset sed (which only rewrites `#`-prefixed
+   lines). It leads the output even when a configured title takes the
+   H1. -#}
+<!-- {{ tool_name }}:scorecard -->
+
+{% if let Some(title) = title -%}
 # {{ title }}
 {% if let Some(subtitle) = subtitle %}
 {{ subtitle }}
@@ -69,9 +79,14 @@ No functions analyzed.
 |------|----------|----|------|------|------|
 {% for row in rows -%}
 | {{ row.file }} | {{ row.function }} | {{ row.cc }} | {{ row.cov }} | {{ row.crap }} | {{ row.risk }} |
+{% if !row.breakdown_bullets.is_empty() -%}
+<details><summary>Show breakdown</summary>
+
 {% for bullet in row.breakdown_bullets -%}
 {{ bullet }}
-{% endfor -%}
+{% endfor %}
+</details>
+{% endif -%}
 {% endfor -%}
 {%- if legend.is_some() %}
 {{ legend.as_ref().unwrap() }}
@@ -83,9 +98,14 @@ No functions analyzed.
 |------|----------|----|------|------|------|
 {% for row in rows -%}
 | {{ row.file }} | {{ row.function }} | {{ row.cc }} | {{ row.cov }} | {{ row.crap }} | {{ row.risk }} |
+{% if !row.breakdown_bullets.is_empty() -%}
+<details><summary>Show breakdown</summary>
+
 {% for bullet in row.breakdown_bullets -%}
 {{ bullet }}
-{% endfor -%}
+{% endfor %}
+</details>
+{% endif -%}
 {% endfor -%}
 {%- if legend.is_some() %}
 {{ legend.as_ref().unwrap() }}

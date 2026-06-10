@@ -194,6 +194,14 @@ fn markdown_format_renders_scorecard_section() {
         ],
     );
     let stdout = stdout_str(&output);
+    // Pins the literal adapter marker end-to-end: the reporter unit
+    // tests exercise the template with a synthetic tool_name only, so
+    // without this a package rename would silently rotate the dedupe
+    // anchor that third-party sticky-comment tooling matches on.
+    assert!(
+        stdout.starts_with("<!-- crap4rs:scorecard -->\n"),
+        "markdown output must lead with the crap4rs sticky-comment marker"
+    );
     assert!(stdout.contains("## CRAP Scorecard"));
     assert!(stdout.contains("- **Delta status:**"));
     assert!(stdout.contains("- **Changes:**"));
