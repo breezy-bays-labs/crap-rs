@@ -2,6 +2,8 @@
 source: crates/crap-core/src/adapters/reporters/markdown.rs
 expression: out
 ---
+<!-- test-adapter:scorecard -->
+
 # test-adapter v0.4.0 — CRAP Score Analysis
 
 ## Summary

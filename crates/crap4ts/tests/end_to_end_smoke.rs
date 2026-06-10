@@ -171,9 +171,10 @@ fn markdown_reporter_emits_crap4ts_title_header() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stdout.starts_with("# crap4ts v"),
-        "markdown body should start with `# crap4ts v…`; got first line:\n{}",
-        stdout.lines().next().unwrap_or("(empty)")
+        stdout.starts_with("<!-- crap4ts:scorecard -->\n\n# crap4ts v"),
+        "markdown body should lead with the sticky-comment dedupe marker, \
+         then the `# crap4ts v…` H1; got first lines:\n{}",
+        stdout.lines().take(3).collect::<Vec<_>>().join("\n")
     );
     assert!(
         stdout.contains("— CRAP Score Analysis"),

@@ -23,9 +23,17 @@ use askama::Template;
 /// threshold, otherwise the worst by CRAP). Designed to fit comfortably
 /// in a PR comment — bounded output regardless of codebase size.
 ///
+/// The first output line is always a hidden HTML comment marker,
+/// `<!-- {tool_name}:scorecard -->` — invisible in rendered GFM, but a
+/// stable dedupe anchor for sticky-PR-comment tooling. It carries the
+/// calling adapter's `tool_name`, so each adapter's scorecard can
+/// sticky to its own comment on the same PR.
+///
 /// `breakdown` injects an indented bullet list of complexity
 /// contributors under each exceeding function in the spotlight (or
-/// the full table when `full_table` is set). `explain` adds a trailing
+/// the full table when `full_table` is set), wrapped in a
+/// `<details><summary>Show breakdown</summary>` collapsible so the
+/// default PR-comment view stays compact. `explain` adds a trailing
 /// legend describing increment semantics (only meaningful when
 /// `breakdown` is set).
 ///
@@ -602,11 +610,14 @@ mod tests {
             None,
         );
         // The configured title is the prominent headline — it takes the
-        // `#` H1, and the tool/version line demotes to `##` attribution
-        // (prominence consistent with the table + html reporters).
+        // `#` H1 (right after the hidden dedupe marker), and the
+        // tool/version line demotes to `##` attribution (prominence
+        // consistent with the table + html reporters).
         assert!(
-            out.starts_with("# Acme Coverage Report\n"),
-            "expected the title as the H1 headline at the top; got:\n{out}",
+            out.starts_with(&format!(
+                "<!-- {TEST_TOOL_NAME}:scorecard -->\n\n# Acme Coverage Report\n"
+            )),
+            "expected the title as the H1 headline beneath the marker; got:\n{out}",
         );
         assert!(out.contains(&format!(
             "## {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
@@ -627,7 +638,9 @@ mod tests {
             Some("nightly build"),
         );
         assert!(
-            out.starts_with("# Acme Coverage Report\n\nnightly build\n"),
+            out.starts_with(&format!(
+                "<!-- {TEST_TOOL_NAME}:scorecard -->\n\n# Acme Coverage Report\n\nnightly build\n"
+            )),
             "expected the subtitle on its own paragraph beneath the title; got:\n{out}",
         );
     }
@@ -641,8 +654,10 @@ mod tests {
         // demote it). Exercises the template's `{%- else -%}` branch's
         // inner subtitle arm.
         assert!(
-            out.starts_with("nightly build\n\n# "),
-            "expected the subtitle above the tool H1; got:\n{out}",
+            out.starts_with(&format!(
+                "<!-- {TEST_TOOL_NAME}:scorecard -->\n\nnightly build\n\n# "
+            )),
+            "expected the subtitle above the tool H1 (beneath the marker); got:\n{out}",
         );
         assert!(out.contains(&format!(
             "# {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
@@ -662,9 +677,160 @@ mod tests {
         );
         assert!(
             default.starts_with(&format!(
-                "# {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
+                "<!-- {TEST_TOOL_NAME}:scorecard -->\n\n# {TEST_TOOL_NAME} v{TEST_TOOL_VERSION} — CRAP Score Analysis"
             )),
-            "default header must lead with the tool/version H1, no empty line above",
+            "default header must lead with the marker, a blank line, then \
+             the tool/version H1 — no extra line drift",
+        );
+    }
+
+    // ── sticky-comment marker + breakdown collapsibles ──────────────
+
+    #[test]
+    fn markdown_leads_with_hidden_sticky_marker() {
+        let result = make_multi_function_result();
+        let out = md(&make_view_default(&result));
+        assert!(
+            out.starts_with(&format!(
+                "<!-- {TEST_TOOL_NAME}:scorecard -->\n\n# {TEST_TOOL_NAME}"
+            )),
+            "expected the hidden dedupe marker as the first line, a blank \
+             line, then the tool H1; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn marker_carries_the_adapter_tool_name() {
+        // Distinct per adapter so crap4rs and crap4ts can sticky to
+        // separate comments on the same PR.
+        let result = make_multi_function_result();
+        let mut meta = test_meta();
+        meta.tool_name = "other-adapter";
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+            &meta,
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+        assert!(
+            out.starts_with("<!-- other-adapter:scorecard -->\n"),
+            "expected the marker to carry the calling adapter's tool_name; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn marker_precedes_configured_title() {
+        // The marker is a machine dedupe anchor — it must stay the first
+        // line even when a configured title takes the H1 headline.
+        let result = make_multi_function_result();
+        let out = md_labeled(
+            &make_view_default(&result),
+            Some("Acme Coverage Report"),
+            None,
+        );
+        assert!(
+            out.starts_with(&format!(
+                "<!-- {TEST_TOOL_NAME}:scorecard -->\n\n# Acme Coverage Report\n"
+            )),
+            "expected marker first, then the configured title H1; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn marker_present_on_empty_analysis() {
+        let result = make_empty_result();
+        let out = md(&make_view_default(&result));
+        assert!(
+            out.starts_with(&format!("<!-- {TEST_TOOL_NAME}:scorecard -->\n")),
+            "the dedupe marker must lead even an empty analysis; got:\n{out}"
+        );
+        assert!(out.contains("No functions analyzed"));
+    }
+
+    #[test]
+    fn breakdown_bullets_collapse_into_details() {
+        use crate::domain::types::{AnalysisResult, ComplexityContributor, ContributorKind};
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "risky_fn",
+                "src/lib.rs",
+                5,
+                30.0,
+                45.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            vec![
+                ComplexityContributor {
+                    kind: ContributorKind::IfBranch,
+                    line: 12,
+                    column: None,
+                    increment: 1,
+                    end_line: 12,
+                    nesting_depth: 0,
+                },
+                ComplexityContributor {
+                    kind: ContributorKind::Match,
+                    line: 18,
+                    column: None,
+                    increment: 2,
+                    end_line: 18,
+                    nesting_depth: 1,
+                },
+            ],
+        );
+        let result = AnalysisResult {
+            functions: vec![verdict.clone()],
+            summary: crate::domain::summary::compute_summary(std::slice::from_ref(&verdict)),
+            passed: false,
+        };
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            true,
+            false,
+            true,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+        let open = out
+            .find("<details><summary>Show breakdown</summary>")
+            .unwrap_or_else(|| panic!("missing <details> wrapper in:\n{out}"));
+        let close = out
+            .find("</details>")
+            .unwrap_or_else(|| panic!("missing </details> in:\n{out}"));
+        assert!(open < close, "malformed details block in:\n{out}");
+        let inner = &out[open..close];
+        assert!(
+            inner.contains("L12 if-branch +1") && inner.contains("L18 match +2"),
+            "contributor bullets must sit inside the collapsible; got:\n{out}"
+        );
+        // GFM only renders markdown inside an HTML block after a blank
+        // line — the bullets must not butt up against the <summary> tag.
+        assert!(
+            out.contains("</summary>\n\n"),
+            "expected a blank line after </summary> so the bullet list renders; got:\n{out}"
+        );
+    }
+
+    #[test]
+    fn no_details_block_without_breakdown() {
+        let result = make_multi_function_result();
+        let out = md(&make_view_default(&result));
+        assert!(
+            !out.contains("<details>"),
+            "no collapsible should render when breakdown is inactive; got:\n{out}"
         );
     }
 
