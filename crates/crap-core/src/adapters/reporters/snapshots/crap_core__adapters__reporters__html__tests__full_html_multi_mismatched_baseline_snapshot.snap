@@ -1588,7 +1588,7 @@ pre code { background: transparent; padding: 0; }
       </p>
       <p class="missing-baseline-note">
         <strong>TypeScript</strong>
-        has no baseline yet — its Delta tab is disabled until one is supplied.
+        has no usable baseline — its Delta tab is disabled; its panel tooltip names the cause.
       </p>
     </section>
     <section aria-label="Combined Delta ranking">

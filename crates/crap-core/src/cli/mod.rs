@@ -1592,6 +1592,7 @@ where
         cli,
         &analysis.result,
         options.missing_coverage_policy,
+        inputs.metric,
         inputs.threshold_epsilon,
     )?;
 
@@ -1824,6 +1825,7 @@ fn load_delta_state<P: ParseDiagnostic>(
     cli: &Cli,
     current: &crate::domain::types::AnalysisResult,
     current_policy: MissingCoveragePolicy,
+    current_metric: ComplexityMetric,
     epsilon: f64,
 ) -> Result<Option<DeltaState<P>>> {
     let Some(path) = cli.input.baseline.as_ref() else {
@@ -1831,6 +1833,9 @@ fn load_delta_state<P: ParseDiagnostic>(
     };
     let snapshot = baseline::load::<P>(path).map_err(|e| anyhow::anyhow!("{e}"))?;
     if let Some(msg) = policy_mismatch_warning(snapshot.missing_coverage_policy, current_policy) {
+        eprintln!("{msg}");
+    }
+    if let Some(msg) = metric_mismatch_warning(snapshot.metric, current_metric) {
         eprintln!("{msg}");
     }
     // compute_with_epsilon consumes both — we own snapshot.result, clone
@@ -1859,6 +1864,28 @@ fn policy_mismatch_warning(
         format!(
             "warning: baseline used `missing_coverage_policy = {baseline}` but this run uses `{current}`; \
              delta scores for functions absent from coverage may be misleading"
+        )
+    })
+}
+
+/// The warning text when the baseline and the current run scored
+/// complexity with different metrics, or `None` when they match — or
+/// when the baseline envelope omits the `metric` field entirely
+/// (absence is not evidence of disagreement; legacy baselines predate
+/// the field). Cognitive and cyclomatic scores are incomparable
+/// scales, so every per-function complexity/CRAP delta across a metric
+/// switch is misleading. Pure so the message is unit-testable; the
+/// caller emits it as a non-fatal stderr warning (the delta still
+/// computes and the gate is unchanged).
+fn metric_mismatch_warning(
+    baseline: Option<ComplexityMetric>,
+    current: ComplexityMetric,
+) -> Option<String> {
+    let baseline = baseline?;
+    (baseline != current).then(|| {
+        format!(
+            "warning: baseline was scored with metric `{baseline}` but this run uses `{current}`; \
+             complexity and CRAP deltas compare incomparable scales and may be misleading"
         )
     })
 }
@@ -3855,6 +3882,45 @@ mod tests {
         )
         .expect("mismatched policies must warn");
         assert!(msg.contains("pessimistic") && msg.contains("optimistic"));
+    }
+
+    #[test]
+    fn metric_mismatch_warning_none_when_metrics_match() {
+        assert!(
+            metric_mismatch_warning(
+                Some(ComplexityMetric::Cognitive),
+                ComplexityMetric::Cognitive
+            )
+            .is_none()
+        );
+        assert!(
+            metric_mismatch_warning(
+                Some(ComplexityMetric::Cyclomatic),
+                ComplexityMetric::Cyclomatic
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn metric_mismatch_warning_none_when_baseline_omits_metric() {
+        // A baseline that predates (or omits) the envelope's `metric`
+        // field carries no evidence of disagreement — warning here
+        // would false-positive on every legacy baseline.
+        assert!(metric_mismatch_warning(None, ComplexityMetric::Cyclomatic).is_none());
+        assert!(metric_mismatch_warning(None, ComplexityMetric::Cognitive).is_none());
+    }
+
+    #[test]
+    fn metric_mismatch_warning_names_both_metrics() {
+        let msg = metric_mismatch_warning(
+            Some(ComplexityMetric::Cyclomatic),
+            ComplexityMetric::Cognitive,
+        )
+        .expect("mismatched metrics must warn");
+        assert!(msg.contains("cyclomatic"), "names the baseline metric");
+        assert!(msg.contains("cognitive"), "names the current metric");
+        assert!(msg.contains("misleading"), "flags the comparison risk");
     }
 
     #[test]

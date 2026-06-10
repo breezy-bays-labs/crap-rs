@@ -469,6 +469,154 @@ fn crap_render_rejects_duplicate_baseline() {
     );
 }
 
+/// A baseline scored with a different complexity metric than its input
+/// envelope must not be silently diffed — cognitive and cyclomatic are
+/// incomparable scales, so the recomputed delta would be confident
+/// garbage. The guard warns on stderr and degrades ONLY that
+/// language's Delta tab to the disabled state, with a tooltip naming
+/// the mismatch; the other language's delta renders untouched. (The
+/// per-panel tooltip exists in the multi-language template — a
+/// single-language render keeps its byte-identical passthrough and
+/// carries the cause on stderr only.)
+#[test]
+fn crap_render_warns_and_disables_delta_on_metric_mismatch() {
+    let tmp = TempDir::new().unwrap();
+    let rs_in = tmp.path().join("rs.json");
+    let rs_base = tmp.path().join("rs-baseline.json");
+    let ts_in = tmp.path().join("ts.json");
+    let ts_base = tmp.path().join("ts-baseline.json");
+    fs::write(&rs_in, MINIMAL_ENVELOPE_V2).unwrap();
+    // Rust baseline scored with the OTHER metric → mismatch.
+    let cyclomatic_baseline =
+        MINIMAL_ENVELOPE_V2.replace("\"metric\": \"cognitive\",", "\"metric\": \"cyclomatic\",");
+    fs::write(&rs_base, &cyclomatic_baseline).unwrap();
+    // TypeScript baseline matches its input → delta renders normally.
+    fs::write(&ts_in, MINIMAL_ENVELOPE_TS_V2).unwrap();
+    fs::write(&ts_base, MINIMAL_ENVELOPE_TS_V2).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", rs_in.display()))
+        .arg("--input")
+        .arg(format!("typescript={}", ts_in.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", rs_base.display()))
+        .arg("--baseline")
+        .arg(format!("typescript={}", ts_base.display()))
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "metric mismatch is a warning, not an error; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        stderr.contains("'rust'")
+            && stderr.contains("`cyclomatic`")
+            && stderr.contains("`cognitive`"),
+        "warning should name the language and both metrics; got: {stderr}"
+    );
+    let html = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        html.contains(
+            "baseline metric (cyclomatic) does not match the input envelope metric (cognitive)"
+        ),
+        "disabled Delta tab tooltip should name the mismatch"
+    );
+    // Exactly two enabled Delta tabs render their "N changed" badge:
+    // the cross-adapter Combined tab (typescript still contributes a
+    // delta) and typescript's own panel tab. The mismatched rust panel
+    // must not add a third — its delta is suppressed.
+    assert_eq!(
+        html.matches("changed</span>").count(),
+        2,
+        "the mismatched language must not render an enabled Delta tab"
+    );
+}
+
+/// A baseline that omits the `metric` field (legacy envelopes predate
+/// it) carries no evidence of disagreement: the delta must compute and
+/// no mismatch warning may fire — otherwise every legacy baseline
+/// render would false-positive.
+#[test]
+fn crap_render_computes_delta_when_baseline_omits_metric() {
+    let tmp = TempDir::new().unwrap();
+    let in_path = tmp.path().join("input.json");
+    let base_path = tmp.path().join("baseline.json");
+    fs::write(&in_path, MINIMAL_ENVELOPE_V2).unwrap();
+    let metricless_baseline = MINIMAL_ENVELOPE_V2.replace("  \"metric\": \"cognitive\",\n", "");
+    assert!(
+        !metricless_baseline.contains("\"metric\""),
+        "fixture must actually omit the top-level metric key"
+    );
+    fs::write(&base_path, &metricless_baseline).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", in_path.display()))
+        .arg("--baseline")
+        .arg(format!("rust={}", base_path.display()))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        !stderr.contains("does not match"),
+        "absent baseline metric must not warn; got: {stderr}"
+    );
+    let html = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        html.contains("changed</span>"),
+        "the Delta tab should render enabled (delta computed)"
+    );
+}
+
+/// An `--input` envelope that omits `metric` or `threshold` gets
+/// defaults applied — visibly: a stderr note names each omitted field
+/// so a hand-built envelope can't silently render with a 0 threshold
+/// or the wrong metric label. Baselines stay silent (legacy envelopes
+/// omitting fields are expected).
+#[test]
+fn crap_render_notes_missing_metric_and_threshold_on_input() {
+    let tmp = TempDir::new().unwrap();
+    let in_path = tmp.path().join("input.json");
+    // Newline-anchored patterns so only the TOP-LEVEL keys (2-space
+    // indent) are stripped — the per-function `threshold` nested in
+    // `result` shares the same tail and must survive (it is required).
+    let stripped = MINIMAL_ENVELOPE_V2
+        .replace("\n  \"metric\": \"cognitive\",", "")
+        .replace("\n  \"threshold\": 8.0,", "");
+    assert!(
+        stripped.contains("\"threshold\": 8.0"),
+        "per-function threshold must survive the strip"
+    );
+    fs::write(&in_path, &stripped).unwrap();
+
+    let out = Command::cargo_bin("crap-render")
+        .unwrap()
+        .arg("--input")
+        .arg(format!("rust={}", in_path.display()))
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "missing metadata fields default with a note, not an error; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        stderr.contains("omits `metric`") && stderr.contains("omits `threshold`"),
+        "stderr should note each omitted field; got: {stderr}"
+    );
+    assert!(
+        stderr.contains("'rust'"),
+        "the note should name the language key; got: {stderr}"
+    );
+}
+
 /// crap-rs#379: the effective `epsilon` travels on the input envelope, so
 /// `crap-render`'s recomputed delta carries the active band and the rendered
 /// report shows the border-jitter line even when nothing was suppressed.

@@ -114,10 +114,20 @@ pub struct Envelope<P: ParseDiagnostic> {
     pub language: String,
     #[serde(default)]
     pub timestamp: String,
+    /// Complexity metric the analysis was scored with. The writer
+    /// always emits it (`Some` serializes as the bare value, so the
+    /// wire bytes are unchanged); on read, `None` means the envelope
+    /// omitted the field. Kept `Option` rather than defaulting so
+    /// consumers can distinguish "predates / omits the field" from
+    /// "scored with the default metric" — the metric-mismatch guard
+    /// must not treat an omitting baseline as disagreeing.
     #[serde(default)]
-    pub metric: ComplexityMetric,
+    pub metric: Option<ComplexityMetric>,
+    /// Workspace-level CRAP threshold the gate ran with. Same
+    /// `Option` semantics as `metric`: always emitted by the writer,
+    /// `None` on read means the envelope omitted it.
     #[serde(default)]
-    pub threshold: f64,
+    pub threshold: Option<f64>,
     /// Git ref used for diff filtering. Always emitted (`null` when no
     /// diff filter was active) so consumers can distinguish "no diff
     /// filter" from "schema doesn't carry the key".
@@ -272,8 +282,8 @@ mod tests {
             tool_version: "9.9.9".to_string(),
             language: "rust".to_string(),
             timestamp: "2026-06-09T12:00:00Z".to_string(),
-            metric: ComplexityMetric::Cyclomatic,
-            threshold: 11.5,
+            metric: Some(ComplexityMetric::Cyclomatic),
+            threshold: Some(11.5),
             diff_ref: Some("main".to_string()),
             result: make_single_function_result(
                 "compute_crap",
@@ -418,8 +428,8 @@ mod tests {
             tool_version: "0.1.0".to_string(),
             language: "rust".to_string(),
             timestamp: "2026-06-09T12:00:00Z".to_string(),
-            metric: ComplexityMetric::Cognitive,
-            threshold: 8.0,
+            metric: Some(ComplexityMetric::Cognitive),
+            threshold: Some(8.0),
             diff_ref: None,
             result: make_single_function_result(
                 "f",
@@ -482,8 +492,14 @@ mod tests {
         assert_eq!(parsed.tool_version, "");
         assert_eq!(parsed.language, "");
         assert_eq!(parsed.timestamp, "");
-        assert_eq!(parsed.metric, ComplexityMetric::Cognitive);
-        assert_eq!(parsed.threshold, 0.0);
+        // Absent metric/threshold read as None — NOT silently as the
+        // Rust-side defaults — so consumers can distinguish "the
+        // envelope predates / omits the field" from "the field was
+        // emitted with the default value". The metric-mismatch guard
+        // depends on this: a baseline that merely omits `metric` must
+        // not be treated as disagreeing with the current run.
+        assert_eq!(parsed.metric, None);
+        assert_eq!(parsed.threshold, None);
         assert_eq!(parsed.diff_ref, None);
         assert!(parsed.result.passed);
         assert!(parsed.diagnostics.is_none());
@@ -545,8 +561,8 @@ mod proptests {
                 tool_version: "0.1.0".to_string(),
                 language: "rust".to_string(),
                 timestamp: "2026-01-01T00:00:00Z".to_string(),
-                metric: ComplexityMetric::Cognitive,
-                threshold,
+                metric: Some(ComplexityMetric::Cognitive),
+                threshold: Some(threshold),
                 diff_ref: None,
                 result,
                 view: ViewBlock::default(),

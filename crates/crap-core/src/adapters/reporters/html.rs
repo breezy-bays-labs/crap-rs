@@ -915,11 +915,16 @@ struct LangPanel {
     dist_moderate: usize,
     dist_high: usize,
     files: Vec<FileCard>,
-    /// True when this language supplied a baseline. The template
-    /// renders the Delta tab as enabled when `true`, disabled +
-    /// titled with a no-baseline tooltip when `false`. The Current
-    /// tab is always enabled.
+    /// True when this language supplied a usable baseline. The
+    /// template renders the Delta tab as enabled when `true`,
+    /// disabled + titled with `delta_disabled_title` when `false`.
+    /// The Current tab is always enabled.
     has_delta: bool,
+    /// Tooltip on the disabled Delta tab — names the cause: the
+    /// default no-baseline wording, or the language block's override
+    /// (e.g. a baseline scored with a mismatched complexity metric).
+    /// Only rendered when `has_delta` is false.
+    delta_disabled_title: String,
     /// Tab-count badge for the Current tab — total analyzed
     /// functions, mirroring the single-language template's
     /// `current_tab_count`.
@@ -966,10 +971,12 @@ struct CombinedDeltaPanel {
     /// Surfaced in the scope-banner copy so reviewers see which
     /// languages this aggregate represents.
     contributing_languages: Vec<String>,
-    /// Display labels of languages with no baseline. Rendered as a
-    /// scope-banner note ("TypeScript has no baseline yet — provide
-    /// one via …") so the asymmetry between Current and Delta views
-    /// is visible in-document, not just at the disabled-tab level.
+    /// Display labels of languages with no usable baseline (none
+    /// supplied, or supplied but rejected — e.g. a metric mismatch).
+    /// Rendered as a scope-banner note pointing at the per-panel
+    /// tooltip for the cause, so the asymmetry between Current and
+    /// Delta views is visible in-document, not just at the
+    /// disabled-tab level.
     missing_baseline_languages: Vec<String>,
     /// Workspace-wide ranked rows. Sort: risk band desc, then
     /// CRAP/threshold ratio desc within band; per-row `kind`
@@ -1141,6 +1148,13 @@ fn build_language_panels(
             };
             let delta_panel = block.delta.as_ref().map(|d| Box::new(build_delta_panel(d)));
             let has_delta = delta_panel.is_some();
+            // Disabled-tab tooltip: the block's explicit reason (e.g.
+            // a metric-mismatched baseline) wins; the default keeps
+            // the long-standing no-baseline wording byte-identical.
+            let delta_disabled_title = block
+                .delta_disabled_reason
+                .clone()
+                .unwrap_or_else(|| format!("no baseline available for {}", block.display_name));
             let current_tab_count = if is_empty { 0 } else { summary.total_functions };
             let delta_tab_count = delta_panel
                 .as_ref()
@@ -1176,6 +1190,7 @@ fn build_language_panels(
                 dist_high: summary_view.dist_high,
                 files,
                 has_delta,
+                delta_disabled_title,
                 current_tab_count,
                 delta_tab_count,
                 delta_has_news,
@@ -2425,6 +2440,7 @@ mod tests {
             threshold,
             view: make_view_default(result),
             delta: None,
+            delta_disabled_reason: None,
         }
     }
 
@@ -2848,6 +2864,7 @@ mod tests {
                 &rs_delta,
                 crate::domain::delta::DeltaViewSpec::default(),
             )),
+            delta_disabled_reason: None,
         };
         let ts_block = LanguageBlock {
             tool_name: "crap4ts".to_string(),
@@ -2861,6 +2878,7 @@ mod tests {
                 &ts_delta,
                 crate::domain::delta::DeltaViewSpec::default(),
             )),
+            delta_disabled_reason: None,
         };
         let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
         let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
@@ -2912,6 +2930,7 @@ mod tests {
             threshold: 8.0,
             view: make_view_default(rs_c),
             delta: Some(apply(rs_delta, DeltaViewSpec::default())),
+            delta_disabled_reason: None,
         };
         let ts_block = LanguageBlock {
             tool_name: "crap4ts".to_string(),
@@ -2922,6 +2941,7 @@ mod tests {
             threshold: 8.0,
             view: make_view_default(ts_c),
             delta: Some(apply(ts_delta, DeltaViewSpec::default())),
+            delta_disabled_reason: None,
         };
         let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
         format_html_multi(&multi, 8.0, HtmlMultiOptions::default())
@@ -2982,6 +3002,7 @@ mod tests {
                 &rs_delta,
                 crate::domain::delta::DeltaViewSpec::default(),
             )),
+            delta_disabled_reason: None,
         };
         let ts_block = LanguageBlock {
             tool_name: "crap4ts".to_string(),
@@ -2992,6 +3013,7 @@ mod tests {
             threshold: 8.0,
             view: make_view_default(&ts_c),
             delta: None,
+            delta_disabled_reason: None,
         };
         let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
         let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
@@ -3028,7 +3050,7 @@ mod tests {
             "Combined Delta hero must render the missing-baseline note"
         );
         assert!(
-            out.contains("<strong>TypeScript</strong>") && out.contains("has no baseline yet"),
+            out.contains("<strong>TypeScript</strong>") && out.contains("has no usable baseline"),
             "missing-baseline-note must name TypeScript"
         );
     }
@@ -3288,6 +3310,7 @@ mod tests {
                     &rs_delta_full,
                     crate::domain::delta::DeltaViewSpec::default(),
                 )),
+                delta_disabled_reason: None,
             },
             LanguageBlock {
                 tool_name: "crap4ts".to_string(),
@@ -3301,6 +3324,7 @@ mod tests {
                     &ts_delta_full,
                     crate::domain::delta::DeltaViewSpec::default(),
                 )),
+                delta_disabled_reason: None,
             },
         ];
         let multi = crate::core::compose::compose_multi_lang(blocks);
@@ -3344,6 +3368,7 @@ mod tests {
                 &rs_delta,
                 crate::domain::delta::DeltaViewSpec::default(),
             )),
+            delta_disabled_reason: None,
         };
         let ts_block = LanguageBlock {
             tool_name: "crap4ts".to_string(),
@@ -3357,6 +3382,7 @@ mod tests {
                 &ts_delta,
                 crate::domain::delta::DeltaViewSpec::default(),
             )),
+            delta_disabled_reason: None,
         };
         let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
         let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
@@ -3382,6 +3408,7 @@ mod tests {
                 &rs_delta,
                 crate::domain::delta::DeltaViewSpec::default(),
             )),
+            delta_disabled_reason: None,
         };
         let ts_block = LanguageBlock {
             tool_name: "crap4ts".to_string(),
@@ -3392,6 +3419,7 @@ mod tests {
             threshold: 8.0,
             view: make_view_default(&ts_c),
             delta: None,
+            delta_disabled_reason: None,
         };
         let multi = crate::core::compose::compose_multi_lang(vec![rs_block, ts_block]);
         let out = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
@@ -3431,6 +3459,7 @@ mod tests {
             threshold: 8.0,
             view: make_view_default(&delta.current),
             delta: Some(make_delta_view_default(&delta)),
+            delta_disabled_reason: None,
         };
         let multi = crate::core::compose::compose_multi_lang(vec![block]);
         let unified = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());
