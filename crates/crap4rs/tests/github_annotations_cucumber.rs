@@ -11,10 +11,12 @@
 //! The two synthetic source templates cover the cardinality and
 //! risk-level invariants every scenario in this feature needs:
 //!
-//! * **EXCEEDS** — branchy uncovered fns. Each generated fn has cognitive
-//!   complexity ≥ 5 (three nested conditionals) and ~0% coverage, which
-//!   produces CRAP well above the default threshold of 8. A configurable
-//!   `n` controls how many such fns the fixture writes.
+//! * **EXCEEDS** — branchy uncovered fns. Nesting depth grows with the
+//!   fn index (3 nested conditionals for the first fn, one more per
+//!   subsequent fn), so every generated fn has a strictly distinct CRAP
+//!   score, the lowest of which (≈21.5 at ~0% body coverage) sits well
+//!   above the default threshold of 15. A configurable `n` controls how
+//!   many such fns the fixture writes.
 //! * **WITHIN** — trivial covered fns. CRAP ≤ 1, so no fn exceeds any
 //!   reasonable threshold.
 
@@ -73,15 +75,23 @@ impl GhaWorld {
     }
 }
 
-/// Build a branchy uncovered fn body that produces high CRAP. Three
-/// nested conditionals push cognitive complexity ≥ 5; coverage is 0%
-/// on the body lines (we only mark line 1 — the signature line — as
-/// covered in the LCOV stub).
-fn branchy_fn_body(name: &str) -> String {
-    format!(
-        "pub fn {name}(x: i32) -> i32 {{\n    \
-         if x > 0 {{ if x > 5 {{ if x > 10 {{ 1 }} else {{ 2 }} }} else {{ 3 }} }} else {{ 4 }}\n}}\n"
-    )
+/// Build a branchy uncovered fn body that produces high CRAP. `depth`
+/// nested conditionals (all on one source line, preserving the
+/// `BRANCHY_LINES` contract) push cognitive complexity up with each
+/// level, so two fns with different depths always score distinct CRAP
+/// values; coverage is 0% on the body lines (we only mark line 1 — the
+/// signature line — as covered in the LCOV stub). The minimum depth
+/// used by `write_project` is 3, which keeps every generated fn above
+/// the default threshold.
+fn branchy_fn_body(name: &str, depth: usize) -> String {
+    assert!(depth >= 1, "branchy_fn_body needs at least one conditional");
+    let mut expr = String::from("1");
+    for level in (0..depth).rev() {
+        let bound = level * 5;
+        let fallback = level + 2;
+        expr = format!("if x > {bound} {{ {expr} }} else {{ {fallback} }}");
+    }
+    format!("pub fn {name}(x: i32) -> i32 {{\n    {expr}\n}}\n")
 }
 
 /// Build a trivial single-expression fn — coverage 100%, complexity 1.
@@ -95,7 +105,11 @@ const BRANCHY_LINES: usize = 3;
 
 /// Write a synthetic project to `dir` containing `n_exceeding` branchy
 /// uncovered fns named `branchy_a`, `branchy_b`, …, plus `n_within`
-/// trivial covered fns.
+/// trivial covered fns. Nesting depth grows with the fn index
+/// (`branchy_a` shallowest, so source order is CRAP-ascending), which
+/// gives every exceeder a strictly distinct CRAP score — scenarios
+/// that assert sort order therefore genuinely exercise the reporter's
+/// descending sort instead of passing on ties.
 fn write_project(dir: &Path, n_exceeding: usize, n_within: usize) {
     let mut src = String::new();
     let mut lcov = String::from("SF:lib.rs\n");
@@ -103,7 +117,7 @@ fn write_project(dir: &Path, n_exceeding: usize, n_within: usize) {
 
     for i in 0..n_exceeding {
         let name = format!("branchy_{}", letter(i));
-        src.push_str(&branchy_fn_body(&name));
+        src.push_str(&branchy_fn_body(&name, 3 + i));
         let _ = writeln!(lcov, "DA:{},1", next_line);
         for _ in 1..BRANCHY_LINES {
             next_line += 1;
@@ -182,11 +196,12 @@ fn given_all_below(world: &mut GhaWorld) {
 
 #[given("exceeding functions across risk levels high, moderate, acceptable")]
 fn given_mixed_risk_exceeders(world: &mut GhaWorld) {
-    // The shaped fixtures all produce High-risk exceeders. The
-    // single-tier-warning contract is "every emitted line begins with
-    // `::warning`" regardless of which risk tier each exceeder lands in —
-    // a fixture that mixes risk tiers is equivalent to one that doesn't
-    // for this assertion (the reporter ignores `risk_level` entirely).
+    // The shaped fixture spans Moderate and High exceeders but not all
+    // three named tiers. The single-tier-warning contract is "every
+    // emitted line begins with `::warning`" regardless of which risk
+    // tier each exceeder lands in — a fixture that covers every tier is
+    // equivalent to one that doesn't for this assertion (the reporter
+    // ignores `risk_level` entirely).
     setup_with(world, 3, 0);
 }
 
@@ -518,10 +533,14 @@ fn then_sorted_crap_desc(world: &mut GhaWorld) {
         .map(extract_crap_score)
         .collect();
     assert!(scores.len() >= 2, "need ≥2 scores, got {scores:?}");
+    // The Given promises DISTINCT scores, so descending must be strict.
+    // A `>=` here would pass on an all-tied fixture without exercising
+    // the sort at all; strict `>` makes the fixture's distinctness
+    // self-enforcing.
     for w in scores.windows(2) {
         assert!(
-            w[0] >= w[1],
-            "scores not CRAP-DESC: {} < {} in {scores:?}",
+            w[0] > w[1],
+            "scores not strictly CRAP-DESC (tie or misorder): {} !> {} in {scores:?}",
             w[0],
             w[1]
         );
