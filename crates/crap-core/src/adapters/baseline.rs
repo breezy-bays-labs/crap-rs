@@ -3,66 +3,34 @@
 //! envelope metadata (tool_version, timestamp) needed for delta
 //! reporting.
 //!
-//! The on-the-wire JSON envelope (see `adapters::reporters::json`)
-//! includes far more than `result`: `view`, `diagnostics`, `delta` (in
-//! the future), etc. The baseline loader ignores everything except
-//! `schema_version`, `result`, `tool_version`, `timestamp`, and
-//! optionally `diagnostics` so that consumers can produce baseline
-//! envelopes that contain extra fields without breaking us.
+//! The envelope is parsed as the canonical
+//! [`wire::Envelope`](crate::adapters::wire::Envelope) — the same type
+//! the JSON reporter serializes — so the writer and this reader cannot
+//! drift apart. The loader then projects the subset delta
+//! reporting needs into [`BaselineSnapshot`]. The wire type's read
+//! contract is permissive (only `schema_version` and `result` are
+//! required; unknown fields are ignored), so consumers can produce
+//! baseline envelopes that carry extra fields — or only the analysis
+//! itself — without breaking us.
 //!
-//! Schema version validation: `schema_version` 1 and 2 are both
-//! accepted (the current emit version is 2; v1 baselines remain
+//! Schema version validation: every version in
+//! [`SUPPORTED_SCHEMA_VERSIONS`] is accepted (v1 baselines remain
 //! loadable because delta matching is identity-keyed, not
 //! column-keyed). Future schema bumps will need an explicit
 //! migration path.
 
+use crate::adapters::wire::Envelope;
 use crate::domain::types::{AnalysisDiagnostics, AnalysisResult, MissingCoveragePolicy};
 use crate::ports::ParseDiagnostic;
-use serde::Deserialize;
 use std::fs::File;
 use std::io::{BufReader, ErrorKind};
 use std::path::Path;
 
-/// Currently-emitted envelope schema version. Lockstep with
-/// `adapters::reporters::json::JsonEnvelope::schema_version`.
-pub const CURRENT_SCHEMA_VERSION: u32 = 2;
-
-/// Envelope schema versions accepted by the baseline loader. v1 stays
-/// loadable across the v0.3.x → v0.4.x boundary so users can keep their
-/// committed baseline JSON; the column-convention shift in v2 doesn't
-/// affect delta calculations (identity-keyed matching).
-pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1, 2];
-
-/// On-disk shape we read. Mirrors the relevant subset of
-/// `JsonEnvelope`. `serde(default)` on optional fields keeps us
-/// forward-compatible with envelopes that omit fields we don't need.
-///
-/// `P: ParseDiagnostic` carries the adapter-specific parse-diagnostic
-/// type through `AnalysisDiagnostics<P>`. crap4rs concretizes to
-/// `LcovParseDiagnostic` via the v0.4 shim alias.
-/// `serde(bound = "")` suppresses the auto-generated `P: Serialize` /
-/// `P: Deserialize<'de>` bounds — `P: ParseDiagnostic` already provides
-/// `Serialize + DeserializeOwned`, and the auto-bounds conflict with
-/// the owned-deserialize requirement.
-#[derive(Debug, Deserialize)]
-#[serde(bound = "")]
-struct BaselineEnvelope<P: ParseDiagnostic> {
-    schema_version: u32,
-    #[serde(default)]
-    tool_version: String,
-    #[serde(default)]
-    timestamp: String,
-    result: AnalysisResult,
-    #[serde(default)]
-    diagnostics: Option<AnalysisDiagnostics<P>>,
-    /// Policy the baseline was generated under. Absent on envelopes
-    /// emitted before the field existed, and on any pessimistic run
-    /// (the emitter elides the default) — both deserialize to
-    /// `Pessimistic` via `Default`, the load-bearing "absent ⇒
-    /// pessimistic" convention the delta mismatch warning relies on.
-    #[serde(default)]
-    missing_coverage_policy: MissingCoveragePolicy,
-}
+// Re-exported from the canonical wire module (where the writer also
+// reads them) so the long-standing
+// `crap_core::adapters::baseline::{CURRENT_SCHEMA_VERSION,
+// SUPPORTED_SCHEMA_VERSIONS}` import paths keep compiling.
+pub use crate::adapters::wire::{CURRENT_SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS};
 
 /// What the loader returns to callers. The fields are all the metadata
 /// the delta envelope's `delta.baseline_*` keys ultimately surface.
@@ -140,7 +108,7 @@ pub fn load<P: ParseDiagnostic>(path: &Path) -> Result<BaselineSnapshot<P>, Base
         },
     })?;
 
-    let envelope: BaselineEnvelope<P> =
+    let envelope: Envelope<P> =
         serde_json::from_reader(BufReader::new(file)).map_err(|source| BaselineError::Parse {
             path: path_str.clone(),
             source,

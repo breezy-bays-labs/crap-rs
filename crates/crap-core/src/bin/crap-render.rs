@@ -32,11 +32,11 @@
 //!
 //! ## Schema-version validation
 //!
-//! Each envelope's `schema_version` is validated on parse. The
-//! renderer accepts `schema_version ∈ {1, 2}` (mirrors the baseline
-//! loader's accepted range in `adapters::baseline`). Out-of-range
-//! values fail fast with an actionable error message naming the
-//! envelope path and the offending value.
+//! Each envelope's `schema_version` is validated on parse against the
+//! shared `adapters::wire::SUPPORTED_SCHEMA_VERSIONS` (the same range
+//! every envelope reader accepts). Out-of-range values fail fast with
+//! an actionable error message naming the envelope path and the
+//! offending value.
 //!
 //! ## Duplicate adapter guard
 //!
@@ -52,22 +52,14 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::{ArgAction, Parser, ValueEnum};
-use serde::Deserialize;
 
 use crap_core::adapters::reporters::{HtmlMultiOptions, format_html_multi};
+use crap_core::adapters::wire::{Envelope, RawParseDiagnostic, SUPPORTED_SCHEMA_VERSIONS};
 use crap_core::core::compose::compose_multi_lang;
 use crap_core::domain::delta::{self, AnalysisDelta, DeltaViewSpec};
 use crap_core::domain::multi_lang::LanguageBlock;
 use crap_core::domain::types::{AnalysisResult, ComplexityMetric};
 use crap_core::domain::view::{self, ViewSpec};
-
-/// Schema versions this renderer accepts on input envelopes.
-///
-/// Mirrors the baseline loader's range
-/// (`adapters::baseline::SUPPORTED_SCHEMA_VERSIONS`); when production
-/// envelopes bump past this range, the renderer fails fast with an
-/// actionable error rather than producing a mangled combined view.
-const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1, 2];
 
 #[derive(Parser, Debug)]
 #[command(
@@ -131,25 +123,6 @@ struct ParsedEnvelope {
     /// matches the gate that produced the envelope. `0.0` ⇒ band off.
     epsilon: f64,
     tool_version: String,
-}
-
-/// Minimal envelope shape for deserialization. Mirrors the relevant
-/// subset of `JsonEnvelope` in `crap-core::adapters::reporters::json`
-/// — we only read the fields the renderer needs.
-#[derive(Deserialize)]
-struct WireEnvelope {
-    schema_version: u32,
-    #[serde(default)]
-    tool_version: String,
-    metric: ComplexityMetric,
-    threshold: f64,
-    /// Effective threshold-border epsilon the emitting run was configured
-    /// with (crap-rs#379). `serde(default)` → `0.0` for envelopes that omit
-    /// it (every pre-#379 envelope, and any epsilon-off run), so the
-    /// recomputed delta stays byte-identical to the old behavior there.
-    #[serde(default)]
-    epsilon: f64,
-    result: AnalysisResult,
 }
 
 fn main() -> ExitCode {
@@ -330,9 +303,13 @@ fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
     // `from_reader` reads forward through the JSON document; on a
     // typical workspace this is functionally equivalent to slurping
     // but bounds peak memory in the high-input case.
+    //
+    // `RawParseDiagnostic` keeps the renderer adapter-agnostic: it
+    // accepts envelopes from any emitting adapter without committing to
+    // a concrete parse-diagnostic type.
     let file =
         File::open(&path).with_context(|| format!("opening envelope at {}", path.display()))?;
-    let envelope: WireEnvelope = serde_json::from_reader(BufReader::new(file))
+    let envelope: Envelope<RawParseDiagnostic> = serde_json::from_reader(BufReader::new(file))
         .with_context(|| format!("parsing JSON envelope at {}", path.display()))?;
 
     if !SUPPORTED_SCHEMA_VERSIONS.contains(&envelope.schema_version) {
