@@ -91,6 +91,13 @@ pub struct LanguageBlock<'a> {
     /// provided to this adapter; the Combined → Delta tab handles
     /// the asymmetric case (per shaping doc EDGE locks).
     pub delta: Option<DeltaView<'a>>,
+    /// Why this language's Delta tab is disabled, when the cause is
+    /// something other than a missing baseline (e.g. the baseline was
+    /// scored with a different complexity metric, so diffing it would
+    /// compare incomparable scales). Rendered as the disabled tab's
+    /// tooltip; `None` falls back to the default no-baseline wording.
+    /// Only meaningful when `delta` is `None`.
+    pub delta_disabled_reason: Option<String>,
 }
 
 /// Cross-adapter aggregation produced by composition.

@@ -857,7 +857,7 @@ fn then_combined_delta_missing_baseline_note(world: &mut MultiLangWorld) {
         "Combined Delta hero must render the missing-baseline note"
     );
     assert!(
-        out.contains("<strong>TypeScript</strong>") && out.contains("has no baseline yet"),
+        out.contains("<strong>TypeScript</strong>") && out.contains("has no usable baseline"),
         "missing-baseline-note must name TypeScript: {out}"
     );
 }

@@ -81,6 +81,7 @@ fn single_language_passthrough_is_byte_identical_to_direct_format_html() {
         threshold: 8.0,
         view: make_view_default(&result),
         delta: None,
+        delta_disabled_reason: None,
     };
     let multi = compose_multi_lang(vec![block]);
     let unified = format_html_multi(&multi, 8.0, HtmlMultiOptions::default());

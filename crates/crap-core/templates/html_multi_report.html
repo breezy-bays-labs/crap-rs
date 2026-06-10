@@ -371,9 +371,9 @@
       <p class="missing-baseline-note">
         {% for lang in cd.missing_baseline_languages %}{% if !loop.first %}, {% endif %}<strong>{{ lang }}</strong>{% endfor %}
         {% if cd.missing_baseline_languages.len() == 1 -%}
-        has no baseline yet — its Delta tab is disabled until one is supplied.
+        has no usable baseline — its Delta tab is disabled; its panel tooltip names the cause.
         {%- else -%}
-        have no baselines yet — their Delta tabs are disabled until baselines are supplied.
+        have no usable baselines — their Delta tabs are disabled; each panel tooltip names the cause.
         {%- endif %}
       </p>
       {%- endif %}
@@ -456,7 +456,7 @@
       <span class="tab-count">{{ panel.delta_tab_count }} changed</span>
     </button>
     {%- else %}
-    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="no baseline available for {{ panel.display_name }}">
+    <button class="tab" role="tab" aria-selected="false" data-tab="delta" type="button" disabled aria-disabled="true" title="{{ panel.delta_disabled_title }}">
       Delta vs baseline <span class="tab-count">—</span>
     </button>
     {%- endif %}

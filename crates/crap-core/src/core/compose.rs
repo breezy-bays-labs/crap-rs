@@ -407,6 +407,7 @@ mod tests {
                 threshold,
                 view: view::apply(&self.result, ViewSpec::default()),
                 delta: None,
+                delta_disabled_reason: None,
             }
         }
     }
@@ -687,6 +688,7 @@ mod tests {
                 threshold,
                 view: view::apply(&self.current, ViewSpec::default()),
                 delta: Some(delta::apply(analysis_delta, DeltaViewSpec::default())),
+                delta_disabled_reason: None,
             }
         }
     }

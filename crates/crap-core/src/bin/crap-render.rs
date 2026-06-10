@@ -115,7 +115,11 @@ enum Format {
 struct ParsedEnvelope {
     language: String,
     result: AnalysisResult,
-    metric: ComplexityMetric,
+    /// Metric as carried on the wire — `None` when the envelope omitted
+    /// the field. Absence is preserved (not defaulted) so the
+    /// metric-mismatch guard never treats an omitting envelope as
+    /// disagreeing; display sites resolve with `unwrap_or_default()`.
+    metric: Option<ComplexityMetric>,
     threshold: f64,
     /// Effective threshold-border epsilon carried from the envelope
     /// (crap-rs#379). Applied when this envelope is the *input* side of a
@@ -154,28 +158,12 @@ fn run(cli: Cli) -> Result<()> {
     // Compose per-language `AnalysisDelta`s ahead of `LanguageBlock`
     // construction so the rendered `DeltaView`s can borrow into
     // owned storage that lives at least as long as the render call.
-    // The deltas vector is kept in 1:1 order alignment with
-    // `parsed`; `None` means this language has no baseline (Delta
-    // tab will render disabled in the report).
-    let analysis_deltas: Vec<Option<AnalysisDelta>> = parsed
-        .iter()
-        .map(|env| {
-            baselines
-                .iter()
-                .find(|b| b.language == env.language)
-                // Recompute the delta carrying the *input* envelope's
-                // effective epsilon (crap-rs#379) — the current run's
-                // configured border band, not the baseline's. With epsilon
-                // threaded, the recomputed `DeltaSummary.border_jitter_active`
-                // / `border_jitter_suppressed` match the gate that produced
-                // the envelope, so the combined panel can show an active band
-                // even at zero suppressed. `epsilon == 0.0` (the common case)
-                // is byte-identical to the old bare `delta::compute`.
-                .map(|b| {
-                    delta::compute_with_epsilon(b.result.clone(), env.result.clone(), env.epsilon)
-                })
-        })
-        .collect();
+    // Both vectors are kept in 1:1 order alignment with `parsed`; a
+    // `None` delta means this language has no usable baseline (Delta
+    // tab renders disabled), and the paired reason — when present —
+    // names a metric mismatch as the cause instead of the default
+    // "no baseline" tooltip.
+    let (analysis_deltas, delta_disabled_reasons) = compose_deltas(&parsed, &baselines);
 
     // Build LanguageBlock list. The view + delta lifetimes borrow
     // from each ParsedEnvelope's result; we therefore keep `parsed`
@@ -183,17 +171,19 @@ fn run(cli: Cli) -> Result<()> {
     let blocks: Vec<LanguageBlock<'_>> = parsed
         .iter()
         .zip(analysis_deltas.iter())
-        .map(|(env, maybe_delta)| LanguageBlock {
+        .zip(delta_disabled_reasons)
+        .map(|((env, maybe_delta), disabled_reason)| LanguageBlock {
             tool_name: tool_name_for_language(&env.language).to_string(),
             display_name: display_name_for_language(&env.language).to_string(),
             language: env.language.clone(),
             tool_version: env.tool_version.clone(),
-            metric: env.metric,
+            metric: env.metric.unwrap_or_default(),
             threshold: env.threshold,
             view: view::apply(&env.result, ViewSpec::default()),
             delta: maybe_delta
                 .as_ref()
                 .map(|d| delta::apply(d, DeltaViewSpec::default())),
+            delta_disabled_reason: disabled_reason,
         })
         .collect();
 
@@ -321,14 +311,105 @@ fn parse_input_spec(spec: &str, kind: &str) -> Result<ParsedEnvelope> {
         );
     }
 
+    note_missing_input_fields(&envelope, language, kind);
+
     Ok(ParsedEnvelope {
         language: language.to_string(),
         result: envelope.result,
         metric: envelope.metric,
-        threshold: envelope.threshold,
+        threshold: envelope.threshold.unwrap_or_default(),
         epsilon: envelope.epsilon,
         tool_version: envelope.tool_version,
     })
+}
+
+/// Stderr notes for an `--input` envelope that omits `metric` or
+/// `threshold`: the defaults are applied *visibly*, so a hand-built
+/// envelope can't silently render with a `0` threshold or the wrong
+/// metric label. Baseline envelopes stay silent — legacy baselines
+/// omitting these fields are expected, and metric absence is already
+/// handled by the mismatch guard's no-evidence rule.
+fn note_missing_input_fields(envelope: &Envelope<RawParseDiagnostic>, language: &str, kind: &str) {
+    if kind != "input" {
+        return;
+    }
+    if envelope.metric.is_none() {
+        eprintln!(
+            "note: --input envelope for language '{language}' omits `metric`; treating it as `{}`",
+            ComplexityMetric::default()
+        );
+    }
+    if envelope.threshold.is_none() {
+        eprintln!(
+            "note: --input envelope for language '{language}' omits `threshold`; treating it as `0`"
+        );
+    }
+}
+
+/// Recompute per-language deltas from the baseline/input envelope
+/// pairs, guarding metric mismatches.
+///
+/// Returns two vectors in 1:1 order alignment with `parsed`: the
+/// recomputed deltas (`None` ⇒ that language's Delta tab renders
+/// disabled) and the per-language disabled-reason override (`Some` ⇒
+/// the tooltip names a metric mismatch instead of a missing baseline).
+///
+/// The delta carries the *input* envelope's effective epsilon — the
+/// current run's configured border band, not the baseline's — so the
+/// recomputed border-jitter signal matches the gate that produced the
+/// envelope. `epsilon == 0.0` (the common case) is byte-identical to
+/// the bare `delta::compute`.
+///
+/// A baseline scored with a different complexity metric than its input
+/// is NOT diffed: cognitive and cyclomatic are incomparable scales, so
+/// the recomputed delta would be confident garbage. The guard warns on
+/// stderr and degrades that language to the disabled-Delta-tab state —
+/// the Current view stays valid, other languages are unaffected, and
+/// the exit code is unchanged. An envelope that *omits* `metric`
+/// carries no evidence of disagreement (legacy envelopes predate the
+/// field), so absence never trips the guard.
+fn compose_deltas(
+    parsed: &[ParsedEnvelope],
+    baselines: &[ParsedEnvelope],
+) -> (Vec<Option<AnalysisDelta>>, Vec<Option<String>>) {
+    let mut deltas = Vec::with_capacity(parsed.len());
+    let mut reasons = Vec::with_capacity(parsed.len());
+    for env in parsed {
+        let baseline = baselines.iter().find(|b| b.language == env.language);
+        let mismatch = baseline.and_then(|b| metric_mismatch(b, env));
+        if let Some((baseline_metric, input_metric)) = mismatch {
+            eprintln!(
+                "warning: baseline for language '{}' was scored with metric `{baseline_metric}` \
+                 but the input envelope uses `{input_metric}`; complexity and CRAP deltas would \
+                 compare incomparable scales — Delta tab disabled for this language",
+                env.language
+            );
+            deltas.push(None);
+            reasons.push(Some(format!(
+                "baseline metric ({baseline_metric}) does not match the input envelope \
+                 metric ({input_metric}) — delta disabled"
+            )));
+            continue;
+        }
+        deltas.push(baseline.map(|b| {
+            delta::compute_with_epsilon(b.result.clone(), env.result.clone(), env.epsilon)
+        }));
+        reasons.push(None);
+    }
+    (deltas, reasons)
+}
+
+/// The mismatched `(baseline, input)` metric pair, or `None` when the
+/// metrics agree or either envelope omits the field (absence is not
+/// evidence of disagreement).
+fn metric_mismatch(
+    baseline: &ParsedEnvelope,
+    input: &ParsedEnvelope,
+) -> Option<(ComplexityMetric, ComplexityMetric)> {
+    match (baseline.metric, input.metric) {
+        (Some(b), Some(i)) if b != i => Some((b, i)),
+        _ => None,
+    }
 }
 
 /// Conventional tool name for a language key. Used to populate

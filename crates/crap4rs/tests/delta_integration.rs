@@ -352,6 +352,83 @@ fn baseline_unsupported_schema_version_exits_2() {
     );
 }
 
+#[test]
+fn baseline_metric_mismatch_warns_on_stderr_without_changing_gate() {
+    // Baseline captured under the default (cognitive) metric; the
+    // current run scores with cyclomatic. The scales are incomparable,
+    // so the run must warn — but the delta still computes and the gate
+    // is unchanged (warn-only, mirroring the policy-mismatch warning).
+    let tmp = tempfile::tempdir().expect("tempdir");
+    setup_dir(tmp.path(), BASELINE_SRC, BASELINE_LCOV);
+    let baseline = capture_baseline(tmp.path(), "5");
+
+    setup_dir(tmp.path(), CURRENT_SRC, CURRENT_LCOV);
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--metric",
+            "cyclomatic",
+            "--no-fail",
+            "--format",
+            "json",
+            "--baseline",
+            baseline.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(output.status.code(), Some(0), "--no-fail keeps exit 0");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("metric `cognitive`") && stderr.contains("`cyclomatic`"),
+        "stderr should warn naming both metrics: {stderr}"
+    );
+    let envelope: serde_json::Value =
+        serde_json::from_str(&stdout_str(&output)).expect("JSON envelope");
+    assert!(
+        envelope.get("delta").is_some(),
+        "the delta still computes — the warning is non-fatal"
+    );
+}
+
+#[test]
+fn baseline_without_metric_field_does_not_warn() {
+    // A baseline that omits `metric` (legacy envelopes predate the
+    // field) carries no evidence of disagreement — no warning, even
+    // when the current run uses the non-default metric.
+    let tmp = tempfile::tempdir().expect("tempdir");
+    setup_dir(tmp.path(), BASELINE_SRC, BASELINE_LCOV);
+    let baseline = capture_baseline(tmp.path(), "5");
+    let stripped = std::fs::read_to_string(&baseline)
+        .expect("read baseline")
+        .replace("\"metric\": \"cognitive\",", "");
+    assert!(
+        !stripped.contains("\"metric\""),
+        "fixture must actually omit the metric key"
+    );
+    std::fs::write(&baseline, stripped).expect("rewrite baseline without metric");
+
+    setup_dir(tmp.path(), CURRENT_SRC, CURRENT_LCOV);
+    let output = run(
+        tmp.path(),
+        &[
+            "--threshold",
+            "5",
+            "--metric",
+            "cyclomatic",
+            "--no-fail",
+            "--baseline",
+            baseline.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("metric `"),
+        "absent baseline metric must not warn (legacy baselines): {stderr}"
+    );
+}
+
 // ── Relocation (Renamed) ────────────────────────────────────────────
 
 /// A branchy, fully-uncovered function — CRAP `c² + c`, comfortably over

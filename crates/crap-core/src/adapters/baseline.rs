@@ -20,7 +20,9 @@
 //! migration path.
 
 use crate::adapters::wire::Envelope;
-use crate::domain::types::{AnalysisDiagnostics, AnalysisResult, MissingCoveragePolicy};
+use crate::domain::types::{
+    AnalysisDiagnostics, AnalysisResult, ComplexityMetric, MissingCoveragePolicy,
+};
 use crate::ports::ParseDiagnostic;
 use std::fs::File;
 use std::io::{BufReader, ErrorKind};
@@ -48,6 +50,11 @@ pub struct BaselineSnapshot<P: ParseDiagnostic> {
     /// envelope omits the key). The delta path compares this to the
     /// current run's policy and warns on a mismatch.
     pub missing_coverage_policy: MissingCoveragePolicy,
+    /// Complexity metric the baseline was scored with, as carried on
+    /// the wire — `None` when the envelope omits the field (legacy
+    /// baselines). The delta path compares this to the current run's
+    /// metric and warns on a mismatch; absence is not a mismatch.
+    pub metric: Option<ComplexityMetric>,
 }
 
 /// Errors raised while loading a baseline envelope.
@@ -127,6 +134,7 @@ pub fn load<P: ParseDiagnostic>(path: &Path) -> Result<BaselineSnapshot<P>, Base
         timestamp: envelope.timestamp,
         diagnostics: envelope.diagnostics,
         missing_coverage_policy: envelope.missing_coverage_policy,
+        metric: envelope.metric,
     })
 }
 
@@ -197,6 +205,22 @@ mod tests {
         assert_eq!(snapshot.result.functions.len(), 0);
         assert!(snapshot.result.passed);
         assert!(snapshot.diagnostics.is_none());
+    }
+
+    #[test]
+    fn load_envelope_metric_absent_vs_present_is_distinguishable() {
+        // The metric-mismatch warning relies on absence staying
+        // observable: a legacy baseline that omits `metric` loads as
+        // `None` (never a silent default), while a carried metric
+        // projects through verbatim.
+        let with_metric = write_envelope(minimal_envelope_json());
+        let snapshot = load_test(with_metric.path()).expect("load envelope with metric");
+        assert_eq!(snapshot.metric, Some(ComplexityMetric::Cognitive));
+
+        let json_without = minimal_envelope_json().replace("\"metric\": \"cognitive\",", "");
+        let without_metric = write_envelope(&json_without);
+        let snapshot = load_test(without_metric.path()).expect("load envelope without metric");
+        assert_eq!(snapshot.metric, None);
     }
 
     #[test]
