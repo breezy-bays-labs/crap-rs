@@ -88,7 +88,7 @@ expression: pretty
               "nesting_depth": 1
             }
           ],
-          "coverage_percent": 94.73684210526316,
+          "coverage_percent": 94.73684210526315,
           "crap": {
             "risk_level": "low",
             "value": 4.0
@@ -121,7 +121,7 @@ expression: pretty
               "nesting_depth": 0
             }
           ],
-          "coverage_percent": 93.33333333333331,
+          "coverage_percent": 93.33333333333333,
           "crap": {
             "risk_level": "low",
             "value": 2.0
@@ -6214,7 +6214,7 @@ expression: pretty
     "passed": true,
     "summary": {
       "average_complexity": 1.5201793721973094,
-      "average_coverage": 95.49769207254388,
+      "average_coverage": 95.49769207254387,
       "average_crap": 1.5780269058295966,
       "distribution": {
         "acceptable": 0,
@@ -6758,7 +6758,7 @@ expression: pretty
               "nesting_depth": 1
             }
           ],
-          "coverage_percent": 94.73684210526316,
+          "coverage_percent": 94.73684210526315,
           "crap": {
             "risk_level": "low",
             "value": 4.0
@@ -7653,7 +7653,7 @@ expression: pretty
               "nesting_depth": 0
             }
           ],
-          "coverage_percent": 93.33333333333331,
+          "coverage_percent": 93.33333333333333,
           "crap": {
             "risk_level": "low",
             "value": 2.0
@@ -12459,7 +12459,7 @@ expression: pretty
     ],
     "shown_summary": {
       "average_complexity": 1.5201793721973094,
-      "average_coverage": 95.49769207254388,
+      "average_coverage": 95.49769207254387,
       "average_crap": 1.5780269058295966,
       "distribution": {
         "acceptable": 0,
