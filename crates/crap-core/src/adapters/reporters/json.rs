@@ -3,17 +3,19 @@
 //!
 //! The envelope carries both the unshapeable underlying analysis
 //! (`result`) and the View metadata (`view`) describing how the
-//! reported rows were filtered, sorted, and truncated. `view.full` is
-//! `#[serde(skip)]` so the analysis is emitted exactly once.
+//! reported rows were filtered, sorted, and truncated. The wire schema
+//! itself is the canonical [`wire::Envelope`]; this module's job is
+//! presentation assembly — projecting the borrowed view / delta state
+//! into the owned envelope at emit time. The clone this implies trades
+//! the previous zero-copy serialization for a single schema type shared
+//! with every envelope reader; for a fire-and-exit CLI about to
+//! pretty-print the same data, the cost is negligible.
 
-use crate::domain::delta::{DeltaSummary, DeltaView, DeltaViewSpec, FunctionChange};
-use crate::domain::types::{
-    AnalysisDiagnostics, AnalysisResult, AnalysisSummary, ComplexityMetric, FunctionVerdict,
-    MissingCoveragePolicy,
-};
-use crate::domain::view::{AnalysisView, GroupedView, ViewSpec};
+use crate::adapters::wire::{self, DeltaBlock, Envelope, ViewBlock};
+use crate::domain::delta::DeltaView;
+use crate::domain::types::{AnalysisDiagnostics, ComplexityMetric, MissingCoveragePolicy};
+use crate::domain::view::AnalysisView;
 use crate::ports::ParseDiagnostic;
-use serde::Serialize;
 
 /// Configuration for the JSON envelope metadata.
 ///
@@ -67,150 +69,33 @@ pub struct DeltaContext<'a, P: ParseDiagnostic> {
     pub baseline_diagnostics: Option<&'a AnalysisDiagnostics<P>>,
 }
 
-/// JSON envelope. Field order is **load-bearing** —
-/// `tests/features/cli_ergonomics.feature:243-246` asserts the
-/// declaration order is exactly:
-///   schema_version, tool_version, language, timestamp, metric,
-///   threshold, diff_ref, result, view
-/// Per ADR D2 the schema is additive across minor versions; the
-/// `schema_version` bump from 1 → 2 in 0.4.0 reflects the
-/// `ComplexityContributor.column` 0-based → 1-based convention shift.
-/// Older v1 baselines remain loadable for delta reporting (matching
-/// is identity-keyed, not column-keyed).
-#[derive(Serialize)]
-#[serde(bound = "")]
-struct JsonEnvelope<'a, P: ParseDiagnostic> {
-    schema_version: u32,
-    tool_version: &'a str,
-    language: &'static str,
-    timestamp: &'a str,
-    metric: &'a ComplexityMetric,
-    threshold: f64,
-    diff_ref: Option<&'a str>,
-    result: &'a AnalysisResult,
-    view: ViewWire<'a>,
-    /// Delta block. Present iff `--baseline` was passed; absent (key
-    /// elided) otherwise so existing consumers see byte-identical
-    /// output for the no-delta case. Additive — does not itself bump
-    /// `schema_version` (ADR D2).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    delta: Option<DeltaWire<'a, P>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    diagnostics: Option<&'a AnalysisDiagnostics<P>>,
-    /// Missing-coverage policy. Elided when `Pessimistic` (the default)
-    /// so every existing pessimistic-run envelope stays byte-identical;
-    /// emitted as `"optimistic"` / `"skip"` otherwise. A reader treats an
-    /// absent key as `Pessimistic` (see `baseline::BaselineEnvelope`).
-    /// Additive — does not bump `schema_version` (the default case is
-    /// unchanged).
-    #[serde(skip_serializing_if = "is_pessimistic")]
-    missing_coverage_policy: MissingCoveragePolicy,
-    /// Effective threshold-border epsilon (`--threshold-epsilon` /
-    /// `[delta] epsilon`) this run was configured with. Carried on the
-    /// envelope — even on a baseline-less run that computes no delta — so a
-    /// downstream consumer that recomputes the delta from result envelopes
-    /// (`crap-render`) applies the same band the gate would (crap-rs#379).
-    /// Additive: does NOT bump `schema_version`, and is elided when `0.0`
-    /// (the suppression-off default) so every existing envelope stays
-    /// byte-identical. Declared last to preserve the load-bearing order of
-    /// the leading keys asserted by `cli_ergonomics.feature`.
-    #[serde(skip_serializing_if = "is_zero_epsilon")]
-    epsilon: f64,
-}
-
-/// `skip_serializing_if` predicate: elide the envelope's
-/// `missing_coverage_policy` key when it carries the default, so a
-/// pessimistic run's envelope is byte-identical to before the field
-/// existed.
-fn is_pessimistic(policy: &MissingCoveragePolicy) -> bool {
-    *policy == MissingCoveragePolicy::Pessimistic
-}
-
-/// `skip_serializing_if` predicate: elide the envelope's `epsilon` key when
-/// it is `0.0` (suppression off — the default), so every existing envelope
-/// stays byte-identical. `0.0 == -0.0` in IEEE-754, and the resolved epsilon
-/// is always a finite value `>= 0.0` (validated at the CLI / config
-/// boundary), so `== 0.0` is the exact "off" test.
-fn is_zero_epsilon(epsilon: &f64) -> bool {
-    *epsilon == 0.0
-}
-
-/// On-the-wire delta representation. Mirrors the `delta` envelope key
-/// shape documented in ADR D7 §DeltaView.
-#[derive(Serialize)]
-#[serde(bound = "")]
-struct DeltaWire<'a, P: ParseDiagnostic> {
-    /// Aggregate counts over the *unshaped* change set. The gate
-    /// keystone — shaping never alters this.
-    summary: &'a DeltaSummary,
-    /// Echoes the resolved [`DeltaViewSpec`] so consumers can
-    /// reconstruct what filters / sort / limit produced `shown`.
-    spec: &'a DeltaViewSpec,
-    /// Post-filter, pre-truncate count. With `truncated`, lets
-    /// consumers render "Showing X of Y".
-    eligible_count: usize,
-    truncated: bool,
-    /// Reserved for a future `--baseline-ref <label>` flag (F2 follow-up).
-    /// Always `null` today.
-    baseline_ref: Option<&'a str>,
-    baseline_tool_version: &'a str,
-    baseline_timestamp: &'a str,
-    /// Per-change list, post-filter / sort / truncate. References
-    /// (the borrows hold for the envelope's lifetime via the View).
-    shown: Vec<&'a FunctionChange>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    baseline_diagnostics: Option<&'a AnalysisDiagnostics<P>>,
-}
-
-impl<'a, P: ParseDiagnostic> DeltaWire<'a, P> {
-    fn from_context(ctx: &'a DeltaContext<'a, P>) -> Self {
-        DeltaWire {
-            summary: &ctx.view.full.summary,
-            spec: &ctx.view.spec,
-            eligible_count: ctx.view.eligible_count,
-            truncated: ctx.view.truncated,
-            baseline_ref: None,
-            baseline_tool_version: ctx.baseline_tool_version,
-            baseline_timestamp: ctx.baseline_timestamp,
-            shown: ctx.view.shown.clone(),
-            baseline_diagnostics: ctx.baseline_diagnostics,
-        }
+/// Project the borrowed row view into the owned wire block.
+///
+/// A minimal view elides the per-row `shown` list; every other view key
+/// remains for scope context.
+fn view_block(view: &AnalysisView<'_>, minimal: bool) -> ViewBlock {
+    ViewBlock {
+        spec: view.spec.clone(),
+        eligible_count: view.eligible_count,
+        truncated: view.truncated,
+        shown: (!minimal).then(|| view.shown.iter().map(|v| (*v).clone()).collect()),
+        shown_summary: view.shown_summary.clone(),
+        grouped: view.grouped.clone(),
     }
 }
 
-/// On-the-wire view representation. Mirrors `AnalysisView`'s serialized
-/// shape exactly when `shown` is `Some`, so the default JSON output is
-/// byte-identical to the prior `view: &AnalysisView` serialization.
-/// `--minimal-view` sets `shown = None`, which `skip_serializing_if`
-/// elides — every other key remains for scope context.
-#[derive(Serialize)]
-struct ViewWire<'a> {
-    spec: &'a ViewSpec,
-    eligible_count: usize,
-    truncated: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    shown: Option<&'a [&'a FunctionVerdict]>,
-    shown_summary: &'a AnalysisSummary,
-    /// Per-key aggregation block. Always serialized (emits `null`
-    /// when grouping is inactive) so consumers can distinguish
-    /// "default invocation" from "schema doesn't carry grouping".
-    grouped: Option<&'a GroupedView>,
-}
-
-impl<'a> ViewWire<'a> {
-    fn from_view(view: &'a AnalysisView<'a>, minimal: bool) -> Self {
-        ViewWire {
-            spec: &view.spec,
-            eligible_count: view.eligible_count,
-            truncated: view.truncated,
-            shown: if minimal {
-                None
-            } else {
-                Some(view.shown.as_slice())
-            },
-            shown_summary: &view.shown_summary,
-            grouped: view.grouped.as_ref(),
-        }
+/// Project the borrowed delta context into the owned wire block.
+fn delta_block<P: ParseDiagnostic>(ctx: &DeltaContext<'_, P>) -> DeltaBlock<P> {
+    DeltaBlock {
+        summary: ctx.view.full.summary,
+        spec: ctx.view.spec.clone(),
+        eligible_count: ctx.view.eligible_count,
+        truncated: ctx.view.truncated,
+        baseline_ref: None,
+        baseline_tool_version: ctx.baseline_tool_version.to_string(),
+        baseline_timestamp: ctx.baseline_timestamp.to_string(),
+        shown: ctx.view.shown.iter().map(|c| (*c).clone()).collect(),
+        baseline_diagnostics: ctx.baseline_diagnostics.cloned(),
     }
 }
 
@@ -227,20 +112,18 @@ pub fn format_json<P: ParseDiagnostic>(
     view: &AnalysisView<'_>,
     config: &JsonConfig<'_, P>,
 ) -> Result<String, serde_json::Error> {
-    let delta_wire: Option<DeltaWire<P>> = config.delta.as_ref().map(DeltaWire::from_context);
-
-    let envelope = JsonEnvelope {
-        schema_version: 2,
-        tool_version: &config.tool_version,
-        language: "rust",
-        timestamp: &config.timestamp,
-        metric: &config.metric,
+    let envelope = Envelope {
+        schema_version: wire::CURRENT_SCHEMA_VERSION,
+        tool_version: config.tool_version.clone(),
+        language: "rust".to_string(),
+        timestamp: config.timestamp.clone(),
+        metric: config.metric,
         threshold: config.threshold,
-        diff_ref: config.diff_ref,
-        result: view.full,
-        view: ViewWire::from_view(view, config.minimal_view),
-        delta: delta_wire,
-        diagnostics: config.diagnostics,
+        diff_ref: config.diff_ref.map(str::to_string),
+        result: view.full.clone(),
+        view: view_block(view, config.minimal_view),
+        delta: config.delta.as_ref().map(delta_block),
+        diagnostics: config.diagnostics.cloned(),
         missing_coverage_policy: config.missing_coverage_policy,
         epsilon: config.epsilon,
     };
@@ -251,7 +134,7 @@ pub fn format_json<P: ParseDiagnostic>(
 mod tests {
     use super::*;
     use crate::adapters::reporters::test_fixtures::*;
-    use crate::domain::types::{ComplexityMetric, RiskLevel};
+    use crate::domain::types::{AnalysisResult, ComplexityMetric, RiskLevel};
     use crate::test_strategies::DummyParseDiagnostic;
 
     /// Concrete `P` for in-module tests — the JSON reporter's behavior
