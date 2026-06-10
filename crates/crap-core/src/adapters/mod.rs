@@ -1,7 +1,10 @@
 //! Language-agnostic adapters — IO and presentation layers that make
 //! no assumptions about the source language being analyzed.
 //!
-//! Four families live here:
+//! Five families live here:
+//! - **`wire`**: the canonical JSON envelope schema — one owned
+//!   `Serialize + Deserialize` type shared by the JSON reporter (write)
+//!   and every envelope reader (the baseline loader, `crap-render`).
 //! - **`baseline`**: loads a previously-emitted JSON envelope from disk
 //!   so delta reporting can compare the current run against a prior one.
 //! - **`config`**: parses the adapter's TOML configuration (threshold
@@ -22,3 +25,4 @@ pub mod baseline;
 pub mod config;
 pub mod diff;
 pub mod reporters;
+pub mod wire;

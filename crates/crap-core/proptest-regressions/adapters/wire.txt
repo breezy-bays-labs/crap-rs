@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e227b24216724bb963ce94334bd7e9cf1d499e39c4f51f1a5936b3d003d637bb # shrinks to result = AnalysisResult { functions: [FunctionVerdict { scored: ScoredFunction { identity: FunctionIdentity { file_path: "src/a.rs", qualified_name: "a", span: SourceSpan { start_line: 1, end_line: 10, start_column: 0, end_column: 0 } }, complexity: 1, complexity_metric: Cognitive, coverage_percent: 90.79017890334245, branch_coverage_percent: None, crap: CrapScore { value: 1.0, risk_level: Low }, contributors: [] }, threshold: 1.0, exceeds: false, diagnostic: None }], summary: AnalysisSummary { total_functions: 1, total_files: 1, exceeding_threshold: 0, average_crap: 1.0, median_crap: 1.0, max_crap: Some(CrapScore { value: 1.0, risk_level: Low }), worst_function: Some(FunctionIdentity { file_path: "src/a.rs", qualified_name: "a", span: SourceSpan { start_line: 1, end_line: 10, start_column: 0, end_column: 0 } }), distribution: RiskDistribution { low: 1, acceptable: 0, moderate: 0, high: 0 }, max_complexity: 1, average_complexity: 1.0, median_complexity: 1.0, min_coverage: 90.79017890334245, average_coverage: 90.79017890334245, median_coverage: 90.79017890334245 }, passed: true }, threshold = 1.0, epsilon = 0.0

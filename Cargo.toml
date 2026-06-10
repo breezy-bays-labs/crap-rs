@@ -55,7 +55,12 @@ napi-build = "2"
 
 # ── Serialization ──
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: serde_json's default fast float parser may lose the
+# last ulp on read (e.g. coverage_percent 90.79017890334245 parsing back
+# as ...44), which would make the wire envelope's serialize→deserialize
+# round-trip lossy. The exact parser keeps the wire contract bit-exact;
+# the round-trip proptest in crap-core's adapters::wire pins it.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 
 # ── Terminal output ──
 comfy-table = { version = "7", features = ["custom_styling"] }
