@@ -1585,12 +1585,12 @@ footer.report-footer {
 </header>
 <nav class="tabs" role="tablist" aria-label="Report views">
   <button class="tab" role="tab" aria-selected="true" data-tab="current" id="tab-current" type="button">
-    Current run <span class="tab-count">1651</span>
+    Current run <span class="tab-count">1657</span>
   </button>
   <button class="tab" role="tab" aria-selected="false" data-tab="delta" id="tab-delta" type="button">
     Delta vs baseline
-    <span class="tab-dot" aria-hidden="true"></span>
-    <span class="tab-count">1651 changed</span>
+    
+    <span class="tab-count">1657 changed</span>
   </button>
 </nav>
 <div class="tab-panel" data-tab="current" data-active role="tabpanel" aria-labelledby="tab-current">
@@ -1600,7 +1600,7 @@ footer.report-footer {
 <!-- ── Scope banner ─────────────────────────────────────────────────── -->
 <section class="scope-banner" aria-label="Scope">
   <p>
-    <strong>0 of 1651</strong>
+    <strong>0 of 1657</strong>
     functions exceed their adapter threshold.
     
     Worst offender scores <code>8.00</code>.
@@ -1613,7 +1613,7 @@ footer.report-footer {
 <section class="kpi-grid" aria-label="Summary">
   <div class="kpi">
     <span class="kpi-label">Exceeding threshold</span>
-    <span class="kpi-value">0<span class="kpi-unit">/ 1651 · 0.0%</span></span>
+    <span class="kpi-value">0<span class="kpi-unit">/ 1657 · 0.0%</span></span>
     <span class="kpi-foot">0 functions over CRAP 8.00</span>
   </div>
   <div class="kpi">
@@ -1637,8 +1637,8 @@ footer.report-footer {
 <section class="panel" aria-label="Risk distribution">
   <div class="panel-header"><h2>Risk distribution</h2></div>
   <div class="dist-bar">
-    <span class="dist-seg" data-risk="1" style="flex:1651" title="low: 1651 functions">
-      <span class="dist-count">1651</span><span class="dist-label">low</span>
+    <span class="dist-seg" data-risk="1" style="flex:1657" title="low: 1657 functions">
+      <span class="dist-count">1657</span><span class="dist-label">low</span>
     </span>
     <span class="dist-seg" data-risk="2" style="flex:0" title="acceptable: 0 functions">
       <span class="dist-count">0</span><span class="dist-label">acceptable</span>
@@ -11093,7 +11093,7 @@ footer.report-footer {
         <span class="caret">›</span>
         <span class="sev-path">crates/crap-core/src/adapters/reporters/markdown.rs</span>
         <span class="sev-meta">
-          <span><b>42</b> fn</span>
+          <span><b>48</b> fn</span>
           <span>max CRAP <b>6.00</b></span>
           
           <span>0 over</span>
@@ -11108,8 +11108,8 @@ footer.report-footer {
           <tbody>
             
             <tr>
-              <td><span class="fn-name">format_markdown</span><span class="fn-loc">97 LOC</span></td>
-              <td>19–115</td>
+              <td><span class="fn-name">format_markdown</span><span class="fn-loc">105 LOC</span></td>
+              <td>19–123</td>
               <td><div class="metric-cell"><div class="num-line"><span>6</span><span class="note">cognitive</span></div><div class="bar"><span class="is-2" style="width:30%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">6.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11117,7 +11117,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">spotlight_section</span><span class="fn-loc">51 LOC</span></td>
-              <td>271–321</td>
+              <td>279–329</td>
               <td><div class="metric-cell"><div class="num-line"><span>5</span><span class="note">cognitive</span></div><div class="bar"><span class="is-2" style="width:25%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>97.6%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:97.6%"></span></div></div></td>
               <td class="num"><span class="crap-cell">5.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11125,7 +11125,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">escape_cell</span><span class="fn-loc">16 LOC</span></td>
-              <td>515–530</td>
+              <td>523–538</td>
               <td><div class="metric-cell"><div class="num-line"><span>4</span><span class="note">cognitive</span></div><div class="bar"><span class="is-2" style="width:20%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>80.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:80.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">4.13 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11133,7 +11133,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">format_markdown_delta</span><span class="fn-loc">44 LOC</span></td>
-              <td>403–446</td>
+              <td>411–454</td>
               <td><div class="metric-cell"><div class="num-line"><span>4</span><span class="note">cognitive</span></div><div class="bar"><span class="is-2" style="width:20%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">4.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11141,7 +11141,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">breakdown_bullets</span><span class="fn-loc">11 LOC</span></td>
-              <td>337–347</td>
+              <td>345–355</td>
               <td><div class="metric-cell"><div class="num-line"><span>3</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:15%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">3.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11149,7 +11149,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">legend_if_needed</span><span class="fn-loc">11 LOC</span></td>
-              <td>367–377</td>
+              <td>375–385</td>
               <td><div class="metric-cell"><div class="num-line"><span>3</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:15%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">3.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11157,7 +11157,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">push_regressions_table</span><span class="fn-loc">24 LOC</span></td>
-              <td>462–485</td>
+              <td>470–493</td>
               <td><div class="metric-cell"><div class="num-line"><span>3</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:15%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">3.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11165,7 +11165,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">push_new_violations_table</span><span class="fn-loc">27 LOC</span></td>
-              <td>487–513</td>
+              <td>495–521</td>
               <td><div class="metric-cell"><div class="num-line"><span>3</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:15%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">3.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11173,7 +11173,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">format_threshold</span><span class="fn-loc">7 LOC</span></td>
-              <td>387–393</td>
+              <td>395–401</td>
               <td><div class="metric-cell"><div class="num-line"><span>2</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:10%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>80.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:80.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">2.03 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11181,7 +11181,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">has_varied_thresholds</span><span class="fn-loc">7 LOC</span></td>
-              <td>395–401</td>
+              <td>403–409</td>
               <td><div class="metric-cell"><div class="num-line"><span>2</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:10%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>83.3%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:83.3%"></span></div></div></td>
               <td class="num"><span class="crap-cell">2.02 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11189,7 +11189,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">summary_data</span><span class="fn-loc">29 LOC</span></td>
-              <td>202–230</td>
+              <td>210–238</td>
               <td><div class="metric-cell"><div class="num-line"><span>2</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:10%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">2.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11197,7 +11197,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">is_md_regression</span><span class="fn-loc">13 LOC</span></td>
-              <td>448–460</td>
+              <td>456–468</td>
               <td><div class="metric-cell"><div class="num-line"><span>2</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:10%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">2.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11205,7 +11205,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">grouped_rows</span><span class="fn-loc">26 LOC</span></td>
-              <td>232–257</td>
+              <td>240–265</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11213,7 +11213,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">full_table_section</span><span class="fn-loc">11 LOC</span></td>
-              <td>259–269</td>
+              <td>267–277</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11221,7 +11221,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">function_row</span><span class="fn-loc">13 LOC</span></td>
-              <td>323–335</td>
+              <td>331–343</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11229,7 +11229,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">top_n_by_crap</span><span class="fn-loc">15 LOC</span></td>
-              <td>349–363</td>
+              <td>357–371</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11237,7 +11237,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">needs_legend</span><span class="fn-loc">7 LOC</span></td>
-              <td>379–385</td>
+              <td>387–393</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11245,7 +11245,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::test_meta</span><span class="fn-loc">24 LOC</span></td>
-              <td>537–560</td>
+              <td>545–568</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11253,7 +11253,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::md</span><span class="fn-loc">15 LOC</span></td>
-              <td>562–576</td>
+              <td>570–584</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11261,39 +11261,87 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::md_labeled</span><span class="fn-loc">15 LOC</span></td>
-              <td>580–594</td>
+              <td>588–602</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
             </tr>
             
             <tr>
-              <td><span class="fn-name">tests::title_labels_the_markdown_header</span><span class="fn-loc">24 LOC</span></td>
-              <td>596–619</td>
+              <td><span class="fn-name">tests::title_labels_the_markdown_header</span><span class="fn-loc">27 LOC</span></td>
+              <td>604–630</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
             </tr>
             
             <tr>
-              <td><span class="fn-name">tests::subtitle_renders_beneath_the_markdown_title</span><span class="fn-loc">13 LOC</span></td>
-              <td>621–633</td>
+              <td><span class="fn-name">tests::subtitle_renders_beneath_the_markdown_title</span><span class="fn-loc">15 LOC</span></td>
+              <td>632–646</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
             </tr>
             
             <tr>
-              <td><span class="fn-name">tests::subtitle_without_title_renders_above_markdown_tool_line</span><span class="fn-loc">16 LOC</span></td>
-              <td>635–650</td>
+              <td><span class="fn-name">tests::subtitle_without_title_renders_above_markdown_tool_line</span><span class="fn-loc">18 LOC</span></td>
+              <td>648–665</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
             </tr>
             
             <tr>
-              <td><span class="fn-name">tests::absent_markdown_title_subtitle_is_byte_identical</span><span class="fn-loc">18 LOC</span></td>
-              <td>652–669</td>
+              <td><span class="fn-name">tests::absent_markdown_title_subtitle_is_byte_identical</span><span class="fn-loc">19 LOC</span></td>
+              <td>667–685</td>
+              <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
+            </tr>
+            
+            <tr>
+              <td><span class="fn-name">tests::markdown_leads_with_hidden_sticky_marker</span><span class="fn-loc">12 LOC</span></td>
+              <td>689–700</td>
+              <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
+            </tr>
+            
+            <tr>
+              <td><span class="fn-name">tests::marker_carries_the_adapter_tool_name</span><span class="fn-loc">25 LOC</span></td>
+              <td>702–726</td>
+              <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
+            </tr>
+            
+            <tr>
+              <td><span class="fn-name">tests::marker_precedes_configured_title</span><span class="fn-loc">17 LOC</span></td>
+              <td>728–744</td>
+              <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
+            </tr>
+            
+            <tr>
+              <td><span class="fn-name">tests::marker_present_on_empty_analysis</span><span class="fn-loc">10 LOC</span></td>
+              <td>746–755</td>
+              <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
+            </tr>
+            
+            <tr>
+              <td><span class="fn-name">tests::breakdown_bullets_collapse_into_details</span><span class="fn-loc">69 LOC</span></td>
+              <td>757–825</td>
+              <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
+              <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
+              <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
+            </tr>
+            
+            <tr>
+              <td><span class="fn-name">tests::no_details_block_without_breakdown</span><span class="fn-loc">9 LOC</span></td>
+              <td>827–835</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11301,7 +11349,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::header_row_pipes_and_columns</span><span class="fn-loc">7 LOC</span></td>
-              <td>671–677</td>
+              <td>837–843</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11309,7 +11357,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::empty_analysis_says_no_functions</span><span class="fn-loc">7 LOC</span></td>
-              <td>679–685</td>
+              <td>845–851</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11317,7 +11365,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::pipe_in_function_name_is_escaped</span><span class="fn-loc">7 LOC</span></td>
-              <td>687–693</td>
+              <td>853–859</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11325,7 +11373,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::summary_reflects_full_analysis_not_view</span><span class="fn-loc">8 LOC</span></td>
-              <td>695–702</td>
+              <td>861–868</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11333,7 +11381,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::full_markdown_snapshot</span><span class="fn-loc">6 LOC</span></td>
-              <td>704–709</td>
+              <td>870–875</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11341,7 +11389,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::md_full_table_renders_all_functions_section</span><span class="fn-loc">24 LOC</span></td>
-              <td>711–734</td>
+              <td>877–900</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11349,7 +11397,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::md_full_table_with_breakdown_includes_contributors_and_legend</span><span class="fn-loc">55 LOC</span></td>
-              <td>736–790</td>
+              <td>902–956</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11357,7 +11405,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::full_markdown_breakdown_snapshot</span><span class="fn-loc">52 LOC</span></td>
-              <td>792–843</td>
+              <td>958–1009</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11365,7 +11413,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::grouped_markdown_has_per_file_header</span><span class="fn-loc">17 LOC</span></td>
-              <td>847–863</td>
+              <td>1013–1029</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11373,7 +11421,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::grouped_markdown_snapshot</span><span class="fn-loc">14 LOC</span></td>
-              <td>865–878</td>
+              <td>1031–1044</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11381,7 +11429,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::delta_scorecard_includes_status_and_counts</span><span class="fn-loc">22 LOC</span></td>
-              <td>882–903</td>
+              <td>1048–1069</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11389,7 +11437,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::delta_scorecard_renders_regressions_table_when_present</span><span class="fn-loc">21 LOC</span></td>
-              <td>905–925</td>
+              <td>1071–1091</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11397,7 +11445,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::delta_scorecard_renders_new_violations_table</span><span class="fn-loc">20 LOC</span></td>
-              <td>927–946</td>
+              <td>1093–1112</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11405,7 +11453,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::no_baseline_means_no_scorecard_block</span><span class="fn-loc">7 LOC</span></td>
-              <td>948–954</td>
+              <td>1114–1120</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11413,7 +11461,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::delta_scorecard_border_jitter_suppressed_is_consistent_with_summary</span><span class="fn-loc">43 LOC</span></td>
-              <td>956–998</td>
+              <td>1122–1164</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11421,7 +11469,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::border_jitter_line_shown_at_zero_when_epsilon_is_set</span><span class="fn-loc">29 LOC</span></td>
-              <td>1000–1028</td>
+              <td>1166–1194</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11429,7 +11477,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::border_jitter_line_absent_when_epsilon_off</span><span class="fn-loc">26 LOC</span></td>
-              <td>1030–1055</td>
+              <td>1196–1221</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -11437,7 +11485,7 @@ footer.report-footer {
             
             <tr>
               <td><span class="fn-name">tests::full_markdown_with_delta_snapshot</span><span class="fn-loc">19 LOC</span></td>
-              <td>1057–1075</td>
+              <td>1223–1241</td>
               <td><div class="metric-cell"><div class="num-line"><span>1</span><span class="note">cognitive</span></div><div class="bar"><span class="is-1" style="width:5%"></span></div></div></td>
               <td><div class="metric-cell"><div class="num-line"><span>100.0%</span><span class="note">lines</span></div><div class="bar"><span class="is-1" style="width:100.0%"></span></div></div></td>
               <td class="num"><span class="crap-cell">1.00 <span class="risk-pill" data-risk="1">low</span></span></td>
@@ -16073,9 +16121,9 @@ footer.report-footer {
         PASS
       </span>
       <span class="meta">
-        9 added · 0 removed · 1642 modified · 0 renamed ·
-        1 regression ·
-        1 improvement ·
+        0 added · 0 removed · 1657 modified · 0 renamed ·
+        0 regressions ·
+        0 improvements ·
         0 new violations
       </span>
     </p>
@@ -16117,11 +16165,11 @@ footer.report-footer {
       </div>
       
       
-      <span class="delta-kpi-foot">9 added · 0 removed · 1642 modified · 0 renamed</span>
+      <span class="delta-kpi-foot">0 added · 0 removed · 1657 modified · 0 renamed</span>
       
     </div>
     
-    <div class="delta-kpi" data-direction="up">
+    <div class="delta-kpi" data-direction="flat">
       <span class="delta-kpi-label">Avg coverage</span>
       <div class="delta-kpi-ba">
         <span class="before">98.4%</span>
@@ -16138,179 +16186,17 @@ footer.report-footer {
 
   
   
-  <section aria-label="Regressions">
-    <h2>Regressions <span class="delta-section-count">1</span></h2>
-    <table class="delta-table regressions">
-      <thead><tr>
-        <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
-      </tr></thead>
-      <tbody>
-        
-        <tr>
-          <td>
-            <span class="fn-name">load_delta_state</span>
-            <span class="fn-loc">crates/crap-core/src/cli/mod.rs L1824–1848</span>
-          </td>
-          <td class="num">4.00</td>
-          <td class="num">5.00</td>
-          <td><span class="ba-cell"><span class="b">93.3%</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">94.7%</span></span></td>
-          <td>
-            <span class="transition-pill">
-              <span class="risk-pill" data-risk="1">low</span>
-              <span class="arrow" aria-hidden="true">→</span>
-              <span class="risk-pill" data-risk="1">low</span>
-            </span>
-          </td>
-          <td class="num"><span class="delta-chip" data-direction="up" data-regression="1"><span class="chip-glyph" aria-hidden="true">▲</span> <span class="chip-value">+1.00</span></span></td>
-        </tr>
-        
-      </tbody>
-    </table>
-  </section>
-  
 
   
   
-  <section aria-label="Improvements">
-    <h2>Improvements <span class="delta-section-count">1</span></h2>
-    <table class="delta-table improvements">
-      <thead><tr>
-        <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
-      </tr></thead>
-      <tbody>
-        
-        <tr>
-          <td>
-            <span class="fn-name">load</span>
-            <span class="fn-loc">crates/crap-core/src/adapters/baseline.rs L94–139</span>
-          </td>
-          <td class="num">6.09</td>
-          <td class="num">6.08</td>
-          <td><span class="ba-cell"><span class="b">86.7%</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">87.1%</span></span></td>
-          <td>
-            <span class="transition-pill">
-              <span class="risk-pill" data-risk="1">low</span>
-              <span class="arrow" aria-hidden="true">→</span>
-              <span class="risk-pill" data-risk="1">low</span>
-            </span>
-          </td>
-          <td class="num"><span class="delta-chip" data-direction="down"><span class="chip-glyph" aria-hidden="true">▼</span> <span class="chip-value">-0.01</span></span></td>
-        </tr>
-        
-      </tbody>
-    </table>
-  </section>
-  
 
   
-  
-  <section aria-label="New functions">
-    <h2>New functions <span class="delta-section-count">9</span></h2>
-    <table class="delta-table new-functions">
-      <thead><tr>
-        <th>Function</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk</th>
-      </tr></thead>
-      <tbody>
-        
-        <tr>
-          <td>
-            <span class="fn-name">note_missing_input_fields</span>
-            <span class="fn-loc">crates/crap-core/src/bin/crap-render.rs L326–347</span>
-          </td>
-          <td class="num">4.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">delta_for_language</span>
-            <span class="fn-loc">crates/crap-core/src/bin/crap-render.rs L387–419</span>
-          </td>
-          <td class="num">3.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">metric_mismatch</span>
-            <span class="fn-loc">crates/crap-core/src/bin/crap-render.rs L421–432</span>
-          </td>
-          <td class="num">2.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">metric_mismatch_warning</span>
-            <span class="fn-loc">crates/crap-core/src/cli/mod.rs L1871–1891</span>
-          </td>
-          <td class="num">2.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">tests::load_envelope_metric_absent_vs_present_is_distinguishable</span>
-            <span class="fn-loc">crates/crap-core/src/adapters/baseline.rs L210–224</span>
-          </td>
-          <td class="num">1.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">compose_deltas</span>
-            <span class="fn-loc">crates/crap-core/src/bin/crap-render.rs L349–385</span>
-          </td>
-          <td class="num">1.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">tests::metric_mismatch_warning_none_when_metrics_match</span>
-            <span class="fn-loc">crates/crap-core/src/cli/mod.rs L3887–3903</span>
-          </td>
-          <td class="num">1.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">tests::metric_mismatch_warning_none_when_baseline_omits_metric</span>
-            <span class="fn-loc">crates/crap-core/src/cli/mod.rs L3905–3912</span>
-          </td>
-          <td class="num">1.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-        <tr>
-          <td>
-            <span class="fn-name">tests::metric_mismatch_warning_names_both_metrics</span>
-            <span class="fn-loc">crates/crap-core/src/cli/mod.rs L3914–3924</span>
-          </td>
-          <td class="num">1.00</td>
-          <td class="num">100.0%</td>
-          <td><span class="risk-pill" data-risk="1">low</span></td>
-        </tr>
-        
-      </tbody>
-    </table>
-  </section>
   
 
   
   
   <p class="delta-unchanged">
-    1640 functions
+    1657 functions
     unchanged (CRAP score within ±0.005). Expand the <strong>Current run</strong> tab to inspect them.
   </p>
   
