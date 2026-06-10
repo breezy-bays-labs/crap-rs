@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `format_markdown` always emits a hidden
+    `<!-- {tool_name}:scorecard -->` HTML comment as the first output
+    line — a per-adapter dedupe anchor for sticky-PR-comment tooling
+    (it precedes a configured `[output] title`, and the scorecard
+    action's heading-offset rewrite leaves it untouched). Breakdown
+    contributor bullets are wrapped per function row in a
+    `<details><summary>Show breakdown</summary>` collapsible, with the
+    blank line GFM needs to render the bullets as a list inside the
+    HTML block. (crap-rs#275)
+
 ### Changed
 
 - Config-file auto-discovery now **walks upward**: when no explicit

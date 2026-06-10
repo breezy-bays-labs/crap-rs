@@ -13,6 +13,17 @@ shared-core development.
 
 ## [Unreleased]
 
+### Added
+
+- The markdown reporter (`--format markdown`) emits a hidden
+    `<!-- crap4ts:scorecard -->` HTML comment as its first line. Sticky
+    PR-comment actions can use it as a dedupe anchor to find and update
+    their existing TypeScript-scorecard comment; because the anchor is
+    adapter-named, it never collides with a crap4rs comment on the same
+    PR. Contributor breakdown bullets (`--breakdown`) are now wrapped
+    in a collapsed `<details>` block so long TS scorecards stay
+    scannable in the PR timeline. (crap-rs#275)
+
 ### Changed
 
 - Config auto-discovery now walks **upward** from the `--src` anchor

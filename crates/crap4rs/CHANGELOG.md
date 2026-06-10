@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--format markdown` output now leads with a hidden
+    `<!-- crap4rs:scorecard -->` HTML comment — invisible in rendered
+    GFM, but a stable dedupe anchor sticky-PR-comment tooling can match
+    on to update its existing comment instead of posting a new one per
+    push. The marker carries the adapter name, so a Rust scorecard and
+    a TypeScript scorecard can sticky to separate comments on the same
+    PR. With `--breakdown`, each exceeding function's
+    complexity-contributor bullets now render inside a collapsed
+    `<details>` block, keeping the default PR-comment view compact.
+    (crap-rs#275)
+
 ### Changed
 
 - Config auto-discovery now walks **upward** from the `--src` anchor
