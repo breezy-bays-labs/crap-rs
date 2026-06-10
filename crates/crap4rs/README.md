@@ -96,7 +96,7 @@ Functions: 988 · Above threshold: 0 · Worst CRAP: 13.00 · Distribution: 951 l
 
 ### Markdown (`--format markdown`) — PR-comment ready
 
-The first output line is always a hidden HTML comment, `<!-- crap4rs:scorecard -->` — invisible when rendered, but a stable anchor that sticky-PR-comment tooling can match on to find and update its own comment instead of posting a new one on every push. The marker carries the adapter name, so a Rust and a TypeScript scorecard can sticky to separate comments on the same PR. (A multi-language combined comment contains both adapters' markers, so match accordingly if you post combined output.) With `--breakdown`, each exceeding function's complexity-contributor bullets are wrapped in a collapsed `<details>` block to keep the default comment view compact.
+The first output line is always a hidden HTML comment, `<!-- crap4rs:scorecard -->` — invisible when rendered, but a stable anchor that sticky-PR-comment tooling can match on to find and update its own comment instead of posting a new one on every push. The marker carries the adapter name, so a Rust and a TypeScript scorecard can sticky to separate comments on the same PR. (A multi-language combined comment contains both adapters' markers, so match accordingly if you post combined output.) With `--breakdown`, the complexity-contributor bullets of the above-threshold functions collect into one collapsed `<details>` block below the scorecard table — below the table rather than between rows, since a `<details>` placed inside a markdown table terminates it.
 
 ```markdown
 <!-- crap4rs:scorecard -->
