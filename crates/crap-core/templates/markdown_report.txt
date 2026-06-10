@@ -72,41 +72,49 @@ No functions analyzed.
 {% for row in rows -%}
 | {{ row.file_path }} | {{ row.function_count }} | {{ row.exceeding_count }} | {{ row.average_crap }} | {{ row.worst_crap }} | {{ row.worst_fn }} |
 {% endfor -%}
-{%- when BodySection::FullTable with { rows, legend } %}
+{%- when BodySection::FullTable with { rows, breakdowns, legend } %}
 ## All functions
 
 | File | Function | CC | Cov% | CRAP | Risk |
 |------|----------|----|------|------|------|
 {% for row in rows -%}
 | {{ row.file }} | {{ row.function }} | {{ row.cc }} | {{ row.cov }} | {{ row.crap }} | {{ row.risk }} |
-{% if !row.breakdown_bullets.is_empty() -%}
+{% endfor -%}
+{%- if !breakdowns.is_empty() %}
 <details><summary>Show breakdown</summary>
 
-{% for bullet in row.breakdown_bullets -%}
+{% for b in breakdowns -%}
+`{{ b.function }}` — `{{ b.file }}`
+
+{% for bullet in b.bullets -%}
 {{ bullet }}
 {% endfor %}
+{% endfor -%}
 </details>
 {% endif -%}
-{% endfor -%}
 {%- if legend.is_some() %}
 {{ legend.as_ref().unwrap() }}
 {%- endif -%}
-{%- when BodySection::Spotlight with { header, rows, legend, footnote } %}
+{%- when BodySection::Spotlight with { header, rows, breakdowns, legend, footnote } %}
 {{ header }}
 
 | File | Function | CC | Cov% | CRAP | Risk |
 |------|----------|----|------|------|------|
 {% for row in rows -%}
 | {{ row.file }} | {{ row.function }} | {{ row.cc }} | {{ row.cov }} | {{ row.crap }} | {{ row.risk }} |
-{% if !row.breakdown_bullets.is_empty() -%}
+{% endfor -%}
+{%- if !breakdowns.is_empty() %}
 <details><summary>Show breakdown</summary>
 
-{% for bullet in row.breakdown_bullets -%}
+{% for b in breakdowns -%}
+`{{ b.function }}` — `{{ b.file }}`
+
+{% for bullet in b.bullets -%}
 {{ bullet }}
 {% endfor %}
+{% endfor -%}
 </details>
 {% endif -%}
-{% endfor -%}
 {%- if legend.is_some() %}
 {{ legend.as_ref().unwrap() }}
 {%- endif -%}

@@ -1,5 +1,6 @@
 ---
 source: crates/crap-core/src/adapters/reporters/markdown.rs
+assertion_line: 1155
 expression: out
 ---
 <!-- test-adapter:scorecard -->
@@ -23,7 +24,10 @@ expression: out
 | File | Function | CC | Cov% | CRAP | Risk |
 |------|----------|----|------|------|------|
 | src/lib.rs | risky_fn | 5 | 30.0 | 45.00 | high |
+
 <details><summary>Show breakdown</summary>
+
+`risky_fn` — `src/lib.rs`
 
   - L5 if-branch +1
   - L10 for-loop +2
