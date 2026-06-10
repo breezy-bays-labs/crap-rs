@@ -372,31 +372,50 @@ fn compose_deltas(
     parsed: &[ParsedEnvelope],
     baselines: &[ParsedEnvelope],
 ) -> (Vec<Option<AnalysisDelta>>, Vec<Option<String>>) {
-    let mut deltas = Vec::with_capacity(parsed.len());
-    let mut reasons = Vec::with_capacity(parsed.len());
-    for env in parsed {
-        let baseline = baselines.iter().find(|b| b.language == env.language);
-        let mismatch = baseline.and_then(|b| metric_mismatch(b, env));
-        if let Some((baseline_metric, input_metric)) = mismatch {
-            eprintln!(
-                "warning: baseline for language '{}' was scored with metric `{baseline_metric}` \
-                 but the input envelope uses `{input_metric}`; complexity and CRAP deltas would \
-                 compare incomparable scales — Delta tab disabled for this language",
-                env.language
-            );
-            deltas.push(None);
-            reasons.push(Some(format!(
+    // Keyed lookup is safe because `guard_unique_languages` already
+    // rejected duplicate baseline keys. The map + `unzip` shape also
+    // encodes the 1:1 pairing invariant by construction — the two
+    // output vectors cannot desync from `parsed` or each other.
+    let by_language: std::collections::HashMap<&str, &ParsedEnvelope> =
+        baselines.iter().map(|b| (b.language.as_str(), b)).collect();
+    parsed
+        .iter()
+        .map(|env| delta_for_language(by_language.get(env.language.as_str()).copied(), env))
+        .unzip()
+}
+
+/// One language's `(recomputed delta, disabled-reason)` pair — see
+/// [`compose_deltas`] for the pairing semantics.
+fn delta_for_language(
+    baseline: Option<&ParsedEnvelope>,
+    env: &ParsedEnvelope,
+) -> (Option<AnalysisDelta>, Option<String>) {
+    let Some(baseline) = baseline else {
+        return (None, None);
+    };
+    if let Some((baseline_metric, input_metric)) = metric_mismatch(baseline, env) {
+        eprintln!(
+            "warning: baseline for language '{}' was scored with metric `{baseline_metric}` \
+             but the input envelope uses `{input_metric}`; complexity and CRAP deltas would \
+             compare incomparable scales — Delta tab disabled for this language",
+            env.language
+        );
+        return (
+            None,
+            Some(format!(
                 "baseline metric ({baseline_metric}) does not match the input envelope \
                  metric ({input_metric}) — delta disabled"
-            )));
-            continue;
-        }
-        deltas.push(baseline.map(|b| {
-            delta::compute_with_epsilon(b.result.clone(), env.result.clone(), env.epsilon)
-        }));
-        reasons.push(None);
+            )),
+        );
     }
-    (deltas, reasons)
+    (
+        Some(delta::compute_with_epsilon(
+            baseline.result.clone(),
+            env.result.clone(),
+            env.epsilon,
+        )),
+        None,
+    )
 }
 
 /// The mismatched `(baseline, input)` metric pair, or `None` when the
