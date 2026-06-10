@@ -237,7 +237,7 @@ pub struct DeltaBlock<P: ParseDiagnostic> {
 /// the [`AnalysisDiagnostics`] block around the entries keeps its
 /// shared concrete shape (the count fields every adapter's writer
 /// emits).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct RawParseDiagnostic(pub serde_json::Value);
 
