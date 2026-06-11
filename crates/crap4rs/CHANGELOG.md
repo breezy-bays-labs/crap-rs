@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     on to update its existing comment instead of posting a new one per
     push. The marker carries the adapter name, so a Rust scorecard and
     a TypeScript scorecard can sticky to separate comments on the same
-    PR. With `--breakdown`, each exceeding function's
-    complexity-contributor bullets now render inside a collapsed
-    `<details>` block, keeping the default PR-comment view compact.
-    (crap-rs#275)
+    PR. With `--breakdown`, the complexity-contributor bullets of the
+    above-threshold functions render inside one collapsed
+    `<details>` block below the scorecard table, keeping the default
+    PR-comment view compact while keeping the markdown table itself
+    intact (a `<details>` placed between table rows would terminate the
+    GFM table). (crap-rs#275, crap-rs#397)
 
 ### Changed
 

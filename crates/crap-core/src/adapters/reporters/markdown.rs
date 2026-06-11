@@ -29,13 +29,13 @@ use askama::Template;
 /// calling adapter's `tool_name`, so each adapter's scorecard can
 /// sticky to its own comment on the same PR.
 ///
-/// `breakdown` injects an indented bullet list of complexity
-/// contributors under each exceeding function in the spotlight (or
-/// the full table when `full_table` is set), wrapped in a
-/// `<details><summary>Show breakdown</summary>` collapsible so the
-/// default PR-comment view stays compact. `explain` adds a trailing
-/// legend describing increment semantics (only meaningful when
-/// `breakdown` is set).
+/// `breakdown` collects the per-line complexity contributors of every
+/// above-threshold function into one `<details><summary>Show
+/// breakdown</summary>` collapsible rendered BELOW the table (spotlight
+/// or full table) so the default PR-comment view stays compact and the
+/// GFM table stays intact — an inline `<details>` would terminate it.
+/// `explain` adds a trailing legend describing increment semantics
+/// (only meaningful when `breakdown` is set).
 ///
 /// `full_table` switches the body to the legacy row-per-function table
 /// rendered after the summary — useful when piping into a longer
@@ -175,11 +175,17 @@ enum BodySection {
     },
     FullTable {
         rows: Vec<FunctionRow>,
+        /// Per-function complexity breakdowns, rendered in one
+        /// collapsible BELOW the table (crap-rs#397). Empty unless
+        /// `--breakdown` is active and at least one shown function
+        /// exceeds the threshold with contributors.
+        breakdowns: Vec<FunctionBreakdown>,
         legend: Option<&'static str>,
     },
     Spotlight {
         header: String,
         rows: Vec<FunctionRow>,
+        breakdowns: Vec<FunctionBreakdown>,
         legend: Option<&'static str>,
         footnote: Option<&'static str>,
     },
@@ -204,7 +210,31 @@ struct FunctionRow {
     cov: String,
     crap: String,
     risk: String,
-    breakdown_bullets: Vec<String>,
+}
+
+/// One function's complexity-contributor breakdown, rendered inside the
+/// single collapsible below the table (crap-rs#397). `function` and
+/// `file` are passed through `code_span_safe` (not pipe-escaped like the
+/// table cells) because the template renders them as markdown code
+/// spans: inside backticks GFM renders `<`/`>` literally, so a TS
+/// `<arrow>` survives where a bare table cell drops it — but a literal
+/// backtick or newline would break the span, so those are neutralized.
+struct FunctionBreakdown {
+    function: String,
+    file: String,
+    bullets: Vec<String>,
+}
+
+/// Make an identity string safe to drop inside a markdown code span.
+/// Code spans are how the breakdown header renders `<`/`>` literally
+/// (a TS `<arrow>`), but a literal backtick closes the span early and a
+/// newline breaks the line. Neither occurs in a Rust path, but a
+/// TypeScript string-literal module/property name reaches
+/// `qualified_name` verbatim (e.g. `module "a`b" { … }`), so collapse
+/// both: backtick → `'`, CR/LF → space (mirroring `escape_cell`'s
+/// newline handling).
+fn code_span_safe(s: &str) -> String {
+    s.replace(['\n', '\r'], " ").replace('`', "'")
 }
 
 fn summary_data(view: &AnalysisView<'_>, threshold: f64) -> SummaryData {
@@ -265,12 +295,9 @@ fn grouped_rows(grouped: &crate::domain::view::GroupedView) -> Vec<GroupedRow> {
 }
 
 fn full_table_section(view: &AnalysisView<'_>, breakdown: bool, explain: bool) -> BodySection {
-    let rows: Vec<FunctionRow> = view
-        .shown
-        .iter()
-        .map(|v| function_row(v, breakdown))
-        .collect();
+    let rows: Vec<FunctionRow> = view.shown.iter().map(|v| function_row(v)).collect();
     BodySection::FullTable {
+        breakdowns: function_breakdowns(view.shown.iter().copied(), breakdown),
         rows,
         legend: legend_if_needed(view, breakdown, explain),
     }
@@ -291,9 +318,13 @@ fn spotlight_section(
             return BodySection::None;
         }
         let header = format!("## Top {} worst by CRAP", worst.len());
-        let rows: Vec<FunctionRow> = worst.iter().map(|v| function_row(v, breakdown)).collect();
+        let rows: Vec<FunctionRow> = worst.iter().map(|v| function_row(v)).collect();
         return BodySection::Spotlight {
             header,
+            // No function exceeds here, so `function_breakdowns`
+            // resolves to empty (breakdowns gate on `exceeds`); the
+            // collapsible never renders in the all-clear case.
+            breakdowns: function_breakdowns(worst.iter().copied(), breakdown),
             rows,
             legend: legend_if_needed(view, breakdown, explain),
             footnote: Some("\n_All functions are within threshold._"),
@@ -316,21 +347,18 @@ fn spotlight_section(
             format_threshold(view, threshold),
         )
     };
-    let rows: Vec<FunctionRow> = shown_failures
-        .iter()
-        .map(|v| function_row(v, breakdown))
-        .collect();
+    let rows: Vec<FunctionRow> = shown_failures.iter().map(|v| function_row(v)).collect();
     BodySection::Spotlight {
         header,
+        breakdowns: function_breakdowns(shown_failures.iter().copied(), breakdown),
         rows,
         legend: legend_if_needed(view, breakdown, explain),
         footnote: None,
     }
 }
 
-fn function_row(verdict: &FunctionVerdict, breakdown: bool) -> FunctionRow {
+fn function_row(verdict: &FunctionVerdict) -> FunctionRow {
     let s = &verdict.scored;
-    let bullets = breakdown_bullets(verdict, breakdown);
     FunctionRow {
         file: escape_cell(&s.identity.file_path),
         function: escape_cell(&s.identity.qualified_name),
@@ -338,8 +366,31 @@ fn function_row(verdict: &FunctionVerdict, breakdown: bool) -> FunctionRow {
         cov: format!("{:.1}", s.coverage_percent),
         crap: format!("{:.2}", s.crap.value),
         risk: s.crap.risk_level.to_string(),
-        breakdown_bullets: bullets,
     }
+}
+
+/// Build the per-function breakdown list rendered in the single
+/// collapsible below the table (crap-rs#397). Iterates the SAME verdict
+/// slice the table rows came from (so order + membership match the
+/// table) and keeps only functions whose `breakdown_bullets` are
+/// non-empty — i.e. `--breakdown` is active AND the function exceeds the
+/// threshold AND it has contributors. Returns empty otherwise, so the
+/// template omits the collapsible entirely.
+fn function_breakdowns<'a, I>(verdicts: I, breakdown: bool) -> Vec<FunctionBreakdown>
+where
+    I: IntoIterator<Item = &'a FunctionVerdict>,
+{
+    verdicts
+        .into_iter()
+        .filter_map(|v| {
+            let bullets = breakdown_bullets(v, breakdown);
+            (!bullets.is_empty()).then(|| FunctionBreakdown {
+                function: code_span_safe(&v.scored.identity.qualified_name),
+                file: code_span_safe(&v.scored.identity.file_path),
+                bullets,
+            })
+        })
+        .collect()
 }
 
 fn breakdown_bullets(verdict: &FunctionVerdict, breakdown: bool) -> Vec<String> {
@@ -831,6 +882,177 @@ mod tests {
         assert!(
             !out.contains("<details>"),
             "no collapsible should render when breakdown is inactive; got:\n{out}"
+        );
+    }
+
+    /// Regression for crap-rs#397. #275 emitted a `<details>` block
+    /// directly after each table row; in GFM a `<details>` is an HTML
+    /// block that TERMINATES the table, so every row after the first
+    /// rendered as literal pipe-text ("pipe soup") — verified against
+    /// GitHub's own `/markdown` renderer. The single-function fixtures
+    /// the other breakdown tests use could never catch it. The
+    /// breakdowns now sit in ONE collapsible BELOW the whole table so
+    /// the table stays contiguous.
+    #[test]
+    fn multi_row_breakdown_keeps_table_contiguous() {
+        use crate::domain::types::{AnalysisResult, ComplexityContributor, ContributorKind};
+        let contributors = || {
+            vec![
+                ComplexityContributor {
+                    kind: ContributorKind::IfBranch,
+                    line: 12,
+                    column: None,
+                    increment: 1,
+                    end_line: 12,
+                    nesting_depth: 0,
+                },
+                ComplexityContributor {
+                    kind: ContributorKind::Match,
+                    line: 18,
+                    column: None,
+                    increment: 2,
+                    end_line: 18,
+                    nesting_depth: 1,
+                },
+            ]
+        };
+        let functions = vec![
+            make_verdict_with_contributors(
+                make_verdict("alpha_fn", "src/a.rs", 9, 40.0, 30.0, RiskLevel::High, 8.0),
+                contributors(),
+            ),
+            make_verdict_with_contributors(
+                make_verdict("beta_fn", "src/b.rs", 7, 50.0, 20.0, RiskLevel::High, 8.0),
+                contributors(),
+            ),
+        ];
+        let result = AnalysisResult {
+            summary: crate::domain::summary::compute_summary(&functions),
+            functions,
+            passed: false,
+        };
+        // Spotlight arm (full_table = false) — the shape the scorecard
+        // action renders on its sticky comments.
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            true,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+
+        // The whole table must precede the first collapsible: both data
+        // rows live in the region above `<details>`. Under the #275 bug
+        // `beta_fn` landed AFTER alpha's `<details>` and rendered as
+        // pipe soup — so it would be absent from this region.
+        let details_at = out
+            .find("<details>")
+            .unwrap_or_else(|| panic!("missing <details>; got:\n{out}"));
+        let table_region = &out[..details_at];
+        assert!(
+            table_region.contains("alpha_fn") && table_region.contains("beta_fn"),
+            "both rows must sit in the contiguous table above the collapsible; got:\n{out}"
+        );
+
+        // Exactly ONE collapsible wraps every breakdown (not one per row).
+        assert_eq!(
+            out.matches("<details>").count(),
+            1,
+            "expected a single breakdown collapsible below the table; got:\n{out}"
+        );
+
+        // GFM needs a blank line between the table and the HTML block,
+        // and after `</summary>`, or the table/list silently fail to
+        // render. A table row ends with `|`; assert the blank line
+        // separates it from `<details>`, and the blank after summary.
+        assert!(
+            out.contains("|\n\n<details><summary>Show breakdown</summary>\n\n"),
+            "need a blank line before <details> and after </summary> for GFM; got:\n{out}"
+        );
+
+        // Each function's breakdown sits inside the wrapper, keyed by a
+        // code span so names with angle brackets (e.g. a TS `<arrow>`)
+        // render literally instead of being eaten as an HTML tag.
+        let open = out
+            .find("<details><summary>Show breakdown</summary>")
+            .unwrap();
+        let close = out.find("</details>").unwrap();
+        let inner = &out[open..close];
+        assert!(
+            inner.contains("`alpha_fn`") && inner.contains("`beta_fn`"),
+            "both function headers must sit inside the collapsible as code spans; got:\n{out}"
+        );
+        assert!(
+            inner.contains("L12 if-branch +1") && inner.contains("L18 match +2"),
+            "contributor bullets must sit inside the collapsible; got:\n{out}"
+        );
+    }
+
+    /// A backtick in an identity string (reachable from crap4ts, which
+    /// maps a string-literal module/property name verbatim into
+    /// `qualified_name`) must NOT leak into the markdown code span, where
+    /// it would close the span early and garble the breakdown header.
+    /// `code_span_safe` neutralizes it to an apostrophe.
+    #[test]
+    fn backtick_in_name_does_not_break_the_code_span() {
+        use crate::domain::types::{AnalysisResult, ComplexityContributor, ContributorKind};
+        let verdict = make_verdict_with_contributors(
+            make_verdict(
+                "ns`weird.fn",
+                "src/a`b.ts",
+                9,
+                30.0,
+                30.0,
+                RiskLevel::High,
+                8.0,
+            ),
+            vec![ComplexityContributor {
+                kind: ContributorKind::IfBranch,
+                line: 12,
+                column: None,
+                increment: 1,
+                end_line: 12,
+                nesting_depth: 0,
+            }],
+        );
+        let result = AnalysisResult {
+            summary: crate::domain::summary::compute_summary(std::slice::from_ref(&verdict)),
+            functions: vec![verdict],
+            passed: false,
+        };
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            true,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+        let open = out
+            .find("<details><summary>Show breakdown</summary>")
+            .unwrap();
+        let close = out.find("</details>").unwrap();
+        let inner = &out[open..close];
+        // The header renders as a balanced code span with the backtick
+        // neutralized — never the raw backtick that would break it.
+        assert!(
+            inner.contains("`ns'weird.fn` — `src/a'b.ts`"),
+            "backtick must be neutralized inside the code-span header; got:\n{out}"
+        );
+        assert!(
+            !inner.contains("ns`weird"),
+            "raw backtick must not leak into the code span; got:\n{out}"
         );
     }
 

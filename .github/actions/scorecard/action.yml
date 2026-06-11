@@ -248,6 +248,26 @@ inputs:
       values outside the range are rejected by the adapter's CLI parser.
     required: false
     default: ''
+  breakdown:
+    description: |
+      When `true`, the analyzer is invoked with `--breakdown` for the
+      MARKDOWN scorecard, so the per-line complexity-contributor
+      breakdown of every ABOVE-THRESHOLD function renders in a single
+      collapsed `<details>` block below the scorecard table (crap-rs#275,
+      crap-rs#397). Lets a reviewer expand WHY a function scored its
+      complexity without leaving the PR timeline, while the table stays
+      scannable by default. Functions within the threshold carry no
+      breakdown, so on an all-green scorecard the collapsible is absent.
+
+      Scoped to the markdown invocation only — the JSON / HTML /
+      scorecard-row passes are unaffected. The flag is forwarded ONLY
+      when `true`, so the analyzer's own default owns the no-opt-in
+      case (the same conditional-forward / never-materialize-the-tool-
+      default contract `annotations` / `html-report` follow). Default
+      `false` keeps the markdown byte-identical for callers who don't
+      opt in; empty string is treated as `false`.
+    required: false
+    default: 'false'
   html-report:
     description: |
       When `true`, the action additionally renders the scorecard as
@@ -1047,6 +1067,10 @@ runs:
         # passing `''` behave identically — same convention as the
         # other empty-default inputs (threshold / gate-mode / etc.).
         HTML_REPORT: ${{ inputs.html-report }}
+        # crap-rs#397: forwarded as `--breakdown` to the per-language
+        # markdown invocation only. Empty string is treated as `false`
+        # (same empty-default convention as HTML_REPORT above).
+        BREAKDOWN: ${{ inputs.breakdown }}
       run: |
         set -euo pipefail
         # Per-language loop. Single-language mode iterates once over
@@ -1168,7 +1192,19 @@ runs:
           # dominated by adapter install upstream. Tracked in
           # https://github.com/breezy-bays-labs/crap-rs/issues/100.
           "$BIN" "${common[@]}" --format json --no-fail > "$envelope"
-          "$BIN" "${common[@]}" --format markdown --no-fail > "$markdown_file"
+
+          # crap-rs#397: the markdown scorecard gets `--breakdown` when
+          # the caller opted in, so each row's complexity-contributor
+          # breakdown renders as a collapsed `<details>` (crap-rs#275).
+          # Built from a markdown-scoped copy of `${common[@]}` so the
+          # flag never leaks into the JSON / HTML / scorecard-row passes
+          # (which reuse `${common[@]}` directly). Forwarded ONLY when
+          # `true` — the analyzer owns the default otherwise.
+          markdown_cmd=("$BIN" "${common[@]}" --format markdown --no-fail)
+          if [ "$BREAKDOWN" = "true" ]; then
+            markdown_cmd+=(--breakdown)
+          fi
+          "${markdown_cmd[@]}" > "$markdown_file"
 
           # PR γ (#294): optional HTML render. Same `${common[@]}`
           # invocation shape as the json + markdown calls above

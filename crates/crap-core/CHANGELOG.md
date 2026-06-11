@@ -16,11 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `<!-- {tool_name}:scorecard -->` HTML comment as the first output
     line — a per-adapter dedupe anchor for sticky-PR-comment tooling
     (it precedes a configured `[output] title`, and the scorecard
-    action's heading-offset rewrite leaves it untouched). Breakdown
-    contributor bullets are wrapped per function row in a
-    `<details><summary>Show breakdown</summary>` collapsible, with the
-    blank line GFM needs to render the bullets as a list inside the
-    HTML block. (crap-rs#275)
+    action's heading-offset rewrite leaves it untouched). When
+    `--breakdown` is active, the per-line complexity contributors of the
+    above-threshold functions collect into one
+    `<details><summary>Show breakdown</summary>` collapsible rendered
+    BELOW the scorecard table, each function keyed by a markdown code
+    span. The collapsible sits below the table (rather than interleaved
+    between rows) because a `<details>` HTML block terminates a GFM
+    table — an inline block would drop every row after the first to
+    literal "pipe-text". Verified against GitHub's own `/markdown`
+    renderer. (crap-rs#275, crap-rs#397)
 
 ### Changed
 

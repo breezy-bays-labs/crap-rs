@@ -254,6 +254,14 @@ jobs:
           gate-mode: report-only
           comment-mode: sticky
           comment-header: 'crap-scorecard-quickstart-smoke'
+          # Surface the complexity-contributor breakdown of every
+          # above-threshold function as a collapsed `<details>` below the
+          # scorecard table (crap-rs#397). The examples corpus is the
+          # richer demo surface — it scores poorly by design, so both
+          # per-language sections have above-threshold functions whose
+          # breakdowns render here (and on this PR's own sticky, since the
+          # smoke is pull_request-triggered).
+          breakdown: true
           comment-preamble: |
             **Examples dogfood — intentionally spans risk bands; not
             production code.** This scorecard analyzes `crap-examples`, a

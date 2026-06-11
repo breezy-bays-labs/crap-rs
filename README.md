@@ -140,7 +140,7 @@ Run `crap4rs --help` for the canonical full reference. Grouped here as in `--hel
 | `--color <COLOR>` | `auto` | `auto`, `always`, or `never`. |
 | `-v`, `--verbose` | — | Show parse diagnostics and matching statistics. |
 | `-q`, `--quiet` | — | Suppress report output, only set exit code. |
-| `--breakdown` | — | Show per-contributor complexity breakdown for failing functions in table output. |
+| `--breakdown` | — | Show the per-contributor complexity breakdown for each above-threshold function. In `table` output it prints inline beneath each row; in `markdown` output the breakdowns collect into one collapsed `<details>` block below the table. |
 | `--explain` | — | With `--breakdown`, explain nested cognitive increments in table output. |
 | `--md-full-table` | — | Append the full per-function table to markdown output (default markdown is a compact top-N summary). |
 | `--md-top <N>` | `10` | Number of rows in the markdown top-N table. |

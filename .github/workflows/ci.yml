@@ -831,6 +831,13 @@ jobs:
           gate-mode: gate-on-analysis
           comment-mode: sticky
           comment-header: crap-scorecard-production
+          # Surface the complexity-contributor breakdown of any
+          # above-threshold function as a collapsed `<details>` below the
+          # sticky scorecard table (crap-rs#397). This gate is normally
+          # green (0 above threshold), so the collapsible is a no-op
+          # then; it pays off when the gate FAILS, explaining WHY the
+          # offending function tripped the threshold right in the sticky.
+          breakdown: true
           comment-preamble: |
             **Production CRAP scorecard** — gates `crap-core`, `crap4rs`,
             and `crap4ts` source. This is real production code held to the

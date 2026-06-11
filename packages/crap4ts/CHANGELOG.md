@@ -20,9 +20,12 @@ shared-core development.
     PR-comment actions can use it as a dedupe anchor to find and update
     their existing TypeScript-scorecard comment; because the anchor is
     adapter-named, it never collides with a crap4rs comment on the same
-    PR. Contributor breakdown bullets (`--breakdown`) are now wrapped
-    in a collapsed `<details>` block so long TS scorecards stay
-    scannable in the PR timeline. (crap-rs#275)
+    PR. With `--breakdown`, the contributor bullets of the
+    above-threshold functions collect into one collapsed `<details>`
+    block below the scorecard table so long TS scorecards stay scannable
+    in the PR timeline — below the table rather than between rows,
+    because an inline `<details>` would break the GFM table.
+    (crap-rs#275, crap-rs#397)
 
 ### Changed
 
