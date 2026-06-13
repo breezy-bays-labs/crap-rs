@@ -491,6 +491,26 @@ silently produce a mangled combined view. Keep `crap4rs` and
 `crap4ts` reasonably up-to-date; major version bumps are documented
 in each crate's CHANGELOG.
 
+#### Interactive validation (the canonical end-to-end surface)
+
+The unified HTML report's two-axis (Language × View) switcher is
+validated end-to-end on every PR by the quick-start smoke, at two
+levels:
+
+| Gate | Level | Asserts |
+|------|-------|---------|
+| `Gate (i)` | markup (grep) | ≥ 3 `<nav class="tabs">` View navs; Delta tabs enabled/disabled per the baseline-fetch outcome |
+| `Gate (j)` | behavior (Playwright) | the report's JavaScript actually works in a headless browser — Language buttons swap panels, View tabs swap tab-panels, the `#<lang>:<view>` hash router tracks state, and a disabled Delta tab is a visible-but-no-op with its explanatory tooltip |
+
+`Gate (j)` (crap-rs#328) is the **canonical end-to-end interactive
+validation surface**. It exists because grep-level checks and
+`Given`-based BDD scenarios can both pass while the rendered page is
+broken — PR #327's artifact once shipped with zero interactive markup.
+The Playwright harness and the exact assertions live in
+[`tests/e2e/README.md`](../../../tests/e2e/README.md); both gates run
+against the same on-disk `unified-html-path` the action surfaces, so
+there is no artifact re-download.
+
 ### Aggregator pattern — `comment-mode: none` + `html-report: true`
 
 The action still uploads both artifacts and surfaces their URLs as

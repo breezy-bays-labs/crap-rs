@@ -1,0 +1,13 @@
+{
+  "name": "crap-rs-e2e-html",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end DOM validation of the crap-rs unified multi-language HTML report (crap-rs#328). Not published.",
+  "type": "module",
+  "scripts": {
+    "validate": "node validate-unified-html.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}
