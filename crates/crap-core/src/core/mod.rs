@@ -988,6 +988,16 @@ mod tests {
         assert_eq!(verdict.scored.contributors[0], contributor);
     }
 
+    #[test]
+    fn analyze_options_default_coverage_metric_is_line() {
+        // The options-struct field default (distinct from
+        // `CoverageMetric::default()`, which is tested in `domain::types`).
+        assert_eq!(
+            AnalyzeOptions::default().coverage_metric,
+            crate::domain::types::CoverageMetric::Line
+        );
+    }
+
     // ── ThresholdResolver tests ───────────────────────────────────────
 
     #[test]
