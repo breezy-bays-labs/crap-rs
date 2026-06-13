@@ -87,38 +87,46 @@ try {
   const activeDelta = page.locator(
     '.lang-panel[data-active] .tabs .tab[data-tab="delta"]',
   );
-  check((await activeDelta.count()) >= 1, "active panel exposes a Delta View tab");
-  check(await activeDelta.first().isVisible(), "Delta View tab is actually visible (not hidden markup)");
-  const deltaDisabled = (await activeDelta.first().getAttribute("disabled")) !== null;
-  if (!deltaDisabled) {
-    await activeDelta.first().dispatchEvent("click");
-    check(
-      (await page
-        .locator('.lang-panel[data-active] .tab-panel[data-tab="delta"][data-active]')
-        .count()) === 1,
-      "clicking the enabled Delta tab activates the Delta tab-panel",
-    );
-    check(
-      page.url().includes(":delta"),
-      `hash view axis reflects :delta after click; got ${page.url().split("#")[1] || "<none>"}`,
-    );
-    // Reset to a clean View before the Language assertion.
-    await page
-      .locator('.lang-panel[data-active] .tabs .tab[data-tab="current"]')
-      .dispatchEvent("click");
-  } else {
-    const title = (await activeDelta.first().getAttribute("title")) || "";
-    check(
-      title.includes("no baselines provided"),
-      `disabled Delta tab carries the no-baseline tooltip; got "${title}"`,
-    );
-    await activeDelta.first().dispatchEvent("click");
-    check(
-      (await page
-        .locator('.lang-panel[data-active] .tab-panel[data-tab="current"][data-active]')
-        .count()) === 1,
-      "clicking a disabled Delta tab is a no-op (stays on Current)",
-    );
+  // Resolve the count ONCE and guard every following operation on it. A
+  // bare `.first().getAttribute()`/`.dispatchEvent()` on an empty locator
+  // would auto-wait the full 30s timeout and throw an opaque TimeoutError
+  // instead of failing fast with the assertion below (gemini catch).
+  const deltaCount = await activeDelta.count();
+  check(deltaCount >= 1, "active panel exposes a Delta View tab");
+  if (deltaCount >= 1) {
+    const firstDelta = activeDelta.first();
+    check(await firstDelta.isVisible(), "Delta View tab is actually visible (not hidden markup)");
+    const deltaDisabled = (await firstDelta.getAttribute("disabled")) !== null;
+    if (!deltaDisabled) {
+      await firstDelta.dispatchEvent("click");
+      check(
+        (await page
+          .locator('.lang-panel[data-active] .tab-panel[data-tab="delta"][data-active]')
+          .count()) === 1,
+        "clicking the enabled Delta tab activates the Delta tab-panel",
+      );
+      check(
+        page.url().includes(":delta"),
+        `hash view axis reflects :delta after click; got ${page.url().split("#")[1] || "<none>"}`,
+      );
+      // Reset to a clean View before the Language assertion.
+      await page
+        .locator('.lang-panel[data-active] .tabs .tab[data-tab="current"]')
+        .dispatchEvent("click");
+    } else {
+      const title = (await firstDelta.getAttribute("title")) || "";
+      check(
+        title.includes("no baselines provided"),
+        `disabled Delta tab carries the no-baseline tooltip; got "${title}"`,
+      );
+      await firstDelta.dispatchEvent("click");
+      check(
+        (await page
+          .locator('.lang-panel[data-active] .tab-panel[data-tab="current"][data-active]')
+          .count()) === 1,
+        "clicking a disabled Delta tab is a no-op (stays on Current)",
+      );
+    }
   }
 
   // 4) Language axis: the first non-Combined Language button. Clicking it
