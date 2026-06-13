@@ -2021,10 +2021,11 @@ runs:
     # and every consumer that does not opt in.
     - name: Stage fork Pages handoff
       id: fork-handoff
+      # html-report / comment-mode are NOT gated here — they are validated
+      # in-script below so an opted-in-but-misconfigured caller fails fast
+      # with an actionable error instead of a silently-skipped step.
       if: >-
         inputs.fork-handoff == 'true'
-        && inputs.html-report == 'true'
-        && inputs.comment-mode == 'sticky'
         && github.event_name == 'pull_request'
         && github.event.pull_request.head.repo.full_name != github.repository
         && (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi')
@@ -2032,6 +2033,9 @@ runs:
       env:
         IS_MULTI: ${{ steps.presets.outputs.is_multi }}
         LANGUAGE: ${{ steps.lang.outputs.language }}
+        # Prerequisites validated in-script (fail-fast — see the if: note).
+        HTML_REPORT: ${{ inputs.html-report }}
+        COMMENT_MODE: ${{ inputs.comment-mode }}
         # Candidate report paths written by the render steps above — the
         # same resolution the inline `Publish HTML to GitHub Pages` step
         # uses, so the hosted artifact is the exact report a same-repo PR
@@ -2049,6 +2053,13 @@ runs:
         HANDOFF_DIR: ${{ runner.temp }}/crap-scorecard-pages-handoff
       run: |
         set -euo pipefail
+        # fork-handoff only makes sense with a report to host and a sticky
+        # to (re)post. Fail fast on a misconfigured opt-in rather than
+        # silently staging nothing (which would also skip the sticky).
+        if [ "$HTML_REPORT" != "true" ] || [ "$COMMENT_MODE" != "sticky" ]; then
+          echo "::error::fork-handoff: true requires html-report: true and comment-mode: sticky (got html-report='${HTML_REPORT}', comment-mode='${COMMENT_MODE}')."
+          exit 1
+        fi
         if [ "$IS_MULTI" = "true" ]; then
           REPORT_HTML="$UNIFIED_PATH"
         elif [ "$LANGUAGE" = "rust" ]; then
@@ -2089,13 +2100,10 @@ runs:
         echo "dir=$HANDOFF_DIR" >> "$GITHUB_OUTPUT"
 
     - name: Upload fork Pages handoff
-      if: >-
-        inputs.fork-handoff == 'true'
-        && inputs.html-report == 'true'
-        && inputs.comment-mode == 'sticky'
-        && github.event_name == 'pull_request'
-        && github.event.pull_request.head.repo.full_name != github.repository
-        && (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi')
+      # Upload exactly when the staging step produced a bundle (single
+      # source of truth — no duplicated gate). A skipped staging step
+      # leaves `dir` empty; a failed one already fails the job.
+      if: steps.fork-handoff.outputs.dir != ''
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         # Suffix mirrors the per-language report uploads so a matrix
@@ -2107,17 +2115,18 @@ runs:
         if-no-files-found: error
 
     - name: Post sticky PR comment
-      # The trailing fork-handoff clause SKIPS the post on a fork PR that
-      # opted into the handoff: a fork's read-only token would 403 here
-      # and red the job. The privileged `workflow_run` consumer posts the
-      # sticky instead (from the trusted context, with the hosted link).
-      # On same-repo PRs and for every consumer that does not opt in, the
-      # clause is true and posting is byte-identical to before.
+      # The `dir == ''` clause SKIPS the post exactly when the handoff
+      # staging step ran (a fork PR that opted into fork-handoff): a fork's
+      # read-only token would 403 here and red the job, so the privileged
+      # `workflow_run` consumer posts the sticky instead (from the trusted
+      # context, with the hosted link). When no handoff was staged
+      # (same-repo PR, or any consumer that did not opt in), `dir` is empty
+      # and posting is byte-identical to before.
       if: >-
         (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi')
         && inputs.comment-mode == 'sticky'
         && github.event_name == 'pull_request'
-        && (inputs.fork-handoff != 'true' || github.event.pull_request.head.repo.full_name == github.repository)
+        && steps.fork-handoff.outputs.dir == ''
       uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
       with:
         header: ${{ inputs.comment-header }}

@@ -79,10 +79,10 @@ that does not set it — output is byte-identical to before it existed.
 A `workflow_run` workflow that fires after CI completes, runs in the base
 repo's trusted context, and:
 
-- gates to **fork PRs whose CI succeeded** (`workflow_run.event ==
-  'pull_request'`, `conclusion == 'success'`, and `head_repository !=
-  repository`) — the fork gate is also the dedup that stops it
-  double-publishing same-repo PRs;
+- gates to **fork PRs whose CI succeeded** — on the `github.event.workflow_run`
+  payload: `event == 'pull_request'`, `conclusion == 'success'`, and
+  `head_repository.full_name != repository.full_name` (the fork gate is
+  also the dedup that stops it double-publishing same-repo PRs);
 - downloads the handoff artifact from the triggering run (best-effort —
   a fork PR that produced no report is a clean no-op);
 - **guards the PR number twice** before using it: (1) it must be a run of
