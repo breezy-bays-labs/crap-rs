@@ -34,6 +34,12 @@ use askama::Template;
 /// breakdown</summary>` collapsible rendered BELOW the table (spotlight
 /// or full table) so the default PR-comment view stays compact and the
 /// GFM table stays intact — an inline `<details>` would terminate it.
+/// `breakdown` ALSO collapses the all-clear "Top N worst" spotlight
+/// TABLE into a `<details>` (crap-rs#400): when every function is within
+/// threshold the worst-by-CRAP list is low-priority detail on a green
+/// sticky, so it folds away while a failures spotlight always stays
+/// visible. Both collapsibles are GFM-safe (blank line after
+/// `</summary>` and before `</details>` so the table renders inside).
 /// `explain` adds a trailing legend describing increment semantics
 /// (only meaningful when `breakdown` is set).
 ///
@@ -183,11 +189,18 @@ enum BodySection {
         legend: Option<&'static str>,
     },
     Spotlight {
+        /// The section label, WITHOUT a `##` prefix — the template adds
+        /// `## ` for the visible heading, or uses it bare as the
+        /// `<summary>` text when `collapsible` (crap-rs#400).
         header: String,
         rows: Vec<FunctionRow>,
         breakdowns: Vec<FunctionBreakdown>,
         legend: Option<&'static str>,
         footnote: Option<&'static str>,
+        /// crap-rs#400: when true, wrap the spotlight table in a collapsed
+        /// `<details>` (the all-clear top-worst under `--breakdown`). The
+        /// failures case stays `false` — failures must be visible.
+        collapsible: bool,
     },
     /// All summary-displayed, no body table. Used when a clean run has
     /// zero shown rows (e.g. `--only-failing` strips everything).
@@ -317,17 +330,21 @@ fn spotlight_section(
         if worst.is_empty() {
             return BodySection::None;
         }
-        let header = format!("## Top {} worst by CRAP", worst.len());
+        let header = format!("Top {} worst by CRAP", worst.len());
         let rows: Vec<FunctionRow> = worst.iter().map(|v| function_row(v)).collect();
         return BodySection::Spotlight {
             header,
             // No function exceeds here, so `function_breakdowns`
             // resolves to empty (breakdowns gate on `exceeds`); the
-            // collapsible never renders in the all-clear case.
+            // breakdown sub-collapsible never renders in the all-clear
+            // case. The top-worst TABLE itself collapses under
+            // `--breakdown` (crap-rs#400) — low-priority detail on a green
+            // sticky — via the `collapsible` flag below.
             breakdowns: function_breakdowns(worst.iter().copied(), breakdown),
             rows,
             legend: legend_if_needed(view, breakdown, explain),
             footnote: Some("\n_All functions are within threshold._"),
+            collapsible: breakdown,
         };
     }
 
@@ -335,14 +352,14 @@ fn spotlight_section(
         top_n_by_crap(view.shown.iter().copied().filter(|v| v.exceeds), top_n);
     let header = if summary.exceeding_threshold > shown_failures.len() {
         format!(
-            "## Failures (top {} of {} above threshold {})",
+            "Failures (top {} of {} above threshold {})",
             shown_failures.len(),
             summary.exceeding_threshold,
             format_threshold(view, threshold),
         )
     } else {
         format!(
-            "## Failures ({} above threshold {})",
+            "Failures ({} above threshold {})",
             summary.exceeding_threshold,
             format_threshold(view, threshold),
         )
@@ -354,6 +371,9 @@ fn spotlight_section(
         rows,
         legend: legend_if_needed(view, breakdown, explain),
         footnote: None,
+        // Failures must stay VISIBLE — never collapse them. (Their
+        // complexity breakdown still collapses below, via `breakdowns`.)
+        collapsible: false,
     }
 }
 
@@ -991,6 +1011,117 @@ mod tests {
         assert!(
             inner.contains("L12 if-branch +1") && inner.contains("L18 match +2"),
             "contributor bullets must sit inside the collapsible; got:\n{out}"
+        );
+    }
+
+    /// crap-rs#400. On a green sticky the "Top N worst by CRAP" spotlight
+    /// is low-priority detail, so under `--breakdown` it collapses into a
+    /// `<details>` (mirroring the failure-breakdown collapsible). The
+    /// header becomes the `<summary>` label (no `##`), the table renders
+    /// inside (GFM-safe blank line after `</summary>` and before
+    /// `</details>`), and the all-clear footnote stays BELOW the
+    /// collapsible.
+    #[test]
+    fn all_clear_top_worst_collapses_under_breakdown() {
+        use crate::domain::types::AnalysisResult;
+        let functions = vec![
+            make_verdict("calc_total", "src/a.rs", 3, 95.0, 5.0, RiskLevel::Low, 8.0),
+            make_verdict("merge_in", "src/b.rs", 2, 90.0, 4.0, RiskLevel::Low, 8.0),
+        ];
+        let result = AnalysisResult {
+            summary: crate::domain::summary::compute_summary(&functions),
+            functions,
+            passed: true,
+        };
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            true,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+
+        // The label is the <summary>, with the GFM-required blank line
+        // before the table renders inside the HTML block.
+        assert!(
+            out.contains("<details><summary>Top 2 worst by CRAP</summary>\n\n| File |"),
+            "green top-worst must open a <details> with the label as summary + blank line before the table; got:\n{out}"
+        );
+        // The header is no longer a `##` heading — it moved into <summary>.
+        assert!(
+            !out.contains("## Top 2 worst by CRAP"),
+            "the `##` heading must be gone in collapsed mode; got:\n{out}"
+        );
+        // Both worst rows sit inside the collapsible (above </details>).
+        let open = out
+            .find("<details><summary>Top 2 worst by CRAP</summary>")
+            .unwrap();
+        let close = out.find("</details>").unwrap();
+        let inner = &out[open..close];
+        assert!(
+            inner.contains("calc_total") && inner.contains("merge_in"),
+            "both worst rows must sit inside the collapsible; got:\n{out}"
+        );
+        // GFM-safe close: a blank line between the last table row and the
+        // `</details>` (a row ends with `|`).
+        assert!(
+            out.contains("|\n\n</details>"),
+            "need a blank line between the last table row and </details>; got:\n{out}"
+        );
+        // The all-clear footnote stays OUTSIDE/below the collapsible.
+        let footnote_at = out.find("_All functions are within threshold._").unwrap();
+        assert!(
+            footnote_at > close,
+            "the all-clear footnote must render below the collapsible; got:\n{out}"
+        );
+    }
+
+    /// crap-rs#400. Without `--breakdown` the all-clear spotlight is
+    /// byte-identical to before the collapsible existed: a plain `##`
+    /// heading + table, no `<details>`.
+    #[test]
+    fn all_clear_top_worst_uncollapsed_without_breakdown() {
+        use crate::domain::types::AnalysisResult;
+        let functions = vec![make_verdict(
+            "calc_total",
+            "src/a.rs",
+            3,
+            95.0,
+            5.0,
+            RiskLevel::Low,
+            8.0,
+        )];
+        let result = AnalysisResult {
+            summary: crate::domain::summary::compute_summary(&functions),
+            functions,
+            passed: true,
+        };
+        let out = format_markdown(
+            &make_view_default(&result),
+            None,
+            8.0,
+            false,
+            false,
+            false,
+            10,
+            &test_meta(),
+            ComplexityMetric::Cognitive,
+            None,
+            None,
+        );
+        assert!(
+            out.contains("## Top 1 worst by CRAP"),
+            "uncollapsed green keeps the `##` heading; got:\n{out}"
+        );
+        assert!(
+            !out.contains("<details>"),
+            "no collapsible without breakdown; got:\n{out}"
         );
     }
 

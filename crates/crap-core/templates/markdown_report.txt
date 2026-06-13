@@ -95,15 +95,21 @@ No functions analyzed.
 {%- if legend.is_some() %}
 {{ legend.as_ref().unwrap() }}
 {%- endif -%}
-{%- when BodySection::Spotlight with { header, rows, breakdowns, legend, footnote } %}
-{{ header }}
+{%- when BodySection::Spotlight with { header, rows, breakdowns, legend, footnote, collapsible } %}
+{%- if collapsible %}
+<details><summary>{{ header }}</summary>
+{%- else %}
+## {{ header }}
+{%- endif %}
 
 | File | Function | CC | Cov% | CRAP | Risk |
 |------|----------|----|------|------|------|
 {% for row in rows -%}
 | {{ row.file }} | {{ row.function }} | {{ row.cc }} | {{ row.cov }} | {{ row.crap }} | {{ row.risk }} |
 {% endfor -%}
-{%- if !breakdowns.is_empty() %}
+{%- if collapsible %}
+</details>
+{%- else if !breakdowns.is_empty() %}
 <details><summary>Show breakdown</summary>
 
 {% for b in breakdowns -%}
