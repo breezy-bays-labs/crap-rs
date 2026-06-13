@@ -30,10 +30,10 @@
 //!    drill-down ergonomics.
 //! 3. **Sort** — function-level (or file-level under grouping) by
 //!    `SortKey`. `sort_by` is *stable* — callers rely on input-order
-//!    preservation on tied keys (BDD: `view.feature:122-128`).
+//!    preservation on tied keys.
 //! 4. **Truncate** — `limit` applies to whichever level was sorted in
 //!    step 3. `Some(0)` and `None` are treated identically as "no limit"
-//!    (`--top 0` ergonomic, BDD: `view.feature:213`).
+//!    (`--top 0` ergonomic).
 //!
 //! # Gate keystone — unshapeable
 //!
@@ -346,9 +346,9 @@ pub struct GroupedView {
 /// keys sort last under their orientation.
 ///
 /// `apply` is total — it never panics, even on NaN coverage or empty
-/// inputs. See the BDD harness `tests/features/view.feature` for the
-/// full behavioral contract and the property-test suite at the bottom
-/// of this module for the order/identity/summary/display invariants.
+/// inputs. The unit tests and the `proptests` module below pin the full
+/// behavioral contract: the order, identity, summary, and display
+/// invariants over arbitrary `AnalysisResult`s.
 pub fn apply<'a>(result: &'a AnalysisResult, spec: ViewSpec) -> AnalysisView<'a> {
     let eligible: Vec<&'a FunctionVerdict> = apply_filters(&result.functions, &spec.filters);
     let eligible_count = eligible.len();
@@ -462,7 +462,7 @@ fn truncate_files_to(files: &mut Vec<FileSummary>, limit: Option<usize>) -> bool
 ///
 /// AND-composes filters: a verdict is eligible iff every active filter
 /// admits it. The coverage-range branch uses `is_finite()` so non-finite
-/// coverage is excluded — NaN in practice (BDD: view.feature:231), and
+/// coverage is excluded — NaN in practice, and
 /// also ±∞ defensively. LCOV-derived percentages should never be infinite,
 /// but the wider check costs nothing and keeps the comparator total.
 fn apply_filters<'a>(
@@ -487,7 +487,7 @@ fn matches_coverage_range(cov: f64, range: &CoverageRange) -> bool {
 
 fn sort_in_place(shown: &mut [&FunctionVerdict], key: SortKey) {
     // sort_by — stable. NOT sort_unstable_by: callers rely on input-order
-    // preservation for tied keys (BDD: view.feature:122-128).
+    // preservation for tied keys.
     match key {
         SortKey::Crap => shown.sort_by(cmp_by_crap),
         SortKey::Coverage => shown.sort_by(cmp_by_coverage),
@@ -509,7 +509,7 @@ fn cmp_by_crap(a: &&FunctionVerdict, b: &&FunctionVerdict) -> std::cmp::Ordering
     }
 }
 
-/// Coverage ascending. NaN sorts last (BDD: view.feature:237).
+/// Coverage ascending. NaN sorts last.
 fn cmp_by_coverage(a: &&FunctionVerdict, b: &&FunctionVerdict) -> std::cmp::Ordering {
     let (ax, bx) = (a.scored.coverage_percent, b.scored.coverage_percent);
     match (ax.is_nan(), bx.is_nan()) {
@@ -542,7 +542,7 @@ fn cmp_by_path(a: &&FunctionVerdict, b: &&FunctionVerdict) -> std::cmp::Ordering
 
 /// Truncate `shown` to `limit` entries. Returns whether any rows were
 /// dropped. `Some(0)` and `None` are treated identically as "no limit"
-/// (BDD: view.feature:213 — `--top 0` semantics).
+/// (the `--top 0` semantics).
 fn truncate_to(shown: &mut Vec<&FunctionVerdict>, limit: Option<usize>) -> bool {
     match limit {
         Some(n) if n > 0 && shown.len() > n => {
@@ -626,7 +626,7 @@ mod tests {
         }
     }
 
-    /// Background fixture from view.feature ll. 9-17. Threshold 25.0.
+    /// Shared 6-function fixture at threshold 25.0 (two rows fail).
     fn background_fixture() -> AnalysisResult {
         let verdicts = vec![
             mk_verdict("parse_lcov", "src/adapters/lcov.rs", 12, 100.0, 12.00, 25.0),
@@ -693,9 +693,9 @@ mod tests {
 
     #[test]
     fn default_spec_is_noop_on_fixture() {
-        // view.feature ll. 25-31: default spec produces a no-op view in
-        // CRAP-descending order. Equivalent: shown contains every function;
-        // eligible_count equals total; truncated false; CRAP desc.
+        // Default spec produces a no-op view in CRAP-descending order:
+        // shown contains every function; eligible_count equals total;
+        // truncated false; CRAP desc.
         let r = background_fixture();
         let view = apply(&r, ViewSpec::default());
         assert_eq!(view.shown.len(), r.functions.len());
@@ -716,7 +716,6 @@ mod tests {
 
     #[test]
     fn default_spec_empty_input_is_empty_view() {
-        // view.feature l. 197.
         let r = empty_result();
         let view = apply(&r, ViewSpec::default());
         assert!(view.shown.is_empty());
@@ -727,7 +726,6 @@ mod tests {
 
     #[test]
     fn view_full_immutability_after_apply() {
-        // view.feature l. 221.
         let r = background_fixture();
         let crap_before: Vec<f64> = r.functions.iter().map(|v| v.scored.crap.value).collect();
         let view = apply(&r, ViewSpec::default());
@@ -740,7 +738,6 @@ mod tests {
 
     #[test]
     fn default_spec_preserves_identity_set() {
-        // view.feature ll. 33-35.
         let r = background_fixture();
         let view = apply(&r, ViewSpec::default());
         let shown_names: std::collections::HashSet<&String> = view
@@ -760,7 +757,6 @@ mod tests {
 
     #[test]
     fn coverage_range_new_validation_table() {
-        // view.feature ll. 79-91.
         type Case = (f64, f64, Result<(f64, f64), ()>);
         let cases: &[Case] = &[
             (0.0, 100.0, Ok((0.0, 100.0))),
@@ -799,7 +795,7 @@ mod tests {
 
     #[test]
     fn sort_stability_on_tied_crap() {
-        // view.feature ll. 122-128. Catches `sort_by → sort_unstable_by`.
+        // Catches the `sort_by → sort_unstable_by` mutation.
         // Hand-built deterministic [foo, bar] both at CRAP=12.0.
         let foo = mk_verdict("foo", "src/a.rs", 5, 80.0, 12.0, 25.0);
         let bar = mk_verdict("bar", "src/a.rs", 5, 80.0, 12.0, 25.0);
@@ -826,7 +822,6 @@ mod tests {
 
     #[test]
     fn only_failing_filter_retains_only_exceeds_true() {
-        // view.feature l. 44.
         let r = background_fixture();
         let spec = ViewSpec {
             filters: Filters {
@@ -845,7 +840,6 @@ mod tests {
 
     #[test]
     fn coverage_range_filter_inclusive() {
-        // view.feature l. 50.
         let r = background_fixture();
         let range = CoverageRange::new(50.0, 90.0).unwrap();
         let spec = ViewSpec {
@@ -871,7 +865,7 @@ mod tests {
 
     #[test]
     fn coverage_range_boundary_inclusive_50_low() {
-        // view.feature ll. 56-68 row 1: cov=50.0 in 50..=90 → appears.
+        // cov=50.0 in 50..=90 → appears (inclusive low boundary).
         let v = mk_verdict("at50", "src/a.rs", 1, 50.0, 1.0, 25.0);
         let r = AnalysisResult {
             functions: vec![v],
@@ -996,29 +990,7 @@ mod tests {
     }
 
     #[test]
-    fn filters_and_compose() {
-        // view.feature l. 70: filters AND-compose.
-        // only_failing AND coverage_range [50, 100] → both must hold.
-        let r = background_fixture();
-        let range = CoverageRange::new(50.0, 100.0).unwrap();
-        let spec = ViewSpec {
-            filters: Filters {
-                only_failing: true,
-                coverage_range: Some(range),
-            },
-            ..Default::default()
-        };
-        let view = apply(&r, spec);
-        for v in &view.shown {
-            assert!(v.exceeds);
-            let cov = v.scored.coverage_percent;
-            assert!((50.0..=100.0).contains(&cov));
-        }
-    }
-
-    #[test]
     fn nan_coverage_excluded_from_range_filter() {
-        // view.feature l. 231: NaN coverage excluded from range filter.
         let v = mk_verdict("zero_lines", "src/a.rs", 1, f64::NAN, 1.0, 25.0);
         let r = AnalysisResult {
             functions: vec![v],
@@ -1041,7 +1013,6 @@ mod tests {
 
     #[test]
     fn sort_by_crap_descending() {
-        // view.feature ll. 95-98.
         let r = background_fixture();
         let spec = ViewSpec {
             sort: SortKey::Crap,
@@ -1055,7 +1026,6 @@ mod tests {
 
     #[test]
     fn sort_by_coverage_ascending() {
-        // view.feature ll. 100-103.
         let r = background_fixture();
         let spec = ViewSpec {
             sort: SortKey::Coverage,
@@ -1069,7 +1039,6 @@ mod tests {
 
     #[test]
     fn sort_by_complexity_descending() {
-        // view.feature ll. 105-108.
         let r = background_fixture();
         let spec = ViewSpec {
             sort: SortKey::Complexity,
@@ -1083,7 +1052,6 @@ mod tests {
 
     #[test]
     fn sort_by_path_alphabetical_then_crap() {
-        // view.feature ll. 110-114.
         let r = background_fixture();
         let spec = ViewSpec {
             sort: SortKey::Path,
@@ -1114,9 +1082,9 @@ mod tests {
 
     #[test]
     fn sort_by_path_secondary_multi_file() {
-        // view.feature ll. 116-120: 3 files, 5 verdicts.
-        // src/a.rs (5, 30), src/b.rs (10), src/c.rs (1, 50)
-        // Expected: a.rs::30, a.rs::5, b.rs::10, c.rs::50, c.rs::1
+        // 3 files, 5 verdicts: src/a.rs (5, 30), src/b.rs (10),
+        // src/c.rs (1, 50). Expected: a.rs::30, a.rs::5, b.rs::10,
+        // c.rs::50, c.rs::1.
         let verdicts = vec![
             mk_verdict("a_low", "src/a.rs", 1, 50.0, 5.0, 25.0),
             mk_verdict("a_high", "src/a.rs", 1, 50.0, 30.0, 25.0),
@@ -1148,7 +1116,7 @@ mod tests {
 
     #[test]
     fn nan_coverage_sorts_last_under_coverage_ascending() {
-        // view.feature ll. 237-242. Coverages: [10.0, NaN, 50.0, NaN, 90.0].
+        // Coverages: [10.0, NaN, 50.0, NaN, 90.0].
         let verdicts = vec![
             mk_verdict("c10", "src/a.rs", 1, 10.0, 1.0, 25.0),
             mk_verdict("nan1", "src/a.rs", 1, f64::NAN, 1.0, 25.0),
@@ -1183,7 +1151,7 @@ mod tests {
 
     #[test]
     fn limit_truncates() {
-        // view.feature ll. 132-137. Background has 6 functions; limit=3.
+        // Background has 6 functions; limit=3.
         let r = background_fixture();
         let spec = ViewSpec {
             limit: Some(3),
@@ -1197,7 +1165,6 @@ mod tests {
 
     #[test]
     fn limit_greater_than_eligible() {
-        // view.feature ll. 139-144.
         let r = background_fixture();
         let spec = ViewSpec {
             limit: Some(100),
@@ -1211,7 +1178,6 @@ mod tests {
 
     #[test]
     fn limit_none() {
-        // view.feature ll. 146-150.
         let r = background_fixture();
         let spec = ViewSpec {
             limit: None,
@@ -1224,8 +1190,8 @@ mod tests {
 
     #[test]
     fn limit_zero_treated_as_no_limit() {
-        // view.feature l. 213. --top 0 ⇒ limit = None semantics.
-        // Construct directly with Some(0); the code treats it as no-limit.
+        // --top 0 ⇒ limit = None semantics. Construct directly with
+        // Some(0); the code treats it as no-limit.
         let r = background_fixture();
         let spec = ViewSpec {
             limit: Some(0),
@@ -1257,8 +1223,7 @@ mod tests {
 
     #[test]
     fn order_filter_then_sort_then_truncate() {
-        // view.feature ll. 154-160.
-        // only_failing AND sort=Coverage AND limit=2
+        // only_failing AND sort=Coverage AND limit=2.
         let r = background_fixture();
         let spec = ViewSpec {
             filters: Filters {
@@ -1283,8 +1248,8 @@ mod tests {
 
     #[test]
     fn truncation_does_not_change_gate() {
-        // view.feature ll. 162-168 — Given an analysis with 3 functions
-        // exceeding threshold. Construct that fixture explicitly.
+        // Analysis with 3 functions exceeding threshold; construct that
+        // fixture explicitly.
         let verdicts = vec![
             mk_verdict("ok", "src/a.rs", 1, 100.0, 1.0, 25.0),
             mk_verdict("fail1", "src/a.rs", 1, 0.0, 50.0, 25.0),
@@ -1311,8 +1276,7 @@ mod tests {
 
     #[test]
     fn filtering_does_not_change_gate() {
-        // view.feature ll. 170-175 — analysis with 3 exceeding, filter
-        // excludes all of them.
+        // Analysis with 3 exceeding; filter excludes all of them.
         let verdicts = vec![
             mk_verdict("ok", "src/a.rs", 1, 100.0, 1.0, 25.0),
             mk_verdict("fail1", "src/a.rs", 1, 0.0, 50.0, 25.0),
@@ -1344,7 +1308,6 @@ mod tests {
 
     #[test]
     fn shown_summary_over_shown_subset() {
-        // view.feature ll. 179-186.
         let r = background_fixture();
         let spec = ViewSpec {
             filters: Filters {
@@ -1368,7 +1331,7 @@ mod tests {
 
     #[test]
     fn shown_summary_differs_from_full() {
-        // view.feature ll. 188-193 — analysis with 6 functions, 3 exceeding.
+        // Analysis with 6 functions, 3 exceeding.
         let verdicts = vec![
             mk_verdict("ok1", "src/a.rs", 1, 100.0, 1.0, 25.0),
             mk_verdict("ok2", "src/a.rs", 1, 100.0, 2.0, 25.0),
@@ -1399,7 +1362,6 @@ mod tests {
 
     #[test]
     fn all_filtered_out_produces_empty_shown() {
-        // view.feature ll. 205-211.
         let v = mk_verdict("low_cov", "src/a.rs", 1, 50.0, 1.0, 25.0);
         let r = AnalysisResult {
             functions: vec![v],
@@ -1885,6 +1847,64 @@ mod proptests {
                 };
                 let _ = apply(&result, spec);
             }
+        }
+
+        /// Filters AND-compose into the *intersection* of each filter's
+        /// result set: `apply` with both `only_failing` and a
+        /// `coverage_range` active yields exactly the functions that pass
+        /// `only_failing` alone AND those that pass the range alone.
+        ///
+        /// Strictly stronger than an example check of `shown ⊆ both`: this
+        /// is full set-equality (no false inclusions AND no false
+        /// exclusions) over arbitrary inputs and arbitrary filter
+        /// combinations. Identity sets are unambiguous because
+        /// `arb_analysis_result` dedups `(file_path, qualified_name)`.
+        #[test]
+        fn prop_filters_and_compose(
+            result in arb_analysis_result(),
+            only_failing in any::<bool>(),
+            band in prop::option::of((0.0..=100.0f64, 0.0..=100.0f64)),
+        ) {
+            use crate::domain::types::FunctionIdentity;
+            use std::collections::HashSet;
+
+            let coverage_range = band.map(|(a, b)| {
+                let (min, max) = if a <= b { (a, b) } else { (b, a) };
+                CoverageRange::new(min, max).expect("min <= max within [0,100] is valid")
+            });
+
+            let view_both = apply(
+                &result,
+                ViewSpec {
+                    filters: Filters { only_failing, coverage_range },
+                    ..Default::default()
+                },
+            );
+            let view_failing = apply(
+                &result,
+                ViewSpec {
+                    filters: Filters { only_failing, coverage_range: None },
+                    ..Default::default()
+                },
+            );
+            let view_range = apply(
+                &result,
+                ViewSpec {
+                    filters: Filters { only_failing: false, coverage_range },
+                    ..Default::default()
+                },
+            );
+
+            let both: HashSet<&FunctionIdentity> =
+                view_both.shown.iter().map(|v| &v.scored.identity).collect();
+            let failing_only: HashSet<&FunctionIdentity> =
+                view_failing.shown.iter().map(|v| &v.scored.identity).collect();
+            let range_only: HashSet<&FunctionIdentity> =
+                view_range.shown.iter().map(|v| &v.scored.identity).collect();
+            let intersection: HashSet<&FunctionIdentity> =
+                failing_only.intersection(&range_only).copied().collect();
+
+            prop_assert_eq!(both, intersection);
         }
     }
 }

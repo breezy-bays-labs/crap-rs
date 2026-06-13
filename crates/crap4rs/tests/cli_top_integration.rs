@@ -103,9 +103,9 @@ fn top_n_truncates_to_n_rows() {
 
 #[test]
 fn top_zero_is_no_limit() {
-    // view.feature:213. --top 0 means "no limit" — view.shown equals
-    // eligible_count and view.truncated is false. JSON view.spec.limit
-    // serialises as null because the CLI canonicalises 0 → None.
+    // --top 0 means "no limit" — view.shown equals eligible_count and
+    // view.truncated is false. JSON view.spec.limit serialises as null
+    // because the CLI canonicalises 0 → None.
     let dir = tempfile::tempdir().unwrap();
     setup_dir(dir.path(), FIXTURE_SRC, FIXTURE_LCOV);
 
