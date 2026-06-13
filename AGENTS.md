@@ -6,7 +6,7 @@
 ## Repo Context
 
 - Architecture: hexagonal (ports & adapters) — `domain/` → `ports/` → `adapters/` → `core/` → `cli/`. Never import "inward."
-- Testing: `cargo nextest run` for tests, `cargo clippy -- -D warnings` for lints, `cargo fmt --check` for formatting. Quick verify: all three chained.
+- Testing: `cargo nextest run` for tests, `cargo clippy -- -D warnings` for lints, `cargo fmt --check` for formatting. Quick verify: all three chained. The org **Testing Strategy** (`~/Github/ops/standards/testing-strategy.md` — the three axes, the Boundary Rule, the quadrants, the five-leg health dashboard) is canonical; crap4rs's per-level tool-map + the Boundary Rule are in `.claude/rules/testing.md`.
 - Property tests use `proptest` — regression files in `proptest-regressions/` are committed to git, never gitignored.
 - Safety: do not push directly to `main`, always branch + PR. Do not modify `.github/workflows/*` unless the task clearly requires CI changes.
 - The `domain/` and `ports/` layers stay language-agnostic (no `syn`/`oxc`, no LCOV/Istanbul types) — they live in the shared `crap-core` library that every adapter links (`crap4rs` via `syn`, `crap4ts` via `oxc`); `crap-core` also ships the `crap-render` binary. Purity is enforced by the four-layer `ast-purity` CI job + `deny.toml`; the only allowed proc-macro-chain derives are `serde`, `thiserror`, and `askama` (the `Template` derive backing the HTML/markdown reporters).
