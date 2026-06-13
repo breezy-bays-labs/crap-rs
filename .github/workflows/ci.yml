@@ -764,19 +764,21 @@ jobs:
             rm -f baseline.json
           fi
 
-      - name: Note fork-PR Pages degradation
+      - name: Note fork-PR Pages handoff
         # On a fork PR the GITHUB_TOKEN is read-only regardless of the
-        # job's permissions: block, so the gh-pages push would 403. The
-        # pages-publish input below is computed false for fork PRs, so
-        # the action degrades to summary-only (no hosted link) — never a
-        # red X, never a dead link. Surface that decision in the log so a
-        # reviewer on a fork PR knows the missing link is by design.
-        # Full fork-PR publishing (a privileged workflow_run topology) is
-        # a later, separate deliverable of this epic.
+        # job's permissions: block, so neither the inline gh-pages push
+        # (pages-publish, computed false on forks below) nor the action's
+        # sticky-comment post can run here. Instead `fork-handoff: true`
+        # makes the action stage a handoff artifact, and the separate
+        # privileged `Pages publish (fork PRs)` workflow (workflow_run, in
+        # the trusted BASE context) publishes the report and posts the
+        # sticky AFTER this run completes. Surface that in the log so a
+        # reviewer on a fork PR knows the hosted link arrives shortly via
+        # the companion workflow, not inline. See docs/pages-fork-reports.md.
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
         run: |
           set -euo pipefail
-          echo "::notice::Fork PR detected — the hosted per-PR report link is omitted because a fork's GITHUB_TOKEN is read-only and cannot publish to GitHub Pages. The scorecard summary is unaffected. Full fork-PR hosted reports are a planned follow-up."
+          echo "::notice::Fork PR detected — the hosted report link is not posted inline (a fork's GITHUB_TOKEN is read-only). The 'Pages publish (fork PRs)' workflow publishes the report and posts the production sticky from the trusted base context once this CI run completes."
 
       - name: Production scorecard (gate-on-analysis)
         uses: ./.github/actions/scorecard
@@ -828,6 +830,13 @@ jobs:
           pages-publish: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
           pages-deploy-path: pr-${{ github.event.number }}
           pages-url: https://breezy-bays-labs.github.io/crap-rs/pr-${{ github.event.number }}/
+          # Fork-PR counterpart to pages-publish (crap-rs#386). On a fork
+          # PR the action stages a handoff artifact instead of publishing
+          # inline (a fork token can't push or comment); the privileged
+          # `pages-publish-fork.yml` workflow_run consumer publishes the
+          # report + posts the sticky from the trusted base context. A
+          # no-op on same-repo PRs and push events.
+          fork-handoff: true
           gate-mode: gate-on-analysis
           comment-mode: sticky
           comment-header: crap-scorecard-production

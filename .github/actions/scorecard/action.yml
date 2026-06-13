@@ -364,6 +364,29 @@ inputs:
       resolve. See the action README's "Hosted per-PR report" section.
     required: false
     default: 'gh-pages'
+  fork-handoff:
+    description: |
+      Opt into the fork-PR hosted-report handoff (advanced pattern). When
+      `true` AND the run is a fork PR with `html-report: true` and
+      `comment-mode: sticky`, the action stages a self-contained handoff
+      bundle (the rendered `report.html`, the PR number, and the composed
+      sticky body) and uploads it as the `crap-scorecard-pages-handoff`
+      artifact, and SKIPS posting the sticky comment (a fork PR's
+      `GITHUB_TOKEN` is read-only, so the post would 403 and red the job).
+
+      A separate privileged `workflow_run` workflow in the BASE repo then
+      consumes that artifact to publish the report to Pages and post the
+      sticky from the trusted context — see `docs/pages-fork-reports.md`.
+      This input is only the PRODUCER half of that two-workflow pattern;
+      without the companion workflow the uploaded artifact is simply
+      unused (harmless).
+
+      Has NO effect on same-repo PRs or push events — those publish inline
+      via `pages-publish`. Default `false`: additive only, byte-identical
+      output for every existing consumer. Empty string is treated as
+      `false`.
+    required: false
+    default: 'false'
 
 outputs:
   markdown:
@@ -1981,8 +2004,129 @@ runs:
           echo "__CRAP_SCORECARD_STICKY_EOF__"
         } >> "$GITHUB_OUTPUT"
 
+    # Fork-PR hosted-report handoff (crap-rs#386, opt-in via
+    # `fork-handoff: true`). A fork PR's GITHUB_TOKEN is read-only, so it
+    # can neither push to gh-pages nor post a comment — the inline
+    # `pages-publish` path and the `Post sticky PR comment` step below
+    # both no-op on forks. Instead, this step stages a self-contained
+    # bundle a SEPARATE privileged `workflow_run` workflow (running in the
+    # trusted BASE-repo context) will publish: the rendered report, the PR
+    # number, and the already-composed sticky body. The body MUST travel
+    # in the artifact because the privileged consumer cannot re-derive it
+    # without running this PR's untrusted code (the pwn-request the
+    # workflow_run topology exists to avoid). See docs/pages-fork-reports.md.
+    #
+    # Gated on a fork PR with html-report + sticky mode; a no-op (and
+    # byte-identical to before this input) for same-repo PRs, push events,
+    # and every consumer that does not opt in.
+    - name: Stage fork Pages handoff
+      id: fork-handoff
+      # html-report / comment-mode are NOT gated here — they are validated
+      # in-script below so an opted-in-but-misconfigured caller fails fast
+      # with an actionable error instead of a silently-skipped step.
+      if: >-
+        inputs.fork-handoff == 'true'
+        && github.event_name == 'pull_request'
+        && github.event.pull_request.head.repo.full_name != github.repository
+        && (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi')
+      shell: bash
+      env:
+        IS_MULTI: ${{ steps.presets.outputs.is_multi }}
+        LANGUAGE: ${{ steps.lang.outputs.language }}
+        # Prerequisites validated in-script (fail-fast — see the if: note).
+        HTML_REPORT: ${{ inputs.html-report }}
+        COMMENT_MODE: ${{ inputs.comment-mode }}
+        # Candidate report paths written by the render steps above — the
+        # same resolution the inline `Publish HTML to GitHub Pages` step
+        # uses, so the hosted artifact is the exact report a same-repo PR
+        # would have published.
+        UNIFIED_PATH: ${{ steps.render-unified.outputs.unified_path }}
+        HTML_PATH_RUST: ${{ steps.run.outputs.html_path_rust }}
+        HTML_PATH_TYPESCRIPT: ${{ steps.run.outputs.html_path_typescript }}
+        # Caller preamble, prepended above the scorecard exactly as the
+        # `Compose sticky message` step does (crap-rs#336).
+        COMMENT_PREAMBLE: ${{ inputs.comment-preamble }}
+        # PR number flows through env (never interpolated into the script)
+        # per the repo's template-injection rule; the privileged consumer
+        # re-validates it as numeric before it touches a filesystem path.
+        PR_NUMBER: ${{ github.event.number }}
+        HANDOFF_DIR: ${{ runner.temp }}/crap-scorecard-pages-handoff
+      run: |
+        set -euo pipefail
+        # fork-handoff only makes sense with a report to host and a sticky
+        # to (re)post. Fail fast on a misconfigured opt-in rather than
+        # silently staging nothing (which would also skip the sticky).
+        if [ "$HTML_REPORT" != "true" ] || [ "$COMMENT_MODE" != "sticky" ]; then
+          echo "::error::fork-handoff: true requires html-report: true and comment-mode: sticky (got html-report='${HTML_REPORT}', comment-mode='${COMMENT_MODE}')."
+          exit 1
+        fi
+        if [ "$IS_MULTI" = "true" ]; then
+          REPORT_HTML="$UNIFIED_PATH"
+        elif [ "$LANGUAGE" = "rust" ]; then
+          REPORT_HTML="$HTML_PATH_RUST"
+        else
+          REPORT_HTML="$HTML_PATH_TYPESCRIPT"
+        fi
+        # Empty-file guard (AGENTS.md release-envelope rule): a silent
+        # render failure surfaces here as a named error rather than as an
+        # empty page published behind a live link by the privileged half.
+        if [ -z "$REPORT_HTML" ] || [ ! -s "$REPORT_HTML" ]; then
+          echo "::error::fork-handoff: the rendered HTML report ('${REPORT_HTML:-<unset>}') is missing or empty; refusing to stage an empty hosted report."
+          exit 1
+        fi
+        mkdir -p "$HANDOFF_DIR"
+        cp "$REPORT_HTML" "$HANDOFF_DIR/report.html"
+        printf '%s\n' "$PR_NUMBER" > "$HANDOFF_DIR/pr_number"
+        # Compose the handoff sticky body = preamble + raw scorecard, with
+        # NO report link. On a fork the inline compose step appends the
+        # artifact-DOWNLOAD link (the HTML artifact URL is populated), but
+        # the privileged consumer publishes a hosted page and must link
+        # THAT instead — so the handoff body is link-free and the consumer
+        # appends the hosted link after it publishes. The preamble +
+        # raw-scorecard selection mirrors the `Compose sticky message`
+        # step minus its link block.
+        sticky="$HANDOFF_DIR/sticky.md"
+        : > "$sticky"
+        if [ -n "$COMMENT_PREAMBLE" ]; then
+          printf '%s\n\n' "$COMMENT_PREAMBLE" >> "$sticky"
+        fi
+        if [ "$IS_MULTI" = "true" ]; then
+          cat "$RUNNER_TEMP/scorecard-combined.md" >> "$sticky"
+        elif [ "$LANGUAGE" = "rust" ]; then
+          cat "$RUNNER_TEMP/crap4rs-scorecard.md" >> "$sticky"
+        else
+          cat "$RUNNER_TEMP/crap4ts-scorecard.md" >> "$sticky"
+        fi
+        echo "dir=$HANDOFF_DIR" >> "$GITHUB_OUTPUT"
+
+    - name: Upload fork Pages handoff
+      # Upload exactly when the staging step produced a bundle (single
+      # source of truth — no duplicated gate). A skipped staging step
+      # leaves `dir` empty; a failed one already fails the job.
+      if: steps.fork-handoff.outputs.dir != ''
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        # Suffix mirrors the per-language report uploads so a matrix
+        # producer never collides on artifact names. crap-rs's single
+        # ubuntu-latest producer resolves to `-Linux`; the privileged
+        # consumer downloads that exact name.
+        name: crap-scorecard-pages-handoff${{ inputs.html-artifact-name-suffix == '' && format('-{0}', runner.os) || inputs.html-artifact-name-suffix }}
+        path: ${{ steps.fork-handoff.outputs.dir }}
+        if-no-files-found: error
+
     - name: Post sticky PR comment
-      if: (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi') && inputs.comment-mode == 'sticky' && github.event_name == 'pull_request'
+      # The `dir == ''` clause SKIPS the post exactly when the handoff
+      # staging step ran (a fork PR that opted into fork-handoff): a fork's
+      # read-only token would 403 here and red the job, so the privileged
+      # `workflow_run` consumer posts the sticky instead (from the trusted
+      # context, with the hosted link). When no handoff was staged
+      # (same-repo PR, or any consumer that did not opt in), `dir` is empty
+      # and posting is byte-identical to before.
+      if: >-
+        (steps.lang.outputs.language == 'rust' || steps.lang.outputs.language == 'typescript' || steps.lang.outputs.language == 'multi')
+        && inputs.comment-mode == 'sticky'
+        && github.event_name == 'pull_request'
+        && steps.fork-handoff.outputs.dir == ''
       uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
       with:
         header: ${{ inputs.comment-header }}

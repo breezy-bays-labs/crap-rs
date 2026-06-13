@@ -2,9 +2,10 @@
 # epic. When a PR against main closes (merged OR not), this removes that
 # PR's report directory (`pr-<N>/`) from the gh-pages branch so per-PR
 # reports don't accumulate forever on the Pages branch as PRs come and
-# go. Wave 1 (the per-PR publish step in
-# `.github/actions/scorecard/action.yml`) creates `pr-<N>/`; this is the
-# matching teardown.
+# go. `pr-<N>/` is created either inline by the per-PR publish step in
+# `.github/actions/scorecard/action.yml` (same-repo PRs) or by the
+# privileged `pages-publish-fork.yml` workflow (fork PRs, crap-rs#386);
+# this is the matching teardown for both.
 #
 # DEDICATED workflow, deliberately NOT folded into ci.yml: adding
 # `closed` to ci.yml's `pull_request:` types would run the entire CI
@@ -13,7 +14,18 @@
 name: Pages cleanup
 
 on:
-  pull_request:
+  # pull_request_target runs privileged in the BASE context, which is what
+  # lets this cleanup push a deletion to gh-pages even when a FORK PR
+  # closes — a fork's plain `pull_request` token is read-only and could
+  # not push (crap-rs#386, once fork PRs publish `pr-<N>/` dirs that need
+  # tearing down). It is safe here because this job checks out NO code
+  # (neither base nor fork) and uses exactly ONE input — the PR number —
+  # which it validates as a positive integer before using it as a
+  # filesystem path. With no checkout-and-run of head code, the
+  # pull_request_target "pwn request" footgun does not apply; the trigger
+  # only supplies the privileged token the metadata-only deletion needs.
+  # See docs/pages-fork-reports.md.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types: [closed]
     branches: [main]
 
@@ -62,12 +74,21 @@ jobs:
           PR_NUMBER: ${{ github.event.number }}
         run: |
           set -euo pipefail
+          # Defense-in-depth: PR_NUMBER is GitHub's own integer, but it
+          # becomes a filesystem path (pr-<N>/) below, so validate it as a
+          # run of digits before use — the same path-traversal guard the
+          # fork-publish workflow applies to its artifact-sourced number.
+          case "$PR_NUMBER" in
+            ''|*[!0-9]*)
+              echo "::error::Pages cleanup: PR number ('${PR_NUMBER}') is not a positive integer; refusing to operate on a derived path."
+              exit 1
+              ;;
+          esac
           # Shallow tokened clone of gh-pages. $GITHUB_REPOSITORY is the
-          # BASE repo even on a fork-PR close, so this always targets the
-          # canonical gh-pages branch. A read-only token (fork PR) can
-          # still CLONE a public repo; the only operation a fork token
-          # can't do is PUSH — and on a fork PR the no-op exit below
-          # happens BEFORE any push is reached (see the fork-safe note).
+          # BASE repo on every close (fork or not), so this always targets
+          # the canonical gh-pages branch — and under pull_request_target
+          # the token is read-write on fork closes too, so the deletion
+          # push below succeeds regardless of where the PR originated.
           #
           # Missing-branch tolerance (consumer robustness): a fresh
           # consumer repo that has never published a per-PR report has no
@@ -84,15 +105,14 @@ jobs:
             exit 0
           fi
           cd gh-pages-cleanup
-          # Fork-safe / degrade-not-fail by construction: Wave 1 publishes
-          # `pr-<N>/` for SAME-REPO PRs only, so a closed fork PR never
-          # created the directory → the else-branch no-ops and exits 0
-          # BEFORE any push (which a read-only fork token couldn't do
-          # anyway). The same absent-dir no-op covers a re-run, an
-          # already-clean state, or a same-repo PR that simply never
-          # published. No same-repo `if:` gate is needed — the dir-
-          # existence check is the whole fork-safety story, and skipping
-          # the gate keeps the workflow shape simplest.
+          # Dir-existence check is the whole story: remove `pr-<N>/` if it
+          # exists, no-op otherwise. Under pull_request_target the job has
+          # a write token on BOTH same-repo and fork closes, so a fork PR's
+          # `pr-<N>/` (published by the privileged fork workflow,
+          # crap-rs#386) is torn down here exactly like a same-repo one.
+          # The absent-dir no-op still covers a re-run, an already-clean
+          # state, a PR that never published, and any close whose report
+          # was never created — no same-repo `if:` gate needed.
           if [ -d "pr-${PR_NUMBER}" ]; then
             git rm -r "pr-${PR_NUMBER}"
             # No-op guard: if nothing is actually staged (e.g. the dir was
