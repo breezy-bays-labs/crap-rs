@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     table — an inline block would drop every row after the first to
     literal "pipe-text". Verified against GitHub's own `/markdown`
     renderer. (crap-rs#275, crap-rs#397)
+- `--breakdown` ALSO collapses the all-clear "Top N worst by CRAP"
+    spotlight TABLE into a `<details>` on the sticky comment: when every
+    function is within threshold the worst-by-CRAP list is low-priority
+    detail, so it folds away (its section header becomes the
+    `<summary>`), while a failures spotlight always stays visible with
+    its complexity breakdown collapsed below. GFM-safe (blank line after
+    `</summary>` and before `</details>`); `--breakdown` off is
+    byte-identical. (crap-rs#400)
 
 ### Changed
 
