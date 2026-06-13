@@ -532,3 +532,29 @@ jobs:
             fi
             echo "unified HTML carries ${NAVS} View navs and ${DISABLED} disabled Delta tabs ok (bootstrap fallback)"
           fi
+
+      # Gate (j) — Playwright DOM validation of the unified HTML (crap-rs#328).
+      # Gate (i) above grep-asserts the interactive MARKUP is present; this
+      # loads the SAME rendered file in a headless browser and asserts the
+      # JAVASCRIPT actually works — Language buttons swap the visible panel,
+      # View tabs swap the visible tab-panel, and the URL hash tracks the
+      # two-axis `#<lang>:<view>` state. A grep can't catch a broken click
+      # handler or a regressed hash router; this can. (Origin: PR #327
+      # review found the rendered artifact had ZERO interactive nav markup
+      # despite the feature being "implemented" — the Given-based BDD
+      # scenarios passed anyway. This is the end-to-end net for that class.)
+      # Runs against steps.crap.outputs.unified-html-path — the same on-disk
+      # file Gate (i) checks, no artifact re-download. See tests/e2e/README.md.
+      - name: Set up Node for Playwright (crap-rs#328)
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0 # zizmor: ignore[cache-poisoning]
+        with:
+          node-version: '24'
+      - name: Gate (j) — Playwright DOM validation of unified HTML
+        env:
+          HTML_PATH: ${{ steps.crap.outputs.unified-html-path }}
+        run: |
+          set -euo pipefail
+          cd tests/e2e
+          npm ci
+          npx playwright install --with-deps chromium
+          node validate-unified-html.mjs "$HTML_PATH"
