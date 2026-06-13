@@ -1,0 +1,215 @@
+# Pages publish (fork PRs) — the privileged half of the fork-PR
+# hosted-report handoff (crap-rs#386, epic #377). This lifts the
+# same-repo-only limitation: a fork PR's GITHUB_TOKEN is read-only, so
+# the fork's own CI run can neither push to gh-pages nor post a comment.
+#
+# THE TRUST MODEL (why this is a separate `workflow_run` workflow):
+# The fork's CI run executes untrusted code, so GitHub denies it
+# privilege. This workflow runs AFTER that run completes, from the BASE
+# repository's trusted context, with a read-write token — but it NEVER
+# checks out or executes the fork's code. The only thing that crosses the
+# trust boundary is the `crap-scorecard-pages-handoff` ARTIFACT the fork
+# run uploaded (the rendered report, the PR number, the scorecard body).
+# This workflow downloads that artifact and treats every byte of it as
+# untrusted input. The PR number gets TWO guards before use: (1) it must
+# be a run of digits (path-traversal defense — it becomes a `pr-<N>/`
+# path); and (2) it is bound to this run's identity — PR N's head SHA and
+# head repo, read from the trusted GitHub API, must equal the
+# workflow_run payload's head_sha + head_repository. A fork controls its
+# whole run, so a numeric-but-arbitrary number could otherwise spoof a
+# maintainer's PR; guard 2 rejects any number whose PR this run did not
+# actually produce. The decoupling prevents code execution (the "pwn
+# request"); the two guards prevent injection AND identity-spoofing
+# through the data channel. All three halves matter.
+#
+# This is an ADVANCED OPT-IN pattern — see docs/pages-fork-reports.md for
+# the full walkthrough and the consumer checklist. Same-repo PRs do NOT
+# use this path: they publish inline in ci.yml's `scorecard-production`
+# job (which has a write token), and the fork-only gate below keeps this
+# workflow from double-publishing them.
+name: Pages publish (fork PRs)
+
+on:
+  # `workflow_run` runs privileged in the base context. It is safe here
+  # because this workflow never checks out or runs the head (fork) code —
+  # it consumes ONLY the uploaded artifact and validates everything it
+  # reads from it (see the trust-model header above).
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+
+# Least-privilege default: read-only at the workflow level. The single
+# job below elevates only what it needs.
+permissions:
+  contents: read
+
+jobs:
+  publish-fork-report:
+    name: Publish fork PR report to gh-pages
+    runs-on: ubuntu-latest
+    # Act ONLY on a fork PR whose CI run succeeded:
+    #   * event == 'pull_request'  — ignore push-to-main (Wave 0 owns that).
+    #   * conclusion == 'success'  — a failed/cancelled run staged no valid
+    #                                handoff.
+    #   * head_repository != repository — FORK only. Same-repo PRs already
+    #                                published inline in scorecard-production;
+    #                                this gate is the dedup that stops a
+    #                                double-publish.
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name != github.event.workflow_run.repository.full_name
+    permissions:
+      # actions: read   — download the triggering run's artifact (a
+      #                    cross-run download needs run-id + a token with
+      #                    actions:read).
+      # contents: write — push the report to the gh-pages branch.
+      # pull-requests: write — post the production sticky on the fork PR.
+      actions: read
+      contents: write
+      pull-requests: write
+    # Shared gh-pages publish lock (epic #377). Same named group as the
+    # inline per-PR publish, the push-to-main publish, and the cleanup, so
+    # no two gh-pages pushes collide on the branch tip. cancel-in-progress
+    # is false so an in-flight push is never aborted mid-operation.
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
+    steps:
+      # Best-effort download of the fork run's handoff. continue-on-error
+      # so a run that produced no handoff (e.g. a docs-only fork PR that
+      # skipped the scorecard job) does not red this workflow — the next
+      # step no-ops cleanly when the files are absent. The fixed `-Linux`
+      # suffix matches the producer: scorecard-production runs on
+      # ubuntu-latest with no html-artifact-name-suffix, so the action's
+      # `runner.os` suffix resolves to `-Linux`.
+      - name: Download fork handoff artifact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: crap-scorecard-pages-handoff-Linux
+          path: handoff
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate handoff and publish report
+        id: publish
+        env:
+          # Token in env (never interpolated into the script); the publish
+          # is a plain git push, so secrets.GITHUB_TOKEN is correct here (a
+          # workflow job, not a composite action). $GITHUB_REPOSITORY is a
+          # default env var = the BASE repo, which is where we publish.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # gh CLI token for the identity cross-check below.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # TRUSTED head identity from the workflow_run payload (not from
+          # the artifact). Used to bind the artifact's claimed PR number to
+          # the run that actually produced it — see the cross-check below.
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+        run: |
+          set -euo pipefail
+          # No handoff (best-effort download missed, or the fork PR
+          # produced no scorecard report) → nothing to publish. Exit 0:
+          # a missing report is not a failure of THIS workflow. All three
+          # files are written atomically by the producer, so guarding all
+          # three keeps the no-op contract total.
+          if [ ! -s handoff/report.html ] || [ ! -s handoff/pr_number ] || [ ! -s handoff/sticky.md ]; then
+            echo "::notice::No fork Pages handoff for this run — nothing to publish (the PR likely produced no scorecard report). Skipping."
+            exit 0
+          fi
+          # SECURITY (guard 1 of 2 — path traversal). The PR number came
+          # from an UNTRUSTED run's artifact and is about to become a
+          # filesystem path (pr-<N>/). Reject anything that is not a run of
+          # digits BEFORE it touches a path: a value like `../../evil` would
+          # otherwise be a path-traversal write into the gh-pages tree.
+          PR_NUMBER="$(tr -d '[:space:]' < handoff/pr_number)"
+          case "$PR_NUMBER" in
+            ''|*[!0-9]*)
+              echo "::error::fork Pages publish: PR number from handoff ('${PR_NUMBER}') is not a positive integer; refusing to proceed (path-traversal guard)."
+              exit 1
+              ;;
+          esac
+          # SECURITY (guard 2 of 2 — identity binding). A numeric PR number
+          # is still attacker-controlled: a malicious fork controls its
+          # whole pull_request run (including the action source), so it
+          # could write ANY valid integer — e.g. a maintainer's PR — to
+          # spoof that PR's sticky and overwrite its gh-pages dir.
+          # `workflow_run.pull_requests` is empty for fork PRs, so we cannot
+          # read the real number from the event; instead we bind the
+          # CLAIMED number to the TRUSTED run payload: PR N's head commit
+          # and head repo must equal this run's head_sha + head_repository.
+          # A fork cannot forge another PR's head SHA, so a mismatched claim
+          # is rejected here, before any publish or comment.
+          # A failed/empty API response (404, network, etc.) leaves the
+          # claimed_* vars empty → mismatch → clean rejection below, rather
+          # than a jq parse error killing the step under `set -e`.
+          pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" 2>/dev/null || true)"
+          claimed_head_sha="$(printf '%s' "$pr_json" | jq -r '.head.sha // ""' 2>/dev/null || true)"
+          claimed_head_repo="$(printf '%s' "$pr_json" | jq -r '.head.repo.full_name // ""' 2>/dev/null || true)"
+          if [ "$claimed_head_sha" != "$RUN_HEAD_SHA" ] || [ "$claimed_head_repo" != "$RUN_HEAD_REPO" ]; then
+            echo "::error::fork Pages publish: handoff PR #${PR_NUMBER} does not match the triggering run's head (PR head ${claimed_head_sha:-<none>} on ${claimed_head_repo:-<none>}; run head ${RUN_HEAD_SHA} on ${RUN_HEAD_REPO}). Refusing to publish/comment on a PR this run did not produce."
+            exit 1
+          fi
+          DEPLOY_PATH="pr-${PR_NUMBER}"
+          # Derive the default project-Pages URL from the base repo. Owner
+          # is lowercased (the github.io subdomain is case-folded); the repo
+          # path segment is preserved. Consumers on a custom domain adjust
+          # this one line — see docs/pages-fork-reports.md.
+          OWNER="$(printf '%s' "${GITHUB_REPOSITORY%%/*}" | tr '[:upper:]' '[:lower:]')"
+          REPO="${GITHUB_REPOSITORY##*/}"
+          PAGES_URL="https://${OWNER}.github.io/${REPO}/${DEPLOY_PATH}/"
+          # Publish: shallow tokened clone of gh-pages, drop the report at
+          # pr-<N>/index.html, commit + push. Same self-contained plain-git
+          # mechanism the inline publish and the cleanup use (no third-party
+          # action — supply-chain conventions). REMOTE_URL is built from the
+          # two env vars so the token never flows through a workflow
+          # expression. Existing Pages content outside pr-<N>/ is preserved
+          # (we copy in, we do not wipe the tree).
+          REMOTE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if ! git clone --branch gh-pages --single-branch --depth 1 "$REMOTE_URL" gh-pages-fork-pub 2>/dev/null; then
+            echo "::error::gh-pages branch not found. Publish a main report first (the push-to-main job seeds gh-pages) before fork PR reports can be hosted."
+            exit 1
+          fi
+          mkdir -p "gh-pages-fork-pub/${DEPLOY_PATH}"
+          cp handoff/report.html "gh-pages-fork-pub/${DEPLOY_PATH}/index.html"
+          # Compose the final sticky body: the link-free handoff body + the
+          # hosted Pages link. The producer deliberately left the report
+          # link OFF (on a fork it would otherwise be the artifact-download
+          # link), so we append the HOSTED url here. Wrapped in <...> per
+          # GFM so the link renders regardless of URL punctuation.
+          cp handoff/sticky.md handoff/sticky-final.md
+          printf '\n\n📊 [Open report](<%s>)\n' "$PAGES_URL" >> handoff/sticky-final.md
+          cd gh-pages-fork-pub
+          # No-op guard: skip an empty commit on an identical re-run. The
+          # sticky is still (re)posted below — marocchino update is
+          # idempotent — so a re-run refreshes the comment either way.
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "gh-pages already up to date for ${DEPLOY_PATH} — nothing to push."
+          else
+            git add "${DEPLOY_PATH}/index.html"
+            git \
+              -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "ci(pages): publish fork PR #${PR_NUMBER} CRAP report to ${DEPLOY_PATH}"
+            git push origin HEAD:gh-pages
+            echo "Published fork PR #${PR_NUMBER} report to ${DEPLOY_PATH}."
+          fi
+          # Signal the sticky step to run (only set on a valid publish, so
+          # the no-handoff early-exit above leaves it empty → sticky skips).
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      # Post the production sticky from the trusted context. The fork run
+      # could not (read-only token), so this CREATES the sticky (and
+      # updates it on re-run — marocchino keys off the header marker).
+      # `number` targets the PR explicitly since workflow_run has no PR
+      # context; it is the integer validated above. `path` reads the body
+      # the publish step composed (handoff body + hosted link).
+      - name: Post production sticky with hosted link
+        if: steps.publish.outputs.pr_number != ''
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
+        with:
+          header: crap-scorecard-production
+          number: ${{ steps.publish.outputs.pr_number }}
+          path: handoff/sticky-final.md
