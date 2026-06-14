@@ -179,99 +179,140 @@ Feature: --baseline delta analysis (Bundle E, issue #81)
     And the JSON envelope at "delta.baseline_timestamp" holds a non-empty string
     And the JSON envelope at "delta.baseline_ref" is null
 
-  @unwired
-  Scenario: delta block propagates baseline diagnostics
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help); needs a --verbose baseline capture
-    Given the baseline JSON includes a `diagnostics` field
-    When the operator runs `crap4rs … --baseline baseline.json --format json`
-    Then `delta.baseline_diagnostics` reflects the baseline's diagnostics
+  @wired
+  Scenario: The delta block propagates the baseline's diagnostics
+    Given a baseline captured with diagnostics at threshold 1000
+    And the project drops one function, modifies another, and adds a third
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 1000 --no-fail --format json`
+    Then the JSON envelope has a "delta.baseline_diagnostics" object
+
+  # ── CLI: identity & relocation through the real pipeline ────────────
+  # The matcher's pairing LOGIC (synthetic verdicts → classification) is
+  # owned by domain::delta's identity / rename unit tests. These two pin
+  # the end-to-end wiring — real source → walker → matcher → envelope.
+  # Identity is (file_path, qualified_name): a line shift must stay
+  # Modified (one modified, one added, one removed — not two added + two
+  # removed), and a whole-file move must pair as a single Renamed.
+
+  @wired
+  Scenario: A function whose lines shift stays Modified (identity is file + name)
+    Given a baseline of two functions captured at threshold 1000
+    And the project drops one function, modifies another, and adds a third
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 1000 --no-fail --format json`
+    Then the JSON envelope at "delta.summary.modified" is 1
+    And the JSON envelope at "delta.summary.added" is 1
+    And the JSON envelope at "delta.summary.removed" is 1
+
+  @wired
+  Scenario: A relocated function pairs as one Renamed and adds no new violation
+    Given a baseline with one function in old_mod.rs captured at threshold 5
+    And the function relocates to new_mod.rs
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 5 --no-fail --format json`
+    Then the JSON envelope at "delta.summary.renamed" is 1
+    And the JSON envelope at "delta.summary.added" is 0
+    And the JSON envelope at "delta.summary.removed" is 0
+    And the JSON envelope at "delta.summary.new_violations" is 0
+    And the JSON envelope at "delta.summary.passed" is true
 
   # ── CLI: shaping flags compose with delta ──────────────────────────
+  # The shaping SEMANTICS (sort order, filter predicate, truncation) are
+  # owned by domain::delta::apply unit tests; these pin the flag → spec
+  # wiring and the truncation / filter counts the envelope surfaces.
 
-  @unwired
-  Scenario: --delta-top truncates delta.shown
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    Given the delta has 10 changes
-    When the operator runs `crap4rs … --baseline baseline.json --delta-top 3 --format json`
-    Then `delta.shown.len()` is `3`
-    And `delta.eligible_count` is `10`
-    And `delta.truncated` is `true`
+  @wired
+  Scenario: --delta-top truncates delta.shown and records the limit
+    Given a baseline of two functions captured at threshold 1000
+    And the project drops one function, modifies another, and adds a third
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 1000 --no-fail --delta-top 2 --format json`
+    Then the JSON envelope at "delta.shown" has 2 entries
+    And the JSON envelope at "delta.eligible_count" is 3
+    And the JSON envelope at "delta.truncated" is true
+    And the JSON envelope at "delta.spec.limit" is 2
 
-  @unwired
-  Scenario: --delta-sort current-crap orders by current score
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    When the operator runs `crap4rs … --baseline baseline.json --delta-sort current-crap --format json`
-    Then `delta.spec.sort` is `"current_crap"`
-    And `delta.shown` is ordered by current.score descending
+  @wired
+  Scenario: --delta-sort current-crap records the sort key in the spec
+    Given a baseline of two functions captured at threshold 1000
+    And the project drops one function, modifies another, and adds a third
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 1000 --no-fail --delta-sort current-crap --format json`
+    Then the JSON envelope at "delta.spec.sort" is "current_crap"
 
-  @unwired
-  Scenario: --delta-only filters to specified change kinds
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    When the operator runs `crap4rs … --baseline baseline.json --delta-only added,modified --format json`
-    Then `delta.shown` contains only `Added` and `Modified` entries
-    And `Removed` entries are absent
+  @wired
+  Scenario: --delta-only filters delta.shown to the named change kinds
+    Given a baseline of two functions captured at threshold 1000
+    And the project drops one function, modifies another, and adds a third
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 1000 --no-fail --delta-only added,modified --format json`
+    Then the JSON envelope at "delta.shown" has 2 entries
+    And the JSON envelope at "delta.spec.filters.change_kinds" is ["added","modified"]
 
   # ── Validation errors ──────────────────────────────────────────────
 
-  @unwired
-  Scenario: --baseline with non-existent path exits 2
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    When the operator runs `crap4rs --coverage lcov.info --baseline /nonexistent.json`
-    Then the process exits 2
+  @wired
+  Scenario: --baseline with a non-existent path exits 2
+    Given a synthetic project with six functions and no baseline
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline does-not-exist.json --threshold 5`
+    Then the exit code is 2
     And stderr contains "baseline file not found"
 
-  @unwired
+  @wired
   Scenario: --baseline with malformed JSON exits 2
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    Given `bad.json` is not valid JSON
-    When the operator runs `crap4rs --coverage lcov.info --baseline bad.json`
-    Then the process exits 2
+    Given a project with a malformed baseline file present
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline bad.json --threshold 5`
+    Then the exit code is 2
     And stderr contains "failed to parse baseline JSON"
 
-  @unwired
-  Scenario: --baseline with mismatched schema_version exits 2
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    Given `future.json` declares an unsupported `schema_version`
-    When the operator runs `crap4rs --coverage lcov.info --baseline future.json`
-    Then the process exits 2
+  @wired
+  Scenario: --baseline with an unsupported schema_version exits 2
+    Given a project with a baseline declaring an unsupported schema_version
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline future.json --threshold 5`
+    Then the exit code is 2
     And stderr contains "unsupported baseline schema_version"
 
-  @unwired
+  @wired
   Scenario: A baseline scored under a different metric warns without changing the gate
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    Given a baseline captured under the cognitive metric
-    When the operator runs `crap4rs … --metric cyclomatic --baseline baseline.json --format json`
-    Then stderr warns that the baseline metric differs
-    And the delta still computes (the warning is non-fatal)
+    Given a baseline of two functions captured at threshold 1000
+    And the project drops one function, modifies another, and adds a third
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 1000 --metric cyclomatic --no-fail --format json`
+    Then the exit code is 0
+    And stderr contains "metric `cognitive`"
+    And stderr contains "`cyclomatic`"
+    And the JSON envelope has a "delta" object
 
-  @unwired
-  Scenario: --delta-only with unknown kind exits 2
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    When the operator runs `crap4rs … --baseline baseline.json --delta-only nonsense`
-    Then the process exits 2
-    And stderr contains "invalid value 'nonsense' for '--delta-only'"
+  @wired
+  Scenario: A baseline that predates the metric field does not warn
+    Given a baseline of two functions captured at threshold 1000
+    And the baseline metric field is then stripped
+    And the project drops one function, modifies another, and adds a third
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --baseline baseline.json --threshold 1000 --metric cyclomatic --no-fail`
+    Then the exit code is 0
+    And stderr does not contain "metric `"
 
-  @unwired
-  Scenario: --delta-sort with unknown key exits 2
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    When the operator runs `crap4rs … --baseline baseline.json --delta-sort nonsense`
-    Then the process exits 2
-    And stderr contains "invalid value 'nonsense' for '--delta-sort'"
+  @wired
+  Scenario: --delta-only with an unknown kind exits 2
+    Given a synthetic project with six functions and no baseline
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --delta-only nonsense`
+    Then the exit code is 2
+    And stderr contains "invalid value 'nonsense' for '--delta-only"
 
-  @unwired
-  Scenario: --delta-top with negative value exits 2
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
-    When the operator runs `crap4rs … --baseline baseline.json --delta-top -5`
-    Then the process exits 2
-    And stderr contains "invalid value '-5' for '--delta-top'"
+  @wired
+  Scenario: --delta-sort with an unknown key exits 2
+    Given a synthetic project with six functions and no baseline
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --delta-sort nonsense`
+    Then the exit code is 2
+    And stderr contains "invalid value 'nonsense' for '--delta-sort"
+
+  @wired
+  Scenario: --delta-top with a negative value exits 2
+    Given a synthetic project with six functions and no baseline
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --delta-top -5`
+    Then the exit code is 2
+    And stderr contains "invalid value '-5' for '--delta-top"
 
   # ── Help discoverability ───────────────────────────────────────────
 
-  @unwired
-  Scenario: --help advertises --baseline and --delta-gate
-    # tracked: crap-rs#169 — wired in the delta curated-pass slice 2 (shaping + validation + help)
+  @wired
+  Scenario: --help advertises --baseline, --delta-gate, and the delta examples
     When the operator runs `crap4rs --help`
-    Then stdout mentions "--baseline"
-    And stdout mentions "--delta-gate"
-    And stdout shows a basic delta example
-    And stdout shows the scorecard example with `--format markdown`
+    Then stdout contains "--baseline"
+    And stdout contains "--delta-gate"
+    And stdout contains "COMPARING TWO ANALYSES"
+    And stdout contains "baseline.json"

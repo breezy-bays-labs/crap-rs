@@ -2,18 +2,20 @@
 //! `tests/features/delta.feature` (issue #81).
 //!
 //! delta.feature's CLI-acceptance contracts — `--baseline` resolution,
-//! the gate-semantics exit-code matrix, reporter rendering, and the
-//! additive JSON envelope shape — are wired here. The DOMAIN behaviors
-//! (FunctionChange classification, identity / rename matching,
-//! new-violation counting, threshold-border epsilon math, and
-//! DeltaViewSpec filter/sort/truncate) live in crap-core's
-//! `domain::delta` unit and property tests; this harness pins only what
-//! needs the real binary process: that the flags wire end-to-end, the
-//! exit codes are right, and each reporter surfaces the delta (see
-//! `AGENTS.md` § BDD hygiene + `tests/features/TAGS.toml`). The harness
-//! uses `filter_run_and_exit` on `@wired`, so an `@unwired` scenario
-//! (the shaping-flag / validation / help contracts wired in a later
-//! curated-pass slice) is skipped until its step defs land.
+//! the gate-semantics exit-code matrix, reporter rendering, the additive
+//! JSON envelope shape, the shaping flags (`--delta-top` / `--delta-sort`
+//! / `--delta-only`), validation exit codes, `--help` discoverability, and
+//! identity / relocation through the real pipeline — are wired here. The
+//! DOMAIN behaviors (FunctionChange classification, the matcher's
+//! identity / rename pairing logic, new-violation counting,
+//! threshold-border epsilon math, and DeltaViewSpec filter/sort/truncate)
+//! live in crap-core's `domain::delta` unit and property tests; this
+//! harness pins only what needs the real binary process: that the flags
+//! wire end-to-end, the exit codes are right, and each reporter surfaces
+//! the delta (see `AGENTS.md` § BDD hygiene + `tests/features/TAGS.toml`).
+//! Every scenario in delta.feature is now `@wired` (curated-pass slices
+//! 1 + 2); the harness still uses `filter_run_and_exit` on `@wired` so a
+//! future `@unwired` scenario is skipped until its step defs land.
 //!
 //! Each scenario captures a baseline envelope from one source snapshot,
 //! optionally mutates the source to a "current" snapshot, then runs the
@@ -144,6 +146,25 @@ fn classify_lcov(hits: u32) -> String {
     s
 }
 
+/// A branchy, fully-uncovered function — CRAP `c² + c`, comfortably over
+/// a threshold of 5 wherever it lives. Reused byte-identically across two
+/// files so the relocation pass pairs it as a single `Renamed` change.
+const RELOCATED_FN: &str = "\
+pub fn process(x: i32) -> i32 {
+    if x > 0 {
+        if x > 5 { 1 } else { 2 }
+    } else {
+        3
+    }
+}
+";
+
+/// LCOV marking every line of [`RELOCATED_FN`] uncovered for `file`, so
+/// the function scores identically (and over threshold) wherever it lives.
+fn relocated_lcov(file: &str) -> String {
+    format!("SF:{file}\nDA:1,0\nDA:2,0\nDA:3,0\nDA:4,0\nDA:5,0\nDA:6,0\nDA:7,0\nend_of_record\n")
+}
+
 #[derive(Debug, Default, World)]
 struct CliWorld {
     project_dir: Option<PathBuf>,
@@ -218,25 +239,40 @@ fn mutate_project(world: &mut CliWorld, src: &str, lcov: &str) {
     write_fixture(&dir, src, lcov);
 }
 
+/// Write a single named source file (plus `lcov.info`) into the project's
+/// `src/` dir — for relocation fixtures where the file name itself is the
+/// identity that moves.
+fn write_single_fn(dir: &Path, file_name: &str, src: &str, lcov: &str) {
+    std::fs::create_dir_all(dir.join("src")).expect("create src dir");
+    std::fs::write(dir.join("src").join(file_name), src).expect("write src file");
+    std::fs::write(dir.join("lcov.info"), lcov).expect("write lcov.info");
+}
+
 /// Run the binary at the captured-baseline threshold and persist its JSON
 /// stdout as `baseline.json` in the project dir. `--no-fail` keeps the
-/// capture exit code 0 regardless of the baseline's own violations.
-fn capture_baseline(world: &mut CliWorld, threshold: &str) {
+/// capture exit code 0 regardless of the baseline's own violations;
+/// `verbose` adds `--verbose` so the baseline envelope carries a
+/// `diagnostics` block (for the propagation scenario).
+fn capture_baseline_inner(world: &mut CliWorld, threshold: &str, verbose: bool) {
     let dir = world.require_dir();
+    let mut args = vec![
+        "--coverage",
+        "lcov.info",
+        "--src",
+        "src",
+        "--no-gitignore",
+        "--format",
+        "json",
+        "--threshold",
+        threshold,
+        "--no-fail",
+    ];
+    if verbose {
+        args.push("--verbose");
+    }
     let output = Command::new(BINARY)
         .current_dir(dir)
-        .args([
-            "--coverage",
-            "lcov.info",
-            "--src",
-            "src",
-            "--no-gitignore",
-            "--format",
-            "json",
-            "--threshold",
-            threshold,
-            "--no-fail",
-        ])
+        .args(&args)
         .output()
         .expect("failed to run crap4rs to capture baseline");
     // Fail fast on a non-zero capture: `--no-fail` keeps a violation-bearing
@@ -252,6 +288,11 @@ fn capture_baseline(world: &mut CliWorld, threshold: &str) {
         String::from_utf8_lossy(&output.stderr)
     );
     std::fs::write(dir.join("baseline.json"), &output.stdout).expect("write baseline.json");
+}
+
+/// Capture a baseline envelope (no `--verbose`) — the common case.
+fn capture_baseline(world: &mut CliWorld, threshold: &str) {
+    capture_baseline_inner(world, threshold, false);
 }
 
 /// Parse a backtick-wrapped `crap4rs ...` command into the args vec
@@ -311,6 +352,83 @@ fn given_current_uncovered(world: &mut CliWorld) {
     mutate_project(world, CLASSIFY_SRC, &classify_lcov(0));
 }
 
+#[given(regex = r#"^a baseline captured with diagnostics at threshold (\d+)$"#)]
+fn given_baseline_with_diagnostics(world: &mut CliWorld, threshold: String) {
+    setup_project(world, DRIFT_BASE_SRC, DRIFT_BASE_LCOV);
+    capture_baseline_inner(world, &threshold, true);
+}
+
+#[given("a project with a malformed baseline file present")]
+fn given_malformed_baseline(world: &mut CliWorld) {
+    setup_project(world, SIX_MIXED_SRC, SIX_MIXED_LCOV);
+    let dir = world.require_dir().to_path_buf();
+    std::fs::write(dir.join("bad.json"), "not json{").expect("write bad.json");
+}
+
+#[given("a project with a baseline declaring an unsupported schema_version")]
+fn given_unsupported_schema_baseline(world: &mut CliWorld) {
+    setup_project(world, SIX_MIXED_SRC, SIX_MIXED_LCOV);
+    let dir = world.require_dir().to_path_buf();
+    std::fs::write(
+        dir.join("future.json"),
+        r#"{
+            "schema_version": 99,
+            "result": {
+                "functions": [],
+                "summary": {
+                    "total_functions": 0, "total_files": 0,
+                    "exceeding_threshold": 0,
+                    "average_crap": 0.0, "median_crap": 0.0,
+                    "max_crap": null, "worst_function": null,
+                    "distribution": {"low":0,"acceptable":0,"moderate":0,"high":0}
+                },
+                "passed": true
+            }
+        }"#,
+    )
+    .expect("write future.json");
+}
+
+#[given("the baseline metric field is then stripped")]
+fn given_strip_baseline_metric(world: &mut CliWorld) {
+    let path = world.require_dir().join("baseline.json");
+    let stripped = std::fs::read_to_string(&path)
+        .expect("read baseline.json")
+        .replace("\"metric\": \"cognitive\",", "");
+    assert!(
+        !stripped.contains("\"metric\""),
+        "fixture must actually omit the metric key after stripping"
+    );
+    std::fs::write(&path, stripped).expect("rewrite baseline.json without metric");
+}
+
+#[given(regex = r#"^a baseline with one function in old_mod\.rs captured at threshold (\d+)$"#)]
+fn given_baseline_relocated(world: &mut CliWorld, threshold: String) {
+    let dir = tempfile::tempdir().expect("create tempdir");
+    let path = dir.path().to_path_buf();
+    write_single_fn(
+        &path,
+        "old_mod.rs",
+        RELOCATED_FN,
+        &relocated_lcov("old_mod.rs"),
+    );
+    world.project_dir = Some(path);
+    world._tempdir = Some(dir);
+    capture_baseline(world, &threshold);
+}
+
+#[given("the function relocates to new_mod.rs")]
+fn given_current_relocates(world: &mut CliWorld) {
+    let dir = world.require_dir().to_path_buf();
+    std::fs::remove_file(dir.join("src").join("old_mod.rs")).expect("remove old_mod.rs");
+    write_single_fn(
+        &dir,
+        "new_mod.rs",
+        RELOCATED_FN,
+        &relocated_lcov("new_mod.rs"),
+    );
+}
+
 // ── When step ────────────────────────────────────────────────────────
 
 #[when(regex = r#"^the operator runs `([^`]+)`$"#)]
@@ -366,6 +484,15 @@ fn then_stderr_contains(world: &mut CliWorld, needle: String) {
     assert!(
         stderr.contains(&needle),
         "stderr did not contain {needle:?}:\nstderr:\n{stderr}"
+    );
+}
+
+#[then(regex = r#"^stderr does not contain "([^"]+)"$"#)]
+fn then_stderr_not_contains(world: &mut CliWorld, needle: String) {
+    let stderr = world.stderr();
+    assert!(
+        !stderr.contains(&needle),
+        "stderr unexpectedly contained {needle:?}:\nstderr:\n{stderr}"
     );
 }
 
