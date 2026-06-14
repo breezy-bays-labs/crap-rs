@@ -113,6 +113,10 @@ name = "cli_ergonomics_cucumber"
 harness = false
 
 [[test]]
+name = "delta_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 
