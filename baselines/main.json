@@ -2,7 +2,7 @@
   "schema_version": 2,
   "tool_version": "0.6.0",
   "language": "rust",
-  "timestamp": "1781462176",
+  "timestamp": "1781466679",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
@@ -9304,9 +9304,9 @@
           },
           "complexity": 1,
           "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
+          "coverage_percent": 0.0,
           "crap": {
-            "value": 1.0,
+            "value": 2.0,
             "risk_level": "low"
           },
           "contributors": []
@@ -18052,7 +18052,7 @@
           },
           "complexity": 7,
           "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
+          "coverage_percent": 97.22222222222221,
           "crap": {
             "value": 7.0,
             "risk_level": "low"
@@ -18125,9 +18125,9 @@
           },
           "complexity": 1,
           "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
+          "coverage_percent": 82.75862068965517,
           "crap": {
-            "value": 1.0,
+            "value": 1.01,
             "risk_level": "low"
           },
           "contributors": []
@@ -18361,9 +18361,9 @@
           },
           "complexity": 5,
           "complexity_metric": "cognitive",
-          "coverage_percent": 94.73684210526315,
+          "coverage_percent": 52.63157894736842,
           "crap": {
-            "value": 5.0,
+            "value": 7.66,
             "risk_level": "low"
           },
           "contributors": [
@@ -47930,7 +47930,7 @@
       "total_functions": 1676,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6208472553699285,
+      "average_crap": 1.6230369928400952,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -47956,7 +47956,7 @@
       "average_complexity": 1.6044152744630071,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.39474204884009,
+      "average_coverage": 98.29800910119926,
       "median_coverage": 100.0
     },
     "passed": true
@@ -48472,6 +48472,63 @@
               "increment": 1,
               "end_line": 1178,
               "nesting_depth": 2
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap-core/src/cli/mod.rs",
+            "qualified_name": "load_delta_state",
+            "span": {
+              "start_line": 1824,
+              "end_line": 1848,
+              "start_column": 1,
+              "end_column": 1
+            }
+          },
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 52.63157894736842,
+          "crap": {
+            "value": 7.66,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "let-else",
+              "line": 1831,
+              "column": 50,
+              "increment": 1,
+              "end_line": 1833,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "try",
+              "line": 1834,
+              "column": 81,
+              "increment": 1,
+              "end_line": 1834,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 1835,
+              "column": 5,
+              "increment": 1,
+              "end_line": 1837,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 1838,
+              "column": 5,
+              "increment": 1,
+              "end_line": 1840,
+              "nesting_depth": 0
             }
           ]
         },
@@ -49248,7 +49305,7 @@
           },
           "complexity": 7,
           "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
+          "coverage_percent": 97.22222222222221,
           "crap": {
             "value": 7.0,
             "risk_level": "low"
@@ -51637,63 +51694,6 @@
               "column": 39,
               "increment": 1,
               "end_line": 1519,
-              "nesting_depth": 0
-            }
-          ]
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap-core/src/cli/mod.rs",
-            "qualified_name": "load_delta_state",
-            "span": {
-              "start_line": 1824,
-              "end_line": 1848,
-              "start_column": 1,
-              "end_column": 1
-            }
-          },
-          "complexity": 5,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 94.73684210526315,
-          "crap": {
-            "value": 5.0,
-            "risk_level": "low"
-          },
-          "contributors": [
-            {
-              "kind": "let-else",
-              "line": 1831,
-              "column": 50,
-              "increment": 1,
-              "end_line": 1833,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "try",
-              "line": 1834,
-              "column": 81,
-              "increment": 1,
-              "end_line": 1834,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 1835,
-              "column": 5,
-              "increment": 1,
-              "end_line": 1837,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 1838,
-              "column": 5,
-              "increment": 1,
-              "end_line": 1840,
               "nesting_depth": 0
             }
           ]
@@ -61536,6 +61536,30 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
+            "qualified_name": "delta_block",
+            "span": {
+              "start_line": 87,
+              "end_line": 100,
+              "start_column": 1,
+              "end_column": 1
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 0.0,
+          "crap": {
+            "value": 2.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::missing_coverage_policy_emitted_when_non_default",
             "span": {
               "start_line": 225,
@@ -67550,6 +67574,30 @@
       {
         "scored": {
           "identity": {
+            "file_path": "crates/crap-core/src/cli/mod.rs",
+            "qualified_name": "format_as_json",
+            "span": {
+              "start_line": 1608,
+              "end_line": 1636,
+              "start_column": 1,
+              "end_column": 1
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 82.75862068965517,
+          "crap": {
+            "value": 1.01,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
             "file_path": "crates/crap-core/src/domain/view.rs",
             "qualified_name": "tests::sort_stability_on_tied_crap",
             "span": {
@@ -72927,30 +72975,6 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
-            "qualified_name": "delta_block",
-            "span": {
-              "start_line": 87,
-              "end_line": 100,
-              "start_column": 1,
-              "end_column": 1
-            }
-          },
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
-          "crap": {
-            "value": 1.0,
-            "risk_level": "low"
-          },
-          "contributors": []
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "format_json",
             "span": {
               "start_line": 106,
@@ -78283,30 +78307,6 @@
             "span": {
               "start_line": 1458,
               "end_line": 1483,
-              "start_column": 1,
-              "end_column": 1
-            }
-          },
-          "complexity": 1,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
-          "crap": {
-            "value": 1.0,
-            "risk_level": "low"
-          },
-          "contributors": []
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap-core/src/cli/mod.rs",
-            "qualified_name": "format_as_json",
-            "span": {
-              "start_line": 1608,
-              "end_line": 1636,
               "start_column": 1,
               "end_column": 1
             }
@@ -95896,7 +95896,7 @@
       "total_functions": 1676,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6208472553699285,
+      "average_crap": 1.6230369928400952,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -95922,7 +95922,7 @@
       "average_complexity": 1.6044152744630071,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.39474204884009,
+      "average_coverage": 98.29800910119926,
       "median_coverage": 100.0
     },
     "grouped": null
