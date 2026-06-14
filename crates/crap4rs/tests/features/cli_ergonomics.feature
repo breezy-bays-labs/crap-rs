@@ -172,40 +172,29 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── --no-fail: exit-code override (issue #65) ──────────────────────
 
-  @unwired
-  Scenario: --no-fail returns 0 even when violations exist
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --no-fail`
-    Then the report shows every violating function
-    And the exit code is 0
-    And the JSON envelope's `result.passed` is false
+  # --no-fail (exit-code override) and --quiet (output suppression) are
+  # CLI-process behaviors with no domain representation — the only place
+  # they are observable is the live process's exit code and stdout. Their
+  # core override + suppression are already pinned by the wired --summary
+  # scenarios below (--summary --no-fail exits 0; --summary --quiet is empty
+  # and preserves exit 1). These two pin what those cannot: that --no-fail
+  # leaves the JSON result block truthful (a consumer still reads
+  # result.passed=false), and that --quiet and --no-fail compose to silent
+  # CI success.
 
-  @unwired
-  Scenario: --no-fail is a no-op when there are no violations
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    Given the project has zero functions exceeding the threshold
-    When the operator runs `crap4rs --coverage lcov.info --no-fail`
+  @wired
+  Scenario: --no-fail forces exit 0 but keeps result.passed false
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json --no-fail`
     Then the exit code is 0
+    And the JSON envelope at "result.passed" is false
 
-  @unwired
-  Scenario: --quiet alone preserves CI exit-1 behavior
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --quiet`
-    Then the report is suppressed
-    And the exit code is 1
-
-  @unwired
-  Scenario: --quiet --no-fail composes to silent success
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --quiet --no-fail`
-    Then the report is suppressed
-    And the exit code is 0
-
-  @unwired
-  Scenario: --quiet also suppresses JSON output
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --quiet --format json`
+  @wired
+  Scenario: --quiet and --no-fail compose to silent success
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --quiet --no-fail`
     Then stdout is empty
+    And the exit code is 0
 
   # ── --only-failing relocated, summary-semantics fix ────────────────
 
@@ -355,16 +344,20 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── Composed investigation example (Story B) ───────────────────────
 
-  @unwired
-  Scenario: investigator's flag-set produces a shaped report and exits 0
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90 --sort-by coverage --top 10 --no-fail`
-    Then the report contains 10 functions
-    And every function has coverage_percent in [1, 90]
-    And the rows are ordered by coverage percent ascending
-    And the JSON envelope reports `view.eligible_count` as the count of partially-covered functions
-    And the JSON envelope reports `view.truncated` as true
-    And the exit code is 0
+  @wired
+  Scenario: an investigator's full flag-set composes into a shaped report that does not fail CI
+    # The headline composition: filter (--only-failing) + sort (--sort-by
+    # coverage) + truncate (--top 5) + gate override (--no-fail) in one
+    # invocation. The ordering and per-row predicates are owned by the
+    # domain::view::apply order-of-operations tests; this pins the CLI-level
+    # emergent contract — the quartet composes, --no-fail forces exit 0, and
+    # the gate stays truthful (result.passed reflects the full analysis, so a
+    # JSON consumer still sees the would-have-failed signal).
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json --only-failing --sort-by coverage --top 5 --no-fail`
+    Then the exit code is 0
+    And the JSON envelope at "result.passed" is false
+    And the JSON envelope at "view.shown" has 3 entries
 
   # ── First-run discoverability (V6) ────────────────────────────────
 
@@ -429,10 +422,9 @@ Feature: CLI ergonomics — shaping the report from the command line
   # crap4ts parity. Format:
   #   `<STATUS>: <N> functions | <M> above threshold (<T>) | worst: <W> | avg: <A>`
   # Status from `result.passed`, threshold formatted integer-when-whole,
-  # worst/avg one decimal place. The tagged scenarios below are wired
-  # to the `cli_ergonomics_cucumber` harness, which sets up a synthetic
-  # LCOV+src layout per scenario (matches `cli_no_fail_integration.rs`).
-  # The rest of this feature remains spec-only.
+  # worst/avg one decimal place. Like the other @wired scenarios in this
+  # feature, these run against the `cli_ergonomics_cucumber` harness, which
+  # sets up a synthetic LCOV+src layout per scenario.
 
   @wired
   Scenario: --summary on a passing run emits a single PASS line

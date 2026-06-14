@@ -9,8 +9,8 @@
 //! step defs and flipping their scenarios from `@unwired` to `@wired`.
 //!
 //! Each scenario sets up a tempdir with a small synthetic LCOV +
-//! `src/lib.rs` (mirrors `cli_no_fail_integration.rs`'s pattern) and
-//! invokes the binary via `CARGO_BIN_EXE_crap4rs`. The harness does
+//! `src/lib.rs` and invokes the binary via `CARGO_BIN_EXE_crap4rs`.
+//! The harness does
 //! NOT depend on the workspace's self-fixture LCOV, so paths in
 //! scenario commands stay relative to the tempdir cwd.
 //!
