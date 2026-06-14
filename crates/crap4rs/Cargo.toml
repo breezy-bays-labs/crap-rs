@@ -125,6 +125,10 @@ name = "complexity_breakdown_cucumber"
 harness = false
 
 [[test]]
+name = "group_by_file_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 

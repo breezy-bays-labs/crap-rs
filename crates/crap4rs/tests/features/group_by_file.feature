@@ -7,118 +7,91 @@ Feature: --group-by file (Bundle C, issue #64)
   CRAP statistics. The gate keystone is preserved — exit code still
   derives from the unshapeable underlying analysis.
 
+  This file pins the CLI-process contracts: the `view.grouped` envelope
+  shape, the `--group-by` / `--top` / `--only-failing` / `--minimal-view`
+  flag wiring, the CSV per-file header, the gate keystone, and `--help`
+  discoverability. The file-level sort / truncate / filter SEMANTICS are
+  owned by `domain::view`'s 17 `group_by_file_*` unit tests (so the
+  `--sort-by` ordering cases live there, not here). Step defs in
+  `tests/group_by_file_cucumber.rs`.
+
   Background:
-    Given an analysis with 6 functions across 3 files:
-      - src/blob.rs has 3 functions, 2 exceeding threshold
-      - src/index.rs has 2 functions, 1 exceeding threshold
-      - src/util.rs has 1 function, 0 exceeding threshold
-    And the threshold is 8
+    Given a project with 6 functions across 3 files (blob.rs 3 functions 2 exceeding, index.rs 2 functions 1 exceeding, util.rs 1 function 0 exceeding)
 
   # ── Default invocation (no --group-by) ─────────────────────────────
 
-  @unwired
+  @wired
   Scenario: Default invocation produces no grouped block
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --format json`
-    Then `view.grouped` is null
-    And `view.spec.group_by` is null
-    And `view.shown` is the full per-function row list
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --no-fail --format json`
+    Then the JSON envelope at "view.grouped" is null
+    And the JSON envelope at "view.spec.group_by" is null
+    And the JSON envelope at "view.shown" has 6 entries
 
   # ── --group-by file populates the grouped block ────────────────────
 
-  @unwired
+  @wired
   Scenario: --group-by file emits a grouped block in JSON
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --group-by file --format json`
-    Then `view.grouped.key` is "file"
-    And `view.grouped.files.length` is 3
-    And `view.grouped.eligible_count` is 3
-    And `view.grouped.truncated` is false
-    And `view.shown.length` is 6
-    And each file in `view.grouped.files` has `file_path`, `function_count`, `exceeding_count`, `average_crap`, `median_crap`, `max_crap`, `worst_function`, `distribution`, `average_coverage`, and `max_complexity`
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --no-fail --group-by file --format json`
+    Then the JSON envelope at "view.grouped.key" is "file"
+    And the JSON envelope at "view.grouped.files" has 3 entries
+    And the JSON envelope at "view.grouped.eligible_count" is 3
+    And the JSON envelope at "view.grouped.truncated" is false
+    And the JSON envelope at "view.shown" has 6 entries
+    And each grouped file carries the FileSummary fields
 
   # ── --top truncates files when grouped ─────────────────────────────
 
-  @unwired
-  Scenario: --top N truncates to top N files when grouped
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --group-by file --top 1 --format json`
-    Then `view.grouped.files.length` is 1
-    And `view.grouped.truncated` is true
-    And `view.grouped.eligible_count` is 3
-    And `view.shown.length` is 6
-    And `view.truncated` is false
-
-  # ── --sort-by keys at file level under grouping ────────────────────
-
-  @unwired
-  Scenario: --sort-by coverage --group-by file sorts files by avg coverage ascending
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --group-by file --sort-by coverage --format json`
-    Then `view.grouped.files` is sorted by `average_coverage` ascending
-
-  @unwired
-  Scenario: --sort-by complexity --group-by file sorts files by max complexity descending
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --group-by file --sort-by complexity --format json`
-    Then `view.grouped.files` is sorted by `max_complexity` descending
-
-  @unwired
-  Scenario: --sort-by path --group-by file sorts files alphabetically
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --group-by file --sort-by path --format json`
-    Then `view.grouped.files` is sorted by `file_path` ascending
+  @wired
+  Scenario: --top N truncates to top N files when grouped (functions untouched)
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --no-fail --group-by file --top 1 --format json`
+    Then the JSON envelope at "view.grouped.files" has 1 entry
+    And the JSON envelope at "view.grouped.truncated" is true
+    And the JSON envelope at "view.grouped.eligible_count" is 3
+    And the JSON envelope at "view.shown" has 6 entries
+    And the JSON envelope at "view.truncated" is false
 
   # ── --only-failing composes with --group-by file ───────────────────
 
-  @unwired
-  Scenario: --only-failing --group-by file filters to files with at least one failing function
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --only-failing --group-by file --format json`
-    Then every file in `view.grouped.files` has `exceeding_count` >= 1
-    And `view.grouped.files.length` is 2
+  @wired
+  Scenario: --only-failing --group-by file keeps only files with a failing function
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --no-fail --only-failing --group-by file --format json`
+    Then the JSON envelope at "view.grouped.files" has 2 entries
+    And every grouped file has at least one exceeding function
 
   # ── CSV schema shifts under --group-by file ────────────────────────
 
-  @unwired
-  Scenario: --format csv --group-by file emits per-file header
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --group-by file --format csv`
-    Then the first line is "file,function_count,exceeding_count,average_crap,max_crap,worst_function,distribution_low,distribution_acceptable,distribution_moderate,distribution_high"
-    And subsequent lines are per-file rows
+  @wired
+  Scenario: --format csv --group-by file emits the per-file header
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --no-fail --group-by file --format csv`
+    Then the first stdout line is "file,function_count,exceeding_count,average_crap,max_crap,worst_function,distribution_low,distribution_acceptable,distribution_moderate,distribution_high"
 
   # ── --minimal-view composes with --group-by file ───────────────────
 
-  @unwired
+  @wired
   Scenario: --minimal-view --group-by file strips view.shown but keeps view.grouped
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --minimal-view --group-by file --format json`
-    Then `view.shown` is absent from the JSON envelope
-    And `view.grouped` is present and populated
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --no-fail --minimal-view --group-by file --format json`
+    Then the JSON envelope has no "view.shown" path
+    And the JSON envelope at "view.grouped.files" has 3 entries
 
   # ── Gate keystone: --group-by file does NOT change exit code ───────
 
-  @unwired
+  @wired
   Scenario: --group-by file does not change exit code on a failing analysis
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    Given the unfiltered analysis would exit 1 (violations exist)
-    When the operator runs `crap4rs --coverage lcov.info --group-by file`
-    Then the process exits 1
-    And `result.passed` is false
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --group-by file --format json`
+    Then the exit code is 1
+    And the JSON envelope at "result.passed" is false
 
-  @unwired
+  @wired
   Scenario: --group-by file --top truncating files leaves the gate alone
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
-    Given the unfiltered analysis would exit 1
-    When the operator runs `crap4rs --coverage lcov.info --group-by file --top 1`
-    Then the process exits 1
-    And `result.passed` is false
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 8 --group-by file --top 1 --format json`
+    Then the exit code is 1
+    And the JSON envelope at "result.passed" is false
 
   # ── Help text discoverability (issue #64 acceptance criteria) ──────
 
-  @unwired
+  @wired
   Scenario: --help documents the --top and --sort-by semantic shift
-    # tracked: crap-rs#169 — group-by-file cucumber harness not yet built
     When the operator runs `crap4rs --help`
-    Then the `--group-by` description mentions that `--top N` truncates files
-    And mentions that `--sort-by` keys at the file level
+    Then stdout contains "--group-by"
+    And stdout contains "top N **files**"
+    And stdout contains "keys at the file level"
