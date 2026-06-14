@@ -391,15 +391,24 @@ fn given_unsupported_schema_baseline(world: &mut CliWorld) {
 
 #[given("the baseline metric field is then stripped")]
 fn given_strip_baseline_metric(world: &mut CliWorld) {
+    // Parse → remove the top-level `metric` key → reserialize, rather than
+    // string-replacing a hard-coded `"metric": "cognitive"`: robust to the
+    // envelope's JSON formatting and to whatever the default metric is.
     let path = world.require_dir().join("baseline.json");
-    let stripped = std::fs::read_to_string(&path)
-        .expect("read baseline.json")
-        .replace("\"metric\": \"cognitive\",", "");
-    assert!(
-        !stripped.contains("\"metric\""),
-        "fixture must actually omit the metric key after stripping"
-    );
-    std::fs::write(&path, stripped).expect("rewrite baseline.json without metric");
+    let raw = std::fs::read_to_string(&path).expect("read baseline.json");
+    let mut envelope: serde_json::Value =
+        serde_json::from_str(&raw).expect("baseline.json is valid JSON");
+    let removed = envelope
+        .as_object_mut()
+        .expect("baseline envelope is a JSON object")
+        .remove("metric")
+        .is_some();
+    assert!(removed, "baseline.json had no `metric` key to strip");
+    std::fs::write(
+        &path,
+        serde_json::to_string_pretty(&envelope).expect("reserialize baseline.json"),
+    )
+    .expect("rewrite baseline.json without metric");
 }
 
 #[given(regex = r#"^a baseline with one function in old_mod\.rs captured at threshold (\d+)$"#)]
