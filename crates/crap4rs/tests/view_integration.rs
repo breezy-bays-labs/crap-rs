@@ -194,6 +194,34 @@ fn default_invocation_table_does_not_render_view_line() {
     );
 }
 
+// ── Shaped invocation DOES render a "View:" line in table output ──
+
+#[test]
+fn top_truncation_table_renders_view_line() {
+    // The companion to the default-spec negative above: when `--top`
+    // truncates the row set, `should_render_view_line(view) == true`, so
+    // the reporter emits the "View:" subtitle below the Summary block.
+    let dir = tempfile::tempdir().unwrap();
+    let multi_fn_src =
+        "pub fn alpha() -> i32 { 1 }\npub fn beta() -> i32 { 2 }\npub fn gamma() -> i32 { 3 }\n";
+    let multi_fn_lcov = "SF:lib.rs\nDA:1,1\nDA:2,1\nDA:3,1\nend_of_record\n";
+    setup_dir(dir.path(), multi_fn_src, multi_fn_lcov);
+
+    let output = run(dir.path(), &["--top", "2"]);
+    assert_success(&output);
+    let out = stdout_str(&output);
+
+    assert!(
+        out.contains("View: showing 2 of 3 functions (top 2)"),
+        "--top truncation must render the View line; got:\n{out}"
+    );
+    // The Summary line is still present, above the View line.
+    assert!(
+        out.contains("Summary:"),
+        "Summary line must remain; got:\n{out}"
+    );
+}
+
 // ── Underlying analysis is unchanged by the View pipeline (gate is unshapeable) ──
 
 #[test]
