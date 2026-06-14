@@ -253,7 +253,6 @@ fn sort_by_complexity_descending() {
 
 #[test]
 fn sort_by_path_alphabetical_then_crap_within_file() {
-    // cli_ergonomics.feature:131-137 + view.feature:124-128.
     // Two-file fixture: src/a.rs and src/b.rs, each containing one
     // simple (covered, low CRAP) and one branchy (uncovered, high CRAP)
     // function. Expected order under `--sort-by path`:
