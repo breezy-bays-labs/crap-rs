@@ -239,6 +239,18 @@ fn capture_baseline(world: &mut CliWorld, threshold: &str) {
         ])
         .output()
         .expect("failed to run crap4rs to capture baseline");
+    // Fail fast on a non-zero capture: `--no-fail` keeps a violation-bearing
+    // baseline at exit 0, so any non-zero status here is a genuine setup
+    // failure (a panic, or an exit-2 validation error). Writing its stdout
+    // to baseline.json anyway would surface later as a confusing JSON-parse
+    // or empty-baseline error in the scenario's `--baseline` run.
+    assert!(
+        output.status.success(),
+        "baseline capture failed (status {:?})\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     std::fs::write(dir.join("baseline.json"), &output.stdout).expect("write baseline.json");
 }
 
