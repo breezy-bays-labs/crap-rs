@@ -108,8 +108,10 @@ fn run_git(dir: &Path, args: &[&str]) {
         .expect("git command failed to start");
     assert!(
         output.status.success(),
-        "git {} failed: {}",
+        "git {} failed (status {:?})\nstdout:\n{}\nstderr:\n{}",
         args.join(" "),
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
 }
