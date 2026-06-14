@@ -80,7 +80,20 @@ impl BreakdownWorld {
     fn json(&self) -> serde_json::Value {
         let out = self.stdout();
         serde_json::from_str(&out)
-            .unwrap_or_else(|e| panic!("stdout was not valid JSON: {e}\nraw stdout:\n{out}"))
+            .unwrap_or_else(|e| panic!("stdout was not valid JSON: {e}\n{}", self.fail_context()))
+    }
+
+    /// A full failure context — exit status + both streams — for actionable
+    /// CI panics when the binary misbehaves (e.g. crashes or errors instead
+    /// of emitting the expected output, leaving stdout empty).
+    fn fail_context(&self) -> String {
+        let o = self.require_output();
+        format!(
+            "exit: {:?}\nstdout:\n{}\nstderr:\n{}",
+            o.status.code(),
+            self.stdout(),
+            self.stderr()
+        )
     }
 }
 
@@ -118,28 +131,28 @@ fn when_run(world: &mut BreakdownWorld, cmd: String) {
 
 #[then(regex = r#"^stdout contains "([^"]+)"$"#)]
 fn then_contains(world: &mut BreakdownWorld, needle: String) {
-    let stdout = world.stdout();
     assert!(
-        stdout.contains(&needle),
-        "stdout did not contain {needle:?}:\nstdout:\n{stdout}"
+        world.stdout().contains(&needle),
+        "stdout did not contain {needle:?}\n{}",
+        world.fail_context()
     );
 }
 
 #[then(regex = r#"^stdout does not contain "([^"]+)"$"#)]
 fn then_not_contains(world: &mut BreakdownWorld, needle: String) {
-    let stdout = world.stdout();
     assert!(
-        !stdout.contains(&needle),
-        "stdout unexpectedly contained {needle:?}:\nstdout:\n{stdout}"
+        !world.stdout().contains(&needle),
+        "stdout unexpectedly contained {needle:?}\n{}",
+        world.fail_context()
     );
 }
 
 #[then(regex = r#"^stderr contains "([^"]+)"$"#)]
 fn then_stderr_contains(world: &mut BreakdownWorld, needle: String) {
-    let stderr = world.stderr();
     assert!(
-        stderr.contains(&needle),
-        "stderr did not contain {needle:?}:\nstderr:\n{stderr}"
+        world.stderr().contains(&needle),
+        "stderr did not contain {needle:?}\n{}",
+        world.fail_context()
     );
 }
 
@@ -150,11 +163,11 @@ fn then_exit_code(world: &mut BreakdownWorld, expected: i32) {
         .status
         .code()
         .expect("process exited via signal");
-    let stdout = world.stdout();
-    let stderr = world.stderr();
     assert_eq!(
-        actual, expected,
-        "exit code mismatch — expected {expected}, got {actual}\nstdout:\n{stdout}\nstderr:\n{stderr}"
+        actual,
+        expected,
+        "exit code mismatch — expected {expected}, got {actual}\n{}",
+        world.fail_context()
     );
 }
 
