@@ -1906,5 +1906,58 @@ mod proptests {
 
             prop_assert_eq!(both, intersection);
         }
+
+        /// Result-block immutability under ANY spec: the `result` block —
+        /// its function set, summary, and pass/fail verdict — is identical
+        /// no matter how aggressively the spec filters, sorts, truncates,
+        /// or groups. `apply` borrows the analysis immutably and never
+        /// replaces it, so `view.full` is pointer-equal to the input (the
+        /// strictest witness); the scalar checks document the user-facing
+        /// promise that a JSON consumer's `result.*` reads the same whether
+        /// or not a view was shaped. Generalizes
+        /// `prop_default_spec_preserves_summary` from the default spec to
+        /// the full spec space (arbitrary filter, sort, limit, and
+        /// grouping).
+        #[test]
+        fn prop_result_block_invariant_under_any_spec(
+            result in arb_analysis_result(),
+            only_failing in any::<bool>(),
+            band in prop::option::of((0.0..=100.0f64, 0.0..=100.0f64)),
+            sort in prop_oneof![
+                Just(SortKey::Crap),
+                Just(SortKey::Coverage),
+                Just(SortKey::Complexity),
+                Just(SortKey::Path),
+            ],
+            limit in prop::option::of(0usize..20),
+            group_by in prop::option::of(Just(GroupKey::File)),
+        ) {
+            let coverage_range = band.map(|(a, b)| {
+                let (min, max) = if a <= b { (a, b) } else { (b, a) };
+                CoverageRange::new(min, max).expect("min <= max within [0,100] is valid")
+            });
+            // Capture the result block BEFORE `apply` borrows it.
+            let baseline_total = result.summary.total_functions;
+            let baseline_exceeding = result.summary.exceeding_threshold;
+            let baseline_passed = result.passed;
+
+            let view = apply(
+                &result,
+                ViewSpec {
+                    filters: Filters { only_failing, coverage_range },
+                    sort,
+                    limit,
+                    group_by,
+                },
+            );
+
+            // The result block is the unmutated original — pointer identity
+            // proves the function set, summary, and verdict are all untouched.
+            prop_assert!(std::ptr::eq(view.full, &result));
+            // Scalar witnesses of the same invariant, for readability.
+            prop_assert_eq!(view.full.summary.total_functions, baseline_total);
+            prop_assert_eq!(view.full.summary.exceeding_threshold, baseline_exceeding);
+            prop_assert_eq!(view.full.passed, baseline_passed);
+        }
     }
 }

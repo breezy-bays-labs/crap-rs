@@ -1,25 +1,29 @@
-//! Cucumber-rs runner for `@wired`-tagged scenarios in
-//! `tests/features/cli_ergonomics.feature` (issues #131, #168).
+//! Cucumber-rs runner for `tests/features/cli_ergonomics.feature`
+//! (issues #131, #168).
 //!
-//! Most scenarios in `cli_ergonomics.feature` are spec-only and tagged
-//! `@unwired` (see `AGENTS.md` § BDD hygiene + `tests/features/TAGS.toml`).
-//! The seven wired scenarios cover the `--summary` AC for #131 (one-line
-//! CLI verdict); the harness uses `filter_run_and_exit` to execute only
-//! `@wired` scenarios. New flags wire themselves by writing executable
-//! step defs and flipping their scenarios from `@unwired` to `@wired`.
+//! Every scenario in `cli_ergonomics.feature` is `@wired`: the curated
+//! BDD pass wired each CLI-level contract — flag-to-envelope echo,
+//! clap/validate exit codes, the gate-keystone exit code, the table
+//! "View:" subtitle line, and `--help` content — and pushed the view
+//! SEMANTICS (sort/filter/truncate ordering, the result-block invariant)
+//! down to crap-core's `domain::view` unit and property tests (see
+//! `AGENTS.md` § BDD hygiene + `tests/features/TAGS.toml`). The harness
+//! still uses `filter_run_and_exit` on `@wired` so a future `@unwired`
+//! scenario is skipped until its step defs land.
 //!
 //! Each scenario sets up a tempdir with a small synthetic LCOV +
-//! `src/lib.rs` and invokes the binary via `CARGO_BIN_EXE_crap4rs`.
-//! The harness does
-//! NOT depend on the workspace's self-fixture LCOV, so paths in
-//! scenario commands stay relative to the tempdir cwd.
+//! `src/lib.rs` and invokes the binary via `CARGO_BIN_EXE_crap4rs`. The
+//! harness does NOT depend on the workspace's self-fixture LCOV, so paths
+//! in scenario commands stay relative to the tempdir cwd; the `--help` /
+//! `-h` scenarios run without a fixture (clap short-circuits before I/O).
 //!
-//! The two synthetic fixtures cover the two pass/fail invariants needed
-//! by the seven wired scenarios:
+//! Three synthetic fixtures cover the pass / fail / range invariants:
 //! - `WITHIN_*` — three trivial covered fns; every CRAP ≤ 2, so any
 //!   reasonable threshold passes.
 //! - `EXCEEDS_*` — three branchy uncovered fns; CRAPs roughly 20+, so
 //!   `--threshold 5` deliberately trips the gate.
+//! - `MIXED_*` — six functions (three of each), so truncation,
+//!   filtering, and `view.eligible_count` are observable.
 
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -256,6 +260,51 @@ fn then_stderr_contains(world: &mut CliWorld, needle: String) {
     assert!(
         stderr.contains(&needle),
         "stderr did not contain {needle:?}:\nstderr:\n{stderr}"
+    );
+}
+
+/// Assert the `--help` text shows a command example, tolerant of clap's
+/// width-based line wrapping: the after-help block is re-wrapped to the
+/// terminal width, so a long example can split across lines (e.g.
+/// `… --top 10\n      --no-fail`). Collapses every run of whitespace to a
+/// single space on both sides before matching, so the assertion pins the
+/// example's content without depending on the runner's column width.
+#[then(regex = r#"^the help text shows the example "([^"]+)"$"#)]
+fn then_help_shows_example(world: &mut CliWorld, example: String) {
+    let collapse = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let stdout = collapse(&world.stdout());
+    let want = collapse(&example);
+    assert!(
+        stdout.contains(&want),
+        "help did not contain example {want:?} (whitespace-normalized):\nstdout:\n{stdout}"
+    );
+}
+
+/// Assert a flag appears under a named `--help` heading (e.g.
+/// `--only-failing` under `Filtering`). Extracts the section between the
+/// `<heading>:` line and the next top-level heading, so this pins clap's
+/// `next_help_heading` grouping — the V1b relocation of `--only-failing`
+/// from the Output group to Filtering, observable only through `--help`.
+#[then(regex = r#"^the help text lists "([^"]+)" under the "([^"]+)" heading$"#)]
+fn then_help_lists_under_heading(world: &mut CliWorld, flag: String, heading: String) {
+    let stdout = world.stdout();
+    let lines: Vec<&str> = stdout.lines().collect();
+    let header = format!("{heading}:");
+    let start = lines
+        .iter()
+        .position(|l| l.trim_end() == header)
+        .unwrap_or_else(|| panic!("help has no {header:?} heading:\nstdout:\n{stdout}"));
+    // A top-level heading is a non-indented line ending in ':'.
+    let is_heading = |l: &str| !l.starts_with(char::is_whitespace) && l.trim_end().ends_with(':');
+    let end = lines[start + 1..]
+        .iter()
+        .position(|l| is_heading(l))
+        .map(|off| start + 1 + off)
+        .unwrap_or(lines.len());
+    let section = lines[start..end].join("\n");
+    assert!(
+        section.contains(&flag),
+        "{flag:?} not found under the {header:?} heading:\n{section}"
     );
 }
 
