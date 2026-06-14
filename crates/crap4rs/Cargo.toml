@@ -121,6 +121,10 @@ name = "diff_cucumber"
 harness = false
 
 [[test]]
+name = "complexity_breakdown_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 
