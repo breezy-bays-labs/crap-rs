@@ -4,141 +4,103 @@ Feature: Diff mode
   files changed since the given git ref. This enables CI PR gating
   where developers only see CRAP scores for code they touched.
 
-  # ── Core Behavior ─────────────────────────────────────────────────
+  This file pins the CLI-acceptance contracts a running binary uniquely
+  captures against a real git repo: the function-selection a --diff run
+  surfaces, the empty-diff exit code, the `diff_ref` envelope field, the
+  validation exit codes, filter composition, and rename handling. The
+  lower-level diff MECHANICS — unified-diff + hunk parsing, deletion-only
+  skipping, new-file detection, bad-ref handling, path normalization —
+  are owned by crap-core's `adapters::diff` unit tests; the `.rs`
+  extension filter by `core` / `walker`; and `diff_ref` serialization by
+  `reporters::json`. Step defs live in `tests/diff_cucumber.rs`.
 
-  @unwired
-  Scenario: Only changed functions appear in output
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with a baseline commit containing functions foo and bar
-    And a second commit that modifies only foo
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then the output includes function foo
-    And the output does not include function bar
+  # ── Function selection ────────────────────────────────────────────
+  # core::compute_diff_regions (changed line-ranges → which functions)
+  # has no crap-core unit test of its own; these two are its coverage.
 
-  @unwired
-  Scenario: New file includes all functions
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with a baseline commit
-    And a second commit that adds a new file with functions baz and qux
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then the output includes function baz
-    And the output includes function qux
+  @wired
+  Scenario: Only changed functions appear in the report
+    Given a git repo whose latest commit changed only function foo
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff HEAD~1 --threshold 30 --format json`
+    Then the report includes function "foo"
+    And the report excludes function "bar"
 
-  @unwired
-  Scenario: Hunk-level precision — untouched function in changed file excluded
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with a file containing functions alpha (lines 1-10) and beta (lines 20-30)
-    And a commit that changes only lines 5-8
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then the output includes function alpha
-    And the output does not include function beta
+  @wired
+  Scenario: Hunk-level precision excludes an untouched function in a changed file
+    Given a git repo whose latest commit changed only function alpha, leaving beta untouched
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff HEAD~1 --threshold 30 --format json`
+    Then the report includes function "alpha"
+    And the report excludes function "beta"
 
-  # ── Score Invariant ───────────────────────────────────────────────
+  # ── Empty diff ────────────────────────────────────────────────────
 
-  @unwired
-  Scenario: Diff mode produces identical scores to full analysis
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with a baseline commit and subsequent changes
-    And a full analysis has been recorded for the changed functions
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then each function's CRAP score matches the full analysis score exactly
+  @wired
+  Scenario: An empty diff produces an empty report and exit 0
+    Given a git repo with no changes since HEAD
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff HEAD --threshold 30 --format json`
+    Then the exit code is 0
+    And the report contains 0 functions
+    And the result reports passed as true
 
-  # ── Empty Diff ────────────────────────────────────────────────────
+  # ── JSON envelope ─────────────────────────────────────────────────
 
-  @unwired
-  Scenario: Empty diff produces empty result and exit 0
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo where HEAD matches the baseline ref
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then the output contains zero functions
-    And the exit code is 0
-    And the result shows passed as true
+  @wired
+  Scenario: The JSON envelope records diff_ref when --diff is used
+    Given a git repo whose latest commit changed only function foo
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff HEAD~1 --threshold 30 --format json`
+    Then the JSON envelope at "diff_ref" is "HEAD~1"
 
-  # ── Filter Composition ────────────────────────────────────────────
+  @wired
+  Scenario: The JSON envelope has a null diff_ref when --diff is not used
+    Given a project that is not a git repository
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --threshold 30 --format json`
+    Then the JSON envelope at "diff_ref" is null
 
-  @unwired
+  # ── Filter composition (AND) ──────────────────────────────────────
+
+  @wired
   Scenario: --diff composes with --exclude as AND
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with changes in src/lib.rs and tests/test_lib.rs
-    When I run crap4rs --diff <baseline> --exclude "tests/**" --coverage lcov.info
-    Then the output includes functions from src/lib.rs
-    And the output does not include functions from tests/test_lib.rs
+    Given a git repo with changes in src/lib.rs and src/tests/test_lib.rs
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff HEAD~1 --exclude tests/** --threshold 30 --format json`
+    Then the report includes function "kept"
+    And the report excludes function "excluded"
 
-  @unwired
+  @wired
   Scenario: --diff composes with --only-failing as AND
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with changed functions, some below and some above threshold
-    When I run crap4rs --diff <baseline> --only-failing --coverage lcov.info
-    Then only functions that are both changed AND exceed the threshold appear
+    # --diff scopes the analysis (result.functions = changed: both); --only-failing
+    # shapes the view, so view.shown is the changed AND failing intersection.
+    Given a git repo with changed functions, one passing and one exceeding threshold
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff HEAD~1 --only-failing --threshold 5 --format json`
+    Then the view includes function "complex"
+    And the view excludes function "simple"
 
-  # ── JSON Envelope ─────────────────────────────────────────────────
+  # ── Rename ────────────────────────────────────────────────────────
 
-  @unwired
-  Scenario: JSON output includes diff_ref when --diff is used
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with changes
-    When I run crap4rs --diff main --format json --coverage lcov.info
-    Then the JSON envelope contains "diff_ref" with value "main"
+  @wired
+  Scenario: A renamed file surfaces its functions under the new path
+    Given a git repo where src/old.rs was renamed to src/new.rs with changes
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff HEAD~1 --threshold 30 --format json`
+    Then the report includes function "moved"
 
-  @unwired
-  Scenario: JSON output has null diff_ref when --diff is not used
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    When I run crap4rs --format json --coverage lcov.info
-    Then the JSON envelope contains "diff_ref" with value null
+  # ── Validation errors ─────────────────────────────────────────────
 
-  # ── Error Handling ────────────────────────────────────────────────
-
-  @unwired
-  Scenario: Error when not inside a git repository
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given I am not inside a git repository
-    When I run crap4rs --diff main --coverage lcov.info
+  @wired
+  Scenario: --diff outside a git repository exits 2
+    Given a project that is not a git repository
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff main --threshold 30`
     Then the exit code is 2
     And stderr contains "not inside a git work tree"
 
-  @unwired
-  Scenario: Error when ref is invalid
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
+  @wired
+  Scenario: --diff with an invalid ref exits 2
     Given a git repo
-    When I run crap4rs --diff nonexistent-ref-xyz --coverage lcov.info
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff nonexistent-ref-xyz --threshold 30`
     Then the exit code is 2
-    And stderr contains an error about the invalid ref
+    And stderr contains "bad revision"
 
-  @unwired
-  Scenario: Ref starting with dash is rejected
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    When I run crap4rs --diff --malicious-flag --coverage lcov.info
+  @wired
+  Scenario: --diff with a dash-prefixed ref is rejected (never reaches git)
+    Given a git repo
+    When the operator runs `crap4rs --coverage lcov.info --src src --no-gitignore --diff --malicious-flag --threshold 30`
     Then the exit code is 2
-    And stderr contains "invalid" or the ref is not passed to git
-
-  # ── Edge Cases ────────────────────────────────────────────────────
-
-  @unwired
-  Scenario: Non-Rust file changes are ignored
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with changes in both src/lib.rs and README.md
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then the output includes functions from src/lib.rs
-    And no functions appear from README.md
-
-  @unwired
-  Scenario: Renamed file includes functions from new path
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo where src/old.rs was renamed to src/new.rs with modifications
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then the output includes functions from src/new.rs with the new path
-
-  @unwired
-  Scenario: Deletion-only changes do not surface functions
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo where the only change is deleting lines from a function
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then the output does not include the function with only deleted lines
-
-  @unwired
-  Scenario: Path normalization matches between git diff and complexity data
-    # tracked: crap-rs#169 — diff-mode cucumber harness not yet built
-    Given a git repo with changes in a nested file src/sub/mod.rs
-    When I run crap4rs --diff <baseline> --coverage lcov.info
-    Then functions from src/sub/mod.rs appear correctly in the output
-    And their file paths match between the diff filter and the CRAP report
+    And stderr contains "unexpected argument"

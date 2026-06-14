@@ -112,6 +112,7 @@ jobs:
           --test cli_init_cucumber
           --test cli_ergonomics_cucumber
           --test delta_cucumber
+          --test diff_cucumber
           --test github_annotations_cucumber
           --test multi_lang_html_cucumber
 
