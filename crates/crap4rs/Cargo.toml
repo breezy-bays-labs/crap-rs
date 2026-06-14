@@ -117,6 +117,10 @@ name = "delta_cucumber"
 harness = false
 
 [[test]]
+name = "diff_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 
