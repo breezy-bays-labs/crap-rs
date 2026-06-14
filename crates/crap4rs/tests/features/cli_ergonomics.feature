@@ -142,43 +142,33 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── --sort-by: choose sort dimension (issue #68) ───────────────────
 
-  @unwired
-  Scenario: --sort-by crap is the default order (CRAP descending)
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info`
-    Then the report is ordered by CRAP score descending
-    And the JSON envelope reports `view.sort` equal to "crap"
+  # --sort-by's per-dimension ORDERINGS (crap descending, coverage
+  # ascending, complexity descending, path-alphabetical-then-CRAP within
+  # file) and its composition with --top are owned by the
+  # domain::view::apply sort + order-of-operations unit tests in crap-core.
+  # These scenarios pin only the CLI-level contract view.rs cannot reach:
+  # the flag threads into the JSON envelope as the lowercase ValueEnum
+  # string, and clap rejects unknown dimensions.
 
-  @unwired
-  Scenario: --sort-by coverage orders by coverage percent ascending
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --sort-by coverage`
-    Then the report is ordered by coverage percent ascending
-    And the JSON envelope reports `view.sort` equal to "coverage"
+  @wired
+  Scenario Outline: --sort-by <key> echoes into the envelope as a lowercase string
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json --sort-by <key>`
+    Then the JSON envelope at "view.spec.sort" is "<key>"
 
-  @unwired
-  Scenario: --sort-by complexity orders by complexity descending
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --sort-by complexity`
-    Then the report is ordered by complexity descending
-    And the JSON envelope reports `view.sort` equal to "complexity"
+    Examples:
+      | key        |
+      | crap       |
+      | coverage   |
+      | complexity |
+      | path       |
 
-  @unwired
-  Scenario: --sort-by path orders alphabetically by file, then CRAP descending within file
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    # Delegates to domain SortKey::Path semantics — see view.feature
-    # for the full secondary-sort spec.
-    Given the project has functions in src/a.rs (CRAPs 5 and 30), src/b.rs (CRAP 10), src/c.rs (CRAPs 1 and 50)
-    When the operator runs `crap4rs --coverage lcov.info --sort-by path`
-    Then the report rows appear in order: src/a.rs::CRAP 30, src/a.rs::CRAP 5, src/b.rs::CRAP 10, src/c.rs::CRAP 50, src/c.rs::CRAP 1
-    And the JSON envelope reports `view.sort` equal to "path"
-
-  @unwired
-  Scenario: --sort-by composes with --top to surface the lowest-coverage targets
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --sort-by coverage --top 10`
-    Then the report contains the 10 functions with the lowest coverage percent
-    And the rows are ordered by coverage percent ascending
+  @wired
+  Scenario: --sort-by rejects an unknown dimension
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --sort-by nonsense`
+    Then the exit code is 2
+    And stderr contains "invalid value 'nonsense' for '--sort-by"
 
   # ── --no-fail: exit-code override (issue #65) ──────────────────────
 
