@@ -2,7 +2,7 @@
   "schema_version": 2,
   "tool_version": "0.6.0",
   "language": "rust",
-  "timestamp": "1781405246",
+  "timestamp": "1781405924",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
@@ -22822,9 +22822,9 @@
           },
           "complexity": 5,
           "complexity_metric": "cognitive",
-          "coverage_percent": 95.0,
+          "coverage_percent": 80.0,
           "crap": {
-            "value": 5.0,
+            "value": 5.2,
             "risk_level": "low"
           },
           "contributors": [
@@ -47930,7 +47930,7 @@
       "total_functions": 1676,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.620727923627685,
+      "average_crap": 1.6208472553699285,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -47956,7 +47956,7 @@
       "average_complexity": 1.6044152744630071,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.40369192950834,
+      "average_coverage": 98.39474204884009,
       "median_coverage": 100.0
     },
     "passed": true
@@ -50995,6 +50995,63 @@
       {
         "scored": {
           "identity": {
+            "file_path": "crates/crap-core/src/cli/view_args.rs",
+            "qualified_name": "validate_view_args",
+            "span": {
+              "start_line": 38,
+              "end_line": 75,
+              "start_column": 1,
+              "end_column": 1
+            }
+          },
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 80.0,
+          "crap": {
+            "value": 5.2,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "let-else",
+              "line": 46,
+              "column": 55,
+              "increment": 1,
+              "end_line": 48,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 50,
+              "column": 5,
+              "increment": 1,
+              "end_line": 56,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 57,
+              "column": 5,
+              "increment": 1,
+              "end_line": 63,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "match",
+              "line": 65,
+              "column": 5,
+              "increment": 1,
+              "end_line": 74,
+              "nesting_depth": 0
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_variable_declaration",
             "span": {
@@ -51637,63 +51694,6 @@
               "column": 5,
               "increment": 1,
               "end_line": 1840,
-              "nesting_depth": 0
-            }
-          ]
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap-core/src/cli/view_args.rs",
-            "qualified_name": "validate_view_args",
-            "span": {
-              "start_line": 38,
-              "end_line": 75,
-              "start_column": 1,
-              "end_column": 1
-            }
-          },
-          "complexity": 5,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 95.0,
-          "crap": {
-            "value": 5.0,
-            "risk_level": "low"
-          },
-          "contributors": [
-            {
-              "kind": "let-else",
-              "line": 46,
-              "column": 55,
-              "increment": 1,
-              "end_line": 48,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 50,
-              "column": 5,
-              "increment": 1,
-              "end_line": 56,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 57,
-              "column": 5,
-              "increment": 1,
-              "end_line": 63,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "match",
-              "line": 65,
-              "column": 5,
-              "increment": 1,
-              "end_line": 74,
               "nesting_depth": 0
             }
           ]
@@ -95896,7 +95896,7 @@
       "total_functions": 1676,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.620727923627685,
+      "average_crap": 1.6208472553699285,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -95922,7 +95922,7 @@
       "average_complexity": 1.6044152744630071,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.40369192950834,
+      "average_coverage": 98.39474204884009,
       "median_coverage": 100.0
     },
     "grouped": null
