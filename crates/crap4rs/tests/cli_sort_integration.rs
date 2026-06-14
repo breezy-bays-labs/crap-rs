@@ -50,8 +50,8 @@ fn parse_json(output: &std::process::Output) -> serde_json::Value {
         .unwrap_or_else(|e| panic!("stdout was not valid JSON: {e}\nraw stdout:\n{out}"))
 }
 
-/// 6-function fixture mirrors `cli_top_integration`: 3 simple/covered, 3
-/// branchy/uncovered. The functions span a range of CRAP, coverage, and
+/// 6-function fixture: 3 simple/covered, 3 branchy/uncovered. The
+/// functions span a range of CRAP, coverage, and
 /// complexity values so each `--sort-by` dimension produces a distinct
 /// ordering — the assertion shape is "compare adjacent rows," not
 /// "match exact CRAP scores."

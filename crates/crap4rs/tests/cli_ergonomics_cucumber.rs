@@ -56,6 +56,32 @@ DA:3,0
 end_of_record
 ";
 
+// Six functions spanning the CRAP range: three trivial+covered (CRAP ≤ 2)
+// and three branchy+uncovered (CRAP > 5). Used by the --top scenarios,
+// which need an eligible count (6) larger than the truncation limit so
+// `view.truncated` is observably true. At `--threshold 5` exactly the
+// three branchy functions exceed, which the keystone exit-code scenario
+// relies on.
+const MIXED_SRC: &str = "\
+pub fn passing_a() -> i32 { 1 }
+pub fn passing_b() -> i32 { 2 }
+pub fn passing_c() -> i32 { 3 }
+pub fn failing_a(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+pub fn failing_b(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+pub fn failing_c(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }
+";
+
+const MIXED_LCOV: &str = "\
+SF:lib.rs
+DA:1,1
+DA:2,1
+DA:3,1
+DA:4,0
+DA:5,0
+DA:6,0
+end_of_record
+";
+
 #[derive(Debug, Default, World)]
 struct CliWorld {
     project_dir: Option<PathBuf>,
@@ -81,6 +107,32 @@ impl CliWorld {
     fn stdout(&self) -> String {
         String::from_utf8_lossy(&self.require_output().stdout).into_owned()
     }
+
+    fn stderr(&self) -> String {
+        String::from_utf8_lossy(&self.require_output().stderr).into_owned()
+    }
+
+    /// Parse stdout as a JSON envelope (`--format json`). Panics with the
+    /// raw stdout if it is not valid JSON, so a malformed envelope fails
+    /// the scenario loudly rather than silently.
+    fn json(&self) -> serde_json::Value {
+        let out = self.stdout();
+        serde_json::from_str(&out)
+            .unwrap_or_else(|e| panic!("stdout was not valid JSON: {e}\nraw stdout:\n{out}"))
+    }
+}
+
+/// Navigate a dotted object path (e.g. `view.spec.limit`) into a JSON
+/// value. Panics naming the missing key if the path does not resolve, so
+/// a renamed envelope field surfaces as a clear scenario failure.
+fn json_at<'a>(root: &'a serde_json::Value, path: &str) -> &'a serde_json::Value {
+    let mut cur = root;
+    for key in path.split('.') {
+        cur = cur.get(key).unwrap_or_else(|| {
+            panic!("JSON path {path:?} missing at key {key:?}; envelope:\n{root:#}")
+        });
+    }
+    cur
 }
 
 fn setup_project(world: &mut CliWorld, src: &str, lcov: &str) {
@@ -109,6 +161,11 @@ fn given_within(world: &mut CliWorld) {
 #[given("a synthetic project where at least one function exceeds threshold")]
 fn given_exceeds(world: &mut CliWorld) {
     setup_project(world, EXCEEDS_SRC, EXCEEDS_LCOV);
+}
+
+#[given("a synthetic project with six functions spanning the CRAP range")]
+fn given_six(world: &mut CliWorld) {
+    setup_project(world, MIXED_SRC, MIXED_LCOV);
 }
 
 // ── When step ────────────────────────────────────────────────────────
@@ -191,6 +248,44 @@ fn then_not_contains(world: &mut CliWorld, needle: String) {
 fn then_empty(world: &mut CliWorld) {
     let stdout = world.stdout();
     assert!(stdout.is_empty(), "expected empty stdout, got:\n{stdout}");
+}
+
+#[then(regex = r#"^stderr contains "([^"]+)"$"#)]
+fn then_stderr_contains(world: &mut CliWorld, needle: String) {
+    let stderr = world.stderr();
+    assert!(
+        stderr.contains(&needle),
+        "stderr did not contain {needle:?}:\nstderr:\n{stderr}"
+    );
+}
+
+/// Assert a scalar JSON envelope field. The expected token is parsed as a
+/// JSON literal so `3`, `null`, `true`, and `false` all compare by value
+/// against the envelope — e.g. `view.spec.limit is null` vs `is 3`.
+#[then(regex = r#"^the JSON envelope at "([^"]+)" is (.+)$"#)]
+fn then_envelope_is(world: &mut CliWorld, path: String, expected: String) {
+    let root = world.json();
+    let actual = json_at(&root, &path);
+    let want: serde_json::Value = serde_json::from_str(&expected)
+        .unwrap_or_else(|e| panic!("expected literal {expected:?} is not valid JSON: {e}"));
+    assert_eq!(
+        *actual, want,
+        "JSON path {path:?}: expected {want}, got {actual}"
+    );
+}
+
+#[then(regex = r#"^the JSON envelope at "([^"]+)" has (\d+) entr(?:y|ies)$"#)]
+fn then_envelope_len(world: &mut CliWorld, path: String, n: usize) {
+    let root = world.json();
+    let arr = json_at(&root, &path)
+        .as_array()
+        .unwrap_or_else(|| panic!("JSON path {path:?} is not an array; envelope:\n{root:#}"));
+    assert_eq!(
+        arr.len(),
+        n,
+        "JSON path {path:?}: expected {n} entries, got {}",
+        arr.len()
+    );
 }
 
 #[then(regex = r"^the exit code is (\d+)$")]
