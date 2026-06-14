@@ -92,53 +92,53 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── --min-coverage / --max-coverage: range filter (issue #63) ──────
 
-  @unwired
-  Scenario: --min-coverage filters out untested functions
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --min-coverage 1`
-    Then no function in the report has coverage_percent equal to 0.0
-    And the JSON envelope reports `view.filters.coverage_range` as { "min": 1.0, "max": 100.0 }
+  # The coverage-range FILTER SEMANTICS (which functions pass, boundary
+  # inclusivity at 0/50/90/100, NaN exclusion) and the AND-composition with
+  # other filters are owned by the domain::view::apply filter unit tests +
+  # the prop_filters_and_compose property test in crap-core. These scenarios
+  # pin only the CLI-level contract view.rs cannot reach: the flags resolve
+  # into the envelope's coverage_range with min/max defaulted from the
+  # absent bound, validate_view_args rejects out-of-range/inverted bounds,
+  # and a filter that hides violations never relaxes the gate.
 
-  @unwired
-  Scenario: --max-coverage 0 surfaces only untested functions
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --max-coverage 0`
-    Then every function in the report has coverage_percent equal to 0.0
-    And the JSON envelope reports `view.filters.coverage_range` as { "min": 0.0, "max": 0.0 }
+  @wired
+  Scenario Outline: coverage-range flags resolve into the envelope filter
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json <flags>`
+    Then the JSON envelope at "view.spec.filters.coverage_range.min" is <min>
+    And the JSON envelope at "view.spec.filters.coverage_range.max" is <max>
 
-  @unwired
-  Scenario: --min-coverage 100 surfaces only fully-tested functions
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --min-coverage 100`
-    Then every function in the report has coverage_percent equal to 100.0
+    Examples:
+      | flags                               | min | max   |
+      | --min-coverage 1                    | 1.0 | 100.0 |
+      | --max-coverage 0                    | 0.0 | 0.0   |
+      | --min-coverage 1 --max-coverage 90  | 1.0 | 90.0  |
 
-  @unwired
-  Scenario: combining --min-coverage and --max-coverage targets partial coverage
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --min-coverage 1 --max-coverage 90`
-    Then every function in the report has coverage_percent strictly above 0 and at most 90
-    And the JSON envelope reports `view.filters.coverage_range` as { "min": 1.0, "max": 90.0 }
-
-  @unwired
-  Scenario Outline: invalid coverage ranges produce exit 2 with a clear stderr message
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info <flags>`
+  @wired
+  Scenario Outline: invalid coverage ranges exit 2 with a clear message
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src <flags>`
     Then the exit code is 2
     And stderr contains "<message>"
 
     Examples:
-      | flags                                       | message                              |
-      | --min-coverage -5                           | --min-coverage must be in [0, 100]   |
-      | --max-coverage 105                          | --max-coverage must be in [0, 100]   |
-      | --min-coverage 90 --max-coverage 30         | --min-coverage must not exceed --max-coverage |
+      | flags                               | message                                       |
+      | --min-coverage -5                   | --min-coverage must be in [0, 100]            |
+      | --max-coverage 105                  | --max-coverage must be in [0, 100]            |
+      | --min-coverage 90 --max-coverage 30 | --min-coverage must not exceed --max-coverage |
 
-  @unwired
-  Scenario: filter hiding violations does not change the exit code
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --min-coverage 99`
-    Then the report contains zero functions
-    And the exit code is 1
-    And the JSON envelope's `result.summary.exceeding_threshold` is greater than 0
+  @wired
+  Scenario: a coverage filter hiding violations does not change the exit code
+    # The feature's headline promise: shaping the view never relaxes the
+    # gate. --min-coverage 99 drops the three uncovered failing functions
+    # from the view (eligible falls to the three fully-covered passing
+    # rows), yet the process still exits 1 because the gate reflects the
+    # full unfiltered analysis.
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json --min-coverage 99`
+    Then the exit code is 1
+    And the JSON envelope at "view.eligible_count" is 3
+    And the JSON envelope at "result.summary.exceeding_threshold" is 3
 
   # ── --sort-by: choose sort dimension (issue #68) ───────────────────
 
