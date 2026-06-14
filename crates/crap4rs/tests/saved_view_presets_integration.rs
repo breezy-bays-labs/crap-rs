@@ -1,8 +1,7 @@
 //! Integration tests for `--view` saved view presets (Bundle D, issue #80).
 //!
 //! Hand-asserted scenarios from `tests/features/saved_view_presets.feature`.
-//! Mirrors the pattern in `tests/group_by_file_integration.rs` and
-//! `tests/cli_top_integration.rs`.
+//! Mirrors the pattern in `tests/group_by_file_integration.rs`.
 
 use std::path::Path;
 use std::process::Command;
@@ -45,8 +44,8 @@ fn parse_json(output: &std::process::Output) -> serde_json::Value {
         .unwrap_or_else(|e| panic!("stdout was not valid JSON: {e}\nraw stdout:\n{out}"))
 }
 
-/// 6-function fixture mirroring `cli_top_integration::FIXTURE_*` and
-/// `group_by_file_integration::FIXTURE_*` for shape comparability.
+/// 6-function fixture mirroring `group_by_file_integration::FIXTURE_*`
+/// for shape comparability: 3 simple/covered, 3 branchy/uncovered.
 const FIXTURE_SRC: &str = "\
 pub fn passing_a() -> i32 { 1 }
 pub fn passing_b() -> i32 { 2 }

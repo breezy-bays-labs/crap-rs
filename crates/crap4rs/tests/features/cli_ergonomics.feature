@@ -37,60 +37,58 @@ Feature: CLI ergonomics — shaping the report from the command line
 
   # ── --top: truncate (issue #62) ────────────────────────────────────
 
-  @unwired
+  # --top's truncation SEMANTICS (which rows survive, when `truncated`
+  # flips, the limit>eligible and limit==eligible boundaries, and the
+  # filter→sort→truncate order of operations) are owned by the
+  # domain::view::apply unit tests in crap-core. These scenarios pin only
+  # the CLI-level contract that view.rs cannot reach: the flag threads
+  # end-to-end into the serialized JSON envelope, --top 0 canonicalises to
+  # a null limit, clap rejects non-positive integers, and — the feature's
+  # headline promise — shaping the view never changes the CI exit code.
+
+  @wired
   Scenario: --top N limits the report to the N highest-CRAP functions
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --top 10`
-    Then the table contains 10 rows
-    And the table rows are the 10 highest-CRAP functions
-    And the JSON envelope reports `view.limit` equal to 10
-    And the JSON envelope reports `view.eligible_count` equal to TOTAL_FUNCTIONS
-    And the JSON envelope reports `view.truncated` equal to true
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json --top 3`
+    Then the JSON envelope at "view.shown" has 3 entries
+    And the JSON envelope at "view.spec.limit" is 3
+    And the JSON envelope at "view.eligible_count" is 6
+    And the JSON envelope at "view.truncated" is true
 
-  @unwired
-  Scenario: --top 0 means no limit
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --top 0`
-    Then the report includes every function
-    And the JSON envelope reports `view.limit` equal to null
-    And the JSON envelope reports `view.truncated` equal to false
+  @wired
+  Scenario: --top 0 canonicalises to no limit
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json --top 0`
+    Then the JSON envelope at "view.shown" has 6 entries
+    And the JSON envelope at "view.spec.limit" is null
+    And the JSON envelope at "view.truncated" is false
 
-  @unwired
-  Scenario: --top 1 surfaces only the worst function
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --top 1`
-    Then the table contains 1 row
-    And that row is the highest-CRAP function in the analysis
-    And the JSON envelope reports `view.truncated` equal to true
-
-  @unwired
-  Scenario: --top greater than the eligible count truncates nothing
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --top 1000000`
-    Then the report includes every function
-    And the JSON envelope reports `view.limit` equal to 1000000
-    And the JSON envelope reports `view.truncated` equal to false
-
-  @unwired
+  @wired
   Scenario: --top hiding violations does not change the exit code
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info --top 5`
-    Then the table shows 5 rows
-    And the exit code is 1
-    And the JSON envelope's `result.passed` is false
+    # The feature's headline promise (see this feature's preamble): shaping
+    # the view never relaxes the gate. Three functions exceed threshold;
+    # --top 1 hides two of those breaches from the rendered view, yet the
+    # process still exits 1 because the gate reflects the full unfiltered
+    # analysis, not the shaped view.
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --format json --top 1`
+    Then the exit code is 1
+    And the JSON envelope at "view.shown" has 1 entry
+    And the JSON envelope at "view.truncated" is true
+    And the JSON envelope at "result.summary.exceeding_threshold" is 3
 
-  @unwired
+  @wired
   Scenario Outline: --top rejects non-positive-integer values
-    # tracked: crap-rs#169 — cli_ergonomics harness wires only the @summary group today
-    When the operator runs `crap4rs --coverage lcov.info <flags>`
+    Given a synthetic project with six functions spanning the CRAP range
+    When the operator runs `crap4rs --coverage lcov.info --src src <flags>`
     Then the exit code is 2
     And stderr contains "<message>"
 
     Examples:
-      | flags        | message                                |
-      | --top -3     | invalid value '-3' for '--top'         |
-      | --top 3.5    | invalid value '3.5' for '--top'        |
-      | --top abc    | invalid value 'abc' for '--top'        |
+      | flags     | message                        |
+      | --top -3  | invalid value '-3' for '--top  |
+      | --top 3.5 | invalid value '3.5' for '--top |
+      | --top abc | invalid value 'abc' for '--top |
 
   # ── --min-coverage / --max-coverage: range filter (issue #63) ──────
 
