@@ -7,7 +7,7 @@
 
 use crate::domain::delta::{DeltaView, FunctionChange};
 use crate::domain::types::RiskLevel;
-use crate::domain::view::AnalysisView;
+use crate::domain::view::{AnalysisView, should_render_view_line};
 use colored::Colorize;
 use comfy_table::{ContentArrangement, Table};
 
@@ -89,6 +89,7 @@ pub fn format_table_with_explain(
         output.push_str(&format_grouped_table(view));
         output.push('\n');
         append_summary_block(&mut output, view, threshold);
+        append_view_line(&mut output, view);
         append_delta_if_present(&mut output, delta);
         return output;
     }
@@ -122,6 +123,8 @@ pub fn format_table_with_explain(
     output.push('\n');
 
     append_summary_block(&mut output, view, threshold);
+
+    append_view_line(&mut output, view);
 
     append_delta_if_present(&mut output, delta);
 
@@ -408,6 +411,95 @@ fn append_summary_block(output: &mut String, view: &AnalysisView<'_>, threshold:
         d.moderate,
         d.high,
     ));
+}
+
+/// Append the "View:" subtitle line directly below the summary block.
+///
+/// A no-op unless the shaped view materially differs from the underlying
+/// analysis (see `should_render_view_line` in `domain::view`): filtering
+/// dropped rows, the function-level limit truncated rows, or grouping
+/// truncated files. Sort-only and default-spec invocations leave the
+/// table byte-identical to its pre-view-line shape.
+///
+/// The line reads `View: showing <shown> of <total> functions` with an
+/// optional parenthetical naming the active shaping (a coverage band,
+/// a failing-only filter, a `--top` truncation, a grouped-file
+/// truncation), joined in that stable order. When no parenthetical
+/// applies the bare `showing N of M functions` form is emitted — never
+/// an empty `()`.
+fn append_view_line(output: &mut String, view: &AnalysisView<'_>) {
+    if !should_render_view_line(view) {
+        return;
+    }
+    let shown = view.shown.len();
+    let total = view.full.functions.len();
+    match describe_shaping(view) {
+        Some(shaping) => output.push_str(&format!(
+            "View: showing {shown} of {total} functions ({shaping})\n",
+        )),
+        None => output.push_str(&format!("View: showing {shown} of {total} functions\n")),
+    }
+}
+
+/// Build the comma-joined description of the active shaping for the
+/// "View:" line, in stable order: coverage band, failing-only,
+/// function-level truncation, grouped-file truncation. Returns `None`
+/// when no descriptor applies (the bare-line fallback).
+fn describe_shaping(view: &AnalysisView<'_>) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    if let Some(range) = view.spec.filters.coverage_range.as_ref() {
+        parts.push(format!(
+            "coverage {}–{}%",
+            format_coverage_bound(range.min),
+            format_coverage_bound(range.max),
+        ));
+    }
+    if view.spec.filters.only_failing {
+        parts.push("failing only".to_string());
+    }
+    if let Some(part) = describe_truncation(view) {
+        parts.push(part);
+    }
+    if let Some(part) = describe_grouped_truncation(view) {
+        parts.push(part);
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(", "))
+    }
+}
+
+/// `top <N>` when the function-level limit truncated rows, else `None`.
+/// `view.truncated` is true only when `spec.limit` is `Some(N)`, so the
+/// effective limit is always present on this branch.
+fn describe_truncation(view: &AnalysisView<'_>) -> Option<String> {
+    if !view.truncated {
+        return None;
+    }
+    view.spec.limit.map(|n| format!("top {n}"))
+}
+
+/// `top <N> files` when grouping is active and the file-level limit
+/// truncated the file list, else `None`. The file-level limit shares
+/// `spec.limit` with the function-level path.
+fn describe_grouped_truncation(view: &AnalysisView<'_>) -> Option<String> {
+    let grouped = view.grouped.as_ref()?;
+    if !grouped.truncated {
+        return None;
+    }
+    view.spec.limit.map(|n| format!("top {n} files"))
+}
+
+/// Format a coverage bound the same way coverage reads elsewhere:
+/// integer-valued bounds drop the decimal (`90` not `90.0`), fractional
+/// bounds keep one decimal (`12.5`).
+fn format_coverage_bound(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.1}")
+    }
 }
 
 /// Build the per-file grouped table body. Caller appends the summary
@@ -1797,6 +1889,165 @@ mod tests {
         );
         let output = format_table(&view, 8.0, false, TEST_TOOL_NAME, TEST_TOOL_VERSION);
         insta::assert_snapshot!(output);
+    }
+
+    // ── "View:" subtitle line ─────────────────────────────────────────
+    //
+    // The line renders directly below the Summary block iff the shaped
+    // view materially differs from the underlying analysis
+    // (`should_render_view_line`). Sort-only and default-spec
+    // invocations leave the table byte-identical (behavior-preserving).
+
+    use crate::domain::view::{self, CoverageRange, Filters, GroupKey, ViewSpec};
+
+    /// Render `make_multi_function_result` (3 functions / 3 files) under
+    /// the given spec, color forced off, and return the plain table text.
+    fn view_line_output(spec: ViewSpec, result: &AnalysisResult) -> String {
+        let v = view::apply(result, spec);
+        format_table(&v, 8.0, false, TEST_TOOL_NAME, TEST_TOOL_VERSION)
+    }
+
+    #[test]
+    fn view_line_top_truncation_reports_top_n() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let output = view_line_output(
+            ViewSpec {
+                limit: Some(2),
+                ..Default::default()
+            },
+            &result,
+        );
+        assert!(
+            output.contains("View: showing 2 of 3 functions (top 2)"),
+            "expected the View line for --top truncation; got:\n{output}",
+        );
+    }
+
+    #[test]
+    fn view_line_coverage_range_reports_band() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        // Coverage band 50–90% admits only parse_record (72.5); the
+        // other two (95.0, 30.0) fall outside, so shown is 1 of 3.
+        let output = view_line_output(
+            ViewSpec {
+                filters: Filters {
+                    coverage_range: Some(CoverageRange::new(50.0, 90.0).unwrap()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            &result,
+        );
+        assert!(
+            output.contains("View: showing 1 of 3 functions (coverage 50–90%)"),
+            "expected the View line for a coverage band; got:\n{output}",
+        );
+    }
+
+    #[test]
+    fn view_line_only_failing_reports_failing_only() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        // Threshold 8.0: parse_record (15.0) and complex_fn (45.2)
+        // exceed; simple_fn (3.0) does not. shown is 2 of 3.
+        let output = view_line_output(
+            ViewSpec {
+                filters: Filters {
+                    only_failing: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            &result,
+        );
+        assert!(
+            output.contains("View: showing 2 of 3 functions (failing only)"),
+            "expected the View line for --only-failing; got:\n{output}",
+        );
+    }
+
+    #[test]
+    fn view_line_combines_filter_and_truncation_in_order() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        // Coverage band 1–90% admits parse_record (72.5) and complex_fn
+        // (30.0) — 2 eligible — then --top 1 truncates to 1 shown. Both
+        // shaping descriptors are active, joined in the locked order:
+        // coverage band first, then truncation.
+        let output = view_line_output(
+            ViewSpec {
+                filters: Filters {
+                    coverage_range: Some(CoverageRange::new(1.0, 90.0).unwrap()),
+                    ..Default::default()
+                },
+                limit: Some(1),
+                ..Default::default()
+            },
+            &result,
+        );
+        assert!(
+            output.contains("View: showing 1 of 3 functions (coverage 1–90%, top 1)"),
+            "expected coverage band before truncation in the parenthetical; got:\n{output}",
+        );
+    }
+
+    #[test]
+    fn view_line_absent_for_default_spec() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        let output = view_line_output(ViewSpec::default(), &result);
+        assert!(
+            !output.contains("View:"),
+            "default spec must not render a View line; got:\n{output}",
+        );
+    }
+
+    #[test]
+    fn view_line_absent_for_sort_only_spec() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        // Re-ordering rows changes no information content, so the
+        // predicate stays false and no View line appears.
+        let output = view_line_output(
+            ViewSpec {
+                sort: crate::domain::view::SortKey::Coverage,
+                ..Default::default()
+            },
+            &result,
+        );
+        assert!(
+            !output.contains("View:"),
+            "sort-only spec must not render a View line; got:\n{output}",
+        );
+    }
+
+    #[test]
+    fn view_line_grouped_file_truncation_reports_top_n_files() {
+        let _guard = acquire_color_lock();
+        colored::control::set_override(false);
+        let result = make_multi_function_result();
+        // 3 files grouped, --top 2 truncates the file list to 2 → the
+        // grouped-truncation descriptor `top 2 files` fires.
+        let output = view_line_output(
+            ViewSpec {
+                group_by: Some(GroupKey::File),
+                limit: Some(2),
+                ..Default::default()
+            },
+            &result,
+        );
+        assert!(
+            output.contains("View: showing 3 of 3 functions (top 2 files)"),
+            "expected the grouped-truncation View line; got:\n{output}",
+        );
     }
 
     // ── Delta block (VS5) ─────────────────────────────────────────────
