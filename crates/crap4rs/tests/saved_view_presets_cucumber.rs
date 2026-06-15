@@ -134,7 +134,7 @@ fn given_project(world: &mut PresetWorld, step: &Step) {
     let dir = tempfile::tempdir().expect("create tempdir");
     let path = dir.path().to_path_buf();
     std::fs::create_dir_all(path.join("src")).expect("create src dir");
-    std::fs::write(path.join("src/lib.rs"), FIXTURE_SRC).expect("write lib.rs");
+    std::fs::write(path.join("src").join("lib.rs"), FIXTURE_SRC).expect("write lib.rs");
     std::fs::write(path.join("lcov.info"), FIXTURE_LCOV).expect("write lcov.info");
     write_config(&path, toml);
     world.project_dir = Some(path);
