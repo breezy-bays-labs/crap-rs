@@ -102,13 +102,18 @@ impl MultiRootWorld {
 }
 
 fn run_git(dir: &Path, args: &[&str]) {
-    let ok = Command::new("git")
+    let output = Command::new("git")
         .current_dir(dir)
         .args(args)
-        .status()
-        .unwrap_or_else(|e| panic!("failed to invoke git {args:?}: {e}"))
-        .success();
-    assert!(ok, "git {args:?} failed");
+        .output()
+        .unwrap_or_else(|e| panic!("failed to invoke git {args:?}: {e}"));
+    assert!(
+        output.status.success(),
+        "git {args:?} failed (exit {:?})\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 /// Scaffold two crate-like roots that share a crate-internal relative path
