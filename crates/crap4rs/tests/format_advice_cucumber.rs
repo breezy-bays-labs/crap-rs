@@ -249,9 +249,11 @@ fn then_exit_parity(world: &mut AdviceWorld) {
     assert_eq!(
         world.require_output().status.code(),
         json_run.status.code(),
-        "advice and json exit codes must match\nadvice: {}\njson exit: {:?}",
+        "advice and json exit codes must match\nadvice: {}\njson exit: {:?}\njson stdout:\n{}\njson stderr:\n{}",
         world.fail_context(),
-        json_run.status.code()
+        json_run.status.code(),
+        String::from_utf8_lossy(&json_run.stdout),
+        String::from_utf8_lossy(&json_run.stderr)
     );
 }
 
@@ -349,6 +351,17 @@ fn then_deterministic(world: &mut AdviceWorld) {
     let cmd = world.last_cmd.clone().expect("no command was run");
     let again = run(world.require_dir(), &parse_args(&cmd));
     let again_stdout = String::from_utf8_lossy(&again.stdout).into_owned();
+    // Fail fast with actionable context if the second run diverges on exit
+    // code — otherwise a failed/signaled re-run surfaces only as an opaque
+    // JSON parse panic below.
+    assert_eq!(
+        again.status.code(),
+        world.require_output().status.code(),
+        "determinism re-run exit code mismatch\nexit: {:?}\nstdout:\n{}\nstderr:\n{}",
+        again.status.code(),
+        again_stdout,
+        String::from_utf8_lossy(&again.stderr)
+    );
     // Strip the wall-clock timestamp before comparing stdout; stderr carries
     // no timestamp so it compares raw.
     assert_eq!(
