@@ -2,7 +2,7 @@
   "schema_version": 2,
   "tool_version": "0.6.0",
   "language": "rust",
-  "timestamp": "1781477535",
+  "timestamp": "1781481795",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
@@ -18173,9 +18173,9 @@
           },
           "complexity": 3,
           "complexity_metric": "cognitive",
-          "coverage_percent": 76.78571428571429,
+          "coverage_percent": 75.0,
           "crap": {
-            "value": 3.11,
+            "value": 3.14,
             "risk_level": "low"
           },
           "contributors": [
@@ -47930,7 +47930,7 @@
       "total_functions": 1676,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6230369928400952,
+      "average_crap": 1.6230548926014319,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -47956,7 +47956,7 @@
       "average_complexity": 1.6044152744630071,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.29800910119926,
+      "average_coverage": 98.29694363921494,
       "median_coverage": 100.0
     },
     "passed": true
@@ -55780,9 +55780,9 @@
           },
           "complexity": 3,
           "complexity_metric": "cognitive",
-          "coverage_percent": 76.78571428571429,
+          "coverage_percent": 75.0,
           "crap": {
-            "value": 3.11,
+            "value": 3.14,
             "risk_level": "low"
           },
           "contributors": [
@@ -95896,7 +95896,7 @@
       "total_functions": 1676,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6230369928400952,
+      "average_crap": 1.6230548926014319,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -95922,7 +95922,7 @@
       "average_complexity": 1.6044152744630071,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.29800910119926,
+      "average_coverage": 98.29694363921494,
       "median_coverage": 100.0
     },
     "grouped": null
