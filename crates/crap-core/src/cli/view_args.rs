@@ -479,4 +479,59 @@ mod tests {
         // No bogus absolute path crept in.
         assert!(!msg.contains('/'), "no resolved path should appear: {msg}");
     }
+
+    // ── validate_view_args ───────────────────────────────────────────
+
+    #[test]
+    fn validate_view_args_accepts_no_coverage_bounds() {
+        // Neither bound passed → early `Ok` (no range to check).
+        let cli = parse(&["--coverage", "lcov.info"]);
+        assert!(validate_view_args(&cli).is_ok());
+    }
+
+    #[test]
+    fn validate_view_args_accepts_valid_bounds() {
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--min-coverage",
+            "10",
+            "--max-coverage",
+            "90",
+        ]);
+        assert!(validate_view_args(&cli).is_ok());
+    }
+
+    #[test]
+    fn validate_view_args_rejects_min_coverage_out_of_range() {
+        let cli = parse(&["--coverage", "lcov.info", "--min-coverage", "150"]);
+        let msg = format!("{:#}", validate_view_args(&cli).unwrap_err());
+        assert!(msg.contains("--min-coverage"), "got: {msg}");
+    }
+
+    #[test]
+    fn validate_view_args_rejects_max_coverage_out_of_range() {
+        let cli = parse(&["--coverage", "lcov.info", "--max-coverage", "105"]);
+        let msg = format!("{:#}", validate_view_args(&cli).unwrap_err());
+        assert!(msg.contains("--max-coverage"), "got: {msg}");
+    }
+
+    #[test]
+    fn validate_view_args_rejects_min_exceeding_max() {
+        // Both bounds in range individually, but min > max → the
+        // CoverageRange::new MinExceedsMax arm, translated to flag prose.
+        let cli = parse(&[
+            "--coverage",
+            "lcov.info",
+            "--min-coverage",
+            "80",
+            "--max-coverage",
+            "20",
+        ]);
+        let msg = format!("{:#}", validate_view_args(&cli).unwrap_err());
+        assert!(
+            msg.contains("must not exceed"),
+            "expected min-exceeds-max message, got: {msg}"
+        );
+    }
 }
