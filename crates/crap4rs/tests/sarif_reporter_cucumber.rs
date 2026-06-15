@@ -456,6 +456,15 @@ fn then_diagnostic_mirrors_advice(world: &mut SarifWorld, advice_cmd: String) {
 
     assert!(!sarif_diags.is_empty(), "SARIF produced no diagnostics");
     assert!(!advice_diags.is_empty(), "advice produced no diagnostics");
+    // A mirror is a bijection, not a subset: both surfaces derive from the
+    // same set of exceeding functions, so neither may carry a diagnostic the
+    // other lacks. Assert key-set equality before comparing values.
+    let sarif_keys: std::collections::BTreeSet<_> = sarif_diags.keys().cloned().collect();
+    let advice_keys: std::collections::BTreeSet<_> = advice_diags.keys().cloned().collect();
+    assert_eq!(
+        sarif_keys, advice_keys,
+        "SARIF and --format advice diagnostic key sets differ"
+    );
     for (key, advice_diag) in &advice_diags {
         let sarif_diag = sarif_diags
             .get(key)
