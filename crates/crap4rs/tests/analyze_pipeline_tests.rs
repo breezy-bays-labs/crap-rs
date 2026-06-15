@@ -621,3 +621,108 @@ pub fn with_branch(x: i32) -> &'static str {
     let verdict = &result.functions[0];
     assert!(verdict.scored.crap.value > 0.0);
 }
+
+/// In-process coverage for `core::populate_diagnostics`: with
+/// `compute_diagnostics` enabled, every over-threshold verdict gains a
+/// populated `Diagnostic` while passing verdicts keep `None`; with it
+/// disabled, even exceeders stay `None`. (The advice/SARIF CLI surfaces are
+/// pinned by the `format_advice` / `sarif_reporter` cucumber harnesses, but
+/// those shell the binary and a `harness = false` runner is skipped by
+/// nextest — so the lib-level gating is covered here, in-process.)
+fn setup_diagnostics_project(dir: &Path) {
+    let src_dir = dir.join("src");
+    fs::create_dir_all(&src_dir).unwrap();
+    fs::write(
+        src_dir.join("lib.rs"),
+        "pub fn simple_pass() -> i32 { 1 }\n\
+         pub fn branchy_fail(x: i32) -> i32 { if x > 0 { if x > 5 { 1 } else { 2 } } else { 3 } }\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.join("lcov.info"),
+        "SF:lib.rs\nDA:1,1\nDA:2,0\nend_of_record\n",
+    )
+    .unwrap();
+}
+
+fn diagnostics_opts(dir: &Path, src: &Path, compute_diagnostics: bool) -> AnalyzeOptions {
+    AnalyzeOptions {
+        identity_base: IdentityBase::SrcRelative(src.to_path_buf()),
+        src: vec![src.to_path_buf()],
+        coverage: dir.join("lcov.info"),
+        threshold_config: ThresholdConfig {
+            global: 8.0,
+            ..ThresholdConfig::default()
+        },
+        metric: ComplexityMetric::Cognitive,
+        exclude: Vec::new(),
+        respect_gitignore: false,
+        extensions: vec!["rs".to_string()],
+        compute_diagnostics,
+        ..AnalyzeOptions::default()
+    }
+}
+
+#[test]
+fn analyze_populates_diagnostics_for_exceeders_when_enabled() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_diagnostics_project(dir.path());
+    let src = dir.path().join("src");
+    let (cx, cov) = adapters(&src);
+
+    let result = analyze(&diagnostics_opts(dir.path(), &src, true), &cx, &cov)
+        .unwrap()
+        .result;
+
+    let mut saw_exceeder = false;
+    let mut saw_passer = false;
+    for v in &result.functions {
+        if v.exceeds {
+            saw_exceeder = true;
+            assert!(
+                v.diagnostic.is_some(),
+                "over-threshold {} must carry a diagnostic",
+                v.scored.identity.qualified_name
+            );
+        } else {
+            saw_passer = true;
+            assert!(
+                v.diagnostic.is_none(),
+                "under-threshold {} must omit the diagnostic",
+                v.scored.identity.qualified_name
+            );
+        }
+    }
+    assert!(
+        saw_exceeder,
+        "fixture must produce an over-threshold function"
+    );
+    assert!(
+        saw_passer,
+        "fixture must produce an under-threshold function"
+    );
+}
+
+#[test]
+fn analyze_omits_diagnostics_when_disabled() {
+    let dir = tempfile::tempdir().unwrap();
+    setup_diagnostics_project(dir.path());
+    let src = dir.path().join("src");
+    let (cx, cov) = adapters(&src);
+
+    let result = analyze(&diagnostics_opts(dir.path(), &src, false), &cx, &cov)
+        .unwrap()
+        .result;
+
+    assert!(
+        result.functions.iter().any(|v| v.exceeds),
+        "fixture must still produce an over-threshold function"
+    );
+    for v in &result.functions {
+        assert!(
+            v.diagnostic.is_none(),
+            "compute_diagnostics=false must leave every diagnostic None ({})",
+            v.scored.identity.qualified_name
+        );
+    }
+}

@@ -137,6 +137,10 @@ name = "saved_view_presets_cucumber"
 harness = false
 
 [[test]]
+name = "format_advice_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 
