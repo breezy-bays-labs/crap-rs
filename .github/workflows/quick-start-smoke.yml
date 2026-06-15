@@ -46,7 +46,7 @@ jobs:
       contents: read
       pull-requests: write   # sticky comment under the dedicated header
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           # `fetch-depth: 0` so the coverage staleness check below
           # (`git diff --name-only "$BASE_REF"...HEAD`) has access to
@@ -69,10 +69,10 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - uses: taiki-e/install-action@e49978b799e49ff429d162b7a30601a569ab6538 # v2
+      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2
         with:
           tool: cargo-nextest@0.9
-      - uses: taiki-e/install-action@e49978b799e49ff429d162b7a30601a569ab6538 # v2
+      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2
         with:
           tool: cargo-llvm-cov@0.6
 
