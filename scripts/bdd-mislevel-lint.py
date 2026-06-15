@@ -119,8 +119,11 @@ OPTOUT_SHAPE_RE = re.compile(
 )
 # RULE D: the voluntary "this harness mirrors a named lower test" marker.
 ASSERTS_ONLY_TOKEN_RE = re.compile(r"//\s*bdd-asserts-only:")
+# The target must be a `::`-qualified Rust path (`<crate>::<path>`) — a
+# bare token before `tracked:` is a malformed marker, not a real test
+# reference.
 ASSERTS_ONLY_SHAPE_RE = re.compile(
-    r"^\s*//\s*bdd-asserts-only:\s*\S+\s+—\s+tracked:\s*crap-rs#\d+\s+—\s+\S.*$"
+    r"^\s*//\s*bdd-asserts-only:\s*\S+::\S+\s+—\s+tracked:\s*crap-rs#\d+\s+—\s+\S.*$"
 )
 
 # ── Feature (Gherkin) scanners ───────────────────────────────────────
@@ -224,7 +227,9 @@ def resolve_feature(harness: Path, rel_path: str) -> Path:
     `crates/<crate>/tests/<name>_cucumber.rs`, so the crate dir is two
     parents up."""
     crate_dir = harness.parent.parent
-    return crate_dir / rel_path
+    # `rel_path` is a forward-slash literal from the Rust source; split it
+    # into components so the join is separator-correct on every platform.
+    return crate_dir.joinpath(*rel_path.split("/"))
 
 
 def line_of(text: str, needle_re: re.Pattern[str]) -> int:
@@ -526,6 +531,9 @@ def self_test() -> int:
          AMBIGUOUS_HARNESS, LIB_FEATURE, None, 1, "ambiguous", ""),
         ("ruleD-malformed-asserts-only-WARNS",
          "// bdd-asserts-only: crap-core::json::tests (no tracked)\n" + SPAWN_HARNESS,
+         CLI_FEATURE, "tests/features/f.feature", 0, "RULE D", ""),
+        ("ruleD-asserts-only-without-qualified-path-WARNS",
+         "// bdd-asserts-only: notqualified — tracked: crap-rs#169 — reason\n" + SPAWN_HARNESS,
          CLI_FEATURE, "tests/features/f.feature", 0, "RULE D", ""),
         ("ruleD-valid-asserts-only-PASSES-no-warn",
          VALID_ASSERTS_ONLY, CLI_FEATURE, "tests/features/f.feature", 0,
