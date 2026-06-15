@@ -133,6 +133,10 @@ name = "sarif_reporter_cucumber"
 harness = false
 
 [[test]]
+name = "saved_view_presets_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 
