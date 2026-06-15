@@ -210,8 +210,8 @@ fn then_keys_src_relative(world: &mut MultiRootWorld) {
     assert!(!keys.is_empty(), "view.shown must not be empty");
     for key in &keys {
         assert!(
-            !key.starts_with("crate-"),
-            "single-root identity must be src-relative, but {key:?} carries a root prefix; keys: {keys:?}"
+            !Path::new(key).is_absolute() && !key.starts_with("crate-"),
+            "single-root identity must be src-relative, but {key:?} is absolute or carries a root prefix; keys: {keys:?}"
         );
     }
 }
