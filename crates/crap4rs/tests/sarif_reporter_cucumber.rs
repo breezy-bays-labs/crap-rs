@@ -417,6 +417,17 @@ fn then_diagnostic_mirrors_advice(world: &mut SarifWorld, advice_cmd: String) {
     let sarif = world.json();
     let advice = {
         let out = run(world.require_dir(), &parse_args(&advice_cmd));
+        // Fail fast with actionable context if the comparison run itself
+        // fails — otherwise a non-zero advice exit surfaces only as an
+        // opaque JSON parse error below. The command carries `--no-fail`,
+        // so exit 0 is expected.
+        assert!(
+            out.status.success(),
+            "advice comparison run failed (status {:?})\nstdout:\n{}\nstderr:\n{}",
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
         let s = String::from_utf8_lossy(&out.stdout).into_owned();
         serde_json::from_str::<serde_json::Value>(&s)
             .unwrap_or_else(|e| panic!("advice stdout was not valid JSON: {e}\n{s}"))
