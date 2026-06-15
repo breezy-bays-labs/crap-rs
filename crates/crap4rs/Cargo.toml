@@ -141,6 +141,10 @@ name = "format_advice_cucumber"
 harness = false
 
 [[test]]
+name = "multi_root_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 

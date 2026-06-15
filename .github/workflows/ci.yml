@@ -118,6 +118,7 @@ jobs:
           --test sarif_reporter_cucumber
           --test saved_view_presets_cucumber
           --test format_advice_cucumber
+          --test multi_root_cucumber
           --test github_annotations_cucumber
           --test multi_lang_html_cucumber
 
