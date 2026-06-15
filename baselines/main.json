@@ -2,7 +2,7 @@
   "schema_version": 2,
   "tool_version": "0.6.0",
   "language": "rust",
-  "timestamp": "1781539373",
+  "timestamp": "1781552738",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
