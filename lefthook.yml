@@ -106,6 +106,16 @@ pre-push:
       # every push. Single source of truth: `scripts/bdd-tracked-lint.py`.
       run: python3 scripts/bdd-tracked-lint.py
       timeout: 30s
+    bdd-mislevel-lint:
+      # Mechanical enforcement of the Boundary Rule's mechanizable
+      # shadow across the cucumber suite (RULE A narration/execution +
+      # A-OPTOUT/A-COHERENCE + RULE B feature-link, FAIL; RULE D marker
+      # shape, WARN). Joins each `crates/*/tests/*_cucumber.rs` harness
+      # to its bound `.feature`. Local-velocity layer of the same check
+      # `.github/workflows/ci.yml`'s `bdd-mislevel-lint` job runs on
+      # every push. Single source of truth: `scripts/bdd-mislevel-lint.py`.
+      run: python3 scripts/bdd-mislevel-lint.py
+      timeout: 30s
     config-discovery-lint:
       # Mechanical enforcement of the crap-rs#339 C-2 isolation rule:
       # analyzer-shelling tests with an IN-REPO `--src` and no `--config`
