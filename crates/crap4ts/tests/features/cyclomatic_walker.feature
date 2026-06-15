@@ -11,7 +11,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return `hello, ${name}`;
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the report includes function `greet` with cyclomatic complexity 1
     And no contributors are emitted for `greet`
 
@@ -24,14 +24,14 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return "non-neg";
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the report includes function `classify` with cyclomatic complexity 2
     And the contributors include one `if-branch` at line 2
 
   @wired
   Scenario Outline: Each universal decision-point construct contributes 1
     Given a TypeScript source file containing the construct `<construct>`
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the function's cyclomatic complexity is `<base + 1>`
     And the contributors include exactly one `<kind>` entry
 
@@ -50,7 +50,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
   @wired
   Scenario Outline: TypeScript-specific decision points add to cyclomatic
     Given a TypeScript source file containing the construct `<construct>`
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the function's cyclomatic complexity is `<base + 1>`
     And the contributors include exactly one `<kind>` entry
 
@@ -70,7 +70,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return <div>{visible && <span>hello, {name}</span>}</div>;
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the function's cyclomatic complexity is 2
     And the JSX conditional is counted via the existing `logical-operator` contributor
     And the contributors list contains exactly one entry of kind `logical-operator`
@@ -84,7 +84,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return xs.map(inner);
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the report includes function `outer` with cyclomatic complexity 1
     And the report includes function `inner` with cyclomatic complexity 2
     And `inner`'s contributors include one `ternary` entry
@@ -97,7 +97,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return x < 0 ? "neg" : x === 0 ? "zero" : "pos";
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the report includes function `classify` with cyclomatic complexity 3
     And the contributors include exactly two `ternary` entries
 
@@ -109,7 +109,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return a && b && c && d;
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the report includes function `allTruthy` with cyclomatic complexity 4
     And the contributors include exactly three `logical-operator` entries
 
@@ -124,7 +124,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return "default";
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the report includes function `deep` with cyclomatic complexity 3
     And the contributors include exactly two `if-branch` entries
 
@@ -139,7 +139,7 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
         return "not-both";
       }
       """
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the report includes function `both` with cyclomatic complexity 3
     And the contributors include exactly one `if-branch` entry
     And the contributors include exactly one `logical-operator` entry
@@ -147,6 +147,6 @@ Feature: Cyclomatic complexity for TypeScript via the oxc walker
   @wired
   Scenario: Risk classification is metric-invariant
     Given a TypeScript function with cyclomatic complexity 4 and coverage 50%
-    When the operator runs `crap4ts --coverage cov.json --src .`
+    When the oxc walker analyzes the source
     Then the function's CRAP score is 6.0
     And the function's risk classification is `low`

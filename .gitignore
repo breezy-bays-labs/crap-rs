@@ -27,3 +27,7 @@ lcov.info
 .gemini/
 excalidraw.log
 .playwright-mcp/
+
+# Python bytecode cache (the scripts/*.py lints generate this on run)
+__pycache__/
+*.pyc

@@ -1857,6 +1857,44 @@ jobs:
       - name: 'Lint status-tag (Rule 1) + `# tracked:` (Rule 2) coverage of every scenario'
         run: python3 scripts/bdd-tracked-lint.py
 
+  bdd-mislevel-lint:
+    # Mechanical enforcement of the Testing Strategy Boundary Rule's
+    # mechanizable SHADOW across the cucumber suite — the sibling of
+    # bdd-tracked-lint that joins `crates/*/tests/*_cucumber.rs`
+    # harnesses to their `crates/*/tests/features/*.feature` specs:
+    #   RULE A (FAIL) — a `@wired`/`@wip` scenario narrating a backtick
+    #     CLI run (`crap4rs`/`crap4ts`/`crap-render`) bound to a harness
+    #     with ZERO spawn markers (`cargo_bin(`/`CARGO_BIN_EXE_`) —
+    #     advertises a CLI contract but executes a library call. Plus the
+    #     A-OPTOUT (lib-direct-by-design marker shape) + A-COHERENCE
+    #     (opted-out harness must stop narrating a CLI run) sub-rules.
+    #   RULE B (FAIL) — every harness binds exactly one resolvable,
+    #     existing feature path (makes RULE A's join sound).
+    #   RULE D (WARN) — `bdd-asserts-only` marker shape, presence-only.
+    # The keystone Boundary-Rule judgment ("is this a product contract?")
+    # is NOT mechanizable and stays a CQO/council audit; this gate
+    # enforces only the provable shadow. Documentation rots; CI doesn't.
+    #
+    # See `scripts/bdd-mislevel-lint.py` for the rules + limitations.
+    # Mirrors the `lefthook.yml` pre-push step — single source of truth
+    # in the script. Separate job (not folded into bdd-tracked-lint) so
+    # each gate's required-check identity + blast radius stay distinct.
+    # Conventions: scoped `permissions: contents: read`,
+    # `persist-credentials: false`, no cache (pure-Python, sub-second).
+    name: bdd-mislevel-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Self-test the mis-leveling lint logic (RULE A/B/optout/coherence/D fixtures)
+        run: python3 scripts/bdd-mislevel-lint.py --self-test
+      - name: 'Lint narration/execution (RULE A) + feature-link (RULE B) across the cucumber suite'
+        run: python3 scripts/bdd-mislevel-lint.py
+
   config-discovery-lint:
     # Mechanical enforcement of the crap-rs#339 C-2 isolation rule: any
     # analyzer-shelling test that passes an IN-REPO `--src` (a string

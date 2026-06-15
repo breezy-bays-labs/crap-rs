@@ -105,6 +105,58 @@ on us without false positives.
 - Touching `Background:` → re-read rule 4; non-executable Backgrounds
   are the source of most BDD hygiene debt in this repo.
 
+### BDD Boundary-Rule lint
+
+`scripts/bdd-mislevel-lint.py` is the mechanical enforcer of the
+*mechanizable shadow* of the org Testing Strategy **Boundary Rule**
+("test each behavior once, at the lowest level that fully captures it;
+promote to acceptance/BDD only for product-level contracts"). It is the
+sibling of `bdd-tracked-lint.py` — wired identically into the
+`bdd-mislevel-lint` CI job and a `lefthook.yml` pre-push command
+(single source of truth in the script; documentation rots, CI doesn't).
+It joins each `crates/*/tests/*_cucumber.rs` harness to its bound
+`crates/*/tests/features/*.feature` spec.
+
+**The honest boundary:** the keystone Boundary-Rule decision — *is this
+behavior a product-level contract a consumer relies on?* — is
+irreducibly **judgment** and is NOT mechanized; it stays a CQO / council
+BDD audit. The lint enforces only the provable shadow:
+
+1. **RULE A (FAIL) — narration/execution mismatch.** A `@wired`/`@wip`
+   scenario whose step prose narrates a backtick-quoted CLI invocation
+   of an analyzer binary (`crap4rs` / `crap4ts` / `crap-render`) while
+   its bound harness has ZERO process-spawn markers (`cargo_bin(` /
+   `CARGO_BIN_EXE_`) — it advertises a CLI contract but executes a
+   library/adapter call. The fix is honest narration: rewrite to
+   adapter-level prose (e.g. `When the oxc walker analyzes the source`,
+   as `cyclomatic_walker.feature` does, or `When the JSON is formatted`
+   as `json_reporter.feature` does) — or actually spawn the binary if
+   it genuinely IS a CLI contract.
+2. **RULE B (FAIL) — feature-link soundness.** Every harness declares
+   exactly one resolvable, on-disk `(filter_)run_and_exit(
+   "tests/features/<X>.feature")` path (the join RULE A relies on; a
+   missing join would silently no-op the gate).
+
+**Annotation conventions** the lint validates (mirroring the
+`# tracked:` em-dash shape):
+
+- `// bdd-lint: lib-direct-by-design — tracked: crap-rs#<n> — <reason>`
+  on a harness DECLARES it is deliberately library-level. Its shape is
+  enforced (RULE A-OPTOUT, FAIL if malformed); and a harness carrying it
+  must NOT have a bound feature that still narrates a CLI run (RULE
+  A-COHERENCE, FAIL) — the opt-out admits lib-level, so the prose must
+  stop claiming a CLI run rather than paper over a lying narration.
+- `// bdd-asserts-only: <crate>::<path> — tracked: crap-rs#<n> —
+  <reason>` is a contributor's *voluntary, honest* declaration that the
+  harness knowingly mirrors a named lower-level test. Presence-only,
+  shape-validated (RULE D, WARN); absence is never a violation. This is
+  the honest mechanizable form of "this scenario duplicates a named unit
+  test" — the *inference* of that duplication is below the false-match
+  floor and is deliberately NOT attempted.
+
+The lint ships `--self-test`; CI runs it as a separate preceding step so
+the rule logic is itself regression-guarded.
+
 ## Supply-chain hygiene
 
 Every GitHub Actions `uses:` reference in the repo — across

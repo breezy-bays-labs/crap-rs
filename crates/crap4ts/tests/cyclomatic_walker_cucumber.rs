@@ -173,7 +173,7 @@ fn given_synthetic_function(world: &mut WalkerWorld, complexity: u32, coverage: 
 
 // ── When ─────────────────────────────────────────────────────────────
 
-#[when(regex = r"^the operator runs `crap4ts .*`$")]
+#[when("the oxc walker analyzes the source")]
 fn when_analyzed(world: &mut WalkerWorld) {
     if let Some((complexity, coverage)) = world.synth {
         world.crap =
