@@ -6,92 +6,54 @@ Feature: Multi-root source analysis — one scorecard across several source root
   unioned into one scorecard, joined against a single shared coverage
   file.
 
-  # Vocabulary used in scenarios:
-  #   "the operator"      — the human or script invoking crap4rs
-  #   "the JSON envelope" — terminal stdout when --format json
-  #   "the run identity base" — the path every function's `file_path`
-  #                         is relativized to. Single-root runs use the
-  #                         src root (back-compat); multi-root runs use
-  #                         the git toplevel so paths stay globally
-  #                         unique across roots.
-  #
-  # Design contract (see shaping.md L2/L3a + adr-multi-root-identity-base):
-  #   The identity base is decided ONCE from the root count and applied
-  #   to BOTH function identity and coverage-SF normalization. A run is
-  #   either single-root/src-relative OR multi-root/toplevel-relative —
-  #   the two regimes never mix within one run.
-  #
-  # Self-CRAP regression invariant: the multi-root code path must not
-  # introduce any crap-core/crap4rs/crap4ts function with CRAP above 15;
-  # the production scorecard gate enforces this.
+  This file pins the CLI-process contracts the running binary uniquely
+  captures: that `prepare_pipeline` resolves the run identity base from
+  the `--src` root COUNT (one root ⇒ src-relative, byte-compatible with
+  the pre-multi-root path; many roots ⇒ git-toplevel-relative so paths
+  stay globally unique), and that multi-root outside a git work tree is a
+  hard error rather than a silent basename strip. The union/dedup
+  invariant, the IdentityBase consumption, and the coverage-join
+  no-bleed contract are owned IN-PROCESS by `multi_root_integration.rs`
+  (it constructs `core::identity::IdentityBase` directly and calls
+  `analyze()` at the library boundary — the sole lib coverage of that
+  path, so it stays) plus the union proptest; the scorecard action's
+  comment-preamble / comment-header surfaces are owned at the CI layer
+  (`.github/actions/scorecard/action.yml` + the dogfood smoke jobs), not
+  by the binary. So those cases live there, not here (see `AGENTS.md`
+  § BDD hygiene). Step defs in `tests/multi_root_cucumber.rs`.
 
-  # ── union semantics ────────────────────────────────────────────────
+  # ── union semantics (end-to-end via the CLI) ───────────────────────
 
-  @unwired
+  @wired
   Scenario: Multiple --src roots union their functions into one report
-    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
-    When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --src crate-b/src --format json`
-    Then the JSON envelope includes every function discovered under `crate-a/src`
-    And the JSON envelope includes every function discovered under `crate-b/src`
-    And the summary `total_functions` equals the count across both roots
+    Given a git work tree with source roots crate-a/src and crate-b/src
+    When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --src crate-b/src --threshold 100 --no-gitignore --no-fail --format json`
+    Then view.shown has 4 functions
+    And view.shown contains a function keyed "crate-a/src/lib.rs"
+    And view.shown contains a function keyed "crate-b/src/lib.rs"
 
-  @unwired
-  Scenario: Union is order-independent and deduplicates overlapping roots
-    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
-    When the operator analyzes roots `[A, B]` and separately `[B, A]`
-    Then both runs report the identical function set
-    And a function discovered under two overlapping roots appears exactly once
+  # ── identity base resolved from the --src root count ────────────────
 
-  # ── identity base (the α' contract) ────────────────────────────────
+  @wired
+  Scenario: A single --src root yields src-relative identity (back-compat)
+    Given a git work tree with source roots crate-a/src and crate-b/src
+    When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --threshold 100 --no-gitignore --no-fail --format json`
+    Then view.shown contains a function keyed "lib.rs"
+    And every view.shown function key is src-relative
 
-  @unwired
-  Scenario: A single --src root yields src-relative identity (byte-identical back-compat)
-    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
-    When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --format json`
-    Then each function `file_path` is relative to `crate-a/src` (e.g. `lib.rs`)
-    And the JSON envelope is byte-identical to the pre-multi-root single-root output
+  @wired
+  Scenario: Multiple --src roots yield git-toplevel-relative identity with distinct keys
+    Given a git work tree with source roots crate-a/src and crate-b/src
+    When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --src crate-b/src --threshold 100 --no-gitignore --no-fail --format json`
+    Then view.shown contains a function keyed "crate-a/src/adapters/mod.rs"
+    And view.shown contains a function keyed "crate-b/src/adapters/mod.rs"
 
-  @unwired
-  Scenario: Multiple --src roots yield git-toplevel-relative identity
-    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
-    When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --src crate-b/src --format json`
-    Then each function `file_path` is relative to the git toplevel (e.g. `crate-a/src/lib.rs`)
-    And two same-named files in different roots have distinct `file_path` keys
+  # ── hard error: multi-root requires a resolvable git toplevel ───────
 
-  # ── coverage join under multi-root (no collision, no bleed) ─────────
-
-  @unwired
-  Scenario: Same-named files in different roots do not bleed coverage
-    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
-    Given `crate-a/src/adapters/mod.rs` and `crate-b/src/adapters/mod.rs` both exist
-    And the shared coverage file covers both with different hit counts
-    When the operator analyzes both roots in one run
-    Then each `adapters/mod.rs` function is joined to its own root's coverage
-    And neither file's coverage is attributed to the other
-
-  @unwired
-  Scenario: Multi-root with an unresolvable git toplevel is a hard error
-    # tracked: crap-rs#169 — behavior covered by proptest + multi_root_integration.rs; cucumber-harness wiring deferred to the BDD umbrella
-    Given the operator runs outside any git working tree
-    When the operator passes more than one --src root
-    Then crap4rs exits with an actionable error naming the unresolvable toplevel
-    And it does NOT silently fall back to a basename strip
-
-  # ── scorecard action surfaces ──────────────────────────────────────
-
-  @unwired
-  Scenario: comment-preamble prepends caller markdown to the sticky comment
-    # tracked: crap-rs#169 — action-integration scenarios wire at the CI layer (BDD umbrella), not the cli harness
-    Given the scorecard action is invoked with a non-empty `comment-preamble`
-    When the action composes the sticky comment
-    Then the preamble markdown appears above the rendered scorecard body
-    And an empty `comment-preamble` produces a byte-identical comment to today
-
-  @unwired
-  Scenario: Production and examples scorecards post distinct, non-colliding comments
-    # tracked: crap-rs#169 — action-integration scenarios wire at the CI layer (BDD umbrella), not the cli harness
-    Given the production scorecard uses `comment-header: crap-scorecard-production`
-    And the examples scorecard uses `comment-header: crap-scorecard-quickstart-smoke`
-    When both run on the same pull request
-    Then two separate sticky comments are posted
-    And each carries its own preamble labeling production vs teaching sample
+  @wired
+  Scenario: Multi-root outside a git work tree is a hard error, not a basename strip
+    Given a non-git directory with source roots crate-a/src and crate-b/src
+    When the operator runs `crap4rs --coverage lcov.info --src crate-a/src --src crate-b/src --threshold 100 --no-gitignore --no-fail --format json`
+    Then the exit code is 2
+    And stderr contains "multi-root analysis requires a git work tree"
+    And stderr contains "not inside a git work tree"
