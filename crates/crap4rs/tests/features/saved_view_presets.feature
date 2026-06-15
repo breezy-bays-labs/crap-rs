@@ -8,6 +8,20 @@ Feature: --view saved presets (Bundle D, issue #80)
   preset cannot change `result.passed`; only the displayed view is
   shapeable.
 
+  This file pins the CLI-process contracts the running binary uniquely
+  captures: a preset on disk is discovered, resolved, applied, and
+  reflected in the `view.spec` envelope; a CLI flag overrides the
+  preset's value through the pipeline; resolution and config-load errors
+  surface as exit 2; and a preset never moves the gate. The preset
+  *merge logic* (every-field application, per-field CLI override, the
+  bool OR-merge, the unknown-preset / no-config message text) is owned
+  by `crap-core`'s `cli::view_args` unit suite, and the TOML
+  parsing/validation (multiple-preset independence, coverage-range
+  rejection) by `adapters::config` units — so those cases live there,
+  not here (see `AGENTS.md` § BDD hygiene). Step defs in
+  `tests/saved_view_presets_cucumber.rs`. Absorbs the (binary-shelling,
+  zero-lib-coverage) `saved_view_presets_integration.rs`.
+
   Background:
     Given a project with `crap.toml` containing:
       """
@@ -26,92 +40,62 @@ Feature: --view saved presets (Bundle D, issue #80)
       top = 10
       """
 
-  # ── Resolution ─────────────────────────────────────────────────────
+  # ── Resolution: preset on disk → view.spec envelope ────────────────
 
-  @unwired
-  Scenario: --view ci applies every preset field to the view
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --view ci --format json`
-    Then `view.spec.limit` is `20`
-    And `view.spec.filters.coverage_range` covers `[0, 90]`
-    And `view.spec.sort` is `"coverage"`
-    And `view.spec.filters.only_failing` is true
-    And `view.spec.group_by` is `"file"`
-    And `view.shown` is absent (minimal_view applied)
+  @wired
+  Scenario: --view ci folds every preset field into the view and minimal_view elides view.shown
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --no-gitignore --no-fail --view ci --format json`
+    Then the exit code is 0
+    And the JSON value at "view.spec.limit" is 20
+    And the JSON value at "view.spec.sort" is "coverage"
+    And the JSON value at "view.spec.group_by" is "file"
+    And the JSON value at "view.spec.filters.only_failing" is true
+    And the JSON value at "view.spec.filters.coverage_range.min" is 0
+    And the JSON value at "view.spec.filters.coverage_range.max" is 90
+    And the JSON path "view.shown" is absent
 
-  # ── Override priority ──────────────────────────────────────────────
+  # ── Override priority: CLI wins through the pipeline ────────────────
 
-  @unwired
-  Scenario: --top on the CLI overrides the preset's top
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --view ci --top 5 --format json`
-    Then `view.spec.limit` is `5`
-    And `view.spec.filters.only_failing` is true (other preset fields preserved)
+  @wired
+  Scenario: A CLI flag overrides the preset's value through the pipeline
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --no-gitignore --no-fail --view ci --top 5 --format json`
+    Then the JSON value at "view.spec.limit" is 5
+    And the JSON value at "view.spec.filters.only_failing" is true
 
-  @unwired
-  Scenario: --no-fail OR-merges with the preset
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    Given the analysis has threshold violations
-    When the operator runs `crap4rs --coverage lcov.info --view ci --no-fail`
-    Then the process exits 0 (CLI --no-fail wins)
+  # ── Validation: resolution + config-load errors exit 2 ─────────────
 
-  @unwired
-  Scenario: Multiple presets coexist independently
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --view investigate --format json`
-    Then `view.spec.sort` is `"complexity"`
-    And `view.spec.limit` is `10`
-    And `view.spec.filters.only_failing` is false (preset `investigate` does not assert it)
-
-  # ── Validation errors ──────────────────────────────────────────────
-
-  @unwired
-  Scenario: Unknown preset name exits 2 with available list
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    When the operator runs `crap4rs --coverage lcov.info --view nonsense`
-    Then the process exits 2
+  @wired
+  Scenario: Unknown preset name exits 2 and lists the available presets
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --no-gitignore --no-fail --view nonsense`
+    Then the exit code is 2
     And stderr contains "unknown view preset"
     And stderr contains "ci"
     And stderr contains "investigate"
 
-  @unwired
-  Scenario: --view with no crap.toml exits 2 with hint
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    Given no `crap.toml` exists
-    When the operator runs `crap4rs --coverage lcov.info --view ci`
-    Then the process exits 2
-    And stderr contains "unknown view preset"
-    And stderr contains "crap.toml"
-
-  @unwired
-  Scenario: Invalid preset field fails fast at config load
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    Given `crap.toml` contains:
+  @wired
+  Scenario: An out-of-range preset field exits 2 at config load
+    Given the config file instead contains:
       """
       [views.bad]
       max_coverage = 105
       """
-    When the operator runs `crap4rs --coverage lcov.info --view bad`
-    Then the process exits 2
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --no-gitignore --no-fail --view bad`
+    Then the exit code is 2
     And stderr contains "out of range"
     And stderr contains "bad"
 
-  # ── Gate keystone ──────────────────────────────────────────────────
+  # ── Gate keystone: a preset never moves the gate ───────────────────
 
-  @unwired
-  Scenario: Preset does not change exit code on a failing analysis
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
-    Given the unfiltered analysis would exit 1 (violations exist)
-    And the preset `ci` has `no_fail = false`
-    When the operator runs `crap4rs --coverage lcov.info --view ci`
-    Then the process exits 1
-    And `result.passed` is false
+  @wired
+  Scenario: A preset cannot change the gate on a failing analysis
+    When the operator runs `crap4rs --coverage lcov.info --src src --threshold 5 --no-gitignore --view ci --format json`
+    Then the exit code is 1
+    And the JSON value at "result.passed" is false
 
   # ── Discoverability ────────────────────────────────────────────────
 
-  @unwired
+  @wired
   Scenario: --help advertises --view
-    # tracked: crap-rs#169 — saved-view-presets cucumber harness not yet built
     When the operator runs `crap4rs --help`
-    Then the help text mentions "--view"
-    And the help text mentions "saved view preset"
+    Then stdout contains "--view"
+    And stdout contains "saved view preset"
