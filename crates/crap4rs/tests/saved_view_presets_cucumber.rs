@@ -119,6 +119,10 @@ fn write_config(dir: &Path, toml: &str) {
     std::fs::write(dir.join("crap.toml"), toml).expect("write crap.toml");
 }
 
+/// Split a backtick-quoted command into args, dropping the leading `crap4rs`.
+/// Whitespace-splitting only: every scenario uses unquoted paths, so an
+/// argument with an embedded space (e.g. `--src "some path"`) is intentionally
+/// unsupported — add a shell-word parser here if a future scenario needs one.
 fn parse_args(cmd: &str) -> Vec<String> {
     cmd.split_whitespace().skip(1).map(str::to_string).collect()
 }
