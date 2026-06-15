@@ -129,6 +129,10 @@ name = "group_by_file_cucumber"
 harness = false
 
 [[test]]
+name = "sarif_reporter_cucumber"
+harness = false
+
+[[test]]
 name = "cli_init_cucumber"
 harness = false
 
