@@ -94,6 +94,10 @@ jsonschema = { workspace = true }
 # harness; future siblings (crap4ts) consume their own bindings.
 cucumber = { workspace = true, features = ["libtest"] }
 tokio = { workspace = true }
+# Q4 fuzzing: `tests/fuzz_*.rs` bolero `check!` targets run on stable
+# via the existing nextest lane (corpus replay + bounded random). See
+# the workspace-deps catalog comment + AGENTS.md for the model.
+bolero = { workspace = true }
 # Cross-crate binary invocation for the multi-language BDD harness:
 # `multi_lang_html_cucumber.rs` runs the `crap-render` binary that
 # ships from crap-core (PR ζ #315). `env!("CARGO_BIN_EXE_*")` is only

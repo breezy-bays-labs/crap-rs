@@ -23,7 +23,7 @@ in unit/property/fuzz, not the `.feature` corpus.
 |-------|------|-------|
 | Unit | `cargo nextest` | domain + adapter `#[test]` |
 | Property | `proptest` | CRAP formula, LCOV parser, line-range matching, walker invariants. Regression files in `proptest-regressions/` are **committed**, never gitignored |
-| **Fuzz (Q4)** | `cargo-fuzz` / `bolero` — **planned** | the LCOV/Istanbul parsers ingest untrusted input; no fuzz target yet |
+| **Fuzz (Q4)** | `bolero` (library) on **stable** via the nextest lane | `tests/fuzz_*/main.rs` `check!` targets run as ordinary tests (no nightly/sanitizer/`cargo-bolero` on the PR path): bounded-random discovery + an explicit replay test over the committed `corpus/`+`crashes/` seeds (the deterministic regression net — a crash + its fix land in the same PR, mirroring `proptest-regressions/`). In scope: syn walker, oxc walker, Istanbul parser. **LCOV deferred** — its `.*` panic-freedom is already proptested; residual `normalize_path` I/O seam tracked as a property-test follow-up. Deferred nightly `cargo bolero fuzz` cron adds coverage-guided libFuzzer+ASan depth (ADR-gated). See AGENTS.md + epic #428 |
 | Integration | `cargo nextest` shelling the built binary against real fixtures | real `.rs` for complexity, real LCOV for coverage; no adapter mocking |
 | Acceptance (BDD) | `cucumber-rs` | `tests/features/*.feature` + `*_cucumber.rs`; hygiene enforced by `bdd-tracked-lint.py` — see AGENTS.md "BDD hygiene" |
 | E2E / smoke | the composite scorecard action; Playwright DOM validation of the unified HTML | CI-only |
