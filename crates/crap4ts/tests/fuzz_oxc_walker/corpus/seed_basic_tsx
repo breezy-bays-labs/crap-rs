@@ -1,0 +1,23 @@
+function top(x: number): number {
+  if (x > 0) {
+    for (let i = 0; i < x; i++) {
+      if (i % 2 === 0 && i > 3) {
+        return i;
+      }
+    }
+  } else if (x < -10) {
+    while (x < 0) {
+      x += 1;
+    }
+  }
+  const C = (p: { n: number }) => <div>{p.n > 0 ? <span>{p.n}</span> : null}</div>;
+  void C;
+  return x > 0 ? 1 : -1;
+}
+
+class Box<T> {
+  constructor(private readonly v: T) {}
+  map(f: (t: T) => T): T {
+    return f(this.v);
+  }
+}

@@ -1,0 +1,10 @@
+const πα = 3;
+void πα;
+function f(α: number): number {
+  if (α > πα) {
+    return α && πα ? α : -α;
+  }
+  return πα;
+}
+const 名前 = (x: number) => (x > 0 ? x : 0);
+void 名前;
