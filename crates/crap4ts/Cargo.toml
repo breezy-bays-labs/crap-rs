@@ -90,6 +90,11 @@ proptest = { workspace = true }
 # crap4rs and crap4ts run cucumber harnesses.
 cucumber = { workspace = true, features = ["libtest"] }
 tokio = { workspace = true }
+# Q4 fuzzing: `tests/fuzz_*/main.rs` bolero `check!` targets run on stable
+# via the existing nextest lane (bounded-random discovery + explicit
+# committed-corpus replay). See the workspace-deps catalog comment +
+# AGENTS.md for the model.
+bolero = { workspace = true }
 
 [build-dependencies]
 napi-build = { workspace = true }
