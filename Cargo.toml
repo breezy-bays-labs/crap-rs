@@ -113,6 +113,15 @@ proptest = "1"
 pretty_assertions = "1"
 insta = { version = "1", features = ["json"] }
 tempfile = "3"
+# Q4 fuzzing (dev/test only). bolero `check!` targets are authored as
+# plain `#[test]` fns and run on STABLE via the existing
+# `cargo nextest run --workspace --all-targets` lane (bounded-random
+# discovery + an explicit committed-corpus replay test) — no nightly,
+# no sanitizer, no cargo-bolero binary on the PR path. Nightly is needed
+# ONLY for the optional coverage-guided `cargo bolero fuzz` cron lane.
+# bolero MSRV 1.66 << workspace floor 1.93. (`arbitrary`, for the
+# Istanbul structured fuzz arm, joins the catalog in its own sub-issue.)
+bolero = "0.13"
 # Schema round-trip validation for `--format scorecard-row` (issue #111).
 jsonschema = { version = "0.30", default-features = false }
 # BDD execution of `tests/features/*.feature` files (issue #115).

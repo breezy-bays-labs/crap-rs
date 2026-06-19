@@ -1,0 +1,18 @@
+fn f(x: i32) -> i32 {
+    if x > 0 {
+        match x {
+            1 => 1,
+            2 | 3 => x + 1,
+            _ => x * 2,
+        }
+    } else if x < -10 {
+        for i in 0..x.abs() {
+            if i % 2 == 0 && i > 3 {
+                return i;
+            }
+        }
+        0
+    } else {
+        -x
+    }
+}

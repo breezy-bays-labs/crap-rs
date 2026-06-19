@@ -20,6 +20,13 @@ permissions:
 env:
   CARGO_TARGET_DIR: target
   CARGO_TERM_COLOR: always
+  # Determinism + speed knob for the bolero Q4 fuzz `check!` targets
+  # (`tests/fuzz_*`), which run on stable as ordinary tests in the
+  # `Test (*)` + `coverage` nextest lanes. Pins the bounded-random
+  # iteration count so PR runs are fast and reproducible in cost; the
+  # committed corpus/crashes seeds carry the deterministic regression
+  # weight (replayed explicitly by each target's replay test).
+  BOLERO_RANDOM_ITERATIONS: '1000'
   # Single source of truth for the smoke jobs' threshold input — both
   # `scorecard-smoke-rust` and `scorecard-smoke-ts` (and the preset
   # spot-check steps under `scorecard-smoke-rust`) consume this. The
