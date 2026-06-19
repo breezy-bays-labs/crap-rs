@@ -24,11 +24,13 @@ use crap4ts::adapters::coverage::IstanbulCoverage;
 
 /// Drive one input through the Istanbul parser. The contract is
 /// panic-freedom: `Ok` and `Err` are both acceptable; only a panic/abort is a
-/// bug. The root is a fixed sentinel — `parse_str` does no filesystem I/O, so
-/// the path only feeds in-memory `SF`/path normalization.
+/// bug. The root is the crate dir (an absolute path, matching production where
+/// `--src` is canonicalized) so the prefix-strip / suffix-match path
+/// normalization is actually exercised rather than short-circuited by a
+/// relative root.
 fn drive(input: &[u8]) {
     let src = String::from_utf8_lossy(input);
-    let parser = IstanbulCoverage::new(std::path::PathBuf::from("."));
+    let parser = IstanbulCoverage::new(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")));
     let _ = parser.parse_str(&src);
 }
 
