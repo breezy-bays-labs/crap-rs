@@ -1041,14 +1041,24 @@ mod proptests {
             junk in prop::collection::vec(r"\.\.|[a-z]{1,5}", 0..4),
         ) {
             use std::io::Write;
-            let dir = tempfile::tempdir().unwrap();
+            use std::sync::OnceLock;
+
+            // Initialize the tempdir + real file ONCE for the whole test run
+            // (the test only reads it), not per proptest case — avoids 256×
+            // dir-create/file-write I/O. The tempdir-qualified absolute path
+            // also keeps execution CWD-independent for parallel test safety.
+            static TEST_DIR: OnceLock<tempfile::TempDir> = OnceLock::new();
+            let dir = TEST_DIR.get_or_init(|| {
+                let d = tempfile::tempdir().unwrap();
+                let leaf_dir = d.path().join("pkg");
+                std::fs::create_dir_all(&leaf_dir).unwrap();
+                std::fs::File::create(leaf_dir.join("leaf.rs"))
+                    .unwrap()
+                    .write_all(b"fn x() {}")
+                    .unwrap();
+                d
+            });
             let root = dir.path();
-            let leaf_dir = root.join("pkg");
-            std::fs::create_dir_all(&leaf_dir).unwrap();
-            std::fs::File::create(leaf_dir.join("leaf.rs"))
-                .unwrap()
-                .write_all(b"fn x() {}")
-                .unwrap();
 
             let mut p = root.to_path_buf();
             for seg in &junk {
@@ -1057,18 +1067,26 @@ mod proptests {
             p.push("pkg");
             p.push("leaf.rs");
 
-            if let Some(suffix) = suffix_match_under(root, &p) {
-                prop_assert!(
-                    !Path::new(&suffix)
-                        .components()
-                        .any(|c| c == std::path::Component::ParentDir),
-                    "suffix_match_under returned a `..`-bearing suffix: {suffix}"
-                );
-                prop_assert!(
-                    root.join(&suffix).is_file(),
-                    "suffix {suffix} does not re-anchor to a real file under root"
-                );
-            }
+            // Non-vacuous: the real `pkg/leaf.rs` leaf guarantees a match, so
+            // assert presence FIRST — otherwise a regression of
+            // `suffix_match_under` to always-`None` would let this test pass
+            // silently. Then validate the guard on the resolved suffix.
+            let suffix = suffix_match_under(root, &p);
+            prop_assert!(
+                suffix.is_some(),
+                "suffix_match_under returned None despite a real pkg/leaf.rs leaf"
+            );
+            let suffix = suffix.unwrap();
+            prop_assert!(
+                !Path::new(&suffix)
+                    .components()
+                    .any(|c| c == std::path::Component::ParentDir),
+                "suffix_match_under returned a `..`-bearing suffix: {suffix}"
+            );
+            prop_assert!(
+                root.join(&suffix).is_file(),
+                "suffix {suffix} does not re-anchor to a real file under root"
+            );
         }
 
         #[test]
