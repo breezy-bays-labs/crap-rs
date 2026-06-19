@@ -1589,7 +1589,7 @@ footer.report-footer {
   </button>
   <button class="tab" role="tab" aria-selected="false" data-tab="delta" id="tab-delta" type="button">
     Delta vs baseline
-    
+    <span class="tab-dot" aria-hidden="true"></span>
     <span class="tab-count">1681 changed</span>
   </button>
 </nav>
@@ -16314,7 +16314,7 @@ footer.report-footer {
       </span>
       <span class="meta">
         0 added · 0 removed · 1681 modified · 0 renamed ·
-        0 regressions ·
+        1 regression ·
         0 improvements ·
         0 new violations
       </span>
@@ -16378,6 +16378,36 @@ footer.report-footer {
 
   
   
+  <section aria-label="Regressions">
+    <h2>Regressions <span class="delta-section-count">1</span></h2>
+    <table class="delta-table regressions">
+      <thead><tr>
+        <th>Function</th><th class="num">Baseline CRAP</th><th class="num">Current CRAP</th><th>Coverage</th><th>Risk transition</th><th class="num">Δ</th>
+      </tr></thead>
+      <tbody>
+        
+        <tr>
+          <td>
+            <span class="fn-name">IstanbulCoverage::parse_str</span>
+            <span class="fn-loc">crates/crap4ts/src/adapters/coverage/mod.rs L570–629</span>
+          </td>
+          <td class="num">7.08</td>
+          <td class="num">7.16</td>
+          <td><span class="ba-cell"><span class="b">88.2%</span> <span class="arrow" aria-hidden="true">→</span> <span class="a">85.3%</span></span></td>
+          <td>
+            <span class="transition-pill">
+              <span class="risk-pill" data-risk="1">low</span>
+              <span class="arrow" aria-hidden="true">→</span>
+              <span class="risk-pill" data-risk="1">low</span>
+            </span>
+          </td>
+          <td class="num"><span class="delta-chip" data-direction="up" data-regression="1"><span class="chip-glyph" aria-hidden="true">▲</span> <span class="chip-value">+0.08</span></span></td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </section>
+  
 
   
   
@@ -16388,7 +16418,7 @@ footer.report-footer {
   
   
   <p class="delta-unchanged">
-    1681 functions
+    1680 functions
     unchanged (CRAP score within ±0.005). Expand the <strong>Current run</strong> tab to inspect them.
   </p>
   
