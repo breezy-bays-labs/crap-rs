@@ -1011,6 +1011,84 @@ mod proptests {
             let _ = parser.parse_str(&lcov);
         }
 
+        // ── crap-rs#434 — Boundary-Rule deferral accountability ──
+        // The LCOV parser is excluded from the Q4 fuzz epic because its `.*`
+        // panic-freedom is already proptested above (`no_panic_on_arbitrary_*`).
+        // Its one residual signal — the I/O-bearing `normalize_path` /
+        // `suffix_match_under` path handling — belongs at the property level,
+        // not fuzz. These two cover that seam over its input domain,
+        // complementing the example-based traversal unit tests.
+
+        // `normalize_path` never panics on arbitrary SF-path input under an
+        // arbitrary root (adversarial `..`, mixed separators, unicode, long
+        // suffixes all included).
+        #[test]
+        fn normalize_path_never_panics(
+            path in ".*",
+            root in "[A-Za-z0-9_/.-]{0,30}",
+        ) {
+            let parser = LcovParser::new(PathBuf::from(root));
+            let _ = parser.normalize_path(&path);
+        }
+
+        // Traversal guard (structural): when `suffix_match_under` resolves a
+        // real file, the returned suffix never contains a `..` component and
+        // always re-anchors *under* the root — even when the input path is
+        // prefixed with `..`/junk segments. A real tempdir file keeps the
+        // `Some` branch non-vacuous.
+        #[test]
+        fn suffix_match_under_is_rooted_and_parentdir_free(
+            junk in prop::collection::vec(r"\.\.|[a-z]{1,5}", 0..4),
+        ) {
+            use std::io::Write;
+            use std::sync::OnceLock;
+
+            // Initialize the tempdir + real file ONCE for the whole test run
+            // (the test only reads it), not per proptest case — avoids 256×
+            // dir-create/file-write I/O. The tempdir-qualified absolute path
+            // also keeps execution CWD-independent for parallel test safety.
+            static TEST_DIR: OnceLock<tempfile::TempDir> = OnceLock::new();
+            let dir = TEST_DIR.get_or_init(|| {
+                let d = tempfile::tempdir().unwrap();
+                let leaf_dir = d.path().join("pkg");
+                std::fs::create_dir_all(&leaf_dir).unwrap();
+                std::fs::File::create(leaf_dir.join("leaf.rs"))
+                    .unwrap()
+                    .write_all(b"fn x() {}")
+                    .unwrap();
+                d
+            });
+            let root = dir.path();
+
+            let mut p = root.to_path_buf();
+            for seg in &junk {
+                p.push(seg);
+            }
+            p.push("pkg");
+            p.push("leaf.rs");
+
+            // Non-vacuous: the real `pkg/leaf.rs` leaf guarantees a match, so
+            // assert presence FIRST — otherwise a regression of
+            // `suffix_match_under` to always-`None` would let this test pass
+            // silently. Then validate the guard on the resolved suffix.
+            let suffix = suffix_match_under(root, &p);
+            prop_assert!(
+                suffix.is_some(),
+                "suffix_match_under returned None despite a real pkg/leaf.rs leaf"
+            );
+            let suffix = suffix.unwrap();
+            prop_assert!(
+                !Path::new(&suffix)
+                    .components()
+                    .any(|c| c == std::path::Component::ParentDir),
+                "suffix_match_under returned a `..`-bearing suffix: {suffix}"
+            );
+            prop_assert!(
+                root.join(&suffix).is_file(),
+                "suffix {suffix} does not re-anchor to a real file under root"
+            );
+        }
+
         #[test]
         fn no_cross_file_leakage(
             a_lines in prop::collection::vec((1..100usize, 0..10u64), 1..5),
