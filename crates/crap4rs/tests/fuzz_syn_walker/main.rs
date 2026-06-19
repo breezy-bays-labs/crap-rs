@@ -56,7 +56,9 @@ fn drive_both(input: &[u8]) {
 /// crash regression through the walker. Runs on stable as an ordinary test.
 #[test]
 fn replay_committed_corpus_and_crashes() {
-    let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fuzz_syn_walker");
+    let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fuzz_syn_walker");
     let mut replayed = 0usize;
     for sub in ["corpus", "crashes"] {
         let dir = base.join(sub);
