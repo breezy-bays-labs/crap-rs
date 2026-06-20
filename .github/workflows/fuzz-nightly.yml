@@ -76,11 +76,15 @@ jobs:
           fi
       - name: Fuzz ${{ matrix.target.test }}
         # `cargo bolero test <target>` is the fuzz command (cargo-bolero 0.13
-        # has no `fuzz` subcommand; `test` drives the engine). Target names +
-        # the `--sanitizer/--engine/-T` flags + the `[profile.fuzz]` requirement
-        # were validated empirically via `cargo bolero list` + a local nightly
-        # run. The job's default toolchain is nightly (dtolnay above), so no
-        # `--toolchain` flag is needed; `--sanitizer address` ⇒ libFuzzer+ASan.
+        # has no `fuzz` subcommand; `test` drives the engine). `--toolchain
+        # nightly` is REQUIRED: `--sanitizer`/libFuzzer need `-Zsanitizer`
+        # (nightly-only), and the repo's `rust-toolchain.toml` pins
+        # `channel=stable` — which overrides dtolnay's installed-nightly
+        # default, so without this flag cargo-bolero runs stable rustc and
+        # `-Z` is rejected. (The dtolnay step above installs the nightly this
+        # flag selects.) Subcommand + target names + `[profile.fuzz]` +
+        # `--toolchain nightly` all validated via `cargo bolero list` + a local
+        # nightly run + this workflow's own dispatch.
         env:
           # Matrix values are workflow-defined literals, but routing them
           # through env keeps the run block free of `${{ }}` interpolation
@@ -90,6 +94,7 @@ jobs:
         run: |
           cargo bolero test "$FUZZ_TEST" \
             --package "$FUZZ_PKG" \
+            --toolchain nightly \
             --engine libfuzzer \
             --sanitizer address \
             -T 5min
