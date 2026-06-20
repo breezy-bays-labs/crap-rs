@@ -145,7 +145,31 @@ impl ComplexityPort for OxcWalker {
         let source_type =
             SourceType::from_path(Path::new(file_path)).unwrap_or_else(|_| SourceType::ts());
 
-        let ret = Parser::new(&allocator, source, source_type).parse();
+        // oxc parses well-formed input panic-free, but its error-recovery
+        // path has upstream defects that panic on adversarial malformed input.
+        // As of oxc 0.129, `parse_tuple_type` builds an inverted diagnostic
+        // span (`start > end`) for a required-after-optional tuple element, and
+        // `Span::size` then asserts `start <= end` and panics — entirely inside
+        // `Parser::parse`, before any AST reaches the walker below. The
+        // `ComplexityPort` contract is that arbitrary bytes yield `Ok`/`Err`
+        // and never a panic (the `fuzz_oxc_walker` target + its committed
+        // `crash-oxc-inverted-tuple-span` seed pin this), so catch the unwind
+        // and route it through the same `SourceParse` path a normal parse
+        // failure takes. `AssertUnwindSafe` is sound here: on the panic path
+        // the arena and any half-built AST are dropped untouched — no
+        // potentially-broken state is ever observed. (Removable once the
+        // upstream fix lands and the oxc pin is bumped past it.)
+        let parsed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Parser::new(&allocator, source, source_type).parse()
+        }));
+        let ret = match parsed {
+            Ok(ret) => ret,
+            Err(_) => {
+                return Err(CrapError::SourceParse(format!(
+                    "{file_path}: could not parse (malformed source)"
+                )));
+            }
+        };
         if let Some(first) = ret.errors.first() {
             return Err(CrapError::SourceParse(format!("{file_path}: {first}")));
         }
