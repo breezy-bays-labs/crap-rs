@@ -42,10 +42,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # `test` is the bolero target name (the `check!` fn, per `cargo bolero
+        # list`), NOT the test-binary/dir name. `dir` is the on-disk
+        # corpus/crashes directory (shared by the fn-targets in one file).
         target:
-          - { package: crap4rs, test: fuzz_syn_walker }
-          - { package: crap4ts, test: fuzz_oxc_walker }
-          - { package: crap4ts, test: fuzz_istanbul }
+          - { package: crap4rs, test: fuzz_syn_walker_cyclomatic, dir: fuzz_syn_walker }
+          - { package: crap4rs, test: fuzz_syn_walker_cognitive, dir: fuzz_syn_walker }
+          - { package: crap4ts, test: fuzz_oxc_walker, dir: fuzz_oxc_walker }
+          - { package: crap4ts, test: fuzz_istanbul_raw, dir: fuzz_istanbul }
+          - { package: crap4ts, test: fuzz_istanbul_structured, dir: fuzz_istanbul }
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -70,15 +75,12 @@ jobs:
             cargo install cargo-bolero --locked
           fi
       - name: Fuzz ${{ matrix.target.test }}
-        # FIRST-FIRE VALIDATION REQUIRED (tracked in the PR): the exact
-        # `cargo bolero fuzz` target selector for the directory-layout,
-        # multi-`#[test]`-fn targets is confirmed by running `cargo bolero list`
-        # on the first `workflow_dispatch`. If `list` reports a different
-        # identifier (e.g. a `<binary>::<fn>` form), update the selector here.
-        # Flags (`--sanitizer address`, `--engine libfuzzer`, `-T`) follow the
-        # bolero CLI docs and are likewise confirmed on first fire. This lane
-        # is schedule/dispatch-only, so iterating on the invocation blocks no
-        # PR.
+        # `cargo bolero test <target>` is the fuzz command (cargo-bolero 0.13
+        # has no `fuzz` subcommand; `test` drives the engine). Target names +
+        # the `--sanitizer/--engine/-T` flags + the `[profile.fuzz]` requirement
+        # were validated empirically via `cargo bolero list` + a local nightly
+        # run. The job's default toolchain is nightly (dtolnay above), so no
+        # `--toolchain` flag is needed; `--sanitizer address` ⇒ libFuzzer+ASan.
         env:
           # Matrix values are workflow-defined literals, but routing them
           # through env keeps the run block free of `${{ }}` interpolation
@@ -86,15 +88,18 @@ jobs:
           FUZZ_TEST: ${{ matrix.target.test }}
           FUZZ_PKG: ${{ matrix.target.package }}
         run: |
-          cargo bolero fuzz "$FUZZ_TEST" \
+          cargo bolero test "$FUZZ_TEST" \
             --package "$FUZZ_PKG" \
-            --sanitizer address \
             --engine libfuzzer \
+            --sanitizer address \
             -T 5min
       - name: Upload crash corpus on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-crashes-${{ matrix.target.test }}
-          path: crates/${{ matrix.target.package }}/tests/${{ matrix.target.test }}/crashes/
+          # Upload the whole target dir (corpus + crashes + bolero's internal
+          # __fuzz__ scratch) so a finding is recoverable for manual promotion
+          # into the committed crashes/ (crash + fix in one PR, per the ADR).
+          path: crates/${{ matrix.target.package }}/tests/${{ matrix.target.dir }}/
           if-no-files-found: ignore
