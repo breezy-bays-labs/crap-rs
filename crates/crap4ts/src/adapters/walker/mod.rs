@@ -164,9 +164,18 @@ impl ComplexityPort for OxcWalker {
         }));
         let ret = match parsed {
             Ok(ret) => ret,
-            Err(_) => {
+            Err(payload) => {
+                // Surface the panic payload (the structural reason) rather than
+                // a generic message, so a future NEW parser-panic class is
+                // diagnosable from the error alone instead of being swallowed.
+                // Rust panic payloads are `&str` or `String`.
+                let reason = payload
+                    .downcast_ref::<&str>()
+                    .map(|s| (*s).to_owned())
+                    .or_else(|| payload.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "non-string panic payload".to_owned());
                 return Err(CrapError::SourceParse(format!(
-                    "{file_path}: could not parse (malformed source)"
+                    "{file_path}: internal parser error on malformed source: {reason}"
                 )));
             }
         };
