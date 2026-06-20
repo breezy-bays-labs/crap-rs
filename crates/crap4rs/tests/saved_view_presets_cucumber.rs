@@ -235,6 +235,7 @@ fn then_stderr_contains(world: &mut PresetWorld, needle: String) {
 async fn main() {
     PresetWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit(
             "tests/features/saved_view_presets.feature",
             |_, _, scenario| scenario.tags.iter().any(|t| t == "wired"),

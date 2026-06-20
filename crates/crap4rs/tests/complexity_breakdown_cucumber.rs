@@ -199,6 +199,7 @@ fn then_no_top_level(world: &mut BreakdownWorld, key: String) {
 async fn main() {
     BreakdownWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit(
             "tests/features/complexity_breakdown.feature",
             |_, _, scenario| scenario.tags.iter().any(|t| t == "wired"),

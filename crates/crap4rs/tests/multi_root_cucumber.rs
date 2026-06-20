@@ -246,6 +246,7 @@ fn then_stderr_contains(world: &mut MultiRootWorld, needle: String) {
 async fn main() {
     MultiRootWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit("tests/features/multi_root_src.feature", |_, _, scenario| {
             scenario.tags.iter().any(|t| t == "wired")
         })

@@ -382,6 +382,7 @@ fn then_deterministic(world: &mut AdviceWorld) {
 async fn main() {
     AdviceWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit("tests/features/format_advice.feature", |_, _, scenario| {
             scenario.tags.iter().any(|t| t == "wired")
         })

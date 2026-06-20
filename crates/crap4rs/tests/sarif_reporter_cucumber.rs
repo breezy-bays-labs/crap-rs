@@ -507,6 +507,7 @@ fn then_diagnostic_present(world: &mut SarifWorld) {
 async fn main() {
     SarifWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit("tests/features/sarif_reporter.feature", |_, _, scenario| {
             scenario.tags.iter().any(|t| t == "wired")
         })

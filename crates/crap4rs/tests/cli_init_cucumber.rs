@@ -275,6 +275,7 @@ async fn main() {
     // `@wired` filter is the AGENTS.md § BDD hygiene rule 5 pattern.
     InitWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit("tests/features/cli_init.feature", |_, _, scenario| {
             scenario.tags.iter().any(|t| t == "wired")
         })

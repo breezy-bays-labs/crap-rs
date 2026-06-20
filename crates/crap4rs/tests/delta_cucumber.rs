@@ -605,6 +605,7 @@ async fn main() {
     // non-zero exit to CI — see memory `cucumber-run-vs-run-and-exit`.
     CliWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit("tests/features/delta.feature", |_, _, scenario| {
             scenario.tags.iter().any(|t| t == "wired")
         })

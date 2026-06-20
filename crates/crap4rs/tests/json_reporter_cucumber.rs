@@ -517,6 +517,7 @@ async fn main() {
     // red CI step green.
     JsonWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .run_and_exit("tests/features/json_reporter.feature")
         .await;
 }

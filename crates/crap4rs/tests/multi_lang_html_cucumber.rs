@@ -1008,6 +1008,7 @@ fn action_yml_path() -> PathBuf {
 async fn main() {
     MultiLangWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit(
             "tests/features/multi_lang_html.feature",
             |_, _, scenario| scenario.tags.iter().any(|t| t == "wired"),

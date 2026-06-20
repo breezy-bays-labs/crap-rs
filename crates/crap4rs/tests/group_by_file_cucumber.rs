@@ -267,6 +267,7 @@ fn then_exit_code(world: &mut GroupWorld, expected: i32) {
 async fn main() {
     GroupWorld::cucumber()
         .with_writer(writer::Libtest::or_basic())
+        .with_default_cli()
         .filter_run_and_exit("tests/features/group_by_file.feature", |_, _, scenario| {
             scenario.tags.iter().any(|t| t == "wired")
         })
