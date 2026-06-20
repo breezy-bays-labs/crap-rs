@@ -1,13 +1,30 @@
 name: fuzz-nightly
 
+# DEFERRED — NOT YET VALIDATED END-TO-END (tracked: crap-rs#443).
+#
 # Coverage-guided fuzzing of the Q4 bolero targets on a SCOPED nightly
-# toolchain — the repo's first and only nightly usage, deliberately confined
-# to this scheduled job and kept entirely OFF the per-PR path. The stable
-# `check!` targets in the `Test (*)` nextest lane carry the per-PR regression
-# net (bounded-random + committed-corpus replay); this lane adds the deeper,
-# coverage-guided libFuzzer + AddressSanitizer discovery that is nightly-only
-# (`-Zsanitizer`). See the ADR:
+# toolchain. The stable `check!` targets in the `Test (*)` nextest lane carry
+# the always-on per-PR regression net (bounded-random + committed-corpus
+# replay); this lane adds the deeper, coverage-guided libFuzzer +
+# AddressSanitizer discovery that is nightly-only (`-Zsanitizer`). See the ADR:
 #   ops/decisions/crap-rs/adr-first-nightly-fuzz-lane.md
+#
+# Why deferred (tracked: crap-rs#443):
+#   `cargo bolero test` has NO test-target scoping flag — its `<test>` arg is a
+#   libtest filter, not a `--test` selector. So `cargo bolero test --package
+#   crap4rs <target>` builds and runs the ENTIRE crap4rs test suite (every
+#   `harness=false` cucumber harness) under nightly + ASan + `--cfg fuzzing`,
+#   just to reach one fuzz target; crap4rs's cucumber harnesses shell the
+#   ASan-instrumented `crap4rs` binary and fail. crap4ts's targets are
+#   unaffected (its harnesses are library-level and never shell a bin), so the
+#   3 crap4ts targets remain below while the 2 crap4rs walker targets are
+#   dropped. Re-enabling them (and the weekly schedule) needs a dedicated fuzz
+#   member crate that holds only the fuzz `[[test]]` targets — the idiomatic
+#   cargo-fuzz pattern. crap-rs#443 tracks that work.
+#
+#   The lane is shelved, not worthless: on first fire it found a real
+#   upstream-oxc panic in the crap4ts walker (fixed in #442). It stays
+#   `workflow_dispatch`-only for now so re-validation blocks no PR.
 #
 # On a finding, `cargo bolero` writes the minimized crash to the target's
 # `crashes/` dir; this job then fails and uploads that dir as an artifact for
@@ -17,11 +34,9 @@ name: fuzz-nightly
 # write token) for least privilege.
 
 on:
-  schedule:
-    # Mondays 06:00 UTC — weekly, mirroring the per-merge cadence intent of
-    # the walker-mutants gate without taxing any PR.
-    - cron: '0 6 * * 1'
-  # Manual trigger for first-fire validation + on-demand deep fuzzing.
+  # Weekly schedule DISABLED while deferred (tracked: crap-rs#443) — the lane
+  # is dispatch-only until the dedicated fuzz crate lands and a full 5-target
+  # run is green. Re-add the `schedule:` block below when re-enabling.
   workflow_dispatch: {}
 
 # Least privilege: this lane never pushes. Read-only checkout token.
@@ -42,16 +57,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # `test` is the bolero target name (the `check!` fn, per `cargo bolero
+        # list`), NOT the test-binary/dir name. `dir` is the on-disk
+        # corpus/crashes directory (shared by the fn-targets in one file).
+        # crap4rs walker targets are deferred (tracked: crap-rs#443) — see the
+        # header. Only the library-level crap4ts targets run here today.
         target:
-          - { package: crap4rs, test: fuzz_syn_walker }
-          - { package: crap4ts, test: fuzz_oxc_walker }
-          - { package: crap4ts, test: fuzz_istanbul }
+          - { package: crap4ts, test: fuzz_oxc_walker, dir: fuzz_oxc_walker }
+          - { package: crap4ts, test: fuzz_istanbul_raw, dir: fuzz_istanbul }
+          - { package: crap4ts, test: fuzz_istanbul_structured, dir: fuzz_istanbul }
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
       # SCOPED nightly — the ONLY nightly toolchain in this repo's CI, and only
-      # on this scheduled job. Pinned to the @nightly branch-HEAD SHA; like the
+      # on this dispatch-only fuzz job. Pinned to the @nightly branch-HEAD SHA; like the
       # @stable pin, Dependabot can't bump version-channel branches, so this
       # needs a manual refresh on the same quarterly cadence (AGENTS.md
       # supply-chain rule 2).
@@ -70,15 +90,16 @@ jobs:
             cargo install cargo-bolero --locked
           fi
       - name: Fuzz ${{ matrix.target.test }}
-        # FIRST-FIRE VALIDATION REQUIRED (tracked in the PR): the exact
-        # `cargo bolero fuzz` target selector for the directory-layout,
-        # multi-`#[test]`-fn targets is confirmed by running `cargo bolero list`
-        # on the first `workflow_dispatch`. If `list` reports a different
-        # identifier (e.g. a `<binary>::<fn>` form), update the selector here.
-        # Flags (`--sanitizer address`, `--engine libfuzzer`, `-T`) follow the
-        # bolero CLI docs and are likewise confirmed on first fire. This lane
-        # is schedule/dispatch-only, so iterating on the invocation blocks no
-        # PR.
+        # `cargo bolero test <target>` is the fuzz command (cargo-bolero 0.13
+        # has no `fuzz` subcommand; `test` drives the engine). `--toolchain
+        # nightly` is REQUIRED: `--sanitizer`/libFuzzer need `-Zsanitizer`
+        # (nightly-only), and the repo's `rust-toolchain.toml` pins
+        # `channel=stable` — which overrides dtolnay's installed-nightly
+        # default, so without this flag cargo-bolero runs stable rustc and
+        # `-Z` is rejected. (The dtolnay step above installs the nightly this
+        # flag selects.) Subcommand + target names + `[profile.fuzz]` +
+        # `--toolchain nightly` validated for the crap4ts targets via `cargo
+        # bolero list` + a workflow_dispatch run.
         env:
           # Matrix values are workflow-defined literals, but routing them
           # through env keeps the run block free of `${{ }}` interpolation
@@ -86,15 +107,19 @@ jobs:
           FUZZ_TEST: ${{ matrix.target.test }}
           FUZZ_PKG: ${{ matrix.target.package }}
         run: |
-          cargo bolero fuzz "$FUZZ_TEST" \
+          cargo bolero test "$FUZZ_TEST" \
             --package "$FUZZ_PKG" \
-            --sanitizer address \
+            --toolchain nightly \
             --engine libfuzzer \
+            --sanitizer address \
             -T 5min
       - name: Upload crash corpus on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-crashes-${{ matrix.target.test }}
-          path: crates/${{ matrix.target.package }}/tests/${{ matrix.target.test }}/crashes/
+          # Upload the whole target dir (corpus + crashes + bolero's internal
+          # __fuzz__ scratch) so a finding is recoverable for manual promotion
+          # into the committed crashes/ (crash + fix in one PR, per the ADR).
+          path: crates/${{ matrix.target.package }}/tests/${{ matrix.target.dir }}/
           if-no-files-found: ignore
