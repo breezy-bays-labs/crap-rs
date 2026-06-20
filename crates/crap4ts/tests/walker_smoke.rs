@@ -351,10 +351,24 @@ fn upstream_oxc_parser_panic_is_caught_as_source_parse() {
         .extract(&src, "crash.tsx", ComplexityMetric::Cyclomatic)
         .expect_err("malformed input that panics oxc must surface as Err, not panic");
     match err {
-        CrapError::SourceParse(msg) => assert!(
-            msg.starts_with("crash.tsx: "),
-            "expected `<file_path>: ` prefix, got: {msg:?}"
-        ),
+        CrapError::SourceParse(msg) => {
+            assert!(
+                msg.starts_with("crash.tsx: "),
+                "expected `<file_path>: ` prefix, got: {msg:?}"
+            );
+            // The caught panic's structural reason must be surfaced, not
+            // swallowed into a generic message (#442 Gemini review). oxc's
+            // inverted-span panic is an `assert!`, so its payload reaches the
+            // error text.
+            assert!(
+                msg.contains("internal parser error on malformed source: "),
+                "expected the surfaced-panic-reason marker, got: {msg:?}"
+            );
+            assert!(
+                msg.contains("assertion failed"),
+                "expected the oxc panic payload to be surfaced, got: {msg:?}"
+            );
+        }
         other => panic!("expected CrapError::SourceParse, got: {other:?}"),
     }
 }

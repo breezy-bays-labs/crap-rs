@@ -168,12 +168,7 @@ impl ComplexityPort for OxcWalker {
                 // Surface the panic payload (the structural reason) rather than
                 // a generic message, so a future NEW parser-panic class is
                 // diagnosable from the error alone instead of being swallowed.
-                // Rust panic payloads are `&str` or `String`.
-                let reason = payload
-                    .downcast_ref::<&str>()
-                    .map(|s| (*s).to_owned())
-                    .or_else(|| payload.downcast_ref::<String>().cloned())
-                    .unwrap_or_else(|| "non-string panic payload".to_owned());
+                let reason = panic_reason(payload.as_ref());
                 return Err(CrapError::SourceParse(format!(
                     "{file_path}: internal parser error on malformed source: {reason}"
                 )));
@@ -1611,6 +1606,22 @@ fn for_init_as_expression<'b>(init: &'b ForStatementInit<'b>) -> Option<&'b Expr
     init.as_expression()
 }
 
+/// Extract a human-readable reason from a caught panic payload (the `Err` of
+/// `catch_unwind`). Rust panic payloads are `&'static str` (a literal
+/// `panic!`/`unreachable!`) or `String` (a formatted `panic!`/`assert!`);
+/// anything else is reported generically. Used by `OxcWalker::extract` to
+/// surface the structural cause when an upstream oxc panic is converted into a
+/// `SourceParse` error.
+fn panic_reason(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_owned()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "non-string panic payload".to_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1619,5 +1630,26 @@ mod tests {
     fn oxc_walker_constructible() {
         let _w = OxcWalker::new();
         let _w2 = OxcWalker::default();
+    }
+
+    #[test]
+    fn panic_reason_extracts_str_payload() {
+        // Literal `panic!`/`unreachable!` carry a `&'static str` payload.
+        let payload: Box<dyn std::any::Any + Send> = Box::new("static message");
+        assert_eq!(panic_reason(payload.as_ref()), "static message");
+    }
+
+    #[test]
+    fn panic_reason_extracts_string_payload() {
+        // Formatted `panic!`/`assert!` (e.g. oxc's `assertion failed: ...`)
+        // carry a `String` payload.
+        let payload: Box<dyn std::any::Any + Send> = Box::new(String::from("formatted message"));
+        assert_eq!(panic_reason(payload.as_ref()), "formatted message");
+    }
+
+    #[test]
+    fn panic_reason_falls_back_on_non_string_payload() {
+        let payload: Box<dyn std::any::Any + Send> = Box::new(42i32);
+        assert_eq!(panic_reason(payload.as_ref()), "non-string panic payload");
     }
 }
