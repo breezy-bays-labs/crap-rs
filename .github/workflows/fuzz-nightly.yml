@@ -55,7 +55,7 @@ jobs:
       # @stable pin, Dependabot can't bump version-channel branches, so this
       # needs a manual refresh on the same quarterly cadence (AGENTS.md
       # supply-chain rule 2).
-      - uses: dtolnay/rust-toolchain@5b842231ba77f5c045dba54ac5560fed2db780e2 # tracks @nightly branch
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @nightly branch
       # Caching is safe here: this lane publishes nothing (no release artifact),
       # so the cache-poisoning fix shape that bars caching in release-plz.yml
       # does not apply.
