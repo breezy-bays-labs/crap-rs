@@ -138,6 +138,20 @@ pre-push:
       # `scripts/config-ast-purity-lint.py`.
       run: python3 scripts/config-ast-purity-lint.py
       timeout: 30s
+    version-edit-lint:
+      # Mechanical enforcement of crap-rs#448: release-plz owns every
+      # `[package] version` bump; a feature push must not hand-edit a
+      # crate's published version. Local-velocity layer of the same check
+      # that `.github/workflows/ci.yml`'s `version-edit-lint` job runs on
+      # every non-release PR. Skips `release-plz-*` branches (where bumps
+      # legitimately land); diffs against `origin/main` locally. Single
+      # source of truth: `scripts/version-edit-lint.py`.
+      run: |
+        set -euo pipefail
+        branch="$(git rev-parse --abbrev-ref HEAD)"
+        case "$branch" in release-plz-*) echo "skip: release-plz branch"; exit 0 ;; esac
+        python3 scripts/version-edit-lint.py
+      timeout: 30s
     clippy:
       run: cargo clippy --workspace --all-targets -- -D warnings
       timeout: 300s
