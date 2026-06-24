@@ -331,6 +331,48 @@ fn malformed_typescript_returns_source_parse_with_file_prefix() {
     }
 }
 
+#[test]
+fn upstream_oxc_parser_panic_is_caught_as_source_parse() {
+    // Regression: this 18-byte input drives oxc 0.129's tuple-type error
+    // recovery (`[fff?,` — a required element after an optional one), which
+    // builds an inverted diagnostic span (`start > end`); `Span::size` then
+    // asserts `start <= end` and panics *inside* `Parser::parse`. The walker
+    // must honor the `ComplexityPort` no-panic contract by catching the unwind
+    // and returning `SourceParse`, not aborting. Found by the nightly
+    // coverage-guided fuzz lane; the same bytes are committed as
+    // `tests/fuzz_oxc_walker/crashes/crash-oxc-inverted-tuple-span` so the
+    // stable replay test guards it too.
+    let bytes: &[u8] = &[
+        0x5a, 0x3c, 0x0b, 0x3f, 0x5b, 0x66, 0x66, 0x66, 0x3f, 0x2c, 0x0d, 0x0d, 0x0d, 0x0d, 0x0d,
+        0x0d, 0x0d, 0x0d,
+    ];
+    let src = String::from_utf8_lossy(bytes);
+    let err = OxcWalker::new()
+        .extract(&src, "crash.tsx", ComplexityMetric::Cyclomatic)
+        .expect_err("malformed input that panics oxc must surface as Err, not panic");
+    match err {
+        CrapError::SourceParse(msg) => {
+            assert!(
+                msg.starts_with("crash.tsx: "),
+                "expected `<file_path>: ` prefix, got: {msg:?}"
+            );
+            // The caught panic's structural reason must be surfaced, not
+            // swallowed into a generic message (#442 Gemini review). oxc's
+            // inverted-span panic is an `assert!`, so its payload reaches the
+            // error text.
+            assert!(
+                msg.contains("internal parser error on malformed source: "),
+                "expected the surfaced-panic-reason marker, got: {msg:?}"
+            );
+            assert!(
+                msg.contains("assertion failed"),
+                "expected the oxc panic payload to be surfaced, got: {msg:?}"
+            );
+        }
+        other => panic!("expected CrapError::SourceParse, got: {other:?}"),
+    }
+}
+
 // ── W2.1 (#184) — TS-specific cyclomatic decision points ───────────────
 //
 // Each fixture isolates one decision-point kind so the assertions stay
