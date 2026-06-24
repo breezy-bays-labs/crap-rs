@@ -292,6 +292,30 @@ jobs:
           print(f"PASS: {len(view_fns)} fn(s) in domain/view.rs, worst CC={worst} (limit {MAX_CC})")
           PY
 
+  envelope-verify:
+    # Shift-left of the release-time envelope assertions (crap-rs#448
+    # release hardening). The release-plz `build-crap-examples-envelopes`
+    # job and this job run the SAME script — so the per-adapter language /
+    # schema_version / non-empty assertions that gate publishing also run
+    # on every PR. The rc.4 incident shipped `language: "rust"` for the
+    # TypeScript adapter because that authoritative assertion lived ONLY
+    # in the release job (post-publish); running it here makes a mislabeled
+    # or malformed envelope fail on the PR instead of at release.
+    name: Example envelopes — build + verify (shift-left)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: envelope-verify
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build + verify both example envelopes
+        run: bash scripts/build-and-verify-example-envelopes.sh
+
   mutants:
     name: Mutation testing (crap-core view.rs + crap4ts walker)
     runs-on: ubuntu-latest

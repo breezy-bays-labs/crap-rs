@@ -672,59 +672,15 @@ jobs:
         with:
           enable-cache: "false"
 
-      - run: cargo build --release --bin crap4rs --bin crap4ts
-
-      - name: Lint committed coverage fixtures for absolute paths
-        # Absolute SF: paths in committed lcov.info (or absolute path
-        # keys in coverage-final.json) diverge between contributors
-        # and CI runners, silently producing envelopes with empty
-        # coverage maps. Fail loudly here rather than ship a
-        # malformed envelope to a release page.
-        run: |
-          set -euo pipefail
-          if grep -E '^SF:/' crates/crap-examples/lcov.info; then
-            echo "::error::lcov.info contains absolute SF: paths — regen with the sed normalization step in crap-examples/README.md"
-            exit 1
-          fi
-          if jq -e 'to_entries | map(select(.key | startswith("/"))) | length > 0' crates/crap-examples/coverage-final.json >/dev/null; then
-            echo "::error::coverage-final.json contains absolute path keys — regen with the jq normalization step in crap-examples/README.md"
-            exit 1
-          fi
-          echo "OK: both fixtures use --src-relative paths"
-
-      - name: Generate crap4rs envelope (Rust modules)
-        # Leading `./` on --src — the adapter's coverage-key matcher
-        # joins SF: paths onto `--src` before lookup, and bare-relative
-        # `--src` produces 0% coverage for workspace-relative SF: paths
-        # in the committed fixture. Tracked: crap-rs#331.
-        run: |
-          set -euo pipefail
-          ./target/release/crap4rs \
-            --src ./crates/crap-examples/src \
-            --coverage crates/crap-examples/lcov.info \
-            --format json --no-fail \
-            > crap4rs-envelope.json
-          # Empty-file guard: a silent adapter failure could write
-          # an empty (or non-JSON) file; jq's raw parse-error would
-          # otherwise obscure the cause. Actionable CI errors over
-          # cryptic parse failures.
-          [ -s crap4rs-envelope.json ] || { echo "::error::crap4rs-envelope.json is empty — adapter produced no output"; exit 1; }
-          jq -e '.schema_version == 2 and .language == "rust" and (.result.summary.total_functions // 0) > 0' crap4rs-envelope.json
-
-      - name: Generate crap4ts envelope (TypeScript modules)
-        # --exclude '*.test.ts' so the pedagogy doesn't include the
-        # test files that share the ts/ directory. Leading `./` on
-        # --src for the same reason as the Rust step above.
-        run: |
-          set -euo pipefail
-          ./target/release/crap4ts \
-            --src ./crates/crap-examples/ts \
-            --coverage crates/crap-examples/coverage-final.json \
-            --format json --no-fail \
-            --exclude '*.test.ts' \
-            > crap4ts-envelope.json
-          [ -s crap4ts-envelope.json ] || { echo "::error::crap4ts-envelope.json is empty — adapter produced no output"; exit 1; }
-          jq -e '.schema_version == 2 and .language == "typescript" and (.result.summary.total_functions // 0) > 0' crap4ts-envelope.json
+      - name: Build + verify both example envelopes
+        # Single source of truth shared with ci.yml's `envelope-verify`
+        # job (which runs on every PR). Builds the adapters, runs each
+        # against crap-examples, and asserts schema_version + the
+        # adapter's own language token + a non-empty function set. One
+        # shared copy so the PR gate and the release gate can never
+        # assert contradictory truths (the rc.4 language="rust" incident,
+        # where the authoritative assertion lived only here, post-publish).
+        run: bash scripts/build-and-verify-example-envelopes.sh
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
