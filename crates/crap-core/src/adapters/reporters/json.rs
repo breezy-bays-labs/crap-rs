@@ -30,8 +30,9 @@ use crate::ports::ParseDiagnostic;
 /// change rather than a major one — the same shape `HtmlMultiOptions`
 /// already uses. (Adding `epsilon` is what made a prior release register
 /// as breaking; that class is now closed.) Cross-crate tests construct it
-/// via the gated [`JsonConfig::for_test`] constructor below; in-crate
-/// code still uses struct literals freely.
+/// via the gated `for_test` constructor below (a plain code span, not an
+/// intra-doc link — `for_test` is `#[cfg]`-gated and absent from the
+/// default doc build); in-crate code still uses struct literals freely.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct JsonConfig<'a, P: ParseDiagnostic> {
