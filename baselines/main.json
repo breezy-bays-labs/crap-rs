@@ -2,7 +2,7 @@
   "schema_version": 2,
   "tool_version": "0.6.2",
   "language": "rust",
-  "timestamp": "1782293690",
+  "timestamp": "1782308335",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
@@ -9270,10 +9270,34 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
+            "qualified_name": "JsonConfig::for_test",
+            "span": {
+              "start_line": 88,
+              "end_line": 110,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "view_block",
             "span": {
-              "start_line": 77,
-              "end_line": 90,
+              "start_line": 135,
+              "end_line": 148,
               "start_column": 1,
               "end_column": 1
             }
@@ -9296,8 +9320,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "delta_block",
             "span": {
-              "start_line": 92,
-              "end_line": 105,
+              "start_line": 150,
+              "end_line": 163,
               "start_column": 1,
               "end_column": 1
             }
@@ -9320,8 +9344,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "format_json",
             "span": {
-              "start_line": 111,
-              "end_line": 136,
+              "start_line": 169,
+              "end_line": 194,
               "start_column": 1,
               "end_column": 1
             }
@@ -9344,8 +9368,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::default_config",
             "span": {
-              "start_line": 152,
-              "end_line": 166,
+              "start_line": 210,
+              "end_line": 224,
               "start_column": 5,
               "end_column": 5
             }
@@ -9368,8 +9392,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::parse_json",
             "span": {
-              "start_line": 168,
-              "end_line": 175,
+              "start_line": 226,
+              "end_line": 233,
               "start_column": 5,
               "end_column": 5
             }
@@ -9392,8 +9416,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::envelope_omits_epsilon_when_zero_and_emits_when_set",
             "span": {
-              "start_line": 177,
-              "end_line": 192,
+              "start_line": 235,
+              "end_line": 250,
               "start_column": 5,
               "end_column": 5
             }
@@ -9416,8 +9440,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_envelope_contains_all_fields",
             "span": {
-              "start_line": 194,
-              "end_line": 206,
+              "start_line": 252,
+              "end_line": 264,
               "start_column": 5,
               "end_column": 5
             }
@@ -9440,8 +9464,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_result_nested_correctly",
             "span": {
-              "start_line": 208,
-              "end_line": 217,
+              "start_line": 266,
+              "end_line": 275,
               "start_column": 5,
               "end_column": 5
             }
@@ -9464,8 +9488,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::missing_coverage_policy_elided_when_pessimistic",
             "span": {
-              "start_line": 219,
-              "end_line": 229,
+              "start_line": 277,
+              "end_line": 287,
               "start_column": 5,
               "end_column": 5
             }
@@ -9488,8 +9512,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::missing_coverage_policy_emitted_when_non_default",
             "span": {
-              "start_line": 231,
-              "end_line": 249,
+              "start_line": 289,
+              "end_line": 307,
               "start_column": 5,
               "end_column": 5
             }
@@ -9504,10 +9528,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 234,
+              "line": 292,
               "column": 9,
               "increment": 1,
-              "end_line": 248,
+              "end_line": 306,
               "nesting_depth": 0
             }
           ]
@@ -9521,8 +9545,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_schema_version_is_integer",
             "span": {
-              "start_line": 251,
-              "end_line": 258,
+              "start_line": 309,
+              "end_line": 316,
               "start_column": 5,
               "end_column": 5
             }
@@ -9545,8 +9569,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_function_all_scored_fields",
             "span": {
-              "start_line": 260,
-              "end_line": 290,
+              "start_line": 318,
+              "end_line": 348,
               "start_column": 5,
               "end_column": 5
             }
@@ -9569,8 +9593,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_summary_aggregate_stats",
             "span": {
-              "start_line": 292,
-              "end_line": 302,
+              "start_line": 350,
+              "end_line": 360,
               "start_column": 5,
               "end_column": 5
             }
@@ -9593,8 +9617,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_summary_distribution",
             "span": {
-              "start_line": 304,
-              "end_line": 314,
+              "start_line": 362,
+              "end_line": 372,
               "start_column": 5,
               "end_column": 5
             }
@@ -9617,8 +9641,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_passed_true",
             "span": {
-              "start_line": 316,
-              "end_line": 322,
+              "start_line": 374,
+              "end_line": 380,
               "start_column": 5,
               "end_column": 5
             }
@@ -9641,8 +9665,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_passed_false",
             "span": {
-              "start_line": 324,
-              "end_line": 329,
+              "start_line": 382,
+              "end_line": 387,
               "start_column": 5,
               "end_column": 5
             }
@@ -9665,8 +9689,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_empty_valid_json",
             "span": {
-              "start_line": 331,
-              "end_line": 340,
+              "start_line": 389,
+              "end_line": 398,
               "start_column": 5,
               "end_column": 5
             }
@@ -9689,8 +9713,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_metric_from_config",
             "span": {
-              "start_line": 342,
-              "end_line": 358,
+              "start_line": 400,
+              "end_line": 416,
               "start_column": 5,
               "end_column": 5
             }
@@ -9713,8 +9737,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_threshold_from_config",
             "span": {
-              "start_line": 360,
-              "end_line": 369,
+              "start_line": 418,
+              "end_line": 427,
               "start_column": 5,
               "end_column": 5
             }
@@ -9737,8 +9761,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_timestamp_passthrough",
             "span": {
-              "start_line": 371,
-              "end_line": 380,
+              "start_line": 429,
+              "end_line": 438,
               "start_column": 5,
               "end_column": 5
             }
@@ -9761,8 +9785,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_full_json_snapshot",
             "span": {
-              "start_line": 382,
-              "end_line": 397,
+              "start_line": 440,
+              "end_line": 455,
               "start_column": 5,
               "end_column": 5
             }
@@ -9785,8 +9809,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_envelope_field_declaration_order",
             "span": {
-              "start_line": 399,
-              "end_line": 442,
+              "start_line": 457,
+              "end_line": 500,
               "start_column": 5,
               "end_column": 5
             }
@@ -9801,10 +9825,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 432,
+              "line": 490,
               "column": 9,
               "increment": 1,
-              "end_line": 441,
+              "end_line": 499,
               "nesting_depth": 0
             }
           ]
@@ -9818,8 +9842,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_view_block_present_in_envelope",
             "span": {
-              "start_line": 444,
-              "end_line": 468,
+              "start_line": 502,
+              "end_line": 526,
               "start_column": 5,
               "end_column": 5
             }
@@ -9842,8 +9866,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_view_grouped_null_by_default",
             "span": {
-              "start_line": 470,
-              "end_line": 478,
+              "start_line": 528,
+              "end_line": 536,
               "start_column": 5,
               "end_column": 5
             }
@@ -9866,8 +9890,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_view_grouped_populated_under_group_by_file",
             "span": {
-              "start_line": 480,
-              "end_line": 508,
+              "start_line": 538,
+              "end_line": 566,
               "start_column": 5,
               "end_column": 5
             }
@@ -9890,8 +9914,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diff_ref_present_in_json",
             "span": {
-              "start_line": 510,
-              "end_line": 519,
+              "start_line": 568,
+              "end_line": 577,
               "start_column": 5,
               "end_column": 5
             }
@@ -9914,8 +9938,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diff_ref_null_when_none",
             "span": {
-              "start_line": 521,
-              "end_line": 530,
+              "start_line": 579,
+              "end_line": 588,
               "start_column": 5,
               "end_column": 5
             }
@@ -9938,8 +9962,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diagnostics_omitted_when_none",
             "span": {
-              "start_line": 532,
-              "end_line": 540,
+              "start_line": 590,
+              "end_line": 598,
               "start_column": 5,
               "end_column": 5
             }
@@ -9962,8 +9986,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diagnostics_included_when_present_p_agnostic_top_level",
             "span": {
-              "start_line": 542,
-              "end_line": 581,
+              "start_line": 600,
+              "end_line": 639,
               "start_column": 5,
               "end_column": 5
             }
@@ -9986,8 +10010,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "proptests::arb_config",
             "span": {
-              "start_line": 591,
-              "end_line": 609,
+              "start_line": 649,
+              "end_line": 667,
               "start_column": 5,
               "end_column": 5
             }
@@ -44981,9 +45005,9 @@
           },
           "complexity": 7,
           "complexity_metric": "cognitive",
-          "coverage_percent": 88.23529411764706,
+          "coverage_percent": 85.29411764705883,
           "crap": {
-            "value": 7.08,
+            "value": 7.16,
             "risk_level": "low"
           },
           "contributors": [
@@ -48168,10 +48192,10 @@
       }
     ],
     "summary": {
-      "total_functions": 1685,
+      "total_functions": 1686,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6240296735905047,
+      "average_crap": 1.6237069988137605,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -48188,16 +48212,16 @@
         }
       },
       "distribution": {
-        "low": 1685,
+        "low": 1686,
         "acceptable": 0,
         "moderate": 0,
         "high": 0
       },
       "max_complexity": 8,
-      "average_complexity": 1.6029673590504452,
+      "average_complexity": 1.6026097271648874,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.21639907055045,
+      "average_coverage": 98.2157124895652,
       "median_coverage": 100.0
     },
     "passed": true
@@ -48212,7 +48236,7 @@
       "limit": null,
       "group_by": null
     },
-    "eligible_count": 1685,
+    "eligible_count": 1686,
     "truncated": false,
     "shown": [
       {
@@ -49007,6 +49031,71 @@
       {
         "scored": {
           "identity": {
+            "file_path": "crates/crap4ts/src/adapters/coverage/mod.rs",
+            "qualified_name": "IstanbulCoverage::parse_str",
+            "span": {
+              "start_line": 570,
+              "end_line": 629,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 7,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 85.29411764705883,
+          "crap": {
+            "value": 7.16,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "if-branch",
+              "line": 581,
+              "column": 9,
+              "increment": 1,
+              "end_line": 583,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "try",
+              "line": 589,
+              "column": 75,
+              "increment": 1,
+              "end_line": 589,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 591,
+              "column": 9,
+              "increment": 1,
+              "end_line": 593,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "match",
+              "line": 601,
+              "column": 29,
+              "increment": 1,
+              "end_line": 616,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 605,
+              "column": 17,
+              "increment": 2,
+              "end_line": 609,
+              "nesting_depth": 1
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
             "file_path": "crates/crap-core/src/domain/delta.rs",
             "qualified_name": "matches_score_delta_range",
             "span": {
@@ -49127,71 +49216,6 @@
               "column": 13,
               "increment": 2,
               "end_line": 549,
-              "nesting_depth": 1
-            }
-          ]
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap4ts/src/adapters/coverage/mod.rs",
-            "qualified_name": "IstanbulCoverage::parse_str",
-            "span": {
-              "start_line": 570,
-              "end_line": 629,
-              "start_column": 5,
-              "end_column": 5
-            }
-          },
-          "complexity": 7,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 88.23529411764706,
-          "crap": {
-            "value": 7.08,
-            "risk_level": "low"
-          },
-          "contributors": [
-            {
-              "kind": "if-branch",
-              "line": 581,
-              "column": 9,
-              "increment": 1,
-              "end_line": 583,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "try",
-              "line": 589,
-              "column": 75,
-              "increment": 1,
-              "end_line": 589,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 591,
-              "column": 9,
-              "increment": 1,
-              "end_line": 593,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "match",
-              "line": 601,
-              "column": 29,
-              "increment": 1,
-              "end_line": 616,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 605,
-              "column": 17,
-              "increment": 2,
-              "end_line": 609,
               "nesting_depth": 1
             }
           ]
@@ -59914,8 +59938,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_envelope_field_declaration_order",
             "span": {
-              "start_line": 399,
-              "end_line": 442,
+              "start_line": 457,
+              "end_line": 500,
               "start_column": 5,
               "end_column": 5
             }
@@ -59930,10 +59954,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 432,
+              "line": 490,
               "column": 9,
               "increment": 1,
-              "end_line": 441,
+              "end_line": 499,
               "nesting_depth": 0
             }
           ]
@@ -61861,8 +61885,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "delta_block",
             "span": {
-              "start_line": 92,
-              "end_line": 105,
+              "start_line": 150,
+              "end_line": 163,
               "start_column": 1,
               "end_column": 1
             }
@@ -61885,8 +61909,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::missing_coverage_policy_emitted_when_non_default",
             "span": {
-              "start_line": 231,
-              "end_line": 249,
+              "start_line": 289,
+              "end_line": 307,
               "start_column": 5,
               "end_column": 5
             }
@@ -61901,10 +61925,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 234,
+              "line": 292,
               "column": 9,
               "increment": 1,
-              "end_line": 248,
+              "end_line": 306,
               "nesting_depth": 0
             }
           ]
@@ -73217,10 +73241,34 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
+            "qualified_name": "JsonConfig::for_test",
+            "span": {
+              "start_line": 88,
+              "end_line": 110,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "view_block",
             "span": {
-              "start_line": 77,
-              "end_line": 90,
+              "start_line": 135,
+              "end_line": 148,
               "start_column": 1,
               "end_column": 1
             }
@@ -73243,8 +73291,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "format_json",
             "span": {
-              "start_line": 111,
-              "end_line": 136,
+              "start_line": 169,
+              "end_line": 194,
               "start_column": 1,
               "end_column": 1
             }
@@ -73267,8 +73315,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::default_config",
             "span": {
-              "start_line": 152,
-              "end_line": 166,
+              "start_line": 210,
+              "end_line": 224,
               "start_column": 5,
               "end_column": 5
             }
@@ -73291,8 +73339,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::parse_json",
             "span": {
-              "start_line": 168,
-              "end_line": 175,
+              "start_line": 226,
+              "end_line": 233,
               "start_column": 5,
               "end_column": 5
             }
@@ -73315,8 +73363,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::envelope_omits_epsilon_when_zero_and_emits_when_set",
             "span": {
-              "start_line": 177,
-              "end_line": 192,
+              "start_line": 235,
+              "end_line": 250,
               "start_column": 5,
               "end_column": 5
             }
@@ -73339,8 +73387,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_envelope_contains_all_fields",
             "span": {
-              "start_line": 194,
-              "end_line": 206,
+              "start_line": 252,
+              "end_line": 264,
               "start_column": 5,
               "end_column": 5
             }
@@ -73363,8 +73411,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_result_nested_correctly",
             "span": {
-              "start_line": 208,
-              "end_line": 217,
+              "start_line": 266,
+              "end_line": 275,
               "start_column": 5,
               "end_column": 5
             }
@@ -73387,8 +73435,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::missing_coverage_policy_elided_when_pessimistic",
             "span": {
-              "start_line": 219,
-              "end_line": 229,
+              "start_line": 277,
+              "end_line": 287,
               "start_column": 5,
               "end_column": 5
             }
@@ -73411,8 +73459,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_schema_version_is_integer",
             "span": {
-              "start_line": 251,
-              "end_line": 258,
+              "start_line": 309,
+              "end_line": 316,
               "start_column": 5,
               "end_column": 5
             }
@@ -73435,8 +73483,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_function_all_scored_fields",
             "span": {
-              "start_line": 260,
-              "end_line": 290,
+              "start_line": 318,
+              "end_line": 348,
               "start_column": 5,
               "end_column": 5
             }
@@ -73459,8 +73507,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_summary_aggregate_stats",
             "span": {
-              "start_line": 292,
-              "end_line": 302,
+              "start_line": 350,
+              "end_line": 360,
               "start_column": 5,
               "end_column": 5
             }
@@ -73483,8 +73531,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_summary_distribution",
             "span": {
-              "start_line": 304,
-              "end_line": 314,
+              "start_line": 362,
+              "end_line": 372,
               "start_column": 5,
               "end_column": 5
             }
@@ -73507,8 +73555,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_passed_true",
             "span": {
-              "start_line": 316,
-              "end_line": 322,
+              "start_line": 374,
+              "end_line": 380,
               "start_column": 5,
               "end_column": 5
             }
@@ -73531,8 +73579,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_passed_false",
             "span": {
-              "start_line": 324,
-              "end_line": 329,
+              "start_line": 382,
+              "end_line": 387,
               "start_column": 5,
               "end_column": 5
             }
@@ -73555,8 +73603,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_empty_valid_json",
             "span": {
-              "start_line": 331,
-              "end_line": 340,
+              "start_line": 389,
+              "end_line": 398,
               "start_column": 5,
               "end_column": 5
             }
@@ -73579,8 +73627,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_metric_from_config",
             "span": {
-              "start_line": 342,
-              "end_line": 358,
+              "start_line": 400,
+              "end_line": 416,
               "start_column": 5,
               "end_column": 5
             }
@@ -73603,8 +73651,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_threshold_from_config",
             "span": {
-              "start_line": 360,
-              "end_line": 369,
+              "start_line": 418,
+              "end_line": 427,
               "start_column": 5,
               "end_column": 5
             }
@@ -73627,8 +73675,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_timestamp_passthrough",
             "span": {
-              "start_line": 371,
-              "end_line": 380,
+              "start_line": 429,
+              "end_line": 438,
               "start_column": 5,
               "end_column": 5
             }
@@ -73651,8 +73699,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_full_json_snapshot",
             "span": {
-              "start_line": 382,
-              "end_line": 397,
+              "start_line": 440,
+              "end_line": 455,
               "start_column": 5,
               "end_column": 5
             }
@@ -73675,8 +73723,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_view_block_present_in_envelope",
             "span": {
-              "start_line": 444,
-              "end_line": 468,
+              "start_line": 502,
+              "end_line": 526,
               "start_column": 5,
               "end_column": 5
             }
@@ -73699,8 +73747,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_view_grouped_null_by_default",
             "span": {
-              "start_line": 470,
-              "end_line": 478,
+              "start_line": 528,
+              "end_line": 536,
               "start_column": 5,
               "end_column": 5
             }
@@ -73723,8 +73771,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_view_grouped_populated_under_group_by_file",
             "span": {
-              "start_line": 480,
-              "end_line": 508,
+              "start_line": 538,
+              "end_line": 566,
               "start_column": 5,
               "end_column": 5
             }
@@ -73747,8 +73795,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diff_ref_present_in_json",
             "span": {
-              "start_line": 510,
-              "end_line": 519,
+              "start_line": 568,
+              "end_line": 577,
               "start_column": 5,
               "end_column": 5
             }
@@ -73771,8 +73819,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diff_ref_null_when_none",
             "span": {
-              "start_line": 521,
-              "end_line": 530,
+              "start_line": 579,
+              "end_line": 588,
               "start_column": 5,
               "end_column": 5
             }
@@ -73795,8 +73843,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diagnostics_omitted_when_none",
             "span": {
-              "start_line": 532,
-              "end_line": 540,
+              "start_line": 590,
+              "end_line": 598,
               "start_column": 5,
               "end_column": 5
             }
@@ -73819,8 +73867,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "tests::test_diagnostics_included_when_present_p_agnostic_top_level",
             "span": {
-              "start_line": 542,
-              "end_line": 581,
+              "start_line": 600,
+              "end_line": 639,
               "start_column": 5,
               "end_column": 5
             }
@@ -73843,8 +73891,8 @@
             "file_path": "crates/crap-core/src/adapters/reporters/json.rs",
             "qualified_name": "proptests::arb_config",
             "span": {
-              "start_line": 591,
-              "end_line": 609,
+              "start_line": 649,
+              "end_line": 667,
               "start_column": 5,
               "end_column": 5
             }
@@ -96375,10 +96423,10 @@
       }
     ],
     "shown_summary": {
-      "total_functions": 1685,
+      "total_functions": 1686,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6240296735905047,
+      "average_crap": 1.6237069988137605,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -96395,16 +96443,16 @@
         }
       },
       "distribution": {
-        "low": 1685,
+        "low": 1686,
         "acceptable": 0,
         "moderate": 0,
         "high": 0
       },
       "max_complexity": 8,
-      "average_complexity": 1.6029673590504452,
+      "average_complexity": 1.6026097271648874,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.21639907055045,
+      "average_coverage": 98.2157124895652,
       "median_coverage": 100.0
     },
     "grouped": null
