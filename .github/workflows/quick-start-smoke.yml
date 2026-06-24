@@ -166,6 +166,24 @@ jobs:
           set -euo pipefail
           gh release download --pattern 'crap4rs-envelope.json' --dir "$RUNNER_TEMP"
           gh release download --pattern 'crap4ts-envelope.json' --dir "$RUNNER_TEMP"
+          # Validity guard: `gh release download` can exit 0 yet leave an
+          # EMPTY (0-byte) file. Observed in CI under the ephemeral
+          # GITHUB_TOKEN — the release asset is a valid ~70KB envelope and
+          # the identical command downloads it correctly with a PAT, but
+          # the runner-side fetch wrote a 0-byte crap4rs-envelope.json and
+          # still exited 0. An empty/invalid baseline crashes crap-render
+          # (`EOF while parsing a value`, exit 2) instead of taking the
+          # graceful run-mode:full fallback. Re-assert JSON validity here so
+          # a bad fetch becomes a fetch MISS (this step exits non-zero →
+          # continue-on-error → the fallback-annotation + run-mode:full path
+          # below), not a hard smoke failure. The warning keeps a genuine
+          # steady-state regression visible.
+          for f in crap4rs-envelope.json crap4ts-envelope.json; do
+            if ! jq -e . "$RUNNER_TEMP/$f" >/dev/null 2>&1; then
+              echo "::warning::fetched baseline $f is empty or not valid JSON (gh exited 0 but wrote no content) — treating as a fetch miss; smoke falls back to run-mode: full"
+              exit 1
+            fi
+          done
 
       # ----------------------------------------------------------------
       # Annotate the cause when the envelope fetch failed. Without
