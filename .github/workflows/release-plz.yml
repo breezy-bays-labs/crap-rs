@@ -280,8 +280,14 @@ jobs:
       # package and installing the tarball into a clean project reproduces
       # that gating on this runner's native platform, pre-publish, so a
       # packaging defect fails the workflow instead of reaching the registry.
+      # zizmor's adhoc-packages audit flags the tarball `npm install` below;
+      # it is intentional and bounded — this step installs the just-built
+      # local tarball into a throwaway consumer to smoke-test platform
+      # gating, which is inherently lockfile-less. The ignore sits on the
+      # `run:` line because a `#` inside a block scalar is bash, not a YAML
+      # comment, so zizmor only reads a directive on the step's YAML line.
       - name: Verify npm packaging + install-gating
-        run: |
+        run: | # zizmor: ignore[adhoc-packages]
           set -euo pipefail
           work="$(mktemp -d)"
           ( cd packages/crap4ts && npm pack --pack-destination "$work" )
@@ -338,7 +344,11 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Upgrade npm to an OIDC-capable version
-        run: npm install -g npm@^11.5.1
+        # zizmor's adhoc-packages audit flags this global install; it is
+        # intentional and bounded — upgrading npm itself to an OIDC-capable
+        # version is a prerequisite for trusted publishing and is inherently
+        # a global, lockfile-less install.
+        run: npm install -g npm@^11.5.1 # zizmor: ignore[adhoc-packages]
 
       - name: Verify package.json + Cargo.toml versions match
         # Belt-and-braces check. package.json is normally bumped on

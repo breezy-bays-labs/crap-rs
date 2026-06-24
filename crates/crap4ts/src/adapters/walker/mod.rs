@@ -145,7 +145,35 @@ impl ComplexityPort for OxcWalker {
         let source_type =
             SourceType::from_path(Path::new(file_path)).unwrap_or_else(|_| SourceType::ts());
 
-        let ret = Parser::new(&allocator, source, source_type).parse();
+        // oxc parses well-formed input panic-free, but its error-recovery
+        // path has upstream defects that panic on adversarial malformed input.
+        // As of oxc 0.129, `parse_tuple_type` builds an inverted diagnostic
+        // span (`start > end`) for a required-after-optional tuple element, and
+        // `Span::size` then asserts `start <= end` and panics — entirely inside
+        // `Parser::parse`, before any AST reaches the walker below. The
+        // `ComplexityPort` contract is that arbitrary bytes yield `Ok`/`Err`
+        // and never a panic (the `fuzz_oxc_walker` target + its committed
+        // `crash-oxc-inverted-tuple-span` seed pin this), so catch the unwind
+        // and route it through the same `SourceParse` path a normal parse
+        // failure takes. `AssertUnwindSafe` is sound here: on the panic path
+        // the arena and any half-built AST are dropped untouched — no
+        // potentially-broken state is ever observed. (Removable once the
+        // upstream fix lands and the oxc pin is bumped past it.)
+        let parsed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Parser::new(&allocator, source, source_type).parse()
+        }));
+        let ret = match parsed {
+            Ok(ret) => ret,
+            Err(payload) => {
+                // Surface the panic payload (the structural reason) rather than
+                // a generic message, so a future NEW parser-panic class is
+                // diagnosable from the error alone instead of being swallowed.
+                let reason = panic_reason(payload.as_ref());
+                return Err(CrapError::SourceParse(format!(
+                    "{file_path}: internal parser error on malformed source: {reason}"
+                )));
+            }
+        };
         if let Some(first) = ret.errors.first() {
             return Err(CrapError::SourceParse(format!("{file_path}: {first}")));
         }
@@ -1578,6 +1606,22 @@ fn for_init_as_expression<'b>(init: &'b ForStatementInit<'b>) -> Option<&'b Expr
     init.as_expression()
 }
 
+/// Extract a human-readable reason from a caught panic payload (the `Err` of
+/// `catch_unwind`). Rust panic payloads are `&'static str` (a literal
+/// `panic!`/`unreachable!`) or `String` (a formatted `panic!`/`assert!`);
+/// anything else is reported generically. Used by `OxcWalker::extract` to
+/// surface the structural cause when an upstream oxc panic is converted into a
+/// `SourceParse` error.
+fn panic_reason(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_owned()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "non-string panic payload".to_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1586,5 +1630,26 @@ mod tests {
     fn oxc_walker_constructible() {
         let _w = OxcWalker::new();
         let _w2 = OxcWalker::default();
+    }
+
+    #[test]
+    fn panic_reason_extracts_str_payload() {
+        // Literal `panic!`/`unreachable!` carry a `&'static str` payload.
+        let payload: Box<dyn std::any::Any + Send> = Box::new("static message");
+        assert_eq!(panic_reason(payload.as_ref()), "static message");
+    }
+
+    #[test]
+    fn panic_reason_extracts_string_payload() {
+        // Formatted `panic!`/`assert!` (e.g. oxc's `assertion failed: ...`)
+        // carry a `String` payload.
+        let payload: Box<dyn std::any::Any + Send> = Box::new(String::from("formatted message"));
+        assert_eq!(panic_reason(payload.as_ref()), "formatted message");
+    }
+
+    #[test]
+    fn panic_reason_falls_back_on_non_string_payload() {
+        let payload: Box<dyn std::any::Any + Send> = Box::new(42i32);
+        assert_eq!(panic_reason(payload.as_ref()), "non-string panic payload");
     }
 }
