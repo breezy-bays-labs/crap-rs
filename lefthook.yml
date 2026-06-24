@@ -152,6 +152,16 @@ pre-push:
         case "$branch" in release-plz-*) echo "skip: release-plz branch"; exit 0 ;; esac
         python3 scripts/version-edit-lint.py
       timeout: 30s
+    encoded-defect-lint:
+      # Mechanical enforcement of AGENTS.md "Encoded-defect discipline": a
+      # deliberately-wrong / deferred value frozen into a test, snapshot, or
+      # fixture must carry a `tracked: crap-rs#<n>` (active) or
+      # `resolved: crap-rs#<n>` (historical) anchor. Local-velocity layer of
+      # the same check that `.github/workflows/ci.yml`'s `encoded-defect-lint`
+      # job runs on every push. Single source of truth:
+      # `scripts/encoded-defect-lint.py`.
+      run: python3 scripts/encoded-defect-lint.py
+      timeout: 30s
     clippy:
       run: cargo clippy --workspace --all-targets -- -D warnings
       timeout: 300s

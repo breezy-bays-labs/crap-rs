@@ -15,7 +15,7 @@
 //! refactors. Separate per-adapter snapshots give cleaner failure
 //! attribution than a single dual-fixture snapshot would.
 //!
-//! ## Wrong-by-design values that flipped at W2.5
+//! ## Wrong-by-design values that flipped at W2.5 — resolved: crap-rs#188 (metric), crap-rs#450 (language)
 //!
 //! Through W1.3 the snapshot baked `metric: "cognitive"` — wrong for
 //! crap4ts (no cognitive support; default should be cyclomatic).
@@ -23,7 +23,8 @@
 //! per locked decision #2. The snapshot was regenerated at W2.5 PR
 //! time; `metric: "cyclomatic"` is now baked. `language` was also once
 //! wrong-by-design (`"rust"` for every adapter); it now stamps the
-//! adapter's own `AdapterMeta::config_lang_key`, so `language:
+//! adapter's own `AdapterMeta::config_lang_key` (resolved: crap-rs#450),
+//! so `language:
 //! "typescript"` is baked here. An explicit assertion below guards the
 //! value so the per-adapter wiring can't silently regress to a literal.
 //!
