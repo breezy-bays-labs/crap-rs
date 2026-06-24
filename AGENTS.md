@@ -786,3 +786,55 @@ There is **no inline override**: the only legitimate feature-PR version
 touch is a new crate (exempt). A genuine one-off bump belongs on the
 release-plz path. The decision is captured in
 `adr-release-process-and-public-api-boundary`.
+
+## Encoded-defect discipline
+
+A **deliberately-wrong / deferred value** frozen into a test, snapshot, or
+fixture must carry a **tracking anchor**. This is the exclusions discipline
+(`~/.claude/rules/exclusions.md`) applied to *values*: if you knowingly
+encode a wrong value, you must name the issue that owns it.
+
+### Why
+
+The rc.4 release shipped a wire envelope whose `language` field was frozen
+to the wrong value (`"rust"` for the TypeScript adapter) under a comment
+labeling it deliberately wrong "pending a later fix" — and because a
+shape-lock **snapshot was the oracle**, the deferred defect sailed green
+through every PR until publish. (Corollary: a snapshot is a *tautological*
+oracle — it bakes whatever the output is. For a field with a
+knowable-correct value, assert it with an explicit `assert_eq!` oracle, not
+a snapshot. The wire-envelope canaries were converted to explicit oracles.)
+
+### The rule
+
+A line carrying an unambiguous "deliberately wrong" marker must have an
+anchor comment within a few lines:
+
+- `tracked: crap-rs#<n>` — **active** deferral; an open issue owns the fix.
+- `resolved: crap-rs#<n>` — **historical** reference; a post-mortem doc
+  narrating a defect that has SINCE been fixed (so the narrative can name
+  the marker without the lint mistaking it for a live defect).
+
+Markers (case-insensitive): `wrong-by-design`, `known-wrong`,
+`wrong-on-purpose`, `deliberately wrong`, `intentionally wrong`. Bare
+"by design" is a legitimate design statement and is **not** a marker — the
+discriminator is *wrong*.
+
+### Mechanical enforcement
+
+`scripts/encoded-defect-lint.py` (the `encoded-defect-lint` CI job +
+`lefthook.yml` pre-push command — single source of truth in the script)
+fails on any unanchored marker. It is scoped to source/test/snapshot/
+fixture files under `crates/` (`.rs .snap .json .ts .toml .feature`) and
+deliberately excludes `scripts/` and `*.md` — the lint and these docs name
+the markers in their own definitions. A `--self-test` guards the rule logic
+(documentation rots; CI doesn't — same pattern as
+`scripts/bdd-tracked-lint.py`).
+
+**Honest limitation:** this is a heuristic text matcher. It enforces that a
+*labeled* deferral is also *anchored*; it cannot detect a deferred wrong
+value that carries no marker at all. The labeling convention is what makes
+the deferral visible; the lint makes the anchor mandatory once it is. The
+narrow marker set keeps the false-match floor near zero (verified by an
+adversarial whole-tree FP-hunt at authoring time). The decision is captured
+in `adr-release-process-and-public-api-boundary`.

@@ -1888,6 +1888,43 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python3 scripts/version-edit-lint.py
 
+  encoded-defect-lint:
+    # Mechanical enforcement of AGENTS.md "Encoded-defect discipline": a
+    # deliberately-wrong / deferred VALUE frozen into a test, snapshot, or
+    # fixture must carry a tracking anchor — `tracked: crap-rs#<n>` (active)
+    # or `resolved: crap-rs#<n>` (historical/post-mortem). The rc.4 release
+    # shipped a wire envelope whose `language` was frozen to the wrong value
+    # under a "wrong-by-design pending a later fix" comment, and because the
+    # snapshot WAS the oracle the deferred defect sailed green to publish.
+    # This gate makes that deferral class accountable — same discipline as
+    # `~/.claude/rules/exclusions.md` (documentation rots; CI doesn't).
+    #
+    # Matches only unambiguous "deliberately wrong" markers (wrong-by-design
+    # / known-wrong / wrong-on-purpose / deliberately|intentionally wrong),
+    # NOT bare "by design" (a legitimate design statement). Scoped to
+    # source/test/snapshot/fixture files under `crates/` (excludes
+    # `scripts/` + `*.md`, which name the markers in their own definition).
+    #
+    # `actions/checkout` SHA-pinned per the repo-wide convention;
+    # `persist-credentials: false` (never pushes) + `permissions:
+    # contents: read` enforce least privilege. Mirrors the `lefthook.yml`
+    # pre-push step — single source of truth in
+    # `scripts/encoded-defect-lint.py`. See AGENTS.md "Encoded-defect
+    # discipline".
+    name: encoded-defect lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Self-test the encoded-defect lint logic
+        run: python3 scripts/encoded-defect-lint.py --self-test
+      - name: Reject unanchored deliberately-wrong markers
+        run: python3 scripts/encoded-defect-lint.py
+
   bdd-tracked-lint:
     # Mechanical enforcement of AGENTS.md "BDD hygiene" Rules 1 and 2
     # across `crates/*/tests/features/` (single script, two rules):
