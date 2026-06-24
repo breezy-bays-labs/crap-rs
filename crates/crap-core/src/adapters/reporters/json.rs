@@ -87,21 +87,21 @@ pub struct JsonConfig<'a, P: ParseDiagnostic> {
 impl<'a, P: ParseDiagnostic> JsonConfig<'a, P> {
     #[allow(clippy::too_many_arguments)]
     pub fn for_test(
-        tool_version: String,
-        language: String,
+        tool_version: impl Into<String>,
+        language: impl Into<String>,
         metric: ComplexityMetric,
         missing_coverage_policy: MissingCoveragePolicy,
         threshold: f64,
-        timestamp: String,
+        timestamp: impl Into<String>,
     ) -> Self {
         Self {
-            tool_version,
-            language,
+            tool_version: tool_version.into(),
+            language: language.into(),
             metric,
             missing_coverage_policy,
             threshold,
             epsilon: 0.0,
-            timestamp,
+            timestamp: timestamp.into(),
             diagnostics: None,
             diff_ref: None,
             minimal_view: false,

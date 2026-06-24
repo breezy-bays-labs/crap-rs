@@ -65,12 +65,12 @@ fn diagnostics_included_when_present() {
 
     let result = make_empty_result();
     let mut config = JsonConfig::for_test(
-        "0.1.0".to_string(),
-        "rust".to_string(),
+        "0.1.0",
+        "rust",
         ComplexityMetric::Cognitive,
         MissingCoveragePolicy::Pessimistic,
         8.0,
-        "2026-03-28T12:00:00Z".to_string(),
+        "2026-03-28T12:00:00Z",
     );
     config.diagnostics = Some(&diag);
 

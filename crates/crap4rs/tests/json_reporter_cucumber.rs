@@ -54,12 +54,12 @@ impl JsonWorld {
         let threshold = self.threshold.unwrap_or(8.0);
         let view = view::apply(result, ViewSpec::default());
         let config = JsonConfig::for_test(
-            "0.1.0".to_string(),
-            "rust".to_string(),
+            "0.1.0",
+            "rust",
             metric,
             MissingCoveragePolicy::Pessimistic,
             threshold,
-            "2026-05-04T00:00:00Z".to_string(),
+            "2026-05-04T00:00:00Z",
         );
         let json_str = format_json(&view, &config).expect("format_json should succeed");
         self.output = Some(serde_json::from_str(&json_str).expect("output should be valid JSON"));

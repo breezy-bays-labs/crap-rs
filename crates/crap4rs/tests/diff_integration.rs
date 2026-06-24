@@ -600,12 +600,12 @@ fn json_envelope_contains_diff_ref() {
         .result;
 
     let mut config = reporters::json::JsonConfig::for_test(
-        "0.1.0".to_string(),
-        "rust".to_string(),
+        "0.1.0",
+        "rust",
         ComplexityMetric::Cognitive,
         MissingCoveragePolicy::Pessimistic,
         30.0,
-        "2026-03-29T00:00:00Z".to_string(),
+        "2026-03-29T00:00:00Z",
     );
     config.diff_ref = Some("HEAD");
     let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
@@ -636,12 +636,12 @@ fn json_envelope_diff_ref_null_without_flag() {
         .result;
 
     let config = reporters::json::JsonConfig::for_test(
-        "0.1.0".to_string(),
-        "rust".to_string(),
+        "0.1.0",
+        "rust",
         ComplexityMetric::Cognitive,
         MissingCoveragePolicy::Pessimistic,
         30.0,
-        "2026-03-29T00:00:00Z".to_string(),
+        "2026-03-29T00:00:00Z",
     );
     let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
     let json_str = reporters::format_json(&view, &config).unwrap();
