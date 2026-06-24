@@ -63,12 +63,17 @@ import sys
 
 # Unambiguous "deliberately wrong" markers. The shared discriminator is
 # "wrong" / "known-wrong" / "on-purpose" — NOT bare "by design".
+# `[-_\s]+` between words tolerates any separator a writer might use —
+# hyphen, underscore, or one-or-more spaces/tabs (`wrong-by-design`,
+# `wrong_by_design`, `wrong by design`) — without widening the matched
+# vocabulary. (`\s` is intra-line only: the lint scans line by line.)
+_SEP = r"[-_\s]+"
 MARKER_RE = re.compile(
-    r"wrong[-\s]by[-\s]design"
-    r"|known[-\s]wrong"
-    r"|wrong[-\s]on[-\s]purpose"
-    r"|deliberately[-\s]wrong"
-    r"|intentionally[-\s]wrong",
+    rf"wrong{_SEP}by{_SEP}design"
+    rf"|known{_SEP}wrong"
+    rf"|wrong{_SEP}on{_SEP}purpose"
+    rf"|deliberately{_SEP}wrong"
+    rf"|intentionally{_SEP}wrong",
     re.IGNORECASE,
 )
 
@@ -119,12 +124,13 @@ def _tracked_files() -> list[str]:
         errors="replace",
         check=True,
     ).stdout
+    # NB: the scan is scoped to `crates/` (the git ls-files arg), so
+    # `scripts/` and root-level `*.md` — which name the markers in their
+    # own definitions — are excluded by SCOPE, no path filter needed.
     files = []
     for line in out.splitlines():
         p = line.strip()
         if not p or not p.endswith(SCAN_EXTS):
-            continue
-        if p.startswith("scripts/"):
             continue
         files.append(p)
     return files
@@ -134,10 +140,14 @@ def run_cli() -> int:
     violations: list[str] = []
     for path in _tracked_files():
         try:
-            with open(path, encoding="utf-8") as fh:
+            # errors="replace": scan a file with stray invalid-UTF-8 bytes
+            # (replacing them with U+FFFD) rather than silently skipping it
+            # — a marker is overwhelmingly likely to be in the valid-ASCII
+            # portion, so dropping the whole file would create a blind spot.
+            with open(path, encoding="utf-8", errors="replace") as fh:
                 text = fh.read()
-        except (OSError, UnicodeDecodeError):
-            continue  # binary / unreadable — skip
+        except OSError:
+            continue  # unreadable — skip
         violations.extend(find_violations(text, path))
 
     if violations:
@@ -174,6 +184,9 @@ def self_test() -> int:
         ),
         ("bare 'by design' NOT matched", "// adapter-agnostic by design — source format is irrelevant\n", 0),
         ("bare 'by design' (warns never fails) NOT matched", "// warns, never fails — by design\n", 0),
+        ("underscore separator matches", "let x = 1; // wrong_by_design\n", 1),
+        ("multiple-space separator matches", "// this is wrong  by  design here\n", 1),
+        ("mixed separators (known_wrong) matches", "v = 2  # known_wrong\n", 1),
         ("known-wrong unanchored fails", "expected = 2.0  # known-wrong placeholder\n", 1),
         (
             "known-wrong anchored passes",
