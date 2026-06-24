@@ -601,6 +601,7 @@ fn json_envelope_contains_diff_ref() {
 
     let config = reporters::json::JsonConfig {
         tool_version: "0.1.0".to_string(),
+        language: "rust".to_string(),
         metric: ComplexityMetric::Cognitive,
         missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
         threshold: 30.0,
@@ -640,6 +641,7 @@ fn json_envelope_diff_ref_null_without_flag() {
 
     let config = reporters::json::JsonConfig {
         tool_version: "0.1.0".to_string(),
+        language: "rust".to_string(),
         metric: ComplexityMetric::Cognitive,
         missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
         threshold: 30.0,

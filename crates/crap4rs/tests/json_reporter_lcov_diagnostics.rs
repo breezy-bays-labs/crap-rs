@@ -66,6 +66,7 @@ fn diagnostics_included_when_present() {
     let result = make_empty_result();
     let config = JsonConfig {
         tool_version: "0.1.0".to_string(),
+        language: "rust".to_string(),
         metric: ComplexityMetric::Cognitive,
         missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
         threshold: 8.0,

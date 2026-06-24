@@ -1622,6 +1622,10 @@ fn format_as_json<P: ParseDiagnostic>(
     });
     let config = reporters::json::JsonConfig {
         tool_version: meta.tool_version.to_string(),
+        // Each adapter stamps its own wire language token (the lowercase
+        // `config_lang_key`: "rust" / "typescript") so the envelope's
+        // `language` field is a usable identity signal per adapter.
+        language: meta.config_lang_key.to_string(),
         metric: inputs.metric,
         missing_coverage_policy: inputs.missing_coverage_policy,
         threshold: inputs.threshold,

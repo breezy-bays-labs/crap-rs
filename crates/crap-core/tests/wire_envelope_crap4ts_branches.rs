@@ -157,6 +157,16 @@ fn envelope() {
         "envelope.tool_version missing or empty (pre-strip)",
     );
 
+    // Per-adapter language guard (mirrors the sibling crap4ts canary).
+    // crap4ts stamps its own `config_lang_key` ("typescript"); this fails
+    // loudly if the wiring regresses to a shared literal.
+    assert_eq!(
+        envelope["language"].as_str(),
+        Some("typescript"),
+        "crap4ts envelope.language must be \"typescript\", got {:?}",
+        envelope["language"],
+    );
+
     strip_volatile(&mut envelope);
     strip_tempdir_paths(&mut envelope, &tempdir_str);
 
