@@ -136,3 +136,17 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 # binary; `env!("CARGO_BIN_EXE_crap4rs")` is only set inside the
 # crap4rs crate's tests, so cross-crate invocation needs assert_cmd.
 assert_cmd = "2"
+
+# ── Q4 fuzz profile ───────────────────────────────────────────────────
+# `cargo bolero test` builds with `--profile fuzz` (the coverage-guided
+# nightly lane in `.github/workflows/fuzz-nightly.yml`). Without this
+# profile the CLI errors `profile 'fuzz' is not defined`. bolero's
+# recommended shape (inherits dev + opt for throughput; codegen-units = 1
+# avoids cargo-bolero's known multi-CGU compilation bugs). The stable
+# per-PR lane runs the `check!` targets as ordinary nextest tests and
+# never uses this profile.
+[profile.fuzz]
+inherits = "dev"
+opt-level = 3
+incremental = false
+codegen-units = 1
