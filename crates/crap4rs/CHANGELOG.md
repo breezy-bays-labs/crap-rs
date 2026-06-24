@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.6.1...crap4rs-v0.6.2) - 2026-06-24
+
+### Fixed
+
+- *(crap-core)* stamp each adapter's real language in the wire envelope ([#450](https://github.com/breezy-bays-labs/crap-rs/pull/450))
+
 ## [0.6.1](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.6.0...crap4rs-v0.6.1) - 2026-06-24
 
 ### Added
