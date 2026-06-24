@@ -735,3 +735,54 @@ reachable on a PR, etc. — was validated empirically against live
 Actions runs (the synthetic-push validation). Keep the script as the
 single implementation: never re-inline the bash into the workflow, or
 the regression test stops guarding what CI runs.
+
+## Version ownership
+
+**release-plz owns every `[package] version` bump.** Feature PRs must
+NOT hand-edit a crate's `[package] version` (or `[workspace.package]
+version`), and must not finalize a versioned CHANGELOG section
+(`[Unreleased]` entries are fine; the `[x.y.z]` heading is release-plz's
+to write). Versions are bumped exactly once, in release-plz's release
+PR, in lockstep with the tag + publish.
+
+### Why
+
+Hand-bumping a version inside a feature PR desyncs the version line from
+the publish cadence and strands intermediate versions: they get
+changelogged on `main` but are never tagged or published. crap-core
+climbed 0.5 → 0.6 → 0.7 → 0.8 on `main` via feature PRs with no release
+cutting them (crap-rs#448), so 0.6.0/0.7.0 became phantom versions and
+release #373 surfaced the confusing jump. The 0.9.0 bump that looked
+"breaking" was a *separate* signal — `cargo-semver-checks` correctly
+flagging an accidentally-`pub` internal type (see the public-API
+boundary policy) — not a version-ownership violation.
+
+### Mechanical enforcement
+
+`scripts/version-edit-lint.py` (the `version-edit-lint` CI job +
+`lefthook.yml` pre-push command — single source of truth in the script)
+fails a NON-release PR that changes a crate's parsed `[package] version`
+or `[workspace.package] version`. The lint:
+
+- **compares parsed TOML values, not diff lines** — a `[dependencies]` /
+  `[dev-dependencies]` / inline `{ version = "..." }` change can never
+  false-positive, because only the real published-version field is read;
+- **exempts brand-new crates** (no prior `[package]` → not a bump) and
+  **deleted manifests**;
+- is **gated to non-release branches**: release-plz's own release PR
+  (head ref `release-plz-*`) is skipped at the job/hook level, so the
+  bumps it makes are never flagged;
+- **fails open** on a missing base ref / TOML parse error (a release
+  gate must not wedge on a shallow checkout, and invalid TOML is the
+  build's job to catch).
+
+The CI job checks out with `fetch-depth: 0` and passes the PR base SHA
+(`BASE_SHA`); the pre-push hook diffs against `origin/main`. A
+`--self-test` flag guards the comparison logic itself
+(documentation rots; CI doesn't — same pattern as
+`scripts/bdd-tracked-lint.py` and `scripts/mutants-skip-lint.py`).
+
+There is **no inline override**: the only legitimate feature-PR version
+touch is a new crate (exempt). A genuine one-off bump belongs on the
+release-plz path. The decision is captured in
+`adr-release-process-and-public-api-boundary`.

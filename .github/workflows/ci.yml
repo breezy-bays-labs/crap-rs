@@ -1849,6 +1849,45 @@ jobs:
       - name: Lint .cargo/mutants.toml `--skip` coverage of adapter-bin-shelling tests
         run: python3 scripts/mutants-skip-lint.py
 
+  version-edit-lint:
+    # Mechanical enforcement of crap-rs#448's release-process contract:
+    # release-plz owns every `[package] version` bump. A NON-release PR
+    # that hand-edits a crate's published version is rejected here — the
+    # drift that stranded crap-core 0.6.0/0.7.0 as phantom versions
+    # (changelogged on `main`, never tagged/published) and produced the
+    # confusing 0.5 -> 0.8 -> 0.9 jump cutting release #373.
+    #
+    # Gated to non-release PRs: release-plz's own release PR (head ref
+    # `release-plz-*`) is where version bumps legitimately land, so this
+    # job is skipped there. The lint compares the PARSED [package].version
+    # (and [workspace.package].version) value before/after — NOT diff
+    # lines — so a [dependencies] / inline dep-table version change can
+    # never false-positive. `fetch-depth: 0` + the PR base SHA give the
+    # before/after `git show` the history it needs.
+    #
+    # `actions/checkout` SHA-pinned per the repo-wide convention;
+    # `persist-credentials: false` (never pushes) and `permissions:
+    # contents: read` enforce least privilege. Mirrors the `lefthook.yml`
+    # pre-push step — single source of truth in
+    # `scripts/version-edit-lint.py`. See AGENTS.md "Version ownership".
+    name: version-edit lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release-plz-')
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Self-test the version-ownership lint logic
+        run: python3 scripts/version-edit-lint.py --self-test
+      - name: Reject non-release `[package] version` bumps
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/version-edit-lint.py
+
   bdd-tracked-lint:
     # Mechanical enforcement of AGENTS.md "BDD hygiene" Rules 1 and 2
     # across `crates/*/tests/features/` (single script, two rules):
