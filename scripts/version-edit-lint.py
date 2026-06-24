@@ -83,10 +83,16 @@ def _versions_from_toml(text: str) -> dict[str, Optional[str]]:
     """
     data = tomllib.loads(text)
     pkg = data.get("package", {})
-    ws = data.get("workspace", {}).get("package", {})
+    # `workspace` (and its `package` child) may be a non-table value in
+    # syntactically-valid-but-structurally-invalid TOML (e.g. `workspace =
+    # "x"`); guard every level so a malformed manifest is skipped (None),
+    # never an uncaught AttributeError that would crash the lint instead of
+    # failing open.
+    ws_section = data.get("workspace", {})
+    ws_pkg = ws_section.get("package", {}) if isinstance(ws_section, dict) else {}
     return {
         "package": pkg.get("version") if isinstance(pkg, dict) else None,
-        "workspace": ws.get("version") if isinstance(ws, dict) else None,
+        "workspace": ws_pkg.get("version") if isinstance(ws_pkg, dict) else None,
     }
 
 
@@ -127,6 +133,11 @@ def _git(args: list[str]) -> Optional[str]:
             ["git", *args],
             capture_output=True,
             text=True,
+            # Pin UTF-8 (not the locale default, which is CP1252 on some
+            # Windows runners) so a Cargo.toml / path with non-ASCII bytes
+            # decodes consistently; tolerate stray bytes rather than raise.
+            encoding="utf-8",
+            errors="replace",
             check=True,
         )
         return out.stdout
@@ -238,6 +249,18 @@ def self_test() -> int:
             "virtual-manifest no [package] passes",
             '[workspace]\nmembers = ["a"]\n',
             '[workspace]\nmembers = ["a", "b"]\n',
+            False,
+        ),
+        (
+            "non-table workspace value is skipped (no AttributeError)",
+            'workspace = "oops"\n[package]\nname = "x"\nversion = "0.5.0"\n',
+            'workspace = "oops"\n[package]\nname = "x"\nversion = "0.5.0"\n',
+            False,
+        ),
+        (
+            "non-table workspace.package value is skipped",
+            '[workspace]\npackage = "oops"\n',
+            '[workspace]\npackage = "oops2"\n',
             False,
         ),
         (
