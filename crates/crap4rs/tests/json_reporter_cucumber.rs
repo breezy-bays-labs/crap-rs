@@ -53,19 +53,14 @@ impl JsonWorld {
         let metric = self.metric.unwrap_or(ComplexityMetric::Cognitive);
         let threshold = self.threshold.unwrap_or(8.0);
         let view = view::apply(result, ViewSpec::default());
-        let config = JsonConfig {
-            tool_version: "0.1.0".to_string(),
-            language: "rust".to_string(),
+        let config = JsonConfig::for_test(
+            "0.1.0".to_string(),
+            "rust".to_string(),
             metric,
-            missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
+            MissingCoveragePolicy::Pessimistic,
             threshold,
-            epsilon: 0.0,
-            timestamp: "2026-05-04T00:00:00Z".to_string(),
-            diagnostics: None,
-            diff_ref: None,
-            minimal_view: false,
-            delta: None,
-        };
+            "2026-05-04T00:00:00Z".to_string(),
+        );
         let json_str = format_json(&view, &config).expect("format_json should succeed");
         self.output = Some(serde_json::from_str(&json_str).expect("output should be valid JSON"));
     }
