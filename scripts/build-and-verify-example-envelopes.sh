@@ -33,8 +33,28 @@ echo "::group::Lint committed coverage fixtures for absolute paths"
 # coverage-final.json) diverge between contributors and CI runners,
 # silently producing envelopes with empty coverage maps. Fail loudly
 # here rather than ship a malformed envelope.
-if grep -E '^SF:/' crates/crap-examples/lcov.info; then
+#
+# Fail-fast on a missing/empty/invalid fixture BEFORE the path lint:
+# the grep and jq below run inside `if` conditions, where `set -e` does
+# NOT propagate their non-zero exit. A missing lcov.info would read as
+# "no absolute SF: paths found" and a missing/garbage coverage-final.json
+# would read as "no absolute keys found" — either way the lint would
+# falsely report OK and let a malformed envelope through. Guard each
+# fixture's existence (and the JSON's parseability) up front.
+if [ ! -s crates/crap-examples/lcov.info ]; then
+  echo "::error::crates/crap-examples/lcov.info is missing or empty"
+  exit 1
+fi
+if grep -qE '^SF:/' crates/crap-examples/lcov.info; then
   echo "::error::lcov.info contains absolute SF: paths — regen with the sed normalization step in crap-examples/README.md"
+  exit 1
+fi
+if [ ! -s crates/crap-examples/coverage-final.json ]; then
+  echo "::error::crates/crap-examples/coverage-final.json is missing or empty"
+  exit 1
+fi
+if ! jq -e . crates/crap-examples/coverage-final.json >/dev/null 2>&1; then
+  echo "::error::crates/crap-examples/coverage-final.json is not valid JSON"
   exit 1
 fi
 if jq -e 'to_entries | map(select(.key | startswith("/"))) | length > 0' crates/crap-examples/coverage-final.json >/dev/null; then
@@ -57,7 +77,26 @@ echo "::group::crap4rs envelope (Rust modules)"
 # Empty-file guard: a silent adapter failure could write an empty (or
 # non-JSON) file; jq's raw parse error would otherwise obscure the cause.
 [ -s crap4rs-envelope.json ] || { echo "::error::crap4rs-envelope.json is empty — adapter produced no output"; exit 1; }
-jq -e '.schema_version == 2 and .language == "rust" and (.result.summary.total_functions // 0) > 0' crap4rs-envelope.json
+# Well-formedness AND semantic validity. The `.scored.crap.value >= 1.0`
+# and non-empty `.scored.identity.file_path` assertions catch a corrupt
+# envelope (CRAP's formula floor is 1.0; a 0/negative value or a blank
+# path signals a broken adapter or a coverage-join gone wrong) before it
+# can be published as a baseline. NOTE the shape: `crap` is an object
+# `{risk_level, value}` (a naive `.crap >= 1.0` would compare object-to-
+# number, always true in jq), and the path key is `scored.identity.file_path`
+# (not a top-level `.path`) — both verified against the committed
+# wire_envelope_crap4rs snapshot.
+jq -e '
+  .schema_version == 2
+  and .language == "rust"
+  and (.result.functions | length) > 0
+  and (.result.summary.total_functions // 0) > 0
+  and all(.result.functions[].scored.crap.value; type == "number" and . >= 1.0)
+  and all(.result.functions[].scored.identity.file_path; type == "string" and . != "")
+' crap4rs-envelope.json >/dev/null || {
+  echo "::error::crap4rs-envelope.json failed verification — expected schema_version==2, language==rust, total_functions>0, every scored.crap.value a number >= 1.0, every scored.identity.file_path a non-empty string"
+  exit 1
+}
 echo "::endgroup::"
 
 echo "::group::crap4ts envelope (TypeScript modules)"
@@ -70,7 +109,20 @@ echo "::group::crap4ts envelope (TypeScript modules)"
   --exclude '*.test.ts' \
   > crap4ts-envelope.json
 [ -s crap4ts-envelope.json ] || { echo "::error::crap4ts-envelope.json is empty — adapter produced no output"; exit 1; }
-jq -e '.schema_version == 2 and .language == "typescript" and (.result.summary.total_functions // 0) > 0' crap4ts-envelope.json
+# Same semantic-validity assertions as the crap4rs envelope above — the
+# wire shape is shared crap-core (scored.crap.value / scored.identity.file_path),
+# so a corrupt TypeScript envelope is caught identically.
+jq -e '
+  .schema_version == 2
+  and .language == "typescript"
+  and (.result.functions | length) > 0
+  and (.result.summary.total_functions // 0) > 0
+  and all(.result.functions[].scored.crap.value; type == "number" and . >= 1.0)
+  and all(.result.functions[].scored.identity.file_path; type == "string" and . != "")
+' crap4ts-envelope.json >/dev/null || {
+  echo "::error::crap4ts-envelope.json failed verification — expected schema_version==2, language==typescript, total_functions>0, every scored.crap.value a number >= 1.0, every scored.identity.file_path a non-empty string"
+  exit 1
+}
 echo "::endgroup::"
 
 echo "✅ both envelopes built + verified (schema_version=2, correct per-adapter language, non-empty function set)"
