@@ -91,12 +91,11 @@ Both share the same `oxc` walker, the same Istanbul JSON coverage parser, and th
 
 ## Library use (Rust)
 
-```toml
-[dependencies]
-crap4ts = "2"
+```bash
+cargo add crap4ts
 ```
 
-Most users want the CLI or the npm package; the library crate is for downstream tooling that needs programmatic TypeScript walking and scoring without spawning a subprocess.
+Most users want the CLI or the npm package; the library crate is for downstream tooling that needs programmatic TypeScript walking and scoring without spawning a subprocess. (The crate is on a `2.0.0-rc` prerelease line — `cargo add` resolves the current release; a manual `[dependencies]` entry needs an explicit prerelease requirement.)
 
 ## Stability
 

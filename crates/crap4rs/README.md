@@ -53,12 +53,11 @@ Fail a PR only on newly introduced or newly elevated violations with `--baseline
 
 ## Library use
 
-```toml
-[dependencies]
-crap4rs = "*"
+```bash
+cargo add crap4rs
 ```
 
-`crap4rs` re-exports `crap-core`'s public API and adds the Rust-specific adapters (syn walker, LCOV parser). If you only need scoring, envelope, and reporter logic without Rust-specific I/O, depend on [`crap-core`](https://crates.io/crates/crap-core) directly.
+`crap4rs` re-exports `crap-core`'s public API and adds the Rust-specific adapters (syn walker, LCOV parser). If you only need scoring, envelope, and reporter logic without Rust-specific I/O, depend on [`crap-core`](https://crates.io/crates/crap-core) directly (`cargo add crap-core`).
 
 ## Stability
 
