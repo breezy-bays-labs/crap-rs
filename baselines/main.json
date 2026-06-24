@@ -2,7 +2,7 @@
   "schema_version": 2,
   "tool_version": "0.6.0",
   "language": "rust",
-  "timestamp": "1781920050",
+  "timestamp": "1782261183",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
@@ -45410,16 +45410,16 @@
             "qualified_name": "OxcWalker::extract",
             "span": {
               "start_line": 127,
-              "end_line": 163,
+              "end_line": 191,
               "start_column": 5,
               "end_column": 5
             }
           },
-          "complexity": 4,
+          "complexity": 5,
           "complexity_metric": "cognitive",
           "coverage_percent": 100.0,
           "crap": {
-            "value": 4.0,
+            "value": 5.0,
             "risk_level": "low"
           },
           "contributors": [
@@ -45432,19 +45432,27 @@
               "nesting_depth": 0
             },
             {
+              "kind": "match",
+              "line": 165,
+              "column": 19,
+              "increment": 1,
+              "end_line": 176,
+              "nesting_depth": 0
+            },
+            {
               "kind": "if-branch",
-              "line": 149,
+              "line": 177,
               "column": 9,
               "increment": 1,
-              "end_line": 151,
+              "end_line": 179,
               "nesting_depth": 0
             },
             {
               "kind": "for-loop",
-              "line": 159,
+              "line": 187,
               "column": 9,
               "increment": 1,
-              "end_line": 161,
+              "end_line": 189,
               "nesting_depth": 0
             }
           ]
@@ -45458,8 +45466,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_top_level_statement",
             "span": {
-              "start_line": 181,
-              "end_line": 210,
+              "start_line": 209,
+              "end_line": 238,
               "start_column": 5,
               "end_column": 5
             }
@@ -45474,18 +45482,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 189,
+              "line": 217,
               "column": 9,
               "increment": 1,
-              "end_line": 209,
+              "end_line": 237,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 194,
+              "line": 222,
               "column": 17,
               "increment": 2,
-              "end_line": 196,
+              "end_line": 224,
               "nesting_depth": 1
             }
           ]
@@ -45499,8 +45507,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_export_default",
             "span": {
-              "start_line": 212,
-              "end_line": 229,
+              "start_line": 240,
+              "end_line": 257,
               "start_column": 5,
               "end_column": 5
             }
@@ -45515,18 +45523,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 219,
+              "line": 247,
               "column": 9,
               "increment": 1,
-              "end_line": 228,
+              "end_line": 256,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 223,
+              "line": 251,
               "column": 17,
               "increment": 2,
-              "end_line": 226,
+              "end_line": 254,
               "nesting_depth": 1
             }
           ]
@@ -45540,8 +45548,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_top_level_declaration",
             "span": {
-              "start_line": 231,
-              "end_line": 238,
+              "start_line": 259,
+              "end_line": 266,
               "start_column": 5,
               "end_column": 5
             }
@@ -45556,10 +45564,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 232,
+              "line": 260,
               "column": 9,
               "increment": 1,
-              "end_line": 237,
+              "end_line": 265,
               "nesting_depth": 0
             }
           ]
@@ -45573,8 +45581,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_variable_declaration",
             "span": {
-              "start_line": 240,
-              "end_line": 248,
+              "start_line": 268,
+              "end_line": 276,
               "start_column": 5,
               "end_column": 5
             }
@@ -45589,26 +45597,26 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 241,
+              "line": 269,
               "column": 9,
               "increment": 1,
-              "end_line": 247,
+              "end_line": 275,
               "nesting_depth": 0
             },
             {
               "kind": "let-else",
-              "line": 242,
+              "line": 270,
               "column": 47,
               "increment": 2,
-              "end_line": 244,
+              "end_line": 272,
               "nesting_depth": 1
             },
             {
               "kind": "continue",
-              "line": 243,
+              "line": 271,
               "column": 17,
               "increment": 1,
-              "end_line": 243,
+              "end_line": 271,
               "nesting_depth": 2
             }
           ]
@@ -45622,8 +45630,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_initializer",
             "span": {
-              "start_line": 250,
-              "end_line": 264,
+              "start_line": 278,
+              "end_line": 292,
               "start_column": 5,
               "end_column": 5
             }
@@ -45638,10 +45646,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 255,
+              "line": 283,
               "column": 9,
               "increment": 1,
-              "end_line": 263,
+              "end_line": 291,
               "nesting_depth": 0
             }
           ]
@@ -45655,8 +45663,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_class",
             "span": {
-              "start_line": 266,
-              "end_line": 291,
+              "start_line": 294,
+              "end_line": 319,
               "start_column": 5,
               "end_column": 5
             }
@@ -45679,8 +45687,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_class_body",
             "span": {
-              "start_line": 293,
-              "end_line": 317,
+              "start_line": 321,
+              "end_line": 345,
               "start_column": 5,
               "end_column": 5
             }
@@ -45695,18 +45703,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 302,
+              "line": 330,
               "column": 9,
               "increment": 1,
-              "end_line": 316,
+              "end_line": 344,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 303,
+              "line": 331,
               "column": 13,
               "increment": 2,
-              "end_line": 315,
+              "end_line": 343,
               "nesting_depth": 1
             }
           ]
@@ -45720,8 +45728,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_property_definition",
             "span": {
-              "start_line": 319,
-              "end_line": 367,
+              "start_line": 347,
+              "end_line": 395,
               "start_column": 5,
               "end_column": 5
             }
@@ -45736,34 +45744,34 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 343,
+              "line": 371,
               "column": 9,
               "increment": 1,
-              "end_line": 348,
+              "end_line": 376,
               "nesting_depth": 0
             },
             {
               "kind": "logical-operator",
-              "line": 344,
+              "line": 372,
               "column": 13,
               "increment": 1,
-              "end_line": 344,
+              "end_line": 372,
               "nesting_depth": 0
             },
             {
               "kind": "let-else",
-              "line": 349,
+              "line": 377,
               "column": 39,
               "increment": 1,
-              "end_line": 351,
+              "end_line": 379,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 354,
+              "line": 382,
               "column": 9,
               "increment": 1,
-              "end_line": 366,
+              "end_line": 394,
               "nesting_depth": 0
             }
           ]
@@ -45777,8 +45785,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_static_block",
             "span": {
-              "start_line": 369,
-              "end_line": 384,
+              "start_line": 397,
+              "end_line": 412,
               "start_column": 5,
               "end_column": 5
             }
@@ -45793,10 +45801,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 380,
+              "line": 408,
               "column": 9,
               "increment": 1,
-              "end_line": 382,
+              "end_line": 410,
               "nesting_depth": 0
             }
           ]
@@ -45810,8 +45818,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_method",
             "span": {
-              "start_line": 386,
-              "end_line": 392,
+              "start_line": 414,
+              "end_line": 420,
               "start_column": 5,
               "end_column": 5
             }
@@ -45834,8 +45842,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_function",
             "span": {
-              "start_line": 394,
-              "end_line": 405,
+              "start_line": 422,
+              "end_line": 433,
               "start_column": 5,
               "end_column": 5
             }
@@ -45850,10 +45858,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 400,
+              "line": 428,
               "column": 9,
               "increment": 1,
-              "end_line": 402,
+              "end_line": 430,
               "nesting_depth": 0
             }
           ]
@@ -45867,8 +45875,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_arrow",
             "span": {
-              "start_line": 407,
-              "end_line": 418,
+              "start_line": 435,
+              "end_line": 446,
               "start_column": 5,
               "end_column": 5
             }
@@ -45891,8 +45899,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::push_function",
             "span": {
-              "start_line": 420,
-              "end_line": 431,
+              "start_line": 448,
+              "end_line": 459,
               "start_column": 5,
               "end_column": 5
             }
@@ -45915,8 +45923,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_function_body",
             "span": {
-              "start_line": 433,
-              "end_line": 440,
+              "start_line": 461,
+              "end_line": 468,
               "start_column": 5,
               "end_column": 5
             }
@@ -45931,10 +45939,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 437,
+              "line": 465,
               "column": 9,
               "increment": 1,
-              "end_line": 439,
+              "end_line": 467,
               "nesting_depth": 0
             }
           ]
@@ -45948,8 +45956,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_statement",
             "span": {
-              "start_line": 442,
-              "end_line": 503,
+              "start_line": 470,
+              "end_line": 531,
               "start_column": 5,
               "end_column": 5
             }
@@ -45964,18 +45972,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 452,
+              "line": 480,
               "column": 9,
               "increment": 1,
-              "end_line": 502,
+              "end_line": 530,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 475,
+              "line": 503,
               "column": 17,
               "increment": 2,
-              "end_line": 477,
+              "end_line": 505,
               "nesting_depth": 1
             }
           ]
@@ -45989,8 +45997,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_variable_declaration_in_body",
             "span": {
-              "start_line": 505,
-              "end_line": 523,
+              "start_line": 533,
+              "end_line": 551,
               "start_column": 5,
               "end_column": 5
             }
@@ -46005,34 +46013,34 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 511,
+              "line": 539,
               "column": 9,
               "increment": 1,
-              "end_line": 522,
+              "end_line": 550,
               "nesting_depth": 0
             },
             {
               "kind": "let-else",
-              "line": 513,
+              "line": 541,
               "column": 47,
               "increment": 2,
-              "end_line": 515,
+              "end_line": 543,
               "nesting_depth": 1
             },
             {
               "kind": "continue",
-              "line": 514,
+              "line": 542,
               "column": 17,
               "increment": 1,
-              "end_line": 514,
+              "end_line": 542,
               "nesting_depth": 2
             },
             {
               "kind": "match",
-              "line": 516,
+              "line": 544,
               "column": 13,
               "increment": 2,
-              "end_line": 521,
+              "end_line": 549,
               "nesting_depth": 1
             }
           ]
@@ -46046,8 +46054,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_block",
             "span": {
-              "start_line": 525,
-              "end_line": 534,
+              "start_line": 553,
+              "end_line": 562,
               "start_column": 5,
               "end_column": 5
             }
@@ -46062,10 +46070,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 531,
+              "line": 559,
               "column": 9,
               "increment": 1,
-              "end_line": 533,
+              "end_line": 561,
               "nesting_depth": 0
             }
           ]
@@ -46079,8 +46087,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for",
             "span": {
-              "start_line": 536,
-              "end_line": 553,
+              "start_line": 564,
+              "end_line": 581,
               "start_column": 5,
               "end_column": 5
             }
@@ -46095,26 +46103,26 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 543,
+              "line": 571,
               "column": 9,
               "increment": 1,
-              "end_line": 545,
+              "end_line": 573,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 546,
+              "line": 574,
               "column": 9,
               "increment": 1,
-              "end_line": 548,
+              "end_line": 576,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 549,
+              "line": 577,
               "column": 9,
               "increment": 1,
-              "end_line": 551,
+              "end_line": 579,
               "nesting_depth": 0
             }
           ]
@@ -46128,8 +46136,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_in",
             "span": {
-              "start_line": 555,
-              "end_line": 565,
+              "start_line": 583,
+              "end_line": 593,
               "start_column": 5,
               "end_column": 5
             }
@@ -46152,8 +46160,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_of",
             "span": {
-              "start_line": 567,
-              "end_line": 577,
+              "start_line": 595,
+              "end_line": 605,
               "start_column": 5,
               "end_column": 5
             }
@@ -46176,8 +46184,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_while",
             "span": {
-              "start_line": 579,
-              "end_line": 595,
+              "start_line": 607,
+              "end_line": 623,
               "start_column": 5,
               "end_column": 5
             }
@@ -46192,10 +46200,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 585,
+              "line": 613,
               "column": 9,
               "increment": 1,
-              "end_line": 592,
+              "end_line": 620,
               "nesting_depth": 0
             }
           ]
@@ -46209,8 +46217,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_do_while",
             "span": {
-              "start_line": 597,
-              "end_line": 613,
+              "start_line": 625,
+              "end_line": 641,
               "start_column": 5,
               "end_column": 5
             }
@@ -46225,10 +46233,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 603,
+              "line": 631,
               "column": 9,
               "increment": 1,
-              "end_line": 610,
+              "end_line": 638,
               "nesting_depth": 0
             }
           ]
@@ -46242,8 +46250,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_switch",
             "span": {
-              "start_line": 615,
-              "end_line": 625,
+              "start_line": 643,
+              "end_line": 653,
               "start_column": 5,
               "end_column": 5
             }
@@ -46258,10 +46266,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 622,
+              "line": 650,
               "column": 9,
               "increment": 1,
-              "end_line": 624,
+              "end_line": 652,
               "nesting_depth": 0
             }
           ]
@@ -46275,64 +46283,7 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_try",
             "span": {
-              "start_line": 627,
-              "end_line": 655,
-              "start_column": 5,
-              "end_column": 5
-            }
-          },
-          "complexity": 5,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
-          "crap": {
-            "value": 5.0,
-            "risk_level": "low"
-          },
-          "contributors": [
-            {
-              "kind": "if-branch",
-              "line": 643,
-              "column": 9,
-              "increment": 1,
-              "end_line": 647,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "logical-operator",
-              "line": 644,
-              "column": 13,
-              "increment": 1,
-              "end_line": 644,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 649,
-              "column": 9,
-              "increment": 1,
-              "end_line": 651,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 652,
-              "column": 9,
-              "increment": 1,
-              "end_line": 654,
-              "nesting_depth": 0
-            }
-          ]
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
-            "qualified_name": "FunctionFinder::visit_if",
-            "span": {
-              "start_line": 657,
+              "start_line": 655,
               "end_line": 683,
               "start_column": 5,
               "end_column": 5
@@ -46348,27 +46299,35 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 663,
+              "line": 671,
               "column": 9,
               "increment": 1,
-              "end_line": 670,
+              "end_line": 675,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "logical-operator",
+              "line": 672,
+              "column": 13,
+              "increment": 1,
+              "end_line": 672,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 673,
+              "line": 677,
+              "column": 9,
+              "increment": 1,
+              "end_line": 679,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 680,
               "column": 9,
               "increment": 1,
               "end_line": 682,
               "nesting_depth": 0
-            },
-            {
-              "kind": "match",
-              "line": 678,
-              "column": 13,
-              "increment": 2,
-              "end_line": 681,
-              "nesting_depth": 1
             }
           ]
         },
@@ -46379,10 +46338,10 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
-            "qualified_name": "FunctionFinder::visit_switch_case",
+            "qualified_name": "FunctionFinder::visit_if",
             "span": {
               "start_line": 685,
-              "end_line": 708,
+              "end_line": 711,
               "start_column": 5,
               "end_column": 5
             }
@@ -46397,26 +46356,75 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 694,
+              "line": 691,
               "column": 9,
               "increment": 1,
-              "end_line": 704,
+              "end_line": 698,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 695,
+              "line": 701,
+              "column": 9,
+              "increment": 1,
+              "end_line": 710,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "match",
+              "line": 706,
               "column": 13,
               "increment": 2,
-              "end_line": 702,
+              "end_line": 709,
+              "nesting_depth": 1
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "FunctionFinder::visit_switch_case",
+            "span": {
+              "start_line": 713,
+              "end_line": 736,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 5.0,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "if-branch",
+              "line": 722,
+              "column": 9,
+              "increment": 1,
+              "end_line": 732,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 723,
+              "column": 13,
+              "increment": 2,
+              "end_line": 730,
               "nesting_depth": 1
             },
             {
               "kind": "for-loop",
-              "line": 705,
+              "line": 733,
               "column": 9,
               "increment": 1,
-              "end_line": 707,
+              "end_line": 735,
               "nesting_depth": 0
             }
           ]
@@ -46430,8 +46438,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_init",
             "span": {
-              "start_line": 710,
-              "end_line": 726,
+              "start_line": 738,
+              "end_line": 754,
               "start_column": 5,
               "end_column": 5
             }
@@ -46446,18 +46454,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 716,
+              "line": 744,
               "column": 9,
               "increment": 1,
-              "end_line": 725,
+              "end_line": 753,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 721,
+              "line": 749,
               "column": 17,
               "increment": 2,
-              "end_line": 723,
+              "end_line": 751,
               "nesting_depth": 1
             }
           ]
@@ -46471,8 +46479,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_var_decl_initializers",
             "span": {
-              "start_line": 728,
-              "end_line": 742,
+              "start_line": 756,
+              "end_line": 770,
               "start_column": 5,
               "end_column": 5
             }
@@ -46487,18 +46495,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 737,
+              "line": 765,
               "column": 9,
               "increment": 1,
-              "end_line": 741,
+              "end_line": 769,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 738,
+              "line": 766,
               "column": 13,
               "increment": 2,
-              "end_line": 740,
+              "end_line": 768,
               "nesting_depth": 1
             }
           ]
@@ -46512,8 +46520,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_left",
             "span": {
-              "start_line": 744,
-              "end_line": 752,
+              "start_line": 772,
+              "end_line": 780,
               "start_column": 5,
               "end_column": 5
             }
@@ -46536,8 +46544,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::charge_for",
             "span": {
-              "start_line": 754,
-              "end_line": 761,
+              "start_line": 782,
+              "end_line": 789,
               "start_column": 5,
               "end_column": 5
             }
@@ -46552,10 +46560,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 758,
+              "line": 786,
               "column": 9,
               "increment": 1,
-              "end_line": 760,
+              "end_line": 788,
               "nesting_depth": 0
             }
           ]
@@ -46569,8 +46577,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_expression",
             "span": {
-              "start_line": 763,
-              "end_line": 918,
+              "start_line": 791,
+              "end_line": 946,
               "start_column": 5,
               "end_column": 5
             }
@@ -46585,34 +46593,34 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 774,
+              "line": 802,
               "column": 9,
               "increment": 1,
-              "end_line": 917,
+              "end_line": 945,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 833,
+              "line": 861,
               "column": 17,
               "increment": 2,
-              "end_line": 845,
+              "end_line": 873,
               "nesting_depth": 1
             },
             {
               "kind": "match",
-              "line": 856,
+              "line": 884,
               "column": 17,
               "increment": 2,
-              "end_line": 868,
+              "end_line": 896,
               "nesting_depth": 1
             },
             {
               "kind": "if-branch",
-              "line": 881,
+              "line": 909,
               "column": 17,
               "increment": 2,
-              "end_line": 883,
+              "end_line": 911,
               "nesting_depth": 1
             }
           ]
@@ -46626,8 +46634,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_conditional",
             "span": {
-              "start_line": 920,
-              "end_line": 943,
+              "start_line": 948,
+              "end_line": 971,
               "start_column": 5,
               "end_column": 5
             }
@@ -46642,10 +46650,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 932,
+              "line": 960,
               "column": 9,
               "increment": 1,
-              "end_line": 939,
+              "end_line": 967,
               "nesting_depth": 0
             }
           ]
@@ -46659,8 +46667,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_arguments",
             "span": {
-              "start_line": 945,
-              "end_line": 956,
+              "start_line": 973,
+              "end_line": 984,
               "start_column": 5,
               "end_column": 5
             }
@@ -46675,18 +46683,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 951,
+              "line": 979,
               "column": 9,
               "increment": 1,
-              "end_line": 955,
+              "end_line": 983,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 952,
+              "line": 980,
               "column": 13,
               "increment": 2,
-              "end_line": 954,
+              "end_line": 982,
               "nesting_depth": 1
             }
           ]
@@ -46700,8 +46708,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_array_elements",
             "span": {
-              "start_line": 958,
-              "end_line": 969,
+              "start_line": 986,
+              "end_line": 997,
               "start_column": 5,
               "end_column": 5
             }
@@ -46716,18 +46724,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 964,
+              "line": 992,
               "column": 9,
               "increment": 1,
-              "end_line": 968,
+              "end_line": 996,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 965,
+              "line": 993,
               "column": 13,
               "increment": 2,
-              "end_line": 967,
+              "end_line": 995,
               "nesting_depth": 1
             }
           ]
@@ -46741,8 +46749,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_each",
             "span": {
-              "start_line": 971,
-              "end_line": 980,
+              "start_line": 999,
+              "end_line": 1008,
               "start_column": 5,
               "end_column": 5
             }
@@ -46757,10 +46765,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 977,
+              "line": 1005,
               "column": 9,
               "increment": 1,
-              "end_line": 979,
+              "end_line": 1007,
               "nesting_depth": 0
             }
           ]
@@ -46774,8 +46782,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_logical",
             "span": {
-              "start_line": 982,
-              "end_line": 1013,
+              "start_line": 1010,
+              "end_line": 1041,
               "start_column": 5,
               "end_column": 5
             }
@@ -46790,10 +46798,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 999,
+              "line": 1027,
               "column": 9,
               "increment": 1,
-              "end_line": 1006,
+              "end_line": 1034,
               "nesting_depth": 0
             }
           ]
@@ -46807,8 +46815,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_chain",
             "span": {
-              "start_line": 1015,
-              "end_line": 1038,
+              "start_line": 1043,
+              "end_line": 1066,
               "start_column": 5,
               "end_column": 5
             }
@@ -46823,10 +46831,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 1029,
+              "line": 1057,
               "column": 9,
               "increment": 1,
-              "end_line": 1036,
+              "end_line": 1064,
               "nesting_depth": 0
             }
           ]
@@ -46840,8 +46848,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_chain_element",
             "span": {
-              "start_line": 1040,
-              "end_line": 1076,
+              "start_line": 1068,
+              "end_line": 1104,
               "start_column": 5,
               "end_column": 5
             }
@@ -46856,26 +46864,26 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1053,
+              "line": 1081,
               "column": 9,
               "increment": 1,
-              "end_line": 1075,
+              "end_line": 1103,
               "nesting_depth": 0
             },
             {
               "kind": "for-loop",
-              "line": 1056,
+              "line": 1084,
               "column": 17,
               "increment": 2,
-              "end_line": 1060,
+              "end_line": 1088,
               "nesting_depth": 1
             },
             {
               "kind": "if-branch",
-              "line": 1057,
+              "line": 1085,
               "column": 21,
               "increment": 3,
-              "end_line": 1059,
+              "end_line": 1087,
               "nesting_depth": 2
             }
           ]
@@ -46889,8 +46897,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_jsx_element",
             "span": {
-              "start_line": 1078,
-              "end_line": 1113,
+              "start_line": 1106,
+              "end_line": 1141,
               "start_column": 5,
               "end_column": 5
             }
@@ -46905,26 +46913,26 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1093,
+              "line": 1121,
               "column": 9,
               "increment": 1,
-              "end_line": 1111,
+              "end_line": 1139,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1094,
+              "line": 1122,
               "column": 13,
               "increment": 2,
-              "end_line": 1110,
+              "end_line": 1138,
               "nesting_depth": 1
             },
             {
               "kind": "match",
-              "line": 1095,
+              "line": 1123,
               "column": 51,
               "increment": 3,
-              "end_line": 1106,
+              "end_line": 1134,
               "nesting_depth": 2
             }
           ]
@@ -46938,8 +46946,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_jsx_children",
             "span": {
-              "start_line": 1115,
-              "end_line": 1136,
+              "start_line": 1143,
+              "end_line": 1164,
               "start_column": 5,
               "end_column": 5
             }
@@ -46954,18 +46962,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1125,
+              "line": 1153,
               "column": 9,
               "increment": 1,
-              "end_line": 1135,
+              "end_line": 1163,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1126,
+              "line": 1154,
               "column": 13,
               "increment": 2,
-              "end_line": 1134,
+              "end_line": 1162,
               "nesting_depth": 1
             }
           ]
@@ -46979,8 +46987,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_jsx_expression_container",
             "span": {
-              "start_line": 1138,
-              "end_line": 1153,
+              "start_line": 1166,
+              "end_line": 1181,
               "start_column": 5,
               "end_column": 5
             }
@@ -46995,10 +47003,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 1150,
+              "line": 1178,
               "column": 9,
               "increment": 1,
-              "end_line": 1152,
+              "end_line": 1180,
               "nesting_depth": 0
             }
           ]
@@ -47012,8 +47020,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_object_expression",
             "span": {
-              "start_line": 1155,
-              "end_line": 1189,
+              "start_line": 1183,
+              "end_line": 1217,
               "start_column": 5,
               "end_column": 5
             }
@@ -47028,34 +47036,34 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1174,
+              "line": 1202,
               "column": 9,
               "increment": 1,
-              "end_line": 1188,
+              "end_line": 1216,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1175,
+              "line": 1203,
               "column": 13,
               "increment": 2,
-              "end_line": 1187,
+              "end_line": 1215,
               "nesting_depth": 1
             },
             {
               "kind": "if-branch",
-              "line": 1177,
+              "line": 1205,
               "column": 21,
               "increment": 3,
-              "end_line": 1181,
+              "end_line": 1209,
               "nesting_depth": 2
             },
             {
               "kind": "logical-operator",
-              "line": 1178,
+              "line": 1206,
               "column": 25,
               "increment": 1,
-              "end_line": 1178,
+              "end_line": 1206,
               "nesting_depth": 2
             }
           ]
@@ -47069,8 +47077,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_ts_module_declaration",
             "span": {
-              "start_line": 1191,
-              "end_line": 1203,
+              "start_line": 1219,
+              "end_line": 1231,
               "start_column": 5,
               "end_column": 5
             }
@@ -47093,8 +47101,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_ts_module_declaration_prefixed",
             "span": {
-              "start_line": 1205,
-              "end_line": 1260,
+              "start_line": 1233,
+              "end_line": 1288,
               "start_column": 5,
               "end_column": 5
             }
@@ -47109,26 +47117,26 @@
           "contributors": [
             {
               "kind": "let-else",
-              "line": 1246,
+              "line": 1274,
               "column": 35,
               "increment": 1,
-              "end_line": 1248,
+              "end_line": 1276,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1250,
+              "line": 1278,
               "column": 9,
               "increment": 1,
-              "end_line": 1259,
+              "end_line": 1287,
               "nesting_depth": 0
             },
             {
               "kind": "for-loop",
-              "line": 1252,
+              "line": 1280,
               "column": 17,
               "increment": 2,
-              "end_line": 1254,
+              "end_line": 1282,
               "nesting_depth": 1
             }
           ]
@@ -47142,8 +47150,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_statement",
             "span": {
-              "start_line": 1262,
-              "end_line": 1310,
+              "start_line": 1290,
+              "end_line": 1338,
               "start_column": 5,
               "end_column": 5
             }
@@ -47158,18 +47166,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1276,
+              "line": 1304,
               "column": 9,
               "increment": 1,
-              "end_line": 1309,
+              "end_line": 1337,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 1298,
+              "line": 1326,
               "column": 17,
               "increment": 2,
-              "end_line": 1300,
+              "end_line": 1328,
               "nesting_depth": 1
             }
           ]
@@ -47183,8 +47191,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_var_decl",
             "span": {
-              "start_line": 1312,
-              "end_line": 1340,
+              "start_line": 1340,
+              "end_line": 1368,
               "start_column": 5,
               "end_column": 5
             }
@@ -47199,34 +47207,34 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1328,
+              "line": 1356,
               "column": 9,
               "increment": 1,
-              "end_line": 1339,
+              "end_line": 1367,
               "nesting_depth": 0
             },
             {
               "kind": "let-else",
-              "line": 1330,
+              "line": 1358,
               "column": 47,
               "increment": 2,
-              "end_line": 1332,
+              "end_line": 1360,
               "nesting_depth": 1
             },
             {
               "kind": "continue",
-              "line": 1331,
+              "line": 1359,
               "column": 17,
               "increment": 1,
-              "end_line": 1331,
+              "end_line": 1359,
               "nesting_depth": 2
             },
             {
               "kind": "match",
-              "line": 1333,
+              "line": 1361,
               "column": 13,
               "increment": 2,
-              "end_line": 1338,
+              "end_line": 1366,
               "nesting_depth": 1
             }
           ]
@@ -47240,8 +47248,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_export_default",
             "span": {
-              "start_line": 1342,
-              "end_line": 1368,
+              "start_line": 1370,
+              "end_line": 1396,
               "start_column": 5,
               "end_column": 5
             }
@@ -47256,10 +47264,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1353,
+              "line": 1381,
               "column": 9,
               "increment": 1,
-              "end_line": 1367,
+              "end_line": 1395,
               "nesting_depth": 0
             }
           ]
@@ -47273,8 +47281,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_declaration",
             "span": {
-              "start_line": 1370,
-              "end_line": 1403,
+              "start_line": 1398,
+              "end_line": 1431,
               "start_column": 5,
               "end_column": 5
             }
@@ -47289,10 +47297,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1383,
+              "line": 1411,
               "column": 9,
               "increment": 1,
-              "end_line": 1402,
+              "end_line": 1430,
               "nesting_depth": 0
             }
           ]
@@ -47306,8 +47314,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "Contributors::push",
             "span": {
-              "start_line": 1419,
-              "end_line": 1422,
+              "start_line": 1447,
+              "end_line": 1450,
               "start_column": 5,
               "end_column": 5
             }
@@ -47330,8 +47338,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "qualify",
             "span": {
-              "start_line": 1427,
-              "end_line": 1435,
+              "start_line": 1455,
+              "end_line": 1463,
               "start_column": 1,
               "end_column": 1
             }
@@ -47346,10 +47354,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1431,
+              "line": 1459,
               "column": 5,
               "increment": 1,
-              "end_line": 1434,
+              "end_line": 1462,
               "nesting_depth": 0
             }
           ]
@@ -47363,8 +47371,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "contributor",
             "span": {
-              "start_line": 1437,
-              "end_line": 1446,
+              "start_line": 1465,
+              "end_line": 1474,
               "start_column": 1,
               "end_column": 1
             }
@@ -47387,8 +47395,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "source_span",
             "span": {
-              "start_line": 1448,
-              "end_line": 1452,
+              "start_line": 1476,
+              "end_line": 1480,
               "start_column": 1,
               "end_column": 1
             }
@@ -47411,8 +47419,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "byte_to_line",
             "span": {
-              "start_line": 1454,
-              "end_line": 1465,
+              "start_line": 1482,
+              "end_line": 1493,
               "start_column": 1,
               "end_column": 1
             }
@@ -47435,8 +47443,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "byte_to_line_col",
             "span": {
-              "start_line": 1467,
-              "end_line": 1483,
+              "start_line": 1495,
+              "end_line": 1511,
               "start_column": 1,
               "end_column": 1
             }
@@ -47459,8 +47467,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "binding_name",
             "span": {
-              "start_line": 1485,
-              "end_line": 1495,
+              "start_line": 1513,
+              "end_line": 1523,
               "start_column": 1,
               "end_column": 1
             }
@@ -47475,10 +47483,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1491,
+              "line": 1519,
               "column": 5,
               "increment": 1,
-              "end_line": 1494,
+              "end_line": 1522,
               "nesting_depth": 0
             }
           ]
@@ -47492,8 +47500,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "module_declaration_name",
             "span": {
-              "start_line": 1497,
-              "end_line": 1512,
+              "start_line": 1525,
+              "end_line": 1540,
               "start_column": 1,
               "end_column": 1
             }
@@ -47508,10 +47516,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1508,
+              "line": 1536,
               "column": 5,
               "increment": 1,
-              "end_line": 1511,
+              "end_line": 1539,
               "nesting_depth": 0
             }
           ]
@@ -47525,8 +47533,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "extend_namespace_prefix",
             "span": {
-              "start_line": 1514,
-              "end_line": 1531,
+              "start_line": 1542,
+              "end_line": 1559,
               "start_column": 1,
               "end_column": 1
             }
@@ -47541,18 +47549,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1524,
+              "line": 1552,
               "column": 5,
               "increment": 1,
-              "end_line": 1530,
+              "end_line": 1558,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1525,
+              "line": 1553,
               "column": 27,
               "increment": 2,
-              "end_line": 1528,
+              "end_line": 1556,
               "nesting_depth": 1
             }
           ]
@@ -47566,8 +47574,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "property_key_name",
             "span": {
-              "start_line": 1533,
-              "end_line": 1544,
+              "start_line": 1561,
+              "end_line": 1572,
               "start_column": 1,
               "end_column": 1
             }
@@ -47582,10 +47590,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1537,
+              "line": 1565,
               "column": 5,
               "increment": 1,
-              "end_line": 1543,
+              "end_line": 1571,
               "nesting_depth": 0
             }
           ]
@@ -47599,8 +47607,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "export_default_as_expression",
             "span": {
-              "start_line": 1546,
-              "end_line": 1560,
+              "start_line": 1574,
+              "end_line": 1588,
               "start_column": 1,
               "end_column": 1
             }
@@ -47615,10 +47623,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1553,
+              "line": 1581,
               "column": 5,
               "increment": 1,
-              "end_line": 1559,
+              "end_line": 1587,
               "nesting_depth": 0
             }
           ]
@@ -47632,8 +47640,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "argument_as_expression",
             "span": {
-              "start_line": 1562,
-              "end_line": 1566,
+              "start_line": 1590,
+              "end_line": 1594,
               "start_column": 1,
               "end_column": 1
             }
@@ -47656,8 +47664,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "array_element_as_expression",
             "span": {
-              "start_line": 1568,
-              "end_line": 1573,
+              "start_line": 1596,
+              "end_line": 1601,
               "start_column": 1,
               "end_column": 1
             }
@@ -47680,8 +47688,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "for_init_as_expression",
             "span": {
-              "start_line": 1575,
-              "end_line": 1579,
+              "start_line": 1603,
+              "end_line": 1607,
               "start_column": 1,
               "end_column": 1
             }
@@ -47702,10 +47710,123 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "panic_reason",
+            "span": {
+              "start_line": 1609,
+              "end_line": 1623,
+              "start_column": 1,
+              "end_column": 1
+            }
+          },
+          "complexity": 3,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 3.0,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "if-branch",
+              "line": 1616,
+              "column": 5,
+              "increment": 1,
+              "end_line": 1622,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 1618,
+              "column": 12,
+              "increment": 1,
+              "end_line": 1622,
+              "nesting_depth": 0
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "tests::oxc_walker_constructible",
             "span": {
-              "start_line": 1585,
-              "end_line": 1589,
+              "start_line": 1629,
+              "end_line": 1633,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "tests::panic_reason_extracts_str_payload",
+            "span": {
+              "start_line": 1635,
+              "end_line": 1640,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "tests::panic_reason_extracts_string_payload",
+            "span": {
+              "start_line": 1642,
+              "end_line": 1648,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "tests::panic_reason_falls_back_on_non_string_payload",
+            "span": {
+              "start_line": 1650,
+              "end_line": 1654,
               "start_column": 5,
               "end_column": 5
             }
@@ -48047,10 +48168,10 @@
       }
     ],
     "summary": {
-      "total_functions": 1681,
+      "total_functions": 1685,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6237358715050565,
+      "average_crap": 1.6240356083086054,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -48067,16 +48188,16 @@
         }
       },
       "distribution": {
-        "low": 1681,
+        "low": 1685,
         "acceptable": 0,
         "moderate": 0,
         "high": 0
       },
       "max_complexity": 8,
-      "average_complexity": 1.60261748958953,
+      "average_complexity": 1.6029673590504452,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.21091170120087,
+      "average_coverage": 98.21515879508527,
       "median_coverage": 100.0
     },
     "passed": true
@@ -48091,7 +48212,7 @@
       "limit": null,
       "group_by": null
     },
-    "eligible_count": 1681,
+    "eligible_count": 1685,
     "truncated": false,
     "shown": [
       {
@@ -48490,8 +48611,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_expression",
             "span": {
-              "start_line": 763,
-              "end_line": 918,
+              "start_line": 791,
+              "end_line": 946,
               "start_column": 5,
               "end_column": 5
             }
@@ -48506,34 +48627,34 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 774,
+              "line": 802,
               "column": 9,
               "increment": 1,
-              "end_line": 917,
+              "end_line": 945,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 833,
+              "line": 861,
               "column": 17,
               "increment": 2,
-              "end_line": 845,
+              "end_line": 873,
               "nesting_depth": 1
             },
             {
               "kind": "match",
-              "line": 856,
+              "line": 884,
               "column": 17,
               "increment": 2,
-              "end_line": 868,
+              "end_line": 896,
               "nesting_depth": 1
             },
             {
               "kind": "if-branch",
-              "line": 881,
+              "line": 909,
               "column": 17,
               "increment": 2,
-              "end_line": 883,
+              "end_line": 911,
               "nesting_depth": 1
             }
           ]
@@ -48547,8 +48668,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_object_expression",
             "span": {
-              "start_line": 1155,
-              "end_line": 1189,
+              "start_line": 1183,
+              "end_line": 1217,
               "start_column": 5,
               "end_column": 5
             }
@@ -48563,34 +48684,34 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1174,
+              "line": 1202,
               "column": 9,
               "increment": 1,
-              "end_line": 1188,
+              "end_line": 1216,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1175,
+              "line": 1203,
               "column": 13,
               "increment": 2,
-              "end_line": 1187,
+              "end_line": 1215,
               "nesting_depth": 1
             },
             {
               "kind": "if-branch",
-              "line": 1177,
+              "line": 1205,
               "column": 21,
               "increment": 3,
-              "end_line": 1181,
+              "end_line": 1209,
               "nesting_depth": 2
             },
             {
               "kind": "logical-operator",
-              "line": 1178,
+              "line": 1206,
               "column": 25,
               "increment": 1,
-              "end_line": 1178,
+              "end_line": 1206,
               "nesting_depth": 2
             }
           ]
@@ -48710,8 +48831,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_chain_element",
             "span": {
-              "start_line": 1040,
-              "end_line": 1076,
+              "start_line": 1068,
+              "end_line": 1104,
               "start_column": 5,
               "end_column": 5
             }
@@ -48726,26 +48847,26 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1053,
+              "line": 1081,
               "column": 9,
               "increment": 1,
-              "end_line": 1075,
+              "end_line": 1103,
               "nesting_depth": 0
             },
             {
               "kind": "for-loop",
-              "line": 1056,
+              "line": 1084,
               "column": 17,
               "increment": 2,
-              "end_line": 1060,
+              "end_line": 1088,
               "nesting_depth": 1
             },
             {
               "kind": "if-branch",
-              "line": 1057,
+              "line": 1085,
               "column": 21,
               "increment": 3,
-              "end_line": 1059,
+              "end_line": 1087,
               "nesting_depth": 2
             }
           ]
@@ -48832,8 +48953,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_var_decl",
             "span": {
-              "start_line": 1312,
-              "end_line": 1340,
+              "start_line": 1340,
+              "end_line": 1368,
               "start_column": 5,
               "end_column": 5
             }
@@ -48848,34 +48969,34 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1328,
+              "line": 1356,
               "column": 9,
               "increment": 1,
-              "end_line": 1339,
+              "end_line": 1367,
               "nesting_depth": 0
             },
             {
               "kind": "let-else",
-              "line": 1330,
+              "line": 1358,
               "column": 47,
               "increment": 2,
-              "end_line": 1332,
+              "end_line": 1360,
               "nesting_depth": 1
             },
             {
               "kind": "continue",
-              "line": 1331,
+              "line": 1359,
               "column": 17,
               "increment": 1,
-              "end_line": 1331,
+              "end_line": 1359,
               "nesting_depth": 2
             },
             {
               "kind": "match",
-              "line": 1333,
+              "line": 1361,
               "column": 13,
               "increment": 2,
-              "end_line": 1338,
+              "end_line": 1366,
               "nesting_depth": 1
             }
           ]
@@ -48962,8 +49083,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_variable_declaration_in_body",
             "span": {
-              "start_line": 505,
-              "end_line": 523,
+              "start_line": 533,
+              "end_line": 551,
               "start_column": 5,
               "end_column": 5
             }
@@ -48978,34 +49099,34 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 511,
+              "line": 539,
               "column": 9,
               "increment": 1,
-              "end_line": 522,
+              "end_line": 550,
               "nesting_depth": 0
             },
             {
               "kind": "let-else",
-              "line": 513,
+              "line": 541,
               "column": 47,
               "increment": 2,
-              "end_line": 515,
+              "end_line": 543,
               "nesting_depth": 1
             },
             {
               "kind": "continue",
-              "line": 514,
+              "line": 542,
               "column": 17,
               "increment": 1,
-              "end_line": 514,
+              "end_line": 542,
               "nesting_depth": 2
             },
             {
               "kind": "match",
-              "line": 516,
+              "line": 544,
               "column": 13,
               "increment": 2,
-              "end_line": 521,
+              "end_line": 549,
               "nesting_depth": 1
             }
           ]
@@ -49856,8 +49977,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_jsx_element",
             "span": {
-              "start_line": 1078,
-              "end_line": 1113,
+              "start_line": 1106,
+              "end_line": 1141,
               "start_column": 5,
               "end_column": 5
             }
@@ -49872,26 +49993,26 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1093,
+              "line": 1121,
               "column": 9,
               "increment": 1,
-              "end_line": 1111,
+              "end_line": 1139,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1094,
+              "line": 1122,
               "column": 13,
               "increment": 2,
-              "end_line": 1110,
+              "end_line": 1138,
               "nesting_depth": 1
             },
             {
               "kind": "match",
-              "line": 1095,
+              "line": 1123,
               "column": 51,
               "increment": 3,
-              "end_line": 1106,
+              "end_line": 1134,
               "nesting_depth": 2
             }
           ]
@@ -51208,8 +51329,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_variable_declaration",
             "span": {
-              "start_line": 240,
-              "end_line": 248,
+              "start_line": 268,
+              "end_line": 276,
               "start_column": 5,
               "end_column": 5
             }
@@ -51224,26 +51345,26 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 241,
+              "line": 269,
               "column": 9,
               "increment": 1,
-              "end_line": 247,
+              "end_line": 275,
               "nesting_depth": 0
             },
             {
               "kind": "let-else",
-              "line": 242,
+              "line": 270,
               "column": 47,
               "increment": 2,
-              "end_line": 244,
+              "end_line": 272,
               "nesting_depth": 1
             },
             {
               "kind": "continue",
-              "line": 243,
+              "line": 271,
               "column": 17,
               "increment": 1,
-              "end_line": 243,
+              "end_line": 271,
               "nesting_depth": 2
             }
           ]
@@ -52347,67 +52468,10 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
-            "qualified_name": "FunctionFinder::visit_property_definition",
+            "qualified_name": "OxcWalker::extract",
             "span": {
-              "start_line": 319,
-              "end_line": 367,
-              "start_column": 5,
-              "end_column": 5
-            }
-          },
-          "complexity": 5,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 96.42857142857143,
-          "crap": {
-            "value": 5.0,
-            "risk_level": "low"
-          },
-          "contributors": [
-            {
-              "kind": "if-branch",
-              "line": 343,
-              "column": 9,
-              "increment": 1,
-              "end_line": 348,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "logical-operator",
-              "line": 344,
-              "column": 13,
-              "increment": 1,
-              "end_line": 344,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "let-else",
-              "line": 349,
-              "column": 39,
-              "increment": 1,
-              "end_line": 351,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "match",
-              "line": 354,
-              "column": 9,
-              "increment": 1,
-              "end_line": 366,
-              "nesting_depth": 0
-            }
-          ]
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
-            "qualified_name": "FunctionFinder::visit_try",
-            "span": {
-              "start_line": 627,
-              "end_line": 655,
+              "start_line": 127,
+              "end_line": 191,
               "start_column": 5,
               "end_column": 5
             }
@@ -52422,34 +52486,34 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 643,
+              "line": 138,
               "column": 9,
               "increment": 1,
-              "end_line": 647,
+              "end_line": 142,
               "nesting_depth": 0
             },
             {
-              "kind": "logical-operator",
-              "line": 644,
-              "column": 13,
+              "kind": "match",
+              "line": 165,
+              "column": 19,
               "increment": 1,
-              "end_line": 644,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 649,
-              "column": 9,
-              "increment": 1,
-              "end_line": 651,
+              "end_line": 176,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 652,
+              "line": 177,
               "column": 9,
               "increment": 1,
-              "end_line": 654,
+              "end_line": 179,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "for-loop",
+              "line": 187,
+              "column": 9,
+              "increment": 1,
+              "end_line": 189,
               "nesting_depth": 0
             }
           ]
@@ -52461,9 +52525,66 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
-            "qualified_name": "FunctionFinder::visit_if",
+            "qualified_name": "FunctionFinder::visit_property_definition",
             "span": {
-              "start_line": 657,
+              "start_line": 347,
+              "end_line": 395,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 96.42857142857143,
+          "crap": {
+            "value": 5.0,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "if-branch",
+              "line": 371,
+              "column": 9,
+              "increment": 1,
+              "end_line": 376,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "logical-operator",
+              "line": 372,
+              "column": 13,
+              "increment": 1,
+              "end_line": 372,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "let-else",
+              "line": 377,
+              "column": 39,
+              "increment": 1,
+              "end_line": 379,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "match",
+              "line": 382,
+              "column": 9,
+              "increment": 1,
+              "end_line": 394,
+              "nesting_depth": 0
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "FunctionFinder::visit_try",
+            "span": {
+              "start_line": 655,
               "end_line": 683,
               "start_column": 5,
               "end_column": 5
@@ -52479,27 +52600,35 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 663,
+              "line": 671,
               "column": 9,
               "increment": 1,
-              "end_line": 670,
+              "end_line": 675,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "logical-operator",
+              "line": 672,
+              "column": 13,
+              "increment": 1,
+              "end_line": 672,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 673,
+              "line": 677,
+              "column": 9,
+              "increment": 1,
+              "end_line": 679,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 680,
               "column": 9,
               "increment": 1,
               "end_line": 682,
               "nesting_depth": 0
-            },
-            {
-              "kind": "match",
-              "line": 678,
-              "column": 13,
-              "increment": 2,
-              "end_line": 681,
-              "nesting_depth": 1
             }
           ]
         },
@@ -52510,10 +52639,10 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
-            "qualified_name": "FunctionFinder::visit_switch_case",
+            "qualified_name": "FunctionFinder::visit_if",
             "span": {
               "start_line": 685,
-              "end_line": 708,
+              "end_line": 711,
               "start_column": 5,
               "end_column": 5
             }
@@ -52528,26 +52657,75 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 694,
+              "line": 691,
               "column": 9,
               "increment": 1,
-              "end_line": 704,
+              "end_line": 698,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 695,
+              "line": 701,
+              "column": 9,
+              "increment": 1,
+              "end_line": 710,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "match",
+              "line": 706,
               "column": 13,
               "increment": 2,
-              "end_line": 702,
+              "end_line": 709,
+              "nesting_depth": 1
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "FunctionFinder::visit_switch_case",
+            "span": {
+              "start_line": 713,
+              "end_line": 736,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 5.0,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "if-branch",
+              "line": 722,
+              "column": 9,
+              "increment": 1,
+              "end_line": 732,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 723,
+              "column": 13,
+              "increment": 2,
+              "end_line": 730,
               "nesting_depth": 1
             },
             {
               "kind": "for-loop",
-              "line": 705,
+              "line": 733,
               "column": 9,
               "increment": 1,
-              "end_line": 707,
+              "end_line": 735,
               "nesting_depth": 0
             }
           ]
@@ -52561,8 +52739,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_ts_module_declaration_prefixed",
             "span": {
-              "start_line": 1205,
-              "end_line": 1260,
+              "start_line": 1233,
+              "end_line": 1288,
               "start_column": 5,
               "end_column": 5
             }
@@ -52577,26 +52755,26 @@
           "contributors": [
             {
               "kind": "let-else",
-              "line": 1246,
+              "line": 1274,
               "column": 35,
               "increment": 1,
-              "end_line": 1248,
+              "end_line": 1276,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1250,
+              "line": 1278,
               "column": 9,
               "increment": 1,
-              "end_line": 1259,
+              "end_line": 1287,
               "nesting_depth": 0
             },
             {
               "kind": "for-loop",
-              "line": 1252,
+              "line": 1280,
               "column": 17,
               "increment": 2,
-              "end_line": 1254,
+              "end_line": 1282,
               "nesting_depth": 1
             }
           ]
@@ -52610,8 +52788,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_statement",
             "span": {
-              "start_line": 1262,
-              "end_line": 1310,
+              "start_line": 1290,
+              "end_line": 1338,
               "start_column": 5,
               "end_column": 5
             }
@@ -52626,18 +52804,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1276,
+              "line": 1304,
               "column": 9,
               "increment": 1,
-              "end_line": 1309,
+              "end_line": 1337,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 1298,
+              "line": 1326,
               "column": 17,
               "increment": 2,
-              "end_line": 1300,
+              "end_line": 1328,
               "nesting_depth": 1
             }
           ]
@@ -52733,8 +52911,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_export_default",
             "span": {
-              "start_line": 212,
-              "end_line": 229,
+              "start_line": 240,
+              "end_line": 257,
               "start_column": 5,
               "end_column": 5
             }
@@ -52749,18 +52927,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 219,
+              "line": 247,
               "column": 9,
               "increment": 1,
-              "end_line": 228,
+              "end_line": 256,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 223,
+              "line": 251,
               "column": 17,
               "increment": 2,
-              "end_line": 226,
+              "end_line": 254,
               "nesting_depth": 1
             }
           ]
@@ -52864,8 +53042,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_class_body",
             "span": {
-              "start_line": 293,
-              "end_line": 317,
+              "start_line": 321,
+              "end_line": 345,
               "start_column": 5,
               "end_column": 5
             }
@@ -52880,18 +53058,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 302,
+              "line": 330,
               "column": 9,
               "increment": 1,
-              "end_line": 316,
+              "end_line": 344,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 303,
+              "line": 331,
               "column": 13,
               "increment": 2,
-              "end_line": 315,
+              "end_line": 343,
               "nesting_depth": 1
             }
           ]
@@ -52905,8 +53083,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "extend_namespace_prefix",
             "span": {
-              "start_line": 1514,
-              "end_line": 1531,
+              "start_line": 1542,
+              "end_line": 1559,
               "start_column": 1,
               "end_column": 1
             }
@@ -52921,18 +53099,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1524,
+              "line": 1552,
               "column": 5,
               "increment": 1,
-              "end_line": 1530,
+              "end_line": 1558,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1525,
+              "line": 1553,
               "column": 27,
               "increment": 2,
-              "end_line": 1528,
+              "end_line": 1556,
               "nesting_depth": 1
             }
           ]
@@ -55415,59 +55593,10 @@
         "scored": {
           "identity": {
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
-            "qualified_name": "OxcWalker::extract",
-            "span": {
-              "start_line": 127,
-              "end_line": 163,
-              "start_column": 5,
-              "end_column": 5
-            }
-          },
-          "complexity": 4,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 100.0,
-          "crap": {
-            "value": 4.0,
-            "risk_level": "low"
-          },
-          "contributors": [
-            {
-              "kind": "if-branch",
-              "line": 138,
-              "column": 9,
-              "increment": 1,
-              "end_line": 142,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 149,
-              "column": 9,
-              "increment": 1,
-              "end_line": 151,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "for-loop",
-              "line": 159,
-              "column": 9,
-              "increment": 1,
-              "end_line": 161,
-              "nesting_depth": 0
-            }
-          ]
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
-            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_top_level_statement",
             "span": {
-              "start_line": 181,
-              "end_line": 210,
+              "start_line": 209,
+              "end_line": 238,
               "start_column": 5,
               "end_column": 5
             }
@@ -55482,18 +55611,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 189,
+              "line": 217,
               "column": 9,
               "increment": 1,
-              "end_line": 209,
+              "end_line": 237,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 194,
+              "line": 222,
               "column": 17,
               "increment": 2,
-              "end_line": 196,
+              "end_line": 224,
               "nesting_depth": 1
             }
           ]
@@ -55507,8 +55636,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_statement",
             "span": {
-              "start_line": 442,
-              "end_line": 503,
+              "start_line": 470,
+              "end_line": 531,
               "start_column": 5,
               "end_column": 5
             }
@@ -55523,18 +55652,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 452,
+              "line": 480,
               "column": 9,
               "increment": 1,
-              "end_line": 502,
+              "end_line": 530,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 475,
+              "line": 503,
               "column": 17,
               "increment": 2,
-              "end_line": 477,
+              "end_line": 505,
               "nesting_depth": 1
             }
           ]
@@ -55548,8 +55677,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for",
             "span": {
-              "start_line": 536,
-              "end_line": 553,
+              "start_line": 564,
+              "end_line": 581,
               "start_column": 5,
               "end_column": 5
             }
@@ -55564,26 +55693,26 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 543,
+              "line": 571,
               "column": 9,
               "increment": 1,
-              "end_line": 545,
+              "end_line": 573,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 546,
+              "line": 574,
               "column": 9,
               "increment": 1,
-              "end_line": 548,
+              "end_line": 576,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 549,
+              "line": 577,
               "column": 9,
               "increment": 1,
-              "end_line": 551,
+              "end_line": 579,
               "nesting_depth": 0
             }
           ]
@@ -55597,8 +55726,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_init",
             "span": {
-              "start_line": 710,
-              "end_line": 726,
+              "start_line": 738,
+              "end_line": 754,
               "start_column": 5,
               "end_column": 5
             }
@@ -55613,18 +55742,18 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 716,
+              "line": 744,
               "column": 9,
               "increment": 1,
-              "end_line": 725,
+              "end_line": 753,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 721,
+              "line": 749,
               "column": 17,
               "increment": 2,
-              "end_line": 723,
+              "end_line": 751,
               "nesting_depth": 1
             }
           ]
@@ -55638,8 +55767,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_var_decl_initializers",
             "span": {
-              "start_line": 728,
-              "end_line": 742,
+              "start_line": 756,
+              "end_line": 770,
               "start_column": 5,
               "end_column": 5
             }
@@ -55654,18 +55783,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 737,
+              "line": 765,
               "column": 9,
               "increment": 1,
-              "end_line": 741,
+              "end_line": 769,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 738,
+              "line": 766,
               "column": 13,
               "increment": 2,
-              "end_line": 740,
+              "end_line": 768,
               "nesting_depth": 1
             }
           ]
@@ -55679,8 +55808,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_arguments",
             "span": {
-              "start_line": 945,
-              "end_line": 956,
+              "start_line": 973,
+              "end_line": 984,
               "start_column": 5,
               "end_column": 5
             }
@@ -55695,18 +55824,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 951,
+              "line": 979,
               "column": 9,
               "increment": 1,
-              "end_line": 955,
+              "end_line": 983,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 952,
+              "line": 980,
               "column": 13,
               "increment": 2,
-              "end_line": 954,
+              "end_line": 982,
               "nesting_depth": 1
             }
           ]
@@ -55720,8 +55849,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_array_elements",
             "span": {
-              "start_line": 958,
-              "end_line": 969,
+              "start_line": 986,
+              "end_line": 997,
               "start_column": 5,
               "end_column": 5
             }
@@ -55736,18 +55865,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 964,
+              "line": 992,
               "column": 9,
               "increment": 1,
-              "end_line": 968,
+              "end_line": 996,
               "nesting_depth": 0
             },
             {
               "kind": "if-branch",
-              "line": 965,
+              "line": 993,
               "column": 13,
               "increment": 2,
-              "end_line": 967,
+              "end_line": 995,
               "nesting_depth": 1
             }
           ]
@@ -55761,8 +55890,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_jsx_children",
             "span": {
-              "start_line": 1115,
-              "end_line": 1136,
+              "start_line": 1143,
+              "end_line": 1164,
               "start_column": 5,
               "end_column": 5
             }
@@ -55777,18 +55906,18 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 1125,
+              "line": 1153,
               "column": 9,
               "increment": 1,
-              "end_line": 1135,
+              "end_line": 1163,
               "nesting_depth": 0
             },
             {
               "kind": "match",
-              "line": 1126,
+              "line": 1154,
               "column": 13,
               "increment": 2,
-              "end_line": 1134,
+              "end_line": 1162,
               "nesting_depth": 1
             }
           ]
@@ -58982,6 +59111,47 @@
       {
         "scored": {
           "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "panic_reason",
+            "span": {
+              "start_line": 1609,
+              "end_line": 1623,
+              "start_column": 1,
+              "end_column": 1
+            }
+          },
+          "complexity": 3,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 3.0,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "if-branch",
+              "line": 1616,
+              "column": 5,
+              "increment": 1,
+              "end_line": 1622,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 1618,
+              "column": 12,
+              "increment": 1,
+              "end_line": 1622,
+              "nesting_depth": 0
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
             "file_path": "crates/crap-core/src/cli/mod.rs",
             "qualified_name": "SortKeyArg::from",
             "span": {
@@ -59447,8 +59617,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "qualify",
             "span": {
-              "start_line": 1427,
-              "end_line": 1435,
+              "start_line": 1455,
+              "end_line": 1463,
               "start_column": 1,
               "end_column": 1
             }
@@ -59463,10 +59633,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1431,
+              "line": 1459,
               "column": 5,
               "increment": 1,
-              "end_line": 1434,
+              "end_line": 1462,
               "nesting_depth": 0
             }
           ]
@@ -59480,8 +59650,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "module_declaration_name",
             "span": {
-              "start_line": 1497,
-              "end_line": 1512,
+              "start_line": 1525,
+              "end_line": 1540,
               "start_column": 1,
               "end_column": 1
             }
@@ -59496,10 +59666,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1508,
+              "line": 1536,
               "column": 5,
               "increment": 1,
-              "end_line": 1511,
+              "end_line": 1539,
               "nesting_depth": 0
             }
           ]
@@ -60074,8 +60244,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "export_default_as_expression",
             "span": {
-              "start_line": 1546,
-              "end_line": 1560,
+              "start_line": 1574,
+              "end_line": 1588,
               "start_column": 1,
               "end_column": 1
             }
@@ -60090,10 +60260,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1553,
+              "line": 1581,
               "column": 5,
               "increment": 1,
-              "end_line": 1559,
+              "end_line": 1587,
               "nesting_depth": 0
             }
           ]
@@ -66908,8 +67078,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_top_level_declaration",
             "span": {
-              "start_line": 231,
-              "end_line": 238,
+              "start_line": 259,
+              "end_line": 266,
               "start_column": 5,
               "end_column": 5
             }
@@ -66924,10 +67094,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 232,
+              "line": 260,
               "column": 9,
               "increment": 1,
-              "end_line": 237,
+              "end_line": 265,
               "nesting_depth": 0
             }
           ]
@@ -66941,8 +67111,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_initializer",
             "span": {
-              "start_line": 250,
-              "end_line": 264,
+              "start_line": 278,
+              "end_line": 292,
               "start_column": 5,
               "end_column": 5
             }
@@ -66957,10 +67127,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 255,
+              "line": 283,
               "column": 9,
               "increment": 1,
-              "end_line": 263,
+              "end_line": 291,
               "nesting_depth": 0
             }
           ]
@@ -66974,8 +67144,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_static_block",
             "span": {
-              "start_line": 369,
-              "end_line": 384,
+              "start_line": 397,
+              "end_line": 412,
               "start_column": 5,
               "end_column": 5
             }
@@ -66990,10 +67160,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 380,
+              "line": 408,
               "column": 9,
               "increment": 1,
-              "end_line": 382,
+              "end_line": 410,
               "nesting_depth": 0
             }
           ]
@@ -67007,8 +67177,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_function",
             "span": {
-              "start_line": 394,
-              "end_line": 405,
+              "start_line": 422,
+              "end_line": 433,
               "start_column": 5,
               "end_column": 5
             }
@@ -67023,10 +67193,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 400,
+              "line": 428,
               "column": 9,
               "increment": 1,
-              "end_line": 402,
+              "end_line": 430,
               "nesting_depth": 0
             }
           ]
@@ -67040,8 +67210,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_function_body",
             "span": {
-              "start_line": 433,
-              "end_line": 440,
+              "start_line": 461,
+              "end_line": 468,
               "start_column": 5,
               "end_column": 5
             }
@@ -67056,10 +67226,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 437,
+              "line": 465,
               "column": 9,
               "increment": 1,
-              "end_line": 439,
+              "end_line": 467,
               "nesting_depth": 0
             }
           ]
@@ -67073,8 +67243,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_block",
             "span": {
-              "start_line": 525,
-              "end_line": 534,
+              "start_line": 553,
+              "end_line": 562,
               "start_column": 5,
               "end_column": 5
             }
@@ -67089,10 +67259,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 531,
+              "line": 559,
               "column": 9,
               "increment": 1,
-              "end_line": 533,
+              "end_line": 561,
               "nesting_depth": 0
             }
           ]
@@ -67106,8 +67276,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_while",
             "span": {
-              "start_line": 579,
-              "end_line": 595,
+              "start_line": 607,
+              "end_line": 623,
               "start_column": 5,
               "end_column": 5
             }
@@ -67122,10 +67292,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 585,
+              "line": 613,
               "column": 9,
               "increment": 1,
-              "end_line": 592,
+              "end_line": 620,
               "nesting_depth": 0
             }
           ]
@@ -67139,8 +67309,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_do_while",
             "span": {
-              "start_line": 597,
-              "end_line": 613,
+              "start_line": 625,
+              "end_line": 641,
               "start_column": 5,
               "end_column": 5
             }
@@ -67155,10 +67325,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 603,
+              "line": 631,
               "column": 9,
               "increment": 1,
-              "end_line": 610,
+              "end_line": 638,
               "nesting_depth": 0
             }
           ]
@@ -67172,8 +67342,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_switch",
             "span": {
-              "start_line": 615,
-              "end_line": 625,
+              "start_line": 643,
+              "end_line": 653,
               "start_column": 5,
               "end_column": 5
             }
@@ -67188,10 +67358,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 622,
+              "line": 650,
               "column": 9,
               "increment": 1,
-              "end_line": 624,
+              "end_line": 652,
               "nesting_depth": 0
             }
           ]
@@ -67205,8 +67375,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::charge_for",
             "span": {
-              "start_line": 754,
-              "end_line": 761,
+              "start_line": 782,
+              "end_line": 789,
               "start_column": 5,
               "end_column": 5
             }
@@ -67221,10 +67391,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 758,
+              "line": 786,
               "column": 9,
               "increment": 1,
-              "end_line": 760,
+              "end_line": 788,
               "nesting_depth": 0
             }
           ]
@@ -67238,8 +67408,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_conditional",
             "span": {
-              "start_line": 920,
-              "end_line": 943,
+              "start_line": 948,
+              "end_line": 971,
               "start_column": 5,
               "end_column": 5
             }
@@ -67254,10 +67424,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 932,
+              "line": 960,
               "column": 9,
               "increment": 1,
-              "end_line": 939,
+              "end_line": 967,
               "nesting_depth": 0
             }
           ]
@@ -67271,8 +67441,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_each",
             "span": {
-              "start_line": 971,
-              "end_line": 980,
+              "start_line": 999,
+              "end_line": 1008,
               "start_column": 5,
               "end_column": 5
             }
@@ -67287,10 +67457,10 @@
           "contributors": [
             {
               "kind": "for-loop",
-              "line": 977,
+              "line": 1005,
               "column": 9,
               "increment": 1,
-              "end_line": 979,
+              "end_line": 1007,
               "nesting_depth": 0
             }
           ]
@@ -67304,8 +67474,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_logical",
             "span": {
-              "start_line": 982,
-              "end_line": 1013,
+              "start_line": 1010,
+              "end_line": 1041,
               "start_column": 5,
               "end_column": 5
             }
@@ -67320,10 +67490,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 999,
+              "line": 1027,
               "column": 9,
               "increment": 1,
-              "end_line": 1006,
+              "end_line": 1034,
               "nesting_depth": 0
             }
           ]
@@ -67337,8 +67507,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_chain",
             "span": {
-              "start_line": 1015,
-              "end_line": 1038,
+              "start_line": 1043,
+              "end_line": 1066,
               "start_column": 5,
               "end_column": 5
             }
@@ -67353,10 +67523,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 1029,
+              "line": 1057,
               "column": 9,
               "increment": 1,
-              "end_line": 1036,
+              "end_line": 1064,
               "nesting_depth": 0
             }
           ]
@@ -67370,8 +67540,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_jsx_expression_container",
             "span": {
-              "start_line": 1138,
-              "end_line": 1153,
+              "start_line": 1166,
+              "end_line": 1181,
               "start_column": 5,
               "end_column": 5
             }
@@ -67386,10 +67556,10 @@
           "contributors": [
             {
               "kind": "if-branch",
-              "line": 1150,
+              "line": 1178,
               "column": 9,
               "increment": 1,
-              "end_line": 1152,
+              "end_line": 1180,
               "nesting_depth": 0
             }
           ]
@@ -67403,8 +67573,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_export_default",
             "span": {
-              "start_line": 1342,
-              "end_line": 1368,
+              "start_line": 1370,
+              "end_line": 1396,
               "start_column": 5,
               "end_column": 5
             }
@@ -67419,10 +67589,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1353,
+              "line": 1381,
               "column": 9,
               "increment": 1,
-              "end_line": 1367,
+              "end_line": 1395,
               "nesting_depth": 0
             }
           ]
@@ -67436,8 +67606,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_namespace_declaration",
             "span": {
-              "start_line": 1370,
-              "end_line": 1403,
+              "start_line": 1398,
+              "end_line": 1431,
               "start_column": 5,
               "end_column": 5
             }
@@ -67452,10 +67622,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1383,
+              "line": 1411,
               "column": 9,
               "increment": 1,
-              "end_line": 1402,
+              "end_line": 1430,
               "nesting_depth": 0
             }
           ]
@@ -67469,8 +67639,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "binding_name",
             "span": {
-              "start_line": 1485,
-              "end_line": 1495,
+              "start_line": 1513,
+              "end_line": 1523,
               "start_column": 1,
               "end_column": 1
             }
@@ -67485,10 +67655,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1491,
+              "line": 1519,
               "column": 5,
               "increment": 1,
-              "end_line": 1494,
+              "end_line": 1522,
               "nesting_depth": 0
             }
           ]
@@ -67502,8 +67672,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "property_key_name",
             "span": {
-              "start_line": 1533,
-              "end_line": 1544,
+              "start_line": 1561,
+              "end_line": 1572,
               "start_column": 1,
               "end_column": 1
             }
@@ -67518,10 +67688,10 @@
           "contributors": [
             {
               "kind": "match",
-              "line": 1537,
+              "line": 1565,
               "column": 5,
               "increment": 1,
-              "end_line": 1543,
+              "end_line": 1571,
               "nesting_depth": 0
             }
           ]
@@ -95537,8 +95707,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_class",
             "span": {
-              "start_line": 266,
-              "end_line": 291,
+              "start_line": 294,
+              "end_line": 319,
               "start_column": 5,
               "end_column": 5
             }
@@ -95561,8 +95731,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_method",
             "span": {
-              "start_line": 386,
-              "end_line": 392,
+              "start_line": 414,
+              "end_line": 420,
               "start_column": 5,
               "end_column": 5
             }
@@ -95585,8 +95755,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::record_arrow",
             "span": {
-              "start_line": 407,
-              "end_line": 418,
+              "start_line": 435,
+              "end_line": 446,
               "start_column": 5,
               "end_column": 5
             }
@@ -95609,8 +95779,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::push_function",
             "span": {
-              "start_line": 420,
-              "end_line": 431,
+              "start_line": 448,
+              "end_line": 459,
               "start_column": 5,
               "end_column": 5
             }
@@ -95633,8 +95803,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_in",
             "span": {
-              "start_line": 555,
-              "end_line": 565,
+              "start_line": 583,
+              "end_line": 593,
               "start_column": 5,
               "end_column": 5
             }
@@ -95657,8 +95827,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_of",
             "span": {
-              "start_line": 567,
-              "end_line": 577,
+              "start_line": 595,
+              "end_line": 605,
               "start_column": 5,
               "end_column": 5
             }
@@ -95681,8 +95851,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_for_left",
             "span": {
-              "start_line": 744,
-              "end_line": 752,
+              "start_line": 772,
+              "end_line": 780,
               "start_column": 5,
               "end_column": 5
             }
@@ -95705,8 +95875,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "FunctionFinder::visit_ts_module_declaration",
             "span": {
-              "start_line": 1191,
-              "end_line": 1203,
+              "start_line": 1219,
+              "end_line": 1231,
               "start_column": 5,
               "end_column": 5
             }
@@ -95729,8 +95899,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "Contributors::push",
             "span": {
-              "start_line": 1419,
-              "end_line": 1422,
+              "start_line": 1447,
+              "end_line": 1450,
               "start_column": 5,
               "end_column": 5
             }
@@ -95753,8 +95923,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "contributor",
             "span": {
-              "start_line": 1437,
-              "end_line": 1446,
+              "start_line": 1465,
+              "end_line": 1474,
               "start_column": 1,
               "end_column": 1
             }
@@ -95777,8 +95947,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "source_span",
             "span": {
-              "start_line": 1448,
-              "end_line": 1452,
+              "start_line": 1476,
+              "end_line": 1480,
               "start_column": 1,
               "end_column": 1
             }
@@ -95801,8 +95971,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "byte_to_line",
             "span": {
-              "start_line": 1454,
-              "end_line": 1465,
+              "start_line": 1482,
+              "end_line": 1493,
               "start_column": 1,
               "end_column": 1
             }
@@ -95825,8 +95995,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "byte_to_line_col",
             "span": {
-              "start_line": 1467,
-              "end_line": 1483,
+              "start_line": 1495,
+              "end_line": 1511,
               "start_column": 1,
               "end_column": 1
             }
@@ -95849,8 +96019,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "argument_as_expression",
             "span": {
-              "start_line": 1562,
-              "end_line": 1566,
+              "start_line": 1590,
+              "end_line": 1594,
               "start_column": 1,
               "end_column": 1
             }
@@ -95873,8 +96043,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "array_element_as_expression",
             "span": {
-              "start_line": 1568,
-              "end_line": 1573,
+              "start_line": 1596,
+              "end_line": 1601,
               "start_column": 1,
               "end_column": 1
             }
@@ -95897,8 +96067,8 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "for_init_as_expression",
             "span": {
-              "start_line": 1575,
-              "end_line": 1579,
+              "start_line": 1603,
+              "end_line": 1607,
               "start_column": 1,
               "end_column": 1
             }
@@ -95921,8 +96091,80 @@
             "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
             "qualified_name": "tests::oxc_walker_constructible",
             "span": {
-              "start_line": 1585,
-              "end_line": 1589,
+              "start_line": 1629,
+              "end_line": 1633,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "tests::panic_reason_extracts_str_payload",
+            "span": {
+              "start_line": 1635,
+              "end_line": 1640,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "tests::panic_reason_extracts_string_payload",
+            "span": {
+              "start_line": 1642,
+              "end_line": 1648,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 1,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 100.0,
+          "crap": {
+            "value": 1.0,
+            "risk_level": "low"
+          },
+          "contributors": []
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/walker/mod.rs",
+            "qualified_name": "tests::panic_reason_falls_back_on_non_string_payload",
+            "span": {
+              "start_line": 1650,
+              "end_line": 1654,
               "start_column": 5,
               "end_column": 5
             }
@@ -96133,10 +96375,10 @@
       }
     ],
     "shown_summary": {
-      "total_functions": 1681,
+      "total_functions": 1685,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6237358715050565,
+      "average_crap": 1.6240356083086054,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -96153,16 +96395,16 @@
         }
       },
       "distribution": {
-        "low": 1681,
+        "low": 1685,
         "acceptable": 0,
         "moderate": 0,
         "high": 0
       },
       "max_complexity": 8,
-      "average_complexity": 1.60261748958953,
+      "average_complexity": 1.6029673590504452,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.21091170120087,
+      "average_coverage": 98.21515879508527,
       "median_coverage": 100.0
     },
     "grouped": null
