@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.6.0...crap4rs-v0.6.1) - 2026-06-24
+
+### Added
+
+- *(core)* View: subtitle line in the terminal table reporter ([#408](https://github.com/breezy-bays-labs/crap-rs/pull/408))
+- *(core)* #397 — breakdown collapsible on sticky scorecards (rendered below the table) ([#398](https://github.com/breezy-bays-labs/crap-rs/pull/398))
+- *(core)* #275 — markdown sticky-comment marker + breakdown collapsibles ([#395](https://github.com/breezy-bays-labs/crap-rs/pull/395))
+- *(core)* #393 — metric-mismatch guard on both delta paths (warn + disabled Delta tab) ([#394](https://github.com/breezy-bays-labs/crap-rs/pull/394))
+- *(core)* #379 — carry effective epsilon on the wire so crap-render's combined panel shows an active band ([#391](https://github.com/breezy-bays-labs/crap-rs/pull/391))
+- *(core+cli)* #277 — configurable threshold-border epsilon (delta jitter suppression) ([#376](https://github.com/breezy-bays-labs/crap-rs/pull/376))
+- *(core)* #274 — Renamed delta variant (relocation-aware delta gate) ([#375](https://github.com/breezy-bays-labs/crap-rs/pull/375))
+- *(core+cli)* #278 — configurable missing-coverage policy (pessimistic|optimistic|skip) ([#374](https://github.com/breezy-bays-labs/crap-rs/pull/374))
+- *(core+ci)* #260 — complete CRAP-8 campaign + flip production gate to strict-8 ([#372](https://github.com/breezy-bays-labs/crap-rs/pull/372))
+- *(core+cli)* config loader hardening (#339 #340 #341 #342) ([#361](https://github.com/breezy-bays-labs/crap-rs/pull/361))
+- *(adapters)* #283 — nested-mod qualified function names in the walker ([#354](https://github.com/breezy-bays-labs/crap-rs/pull/354))
+- *(core)* #348 — multi-language [language.*] config schema + [output] title/subtitle + public ConfigSchema ([#355](https://github.com/breezy-bays-labs/crap-rs/pull/355))
+- *(core+cli)* #345 — unified crap.toml config name + dual-discovery back-compat ([#349](https://github.com/breezy-bays-labs/crap-rs/pull/349))
+- *(core+ci)* #336 — base-gated multi-root src + separate production scorecard from examples dogfood ([#344](https://github.com/breezy-bays-labs/crap-rs/pull/344))
+- *(ci)* #314 — wire-envelope publication to release assets + smoke flip to baseline mode ([#332](https://github.com/breezy-bays-labs/crap-rs/pull/332))
+- *(crap-core+ci)* #326 — Current/Delta View axis on multi-language unified HTML report ([#327](https://github.com/breezy-bays-labs/crap-rs/pull/327))
+- *(crap-core+ci)* #315 — unified multi-language HTML report with per-language toggle ([#318](https://github.com/breezy-bays-labs/crap-rs/pull/318))
+
+### Other
+
+- *(crap4rs)* #434 — property tests for the LCOV path-normalization seam ([#439](https://github.com/breezy-bays-labs/crap-rs/pull/439))
+- *(crap4rs)* #429 — bolero fuzz harness + syn-walker target (Q4 walking skeleton) ([#435](https://github.com/breezy-bays-labs/crap-rs/pull/435))
+- *(core)* curate multi_root_src.feature — wire identity-resolution CLI contracts, keep in-process coverage ([#425](https://github.com/breezy-bays-labs/crap-rs/pull/425))
+- *(core)* curate config_discovery + config_schema — delete specs owned by lower levels ([#424](https://github.com/breezy-bays-labs/crap-rs/pull/424))
+- *(core)* curate format_advice.feature — wire advice CLI contracts, push coverage to lib units ([#421](https://github.com/breezy-bays-labs/crap-rs/pull/421))
+- *(core)* curate saved_view_presets.feature — wire --view CLI contracts, delete integration ([#420](https://github.com/breezy-bays-labs/crap-rs/pull/420))
+- *(core)* curate sarif_reporter.feature — wire SARIF CLI contracts, delete integration ([#419](https://github.com/breezy-bays-labs/crap-rs/pull/419))
+- *(core)* curate group_by_file.feature — wire --group-by CLI contracts, delete integration ([#418](https://github.com/breezy-bays-labs/crap-rs/pull/418))
+- *(core)* curate complexity_breakdown.feature — wire --breakdown/--explain CLI contracts ([#417](https://github.com/breezy-bays-labs/crap-rs/pull/417))
+- *(core)* delete table_reporter.feature — rendering exhaustively unit-owned ([#416](https://github.com/breezy-bays-labs/crap-rs/pull/416))
+- *(core)* curate diff_mode.feature — add --diff CLI-acceptance layer (keep integration for coverage) ([#415](https://github.com/breezy-bays-labs/crap-rs/pull/415))
+- *(core)* curate delta.feature CLI contracts (slice 2/2) — shaping/validation/help, delete integration files ([#414](https://github.com/breezy-bays-labs/crap-rs/pull/414))
+- *(core)* curate delta.feature CLI contracts (slice 1/2) — wire gate/reporter/envelope, push domain down ([#413](https://github.com/breezy-bays-labs/crap-rs/pull/413))
+- *(core)* curate cli_ergonomics --help/View-line/exit + result-invariant proptest ([#412](https://github.com/breezy-bays-labs/crap-rs/pull/412))
+- *(core)* curate --no-fail/--quiet + Story B BDD coverage — wire the CLI-process gaps, delete duplicates ([#411](https://github.com/breezy-bays-labs/crap-rs/pull/411))
+- *(core)* curate --min/--max-coverage BDD coverage — wire envelope + validation, delete view.rs-owned filter semantics ([#409](https://github.com/breezy-bays-labs/crap-rs/pull/409))
+- *(core)* curate --sort-by BDD coverage — wire the envelope echo, delete view.rs-owned orderings ([#407](https://github.com/breezy-bays-labs/crap-rs/pull/407))
+- *(core)* curate --top BDD coverage — wire CLI contracts, delete view.rs-owned details ([#406](https://github.com/breezy-bays-labs/crap-rs/pull/406))
+- *(core)* curate view.feature — delete spec, lift filters-AND-compose to a proptest ([#405](https://github.com/breezy-bays-labs/crap-rs/pull/405))
+- *(core)* assert AnalyzeOptions default coverage_metric is Line ([#404](https://github.com/breezy-bays-labs/crap-rs/pull/404))
+- #290 — vary github-annotations fixture nesting depth so CRAP scores are distinct ([#396](https://github.com/breezy-bays-labs/crap-rs/pull/396))
+- *(crap4rs)* #262 — rewrite cli_init.feature to the #347 init contract + gate 4 wired cucumber harnesses ([#363](https://github.com/breezy-bays-labs/crap-rs/pull/363))
+- *(bdd)* #280 — enforce one-status-tag-per-scenario + backfill delta.feature ([#362](https://github.com/breezy-bays-labs/crap-rs/pull/362))
+- #331 — analyzer resolves workspace-relative coverage paths in both adapters ([#333](https://github.com/breezy-bays-labs/crap-rs/pull/333))
+
 ### Added
 
 - `--format markdown` output now leads with a hidden

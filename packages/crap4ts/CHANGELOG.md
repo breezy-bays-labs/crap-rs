@@ -13,6 +13,31 @@ shared-core development.
 
 ## [Unreleased]
 
+## [2.0.0-rc.4](https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.3...crap4ts-v2.0.0-rc.4) - 2026-06-24
+
+### Added
+
+- *(ci)* bdd-mislevel-lint — mechanically enforce the Boundary Rule's provable shadow ([#426](https://github.com/breezy-bays-labs/crap-rs/pull/426))
+- *(core)* #397 — breakdown collapsible on sticky scorecards (rendered below the table) ([#398](https://github.com/breezy-bays-labs/crap-rs/pull/398))
+- *(core)* #275 — markdown sticky-comment marker + breakdown collapsibles ([#395](https://github.com/breezy-bays-labs/crap-rs/pull/395))
+- *(core+cli)* #277 — configurable threshold-border epsilon (delta jitter suppression) ([#376](https://github.com/breezy-bays-labs/crap-rs/pull/376))
+- *(core)* #274 — Renamed delta variant (relocation-aware delta gate) ([#375](https://github.com/breezy-bays-labs/crap-rs/pull/375))
+- *(core+ci)* #260 — complete CRAP-8 campaign + flip production gate to strict-8 ([#372](https://github.com/breezy-bays-labs/crap-rs/pull/372))
+- *(core)* #348 — multi-language [language.*] config schema + [output] title/subtitle + public ConfigSchema ([#355](https://github.com/breezy-bays-labs/crap-rs/pull/355))
+- *(core+cli)* #345 — unified crap.toml config name + dual-discovery back-compat ([#349](https://github.com/breezy-bays-labs/crap-rs/pull/349))
+- *(core+ci)* #336 — base-gated multi-root src + separate production scorecard from examples dogfood ([#344](https://github.com/breezy-bays-labs/crap-rs/pull/344))
+
+### Fixed
+
+- *(crap4ts)* catch upstream oxc parser panic on malformed input ([#442](https://github.com/breezy-bays-labs/crap-rs/pull/442))
+
+### Other
+
+- *(crap4ts)* #432 — Istanbul structured fuzz arm (Q4) ([#438](https://github.com/breezy-bays-labs/crap-rs/pull/438))
+- *(crap4ts)* #431 — Istanbul parser raw-bytes fuzz target (Q4) ([#437](https://github.com/breezy-bays-labs/crap-rs/pull/437))
+- *(crap4ts)* #430 — oxc-walker fuzz target (Q4) ([#436](https://github.com/breezy-bays-labs/crap-rs/pull/436))
+- #331 — analyzer resolves workspace-relative coverage paths in both adapters ([#333](https://github.com/breezy-bays-labs/crap-rs/pull/333))
+
 ### Added
 
 - The markdown reporter (`--format markdown`) emits a hidden
