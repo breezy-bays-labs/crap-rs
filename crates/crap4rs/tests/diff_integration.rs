@@ -599,19 +599,15 @@ fn json_envelope_contains_diff_ref() {
         .unwrap()
         .result;
 
-    let config = reporters::json::JsonConfig {
-        tool_version: "0.1.0".to_string(),
-        language: "rust".to_string(),
-        metric: ComplexityMetric::Cognitive,
-        missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
-        threshold: 30.0,
-        epsilon: 0.0,
-        timestamp: "2026-03-29T00:00:00Z".to_string(),
-        diagnostics: None,
-        diff_ref: Some("HEAD"),
-        minimal_view: false,
-        delta: None,
-    };
+    let mut config = reporters::json::JsonConfig::for_test(
+        "0.1.0",
+        "rust",
+        ComplexityMetric::Cognitive,
+        MissingCoveragePolicy::Pessimistic,
+        30.0,
+        "2026-03-29T00:00:00Z",
+    );
+    config.diff_ref = Some("HEAD");
     let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
     let json_str = reporters::format_json(&view, &config).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
@@ -639,19 +635,14 @@ fn json_envelope_diff_ref_null_without_flag() {
         .unwrap()
         .result;
 
-    let config = reporters::json::JsonConfig {
-        tool_version: "0.1.0".to_string(),
-        language: "rust".to_string(),
-        metric: ComplexityMetric::Cognitive,
-        missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
-        threshold: 30.0,
-        epsilon: 0.0,
-        timestamp: "2026-03-29T00:00:00Z".to_string(),
-        diagnostics: None,
-        diff_ref: None,
-        minimal_view: false,
-        delta: None,
-    };
+    let config = reporters::json::JsonConfig::for_test(
+        "0.1.0",
+        "rust",
+        ComplexityMetric::Cognitive,
+        MissingCoveragePolicy::Pessimistic,
+        30.0,
+        "2026-03-29T00:00:00Z",
+    );
     let view = crap4rs::domain::view::apply(&result, crap4rs::domain::view::ViewSpec::default());
     let json_str = reporters::format_json(&view, &config).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();

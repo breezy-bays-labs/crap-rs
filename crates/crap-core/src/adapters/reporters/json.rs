@@ -23,7 +23,18 @@ use crate::ports::ParseDiagnostic;
 /// is generic across adapters. crap4rs concretizes via the
 /// `JsonConfig<'a>` type alias in `crap4rs::adapters::reporters::json`
 /// so v0.4 callers' type paths stay byte-identical.
+///
+/// `#[non_exhaustive]`: a public, additive-only options struct. Marking
+/// it non-exhaustive forbids cross-crate struct-literal construction and
+/// exhaustive matching, so adding a field later is a minor (non-breaking)
+/// change rather than a major one — the same shape `HtmlMultiOptions`
+/// already uses. (Adding `epsilon` is what made a prior release register
+/// as breaking; that class is now closed.) Cross-crate tests construct it
+/// via the gated `for_test` constructor below (a plain code span, not an
+/// intra-doc link — `for_test` is `#[cfg]`-gated and absent from the
+/// default doc build); in-crate code still uses struct literals freely.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct JsonConfig<'a, P: ParseDiagnostic> {
     pub tool_version: String,
     /// Lowercase wire language token for the envelope's `language` field
@@ -58,6 +69,47 @@ pub struct JsonConfig<'a, P: ParseDiagnostic> {
     pub delta: Option<DeltaContext<'a, P>>,
 }
 
+/// Cross-crate test constructor for [`JsonConfig`].
+///
+/// `#[non_exhaustive]` blocks struct-literal construction from other
+/// crates, so adapter integration tests (which legitimately build a
+/// `JsonConfig` to exercise the JSON reporter) need a constructor. This
+/// takes the fields those tests actually vary and defaults the rest
+/// (`epsilon = 0.0`, `minimal_view = false`, the three `Option` fields to
+/// `None`); a test that needs `diff_ref` or `diagnostics` sets the field
+/// afterward — `#[non_exhaustive]` still permits cross-crate writes to an
+/// already-built value, only struct-literal creation is removed.
+///
+/// Gated on `test` (in-crate) OR the `test-helpers` feature (the arm
+/// adapter integration tests reach through their `crap-core` dev-dep), so
+/// it never reaches a production build.
+#[cfg(any(test, feature = "test-helpers"))]
+impl<'a, P: ParseDiagnostic> JsonConfig<'a, P> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn for_test(
+        tool_version: impl Into<String>,
+        language: impl Into<String>,
+        metric: ComplexityMetric,
+        missing_coverage_policy: MissingCoveragePolicy,
+        threshold: f64,
+        timestamp: impl Into<String>,
+    ) -> Self {
+        Self {
+            tool_version: tool_version.into(),
+            language: language.into(),
+            metric,
+            missing_coverage_policy,
+            threshold,
+            epsilon: 0.0,
+            timestamp: timestamp.into(),
+            diagnostics: None,
+            diff_ref: None,
+            minimal_view: false,
+            delta: None,
+        }
+    }
+}
+
 /// Bundles everything the JSON reporter needs to render the `delta`
 /// block: the shaped view (post-filter / sort / truncate) plus the
 /// underlying delta and baseline metadata captured when the baseline
@@ -65,7 +117,13 @@ pub struct JsonConfig<'a, P: ParseDiagnostic> {
 ///
 /// Generic over `P: ParseDiagnostic` — see `JsonConfig` for the
 /// rationale.
+///
+/// `#[non_exhaustive]` for the same additive-only reason as `JsonConfig`.
+/// Unlike `JsonConfig` this needs no `for_test` constructor: its sole
+/// construction site is in-crate (`cli::format_as_json`), where
+/// `#[non_exhaustive]` imposes no restriction.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct DeltaContext<'a, P: ParseDiagnostic> {
     /// Shaped view — drives `shown`, `spec`, `eligible_count`, `truncated`.
     pub view: &'a DeltaView<'a>,

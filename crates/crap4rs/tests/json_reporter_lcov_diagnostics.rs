@@ -64,19 +64,15 @@ fn diagnostics_included_when_present() {
         serde_json::from_str(diag_json).expect("diagnostics JSON should deserialize");
 
     let result = make_empty_result();
-    let config = JsonConfig {
-        tool_version: "0.1.0".to_string(),
-        language: "rust".to_string(),
-        metric: ComplexityMetric::Cognitive,
-        missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
-        threshold: 8.0,
-        epsilon: 0.0,
-        timestamp: "2026-03-28T12:00:00Z".to_string(),
-        diagnostics: Some(&diag),
-        diff_ref: None,
-        minimal_view: false,
-        delta: None,
-    };
+    let mut config = JsonConfig::for_test(
+        "0.1.0",
+        "rust",
+        ComplexityMetric::Cognitive,
+        MissingCoveragePolicy::Pessimistic,
+        8.0,
+        "2026-03-28T12:00:00Z",
+    );
+    config.diagnostics = Some(&diag);
 
     let analysis_view = view::apply(&result, ViewSpec::default());
     let json_str = format_json(&analysis_view, &config).expect("format_json should succeed");
