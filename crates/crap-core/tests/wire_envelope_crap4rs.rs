@@ -114,6 +114,16 @@ fn envelope() {
         "envelope.tool_version missing or empty (pre-strip)",
     );
 
+    // Per-adapter language guard (mirrors the crap4ts canary). crap4rs
+    // stamps its own `config_lang_key` ("rust"); this fails loudly if the
+    // wiring regresses to a shared literal.
+    assert_eq!(
+        envelope["language"].as_str(),
+        Some("rust"),
+        "crap4rs envelope.language must be \"rust\", got {:?}",
+        envelope["language"],
+    );
+
     strip_volatile(&mut envelope);
 
     let pretty = serde_json::to_string_pretty(&envelope).expect("envelope re-serializes");

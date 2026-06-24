@@ -55,6 +55,7 @@ impl JsonWorld {
         let view = view::apply(result, ViewSpec::default());
         let config = JsonConfig {
             tool_version: "0.1.0".to_string(),
+            language: "rust".to_string(),
             metric,
             missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold,

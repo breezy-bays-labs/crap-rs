@@ -15,11 +15,12 @@
 //!
 //! `--input <LANG>=<FILE>` pairs each envelope path with the language
 //! key it represents (`rust`, `typescript`, etc.). The language
-//! identity is supplied via CLI rather than read from the envelope
-//! because the JSON wire shape's `language` field is currently
-//! hard-coded "rust" by every emitting binary (a pre-existing bug
-//! tracked elsewhere) — pairing the language at the CLI sidesteps
-//! the field and stays N-adapter agnostic for future adapters.
+//! identity is supplied via CLI rather than read from the envelope's
+//! own `language` field so routing stays explicit and N-adapter
+//! agnostic — the renderer never has to trust per-envelope identity to
+//! place a block. (The envelope's `language` field is now a faithful
+//! per-adapter tag, each adapter stamping its `config_lang_key`, but
+//! the CLI key remains the routing source of truth.)
 //!
 //! `--baseline <LANG>=<FILE>` is the optional baseline counterpart.
 //! Each baseline envelope is composed against the matching `--input`

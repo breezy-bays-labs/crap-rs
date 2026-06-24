@@ -26,6 +26,11 @@ use crate::ports::ParseDiagnostic;
 #[derive(Debug)]
 pub struct JsonConfig<'a, P: ParseDiagnostic> {
     pub tool_version: String,
+    /// Lowercase wire language token for the envelope's `language` field
+    /// (`"rust"` / `"typescript"`). Sourced from the active adapter's
+    /// `AdapterMeta::config_lang_key`, so each adapter stamps its own
+    /// language rather than a shared literal.
+    pub language: String,
     pub metric: ComplexityMetric,
     /// Resolved missing-coverage policy for this run. Recorded in the
     /// envelope (unless `Pessimistic`) so a baseline captures the policy
@@ -115,7 +120,7 @@ pub fn format_json<P: ParseDiagnostic>(
     let envelope = Envelope {
         schema_version: wire::CURRENT_SCHEMA_VERSION,
         tool_version: config.tool_version.clone(),
-        language: "rust".to_string(),
+        language: config.language.clone(),
         timestamp: config.timestamp.clone(),
         metric: Some(config.metric),
         threshold: Some(config.threshold),
@@ -147,6 +152,7 @@ mod tests {
     fn default_config() -> TestJsonConfig {
         JsonConfig {
             tool_version: "0.1.0".to_string(),
+            language: "rust".to_string(),
             metric: ComplexityMetric::Cognitive,
             missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
             threshold: 8.0,
@@ -588,6 +594,7 @@ mod proptests {
         (1.0..100.0f64, prop_oneof![Just(0.0f64), 0.001..2.0f64]).prop_map(
             |(threshold, epsilon)| JsonConfig {
                 tool_version: "0.1.0".to_string(),
+                language: "rust".to_string(),
                 metric: ComplexityMetric::Cognitive,
                 missing_coverage_policy: MissingCoveragePolicy::Pessimistic,
                 threshold,

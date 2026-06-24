@@ -21,10 +21,11 @@
 //! crap4ts (no cognitive support; default should be cyclomatic).
 //! W2.5 (crap-rs#188) flips this via `AdapterMeta::default_metric`
 //! per locked decision #2. The snapshot was regenerated at W2.5 PR
-//! time; `metric: "cyclomatic"` is now baked. `language: "rust"`
-//! remains wrong-by-design — that flips later when the `Language`
-//! enum lands as part of the deferred HTML-reporter Wave 5
-//! re-launch.
+//! time; `metric: "cyclomatic"` is now baked. `language` was also once
+//! wrong-by-design (`"rust"` for every adapter); it now stamps the
+//! adapter's own `AdapterMeta::config_lang_key`, so `language:
+//! "typescript"` is baked here. An explicit assertion below guards the
+//! value so the per-adapter wiring can't silently regress to a literal.
 //!
 //! ## Volatile fields stripped
 //!
@@ -207,6 +208,17 @@ fn envelope() {
             .as_str()
             .is_some_and(|s| !s.is_empty()),
         "envelope.tool_version missing or empty (pre-strip)",
+    );
+
+    // Explicit per-adapter language guard (crap4ts must stamp its own
+    // `config_lang_key`, not the shared default). Stronger than the
+    // snapshot alone, which could be blindly re-accepted back to a wrong
+    // literal — this assertion fails loudly if the wiring regresses.
+    assert_eq!(
+        envelope["language"].as_str(),
+        Some("typescript"),
+        "crap4ts envelope.language must be \"typescript\", got {:?}",
+        envelope["language"],
     );
 
     strip_volatile(&mut envelope);

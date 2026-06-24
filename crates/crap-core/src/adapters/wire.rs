@@ -106,10 +106,12 @@ pub struct Envelope<P: ParseDiagnostic> {
     pub schema_version: u32,
     #[serde(default)]
     pub tool_version: String,
-    /// Language tag of the emitting adapter. Note the JSON reporter
-    /// currently stamps `"rust"` for every adapter, so readers must not
-    /// treat this field as a usable identity signal yet; `crap-render`
-    /// pairs each envelope with a language key on the CLI instead.
+    /// Lowercase language tag of the emitting adapter (`"rust"` /
+    /// `"typescript"`), sourced from the adapter's
+    /// `AdapterMeta::config_lang_key`, so each adapter stamps its own
+    /// language. `crap-render` still pairs each envelope with an explicit
+    /// `--input <lang>=<file>` key for routing rather than trusting this
+    /// field, but the field is now a faithful per-adapter identity signal.
     #[serde(default)]
     pub language: String,
     #[serde(default)]
