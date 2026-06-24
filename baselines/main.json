@@ -2,7 +2,7 @@
   "schema_version": 2,
   "tool_version": "0.6.2",
   "language": "rust",
-  "timestamp": "1782281081",
+  "timestamp": "1782285269",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
@@ -44981,9 +44981,9 @@
           },
           "complexity": 7,
           "complexity_metric": "cognitive",
-          "coverage_percent": 85.29411764705883,
+          "coverage_percent": 88.23529411764706,
           "crap": {
-            "value": 7.16,
+            "value": 7.08,
             "risk_level": "low"
           },
           "contributors": [
@@ -48171,7 +48171,7 @@
       "total_functions": 1685,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6240771513353116,
+      "average_crap": 1.6240296735905047,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -48197,7 +48197,7 @@
       "average_complexity": 1.6029673590504452,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.21465356522667,
+      "average_coverage": 98.21639907055045,
       "median_coverage": 100.0
     },
     "passed": true
@@ -49007,71 +49007,6 @@
       {
         "scored": {
           "identity": {
-            "file_path": "crates/crap4ts/src/adapters/coverage/mod.rs",
-            "qualified_name": "IstanbulCoverage::parse_str",
-            "span": {
-              "start_line": 570,
-              "end_line": 629,
-              "start_column": 5,
-              "end_column": 5
-            }
-          },
-          "complexity": 7,
-          "complexity_metric": "cognitive",
-          "coverage_percent": 85.29411764705883,
-          "crap": {
-            "value": 7.16,
-            "risk_level": "low"
-          },
-          "contributors": [
-            {
-              "kind": "if-branch",
-              "line": 581,
-              "column": 9,
-              "increment": 1,
-              "end_line": 583,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "try",
-              "line": 589,
-              "column": 75,
-              "increment": 1,
-              "end_line": 589,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 591,
-              "column": 9,
-              "increment": 1,
-              "end_line": 593,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "match",
-              "line": 601,
-              "column": 29,
-              "increment": 1,
-              "end_line": 616,
-              "nesting_depth": 0
-            },
-            {
-              "kind": "if-branch",
-              "line": 605,
-              "column": 17,
-              "increment": 2,
-              "end_line": 609,
-              "nesting_depth": 1
-            }
-          ]
-        },
-        "threshold": 8.0,
-        "exceeds": false
-      },
-      {
-        "scored": {
-          "identity": {
             "file_path": "crates/crap-core/src/domain/delta.rs",
             "qualified_name": "matches_score_delta_range",
             "span": {
@@ -49192,6 +49127,71 @@
               "column": 13,
               "increment": 2,
               "end_line": 549,
+              "nesting_depth": 1
+            }
+          ]
+        },
+        "threshold": 8.0,
+        "exceeds": false
+      },
+      {
+        "scored": {
+          "identity": {
+            "file_path": "crates/crap4ts/src/adapters/coverage/mod.rs",
+            "qualified_name": "IstanbulCoverage::parse_str",
+            "span": {
+              "start_line": 570,
+              "end_line": 629,
+              "start_column": 5,
+              "end_column": 5
+            }
+          },
+          "complexity": 7,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 88.23529411764706,
+          "crap": {
+            "value": 7.08,
+            "risk_level": "low"
+          },
+          "contributors": [
+            {
+              "kind": "if-branch",
+              "line": 581,
+              "column": 9,
+              "increment": 1,
+              "end_line": 583,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "try",
+              "line": 589,
+              "column": 75,
+              "increment": 1,
+              "end_line": 589,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 591,
+              "column": 9,
+              "increment": 1,
+              "end_line": 593,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "match",
+              "line": 601,
+              "column": 29,
+              "increment": 1,
+              "end_line": 616,
+              "nesting_depth": 0
+            },
+            {
+              "kind": "if-branch",
+              "line": 605,
+              "column": 17,
+              "increment": 2,
+              "end_line": 609,
               "nesting_depth": 1
             }
           ]
@@ -96378,7 +96378,7 @@
       "total_functions": 1685,
       "total_files": 45,
       "exceeding_threshold": 0,
-      "average_crap": 1.6240771513353116,
+      "average_crap": 1.6240296735905047,
       "median_crap": 1.0,
       "max_crap": {
         "value": 8.0,
@@ -96404,7 +96404,7 @@
       "average_complexity": 1.6029673590504452,
       "median_complexity": 1.0,
       "min_coverage": 0.0,
-      "average_coverage": 98.21465356522667,
+      "average_coverage": 98.21639907055045,
       "median_coverage": 100.0
     },
     "grouped": null
