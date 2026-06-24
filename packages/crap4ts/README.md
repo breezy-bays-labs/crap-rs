@@ -1,26 +1,16 @@
 # crap4ts
 
-Rust-powered [CRAP](https://www.artima.com/weblogs/viewpost.jsp?thread=210575) (Change Risk Anti-Patterns) score analyzer for TypeScript and JavaScript. Combines [oxc](https://oxc.rs/)-driven AST complexity with [Istanbul](https://istanbul.js.org/) JSON coverage to identify functions that are both complex and under-tested.
+Rust-powered [CRAP (Change Risk Anti-Patterns)](https://breezy-bays-labs.github.io/crap-rs/book/understanding-crap.html) score analyzer for TypeScript and JavaScript. Combines [oxc](https://oxc.rs/)-driven AST complexity with [Istanbul](https://istanbul.js.org/) JSON coverage to find functions that are both complex and under-tested.
 
-`crap4ts@2.x` is the TypeScript adapter for [`crap-rs`](https://github.com/breezy-bays-labs/crap-rs), distributed as a [napi-rs](https://napi.rs/) Node addon. The CRAP formula, scorecard envelope, and reporter shapes are shared with [`crap4rs`](https://github.com/breezy-bays-labs/crap-rs) (the Rust adapter) so TypeScript projects get identical semantics to Rust projects.
-
-## Status
-
-This is `2.0.0-rc.1` — a release candidate in a 48–72 h soak window before the GA `2.0.0` cut. Try it on a sandbox project; file issues against [`breezy-bays-labs/crap-rs`](https://github.com/breezy-bays-labs/crap-rs/issues) if you hit anything.
+crap4ts is the TypeScript adapter for the `crap-rs` analyzer, distributed as a [napi-rs](https://napi.rs/) Node addon. It shares its CRAP formula, scorecard envelope, and reporter shapes with the Rust adapter (`crap4rs`), so a CRAP score means the same thing whether you analyze a TypeScript project or a Rust one. crap4ts measures complexity with the cyclomatic metric; crap4rs defaults to cognitive.
 
 ## Install
 
 ```sh
-npm install crap4ts@2.0.0-rc.1
-# or
-pnpm add crap4ts@2.0.0-rc.1
+npm install crap4ts
+# pre-release channel:
+npm install crap4ts@rc
 ```
-
-Published platforms in `2.0.0-rc.1`:
-- macOS (arm64 + x64)
-- Linux (x64 / glibc)
-
-Windows and Linux arm64 / musl are tracked for a later release (see [`crap-rs`#154](https://github.com/breezy-bays-labs/crap-rs/issues/154)).
 
 ## Usage
 
@@ -31,19 +21,24 @@ const json = analyze({
   sourceRoot: 'src',
   coveragePath: 'coverage/coverage-final.json',
   // Optional:
-  // threshold: 16,            // metric-correct default (cyclomatic: 16, cognitive: 25)
-  // metric: 'cyclomatic',     // 'cyclomatic' (default) or 'cognitive' (not yet supported)
+  // threshold: 15,        // default gate
+  // metric: 'cyclomatic', // crap4ts is cyclomatic-only
 });
 
 const { result, diagnostics } = JSON.parse(json);
 console.log(result.summary);
 ```
 
-Generate `coverage-final.json` via your test runner with Istanbul coverage enabled (`jest --coverage`, `vitest --coverage`, `c8 --reporter=json`, etc.).
+Generate `coverage-final.json` with Istanbul coverage enabled in your test runner (`jest --coverage`, `vitest --coverage`, `c8 --reporter=json`, etc.).
 
-## Migrating from `crap4ts@1.x`
+Use the istanbul coverage provider, not v8 — crap4ts consumes the Istanbul JSON shape only. For Vitest, set `coverage.provider: 'istanbul'`.
 
-See [`MIGRATION.md`](https://github.com/breezy-bays-labs/crap-rs/blob/main/MIGRATION.md) for the full upgrade guide. Short version: scores may differ for three compounding reasons (calibrated threshold default, TS-specific calibration not yet validated, arrow-function coverage handling), and the subpath exports (`crap4ts/formula`, `crap4ts/complexity`, `crap4ts/coverage`) are not re-exposed in 2.x — call `analyze()` and read fields from the returned JSON.
+## Documentation
+
+The CRAP score, the threshold gate, and the full reporter gallery (terminal, JSON, HTML — HTML ships today) are documented in the book:
+
+- [Quick start (TypeScript)](https://breezy-bays-labs.github.io/crap-rs/book/quick-start.html)
+- [Understanding CRAP](https://breezy-bays-labs.github.io/crap-rs/book/understanding-crap.html)
 
 ## License
 
