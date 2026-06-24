@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "tool_version": "0.6.1",
+  "tool_version": "0.6.2",
   "language": "rust",
-  "timestamp": "1782272476",
+  "timestamp": "1782273932",
   "metric": "cognitive",
   "threshold": 8.0,
   "diff_ref": null,
