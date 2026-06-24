@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/breezy-bays-labs/crap-rs/compare/crap-core-v0.8.0...crap-core-v0.9.0) - 2026-06-24
+
+### Fixed
+
+- *(crap-core)* stamp each adapter's real language in the wire envelope ([#450](https://github.com/breezy-bays-labs/crap-rs/pull/450))
+
 ### Added
 
 - `format_markdown` always emits a hidden

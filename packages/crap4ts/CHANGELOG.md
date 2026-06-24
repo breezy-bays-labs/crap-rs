@@ -13,6 +13,12 @@ shared-core development.
 
 ## [Unreleased]
 
+## [2.0.0-rc.5](https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.4...crap4ts-v2.0.0-rc.5) - 2026-06-24
+
+### Other
+
+- updated the following local packages: crap-core
+
 ## [2.0.0-rc.4](https://github.com/breezy-bays-labs/crap-rs/compare/crap4ts-v2.0.0-rc.3...crap4ts-v2.0.0-rc.4) - 2026-06-24
 
 ### Added
