@@ -164,8 +164,36 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release download --pattern 'crap4rs-envelope.json' --dir "$RUNNER_TEMP"
-          gh release download --pattern 'crap4ts-envelope.json' --dir "$RUNNER_TEMP"
+          # Fetch into a DEDICATED subdir, NOT $RUNNER_TEMP directly.
+          # Collision bug (fixed here): the scorecard action writes its
+          # own analysis output to `$RUNNER_TEMP/${BIN}-envelope.json`
+          # (action.yml) — i.e. `$RUNNER_TEMP/crap4rs-envelope.json`, the
+          # EXACT path this step used to download the baseline to. The
+          # action's `crap4rs --baseline <path> ... > $RUNNER_TEMP/crap4rs-envelope.json`
+          # truncates that file (the `>` redirect zeroes it) BEFORE the
+          # binary reads `--baseline` from the same path, so crap-render
+          # saw an empty baseline and crashed (`EOF while parsing a value`,
+          # exit 2). The bug was dormant on main only because the fetch
+          # failed pre-envelope-release (run-mode:full, no baseline passed).
+          # A separate baselines/ dir keeps the fetched baseline clear of
+          # the action's output filenames.
+          dir="$RUNNER_TEMP/baselines"
+          mkdir -p "$dir"
+          gh release download --pattern 'crap4rs-envelope.json' --dir "$dir"
+          gh release download --pattern 'crap4ts-envelope.json' --dir "$dir"
+          # Validity guard (defense in depth): `gh release download` can
+          # also exit 0 yet leave an EMPTY file (observed under the
+          # ephemeral GITHUB_TOKEN). Re-assert JSON validity so a bad
+          # fetch becomes a fetch MISS — this step exits non-zero →
+          # continue-on-error → the fallback-annotation + run-mode:full
+          # path below — rather than a hard smoke failure. The warning
+          # keeps a genuine steady-state regression visible.
+          for f in crap4rs-envelope.json crap4ts-envelope.json; do
+            if ! jq -e . "$dir/$f" >/dev/null 2>&1; then
+              echo "::warning::fetched baseline $f is empty or not valid JSON — treating as a fetch miss; smoke falls back to run-mode: full"
+              exit 1
+            fi
+          done
 
       # ----------------------------------------------------------------
       # Annotate the cause when the envelope fetch failed. Without
@@ -247,8 +275,8 @@ jobs:
           coverage-ts: crates/crap-examples/coverage-final.json
           src:    ./crates/crap-examples/src
           src-ts: ./crates/crap-examples/ts
-          baseline:    ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/crap4rs-envelope.json', runner.temp) || '' }}
-          baseline-ts: ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/crap4ts-envelope.json', runner.temp) || '' }}
+          baseline:    ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/baselines/crap4rs-envelope.json', runner.temp) || '' }}
+          baseline-ts: ${{ steps.fetch-baseline.outcome == 'success' && format('{0}/baselines/crap4ts-envelope.json', runner.temp) || '' }}
           run-mode:    ${{ steps.fetch-baseline.outcome == 'success' && 'both' || 'full' }}
           threshold-preset: default
           gate-mode: report-only
