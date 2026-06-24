@@ -30,21 +30,37 @@ pkg_dir="${1:-packages/crap4ts}"
 
 echo "::group::npm pack + install-gating ($pkg_dir)"
 work="$(mktemp -d)"
+# Clean the scratch dir on any exit. The trap runs in THIS shell, so the
+# script must not cd into $work itself (the install runs in a subshell
+# below) or the rmdir could fail on a busy cwd.
+trap 'rm -rf "$work"' EXIT
+
 ( cd "$pkg_dir" && npm pack --pack-destination "$work" )
-tarball="$(ls "$work"/crap4ts-*.tgz)"
+# Resolve the packed tarball by glob, not by parsing `ls`. No-match leaves
+# the literal pattern, which the -f guard rejects.
+tarballs=("$work"/crap4ts-*.tgz)
+tarball="${tarballs[0]}"
+if [ ! -f "$tarball" ]; then
+  echo "::error::npm pack produced no crap4ts-*.tgz in $work"
+  exit 1
+fi
 echo "packed: $(basename "$tarball")"
 
 consumer="$work/consumer"
 mkdir -p "$consumer"
-cd "$consumer"
-npm init -y >/dev/null
-# `npm install` exits non-zero on EBADPLATFORM; the explicit node_modules
-# check is a backstop so the failure stays loud even if a future npm
-# softens platform mismatch to a warning.
-npm install --no-audit --no-fund "$tarball"
-if [ ! -d node_modules/crap4ts ]; then
-  echo "::error::npm did not install crap4ts — os/cpu/libc gating rejected this platform (see EBADPLATFORM above). Packaging defect."
-  exit 1
-fi
-node -e 'const m = require("crap4ts"); if (typeof m.analyze !== "function") { throw new Error("crap4ts installed from the packed tarball but the analyze export is missing"); } console.log("OK: npm install-gating passed and analyze export present");'
+# Subshell so the main script's cwd is unchanged (keeps the EXIT trap able
+# to remove $work). A non-zero exit inside propagates via set -e.
+(
+  cd "$consumer"
+  npm init -y >/dev/null
+  # `npm install` exits non-zero on EBADPLATFORM; the explicit node_modules
+  # check is a backstop so the failure stays loud even if a future npm
+  # softens platform mismatch to a warning.
+  npm install --no-audit --no-fund "$tarball"
+  if [ ! -d node_modules/crap4ts ]; then
+    echo "::error::npm did not install crap4ts — os/cpu/libc gating rejected this platform (see EBADPLATFORM above). Packaging defect."
+    exit 1
+  fi
+  node -e 'const m = require("crap4ts"); if (typeof m.analyze !== "function") { throw new Error("crap4ts installed from the packed tarball but the analyze export is missing"); } console.log("OK: npm install-gating passed and analyze export present");'
+)
 echo "::endgroup::"
