@@ -80,7 +80,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2
+      - uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2
         with:
           tool: cargo-nextest@0.9
       - name: Verify cargo + nextest resolve (broken-rustup canary)
@@ -213,10 +213,10 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2
+      - uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2
         with:
           tool: cargo-nextest@0.9
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2
+      - uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2
         with:
           tool: cargo-llvm-cov@0.6
       - name: Generate workspace LCOV (excluding crap-examples)
@@ -304,7 +304,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # tracks @stable branch
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2
+      - uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2
         with:
           tool: cargo-mutants
       - name: Run cargo mutants on crates/crap-core/src/domain/view.rs
