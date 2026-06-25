@@ -1,0 +1,21 @@
+[book]
+title = "crap-rs"
+description = "A CRAP (Change Risk Anti-Patterns) analyzer for Rust and TypeScript — one per-function score fusing source complexity with test coverage."
+authors = ["Breezy Bays Labs"]
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/breezy-bays-labs/crap-rs"
+edit-url-template = "https://github.com/breezy-bays-labs/crap-rs/edit/main/book/{path}"
+# Served from the project's GitHub Pages under /crap-rs/book/ (the CRAP
+# scorecard reports occupy the Pages root). Relative asset links work
+# under the subpath; site-url anchors the search/print base.
+site-url = "/crap-rs/book/"
+
+[output.html.search]
+enable = true
+
+[output.html.fold]
+enable = true
+level = 1

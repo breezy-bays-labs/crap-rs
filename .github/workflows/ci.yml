@@ -1007,6 +1007,83 @@ jobs:
             commit -m "ci(pages): publish production report + baseline envelope (${GITHUB_SHA})"
           git push origin HEAD:gh-pages
 
+  book-build:
+    # Build the mdBook product docs (book/) and fail on a broken build —
+    # a missing chapter, a bad SUMMARY.md link, etc. Gate only; the
+    # publish to GitHub Pages happens in `publish-book` on push to main.
+    #
+    # `actions/checkout` SHA-pinned; `persist-credentials: false` (never
+    # pushes) + `permissions: contents: read` per the supply-chain policy.
+    name: Book build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2
+        with:
+          tool: mdbook
+      - name: Build the book
+        run: mdbook build book
+
+  publish-book:
+    # Publish the built mdBook to GitHub Pages under /book/ on push to
+    # main. The CRAP scorecard reports occupy the Pages root; this copies
+    # the book into /book/ and touches nothing else. Shares the
+    # `gh-pages-publish` concurrency lock with `publish-production-report`
+    # + the per-PR report publish so the three never race on the branch tip.
+    name: Publish book → gh-pages /book/
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: book-build
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
+    permissions:
+      # Elevate ONLY here: contents: write to push the rendered book to
+      # the gh-pages branch. The top-level workflow default stays read.
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2
+        with:
+          tool: mdbook
+      - name: Build the book
+        run: mdbook build book
+      - name: Publish to gh-pages /book/
+        # Plain git push (no third-party action — supply-chain conventions).
+        # A separate shallow tokened clone of gh-pages avoids relying on the
+        # main checkout's (deliberately absent) persisted credentials.
+        # `/book/` is replaced wholesale so deleted chapters don't linger;
+        # everything else on gh-pages (the scorecard reports, .nojekyll) is
+        # preserved because we only touch the book/ subtree.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --branch gh-pages --single-branch --depth 1 \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages-pub
+          rm -rf gh-pages-pub/book
+          mkdir -p gh-pages-pub/book
+          cp -R book/book/. gh-pages-pub/book/
+          cd gh-pages-pub
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "gh-pages /book/ already up to date — nothing to publish"
+            exit 0
+          fi
+          git add book
+          git \
+            -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "ci(pages): publish mdBook to /book/ (${GITHUB_SHA})"
+          git push origin HEAD:gh-pages
+
   scorecard-smoke-ts:
     # Sibling of `scorecard-smoke-rust` for the TypeScript dispatch
     # path. Build crap4ts from the PR, stage it on PATH (the only

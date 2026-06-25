@@ -5,7 +5,7 @@
 [![docs.rs](https://img.shields.io/docsrs/crap4ts)](https://docs.rs/crap4ts)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/breezy-bays-labs/crap-rs#license)
 
-**Rust-powered CRAP (Change Risk Anti-Patterns) score analyzer for TypeScript and JavaScript.** Find the functions in your codebase that are both complex *and* under-tested.
+CRAP (Change Risk Anti-Patterns) score analyzer for TypeScript and JavaScript, powered by Rust. It finds the functions that are both complex and under-tested.
 
 `crap4ts` combines [oxc](https://oxc.rs/)-driven AST complexity with [Istanbul](https://istanbul.js.org/) JSON coverage. One pass, one CI gate, one number per function.
 
@@ -13,7 +13,7 @@
 CRAP(complexity, coverage) = complexity² × (1 − coverage)³ + complexity
 ```
 
-High complexity + low coverage = high CRAP = high change risk.
+High complexity plus low coverage yields a high CRAP score. See [understanding CRAP](https://breezy-bays-labs.github.io/crap-rs/book/understanding-crap.html) for the math and the unit conventions.
 
 > **JavaScript / Node consumers**: install [`crap4ts` from npm](https://www.npmjs.com/package/crap4ts) — that package ships pre-built Node addons for every supported platform. Its [npm README](https://github.com/breezy-bays-labs/crap-rs/blob/main/packages/crap4ts/README.md) covers Node-side usage.
 >
@@ -25,9 +25,9 @@ High complexity + low coverage = high CRAP = high change risk.
 cargo install crap4ts
 ```
 
-Pre-built CLI binaries for `crap4ts` are tracked for a future release (the napi `cdylib` for the npm package ships pre-built today; the standalone CLI artifact does not yet). Use `cargo install` for now, or install the [npm package](https://www.npmjs.com/package/crap4ts) if you're consuming from Node.
+Pre-built standalone CLI binaries are tracked for a future release; the napi `cdylib` for the npm package ships pre-built today, the CLI artifact does not yet. Use `cargo install` for now, or install the [npm package](https://www.npmjs.com/package/crap4ts) if you consume from Node. See [installation](https://breezy-bays-labs.github.io/crap-rs/book/installation.html) for all install paths.
 
-## 30-second tour
+## Quick run
 
 ```bash
 # Generate Istanbul JSON coverage (e.g. via Vitest + istanbul provider)
@@ -40,174 +40,66 @@ crap4ts --coverage coverage/coverage-final.json --src src
 crap4ts --coverage coverage/coverage-final.json --src src --strict
 ```
 
+`--coverage` is required at runtime. The full flag surface lives in the [CLI reference](https://breezy-bays-labs.github.io/crap-rs/book/cli-reference.html); see [quick start](https://breezy-bays-labs.github.io/crap-rs/book/quick-start.html) for a guided first run.
+
 ## Why cyclomatic complexity (only)
 
-`crap4ts` 2.x ships **cyclomatic complexity** as the only supported metric. Two reasons:
+`crap4ts` ships cyclomatic complexity as the only supported metric. Two reasons:
 
-1. **Classic CRAP semantics.** Cyclomatic decision-point count is the original CRAP metric and aligns with how virtually every TypeScript / JavaScript quality tool (ESLint's `complexity` rule, SonarJS, Code Climate, etc.) reports complexity. CI gates and reviewer expectations transfer cleanly.
-2. **AST signal density differs from Rust.** TypeScript code doesn't lean as heavily on `match`-style branching as idiomatic Rust does, so the cognitive-vs-cyclomatic divergence is much smaller. Cyclomatic ships first; cognitive may follow in a later release if the ecosystem demand justifies the additional walker logic.
+1. **Classic CRAP semantics.** Cyclomatic decision-point count is the original CRAP metric and aligns with how TypeScript and JavaScript quality tools report complexity (for example ESLint's `complexity` rule). CI gates and reviewer expectations transfer cleanly.
+2. **AST signal density differs from Rust.** TypeScript code leans less on `match`-style branching than idiomatic Rust, so the cognitive-vs-cyclomatic divergence is smaller. Cognitive may follow in a later release if ecosystem demand justifies the additional walker logic.
 
 Passing `--metric cognitive` errors out cleanly with `MetricNotSupported`.
 
-The companion Rust analyzer [`crap4rs`](https://crates.io/crates/crap4rs) defaults to cognitive complexity for the inverse reason — Rust idioms benefit from it. The shared CRAP formula, risk tiers, and envelope shape are identical across both adapters; only the complexity number entering the formula differs.
+The companion Rust analyzer [`crap4rs`](https://crates.io/crates/crap4rs) defaults to cognitive complexity for the inverse reason — Rust idioms benefit from it. The shared CRAP formula, risk bands, and envelope shape are identical across both adapters; only the complexity number entering the formula differs.
 
-## Threshold presets
+## Threshold gate and risk bands
 
-`crap4ts` ships three preset gates calibrated against four risk tiers:
+The default gate (no flag) is CRAP ≤ 15. The two preset flags shift it:
 
-| Preset | Threshold | Gates at | Use for |
-|---|---|---|---|
-| `--strict` | CRAP ≤ 8 | Low → Acceptable | safety-critical, high-quality libraries |
-| *(default)* | CRAP ≤ 15 | Acceptable → Moderate | typical app / library code |
-| `--lenient` | CRAP ≤ 25 | Moderate → High | legacy / transitional codebases |
+| Flag | Gate | Use for |
+|---|---|---|
+| `--strict` | CRAP ≤ 8 | safety-critical, high-quality libraries |
+| *(default)* | CRAP ≤ 15 | typical app / library code |
+| `--lenient` | CRAP ≤ 25 | legacy / transitional codebases |
 
-The risk tiers themselves:
+The threshold gate and the score-based risk bands are distinct axes that share the same numbers today:
 
-| CRAP score | Risk |
+| CRAP score | Risk band |
 |---|---|
 | ≤ 8 | Low |
 | ≤ 15 | Acceptable |
 | ≤ 25 | Moderate |
 | > 25 | High |
 
-The presets correspond to "gate at the next risk tier up." Override with `--threshold <N>` for a custom value, or define presets per-codebase in `crap.toml` (the canonical config name, written by `crap4ts init`). The legacy name `crap4ts.toml` is still discovered as a deprecated alias when no `crap.toml` is present.
+The `8`/`15`/`25` values are a calibration convention, not empirically derived. Override or define per-codebase presets in [configuration](https://breezy-bays-labs.github.io/crap-rs/book/configuration.html).
 
-## What it looks like
+## Output formats
 
-### Table (TTY default)
+Table (TTY default), markdown, GitHub annotations, JSON, CSV, SARIF, scorecard-row, and an interactive HTML report all ship today. The output gallery and per-format details live in [output formats](https://breezy-bays-labs.github.io/crap-rs/book/output-formats.html). Multiple formats compose in one pass.
 
-```
-crap4ts v2.0.0-rc.2 — CRAP Score Analysis
+The JSON wire envelope is byte-identical to `crap4rs`'s output — same fields, same risk-band strings, same delta-gate semantics — so a multi-language monorepo can drive a single CI gate across both ecosystems. Delta gates, rename detection, and threshold-epsilon jitter suppression are covered in the [CLI reference](https://breezy-bays-labs.github.io/crap-rs/book/cli-reference.html) and [limitations and FAQ](https://breezy-bays-labs.github.io/crap-rs/book/limitations-and-faq.html).
 
-+-----------------------------+-------------------------+----+-------+-------+----------+
-| File                        | Function                | CC | Cov%  | CRAP  | Risk     |
-+=========================================================================================+
-| src/walker.ts               | walkExpression          | 14 |  72.0 | 17.06 | moderate |
-| src/cli.ts                  | resolveConfig           | 11 |  88.5 | 11.16 | acceptable |
-| src/reporters/markdown.ts   | renderTopOffenders      |  9 | 100.0 |  9.00 | acceptable |
-| src/coverage/istanbul.ts    | parseStatementMap       |  8 |  91.2 |  8.05 | acceptable |
-+-----------------------------+-------------------------+----+-------+-------+----------+
+## Two artifacts from one crate
 
-Functions: 142 · Above threshold: 1 · Worst CRAP: 17.06 · Distribution: 98 low · 32 acceptable · 11 moderate · 1 high
-```
+`crap4ts` is the TypeScript / JavaScript adapter in the [`crap-rs`](https://github.com/breezy-bays-labs/crap-rs) workspace. It compiles to two artifacts:
 
-### Markdown (`--format markdown`) — PR-comment ready
+- A standalone Rust CLI binary, built from source with `cargo install crap4ts` (this page). Prebuilt binaries and `cargo binstall` support are tracked for a future release.
+- A [napi-rs](https://napi.rs/) `cdylib` Node addon, distributed via [npm](https://www.npmjs.com/package/crap4ts).
 
-The first output line is always a hidden HTML comment, `<!-- crap4ts:scorecard -->` — invisible when rendered, but a stable anchor that sticky-PR-comment tooling can match on to find and update its own comment instead of posting a new one on every push. The marker carries the adapter name, so a Rust and a TypeScript scorecard can sticky to separate comments on the same PR. (A multi-language combined comment contains both adapters' markers, so match accordingly if you post combined output.) With `--breakdown`, the complexity-contributor bullets of the above-threshold functions collect into one collapsed `<details>` block below the scorecard table — below the table rather than between rows, since a `<details>` placed inside a markdown table terminates it.
-
-```markdown
-<!-- crap4ts:scorecard -->
-
-# crap4ts v2.0.0-rc.2 — CRAP Score Analysis
-
-**Result:** FAIL · **Functions:** 142 · **Above threshold (15):** 1
-
-| Metric     | Worst | Average | Median |
-|------------|------:|--------:|-------:|
-| CRAP       | 17.06 |    2.41 |   1.00 |
-| Complexity |    14 |     2.3 |    1.0 |
-| Coverage   |  0.0% |   89.4% |  98.5% |
-
-**Risk distribution:** low 98 · acceptable 32 · moderate 11 · high 1
-```
-
-### GitHub annotations (`--format github-annotations`) — inline PR review
-
-Drops findings as inline warnings on the PR Files Changed tab, no GHAS / Code Scanning license needed:
-
-```
-::warning file=src/walker.ts,line=128,title=CRAP 17.1::Function `walkExpression` has CRAP 17.06 (complexity=14, coverage=72.0%) which exceeds threshold 15.0
-```
-
-### JSON (`--format json`) — programmatic consumption
-
-```json
-{
-  "schema_version": 2,
-  "run_meta": { "tool": "crap4ts", "version": "2.0.0-rc.2", "metric": "cyclomatic" },
-  "result": {
-    "summary": {
-      "total_functions": 142,
-      "exceeding_threshold": 1,
-      "distribution": { "low": 98, "acceptable": 32, "moderate": 11, "high": 1 },
-      "max_crap": { "value": 17.06, "risk_level": "moderate" }
-    },
-    "functions": [
-      {
-        "scored": {
-          "identity": { "file_path": "src/walker.ts", "qualified_name": "walkExpression", "span": { "start_line": 128, "end_line": 184 } },
-          "complexity": 14,
-          "complexity_metric": "cyclomatic",
-          "coverage_percent": 72.0,
-          "crap": { "value": 17.06, "risk_level": "moderate" }
-        },
-        "threshold": 15.0,
-        "exceeds": true
-      }
-    ]
-  }
-}
-```
-
-The wire envelope is byte-identical to `crap4rs`'s output — same fields, same risk-tier strings, same delta-gate semantics. A multi-language monorepo can drive a single CI gate across both ecosystems.
-
-### Other formats
-
-- `--format csv` — spreadsheet ingestion
-- `--format sarif` — Code Scanning upload (requires GHAS) for surface-as-security-finding flows
-- `--format scorecard` — single-row CI gate output for cross-PR delta tracking
-- **HTML report** — interactive, sortable, with per-function contributor drill-down. *Coming in a future release; file an issue for early-access interest.*
-
-Multiple formats compose in one pass: `--format json:envelope.json,markdown:report.md` writes both files from a single analysis.
-
-## Delta gates — fail PRs that introduce new high-CRAP functions
-
-```bash
-# Generate baseline on main
-crap4ts --coverage main-coverage/coverage-final.json --src src --format json > baseline.json
-
-# On PR — fail only on NEW threshold violations
-crap4ts --coverage pr-coverage/coverage-final.json --src src --baseline baseline.json --delta-gate
-```
-
-A function above-threshold on main doesn't fail the PR; only functions newly introduced or newly elevated do. Lets teams ratchet quality forward without blocking every PR on pre-existing debt.
-
-### Relocations don't count as new violations
-
-A function that is **moved to another file, renamed, or moved between modules** — body otherwise unchanged — is recognized as a single `renamed` change rather than an unrelated `removed` + `added` pair, so a pure relocation contributes **zero new violations** and large migrations sail through the delta gate. A relocation that *also* worsens the score still counts. The matching is conservative (the same name *and* structure, or a distinctive structure with exactly one candidate per side). Enabling rename detection can only *lower* the new-violation count, never raise it (it never newly fails a PR) — but, since matching works from analysis output rather than source text, a genuinely-unrelated function whose structure coincidentally matches a removed one can pair and thereby lower the count below the true figure; the guards make that rare, not impossible. This is the same `crap-core` delta engine `crap4rs` uses, so the behavior — and the `renamed` count in every report format — is identical across both adapters.
-
-### Threshold-border jitter suppression (opt-in)
-
-A function whose CRAP score sits on the threshold line can flip across it on measurement noise. Set a **threshold-border epsilon** to stop that jitter from tripping the delta gate, via `--threshold-epsilon 0.5` or a `crap.toml` (or legacy `crap4ts.toml`) `[delta]` table:
-
-```toml
-[delta]
-epsilon = 0.5
-```
-
-`epsilon` is an **absolute, unitless CRAP-point** band half-width. A would-be new violation whose transition stays within `epsilon` of the threshold — on **both** sides — is treated as border jitter and not counted; what was suppressed surfaces as `border_jitter_suppressed` in the delta summary. The default `0.0` disables it (byte-identical output). It is deliberately narrow (oscillation across the line, not delta magnitude) and is a *jitter* knob, **not** a noise-only guarantee: like rename detection it only lowers the count, so a genuinely-new in-band violation is suppressed too (an in-band `Added` row is a one-sided soft threshold bypass). Same `crap-core` engine as `crap4rs` — identical behavior across both adapters. Keep `epsilon` small.
-
-## What this is (architecture)
-
-`crap4ts` is the TypeScript / JavaScript adapter in the [`crap-rs`](https://github.com/breezy-bays-labs/crap-rs) workspace. It compiles to two artifacts from one crate:
-
-- A standalone Rust CLI binary, distributed via crates.io (this page) and `cargo binstall`
-- A [napi-rs](https://napi.rs/) `cdylib` Node addon, distributed via [npm](https://www.npmjs.com/package/crap4ts)
-
-Both share the same walker (`oxc` for complexity), the same Istanbul JSON coverage parser, and the same [`crap-core`](https://crates.io/crates/crap-core) scoring/reporter pipeline as the Rust adapter [`crap4rs`](https://crates.io/crates/crap4rs).
+Both share the same `oxc` walker, the same Istanbul JSON coverage parser, and the same [`crap-core`](https://crates.io/crates/crap-core) scoring and reporter pipeline as the Rust adapter [`crap4rs`](https://crates.io/crates/crap4rs).
 
 ## Library use (Rust)
 
-```toml
-[dependencies]
-crap4ts = "2"
+```bash
+cargo add crap4ts
 ```
 
-Most users want the CLI or the npm package; the library crate is intended for downstream tooling that needs programmatic access to TypeScript walking + scoring without spawning a subprocess.
+Most users want the CLI or the npm package; the library crate is for downstream tooling that needs programmatic TypeScript walking and scoring without spawning a subprocess. (The crate is on a `2.0.0-rc` prerelease line — `cargo add` resolves the current release; a manual `[dependencies]` entry needs an explicit prerelease requirement.)
 
 ## Stability
 
-`crap4ts` is in the `2.0.0-rc.x` release-candidate series ahead of the GA `2.0.0` cut. The CLI surface, configuration shape, and scorecard envelope are locked across the rc series; rc bumps fix bugs and tighten the walker. See the [changelog](https://github.com/breezy-bays-labs/crap-rs/blob/main/packages/crap4ts/CHANGELOG.md) for the per-version history.
+`crap4ts` is in the `2.0.0-rc.x` release-candidate series ahead of the GA `2.0.0` cut. The CLI surface, configuration shape, and scorecard envelope are locked across the rc series; rc bumps fix bugs and tighten the walker. See the [changelog](https://github.com/breezy-bays-labs/crap-rs/blob/main/packages/crap4ts/CHANGELOG.md) for per-version history.
 
 ## See also
 
