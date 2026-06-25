@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/breezy-bays-labs/crap-rs/compare/crap-core-v0.9.0...crap-core-v0.10.0) - 2026-06-25
+
+### Other
+
+- mdBook product book + trim-hard READMEs + gh-pages /book/ hosting ([#457](https://github.com/breezy-bays-labs/crap-rs/pull/457))
+- *(core)* [**breaking**] make JsonConfig + DeltaContext #[non_exhaustive] ([#453](https://github.com/breezy-bays-labs/crap-rs/pull/453))
+- encoded-defect lint — anchor deliberately-wrong values to a tracking issue ([#454](https://github.com/breezy-bays-labs/crap-rs/pull/454))
+
 ## [0.9.0](https://github.com/breezy-bays-labs/crap-rs/compare/crap-core-v0.8.0...crap-core-v0.9.0) - 2026-06-24
 
 ### Fixed
