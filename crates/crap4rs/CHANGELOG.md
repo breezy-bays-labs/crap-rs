@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.6.2...crap4rs-v0.7.0) - 2026-06-25
+
+### Other
+
+- mdBook product book + trim-hard READMEs + gh-pages /book/ hosting ([#457](https://github.com/breezy-bays-labs/crap-rs/pull/457))
+- *(core)* [**breaking**] make JsonConfig + DeltaContext #[non_exhaustive] ([#453](https://github.com/breezy-bays-labs/crap-rs/pull/453))
+
 ## [0.6.2](https://github.com/breezy-bays-labs/crap-rs/compare/crap4rs-v0.6.1...crap4rs-v0.6.2) - 2026-06-24
 
 ### Fixed
