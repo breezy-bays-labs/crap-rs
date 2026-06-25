@@ -1,0 +1,1205 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>crap-rs</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="A CRAP (Change Risk Anti-Patterns) analyzer for Rust and TypeScript — one per-function score fusing source complexity with test coverage.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-8fc66a0e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-5a8c73d4.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">crap-rs</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/breezy-bays-labs/crap-rs" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p>CRAP (Change Risk Anti-Patterns) is a single number per function that fuses how complex the code is with how well it is tested. Complex code with thin coverage is the code most likely to break when you change it, and CRAP makes that risk one sortable column: a function the size of a one-liner with full coverage scores low; a deeply branched function with no tests scores high. You point the tool at your source and a coverage report, and it ranks every function by how dangerous it is to touch.</p>
+<h2 id="the-formula"><a class="header" href="#the-formula">The formula</a></h2>
+<pre><code>CRAP(complexity, coverage) = complexity² × (1 − coverage)³ + complexity
+</code></pre>
+<p><code>coverage</code> is the fraction in <code>[0, 1]</code> (50% is <code>0.5</code>). At full coverage the score collapses to the bare complexity (<code>complexity² × 0 + complexity</code>); at zero coverage it is <code>complexity² + complexity</code>, the maximum penalty. The cubed uncovered term means missing coverage on complex code dominates fast. The full derivation, worked examples, and the unit distinction (the published formula takes a fraction; the implementation takes a percent) live in <a href="#understanding-the-crap-score">understanding CRAP</a>.</p>
+<h2 id="two-adapters-one-core"><a class="header" href="#two-adapters-one-core">Two adapters, one core</a></h2>
+<p>The metric is language-agnostic, so the workspace splits the universal math from the language-specific extraction:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Binary</th><th>Analyzes</th><th>Complexity source</th><th>Coverage format</th></tr>
+</thead>
+<tbody>
+<tr><td><code>crap4rs</code></td><td>Rust</td><td><code>syn</code> AST walk</td><td>LCOV (<code>lcov.info</code>)</td></tr>
+<tr><td><code>crap4ts</code></td><td>TypeScript / JavaScript</td><td><code>oxc</code> AST walk</td><td>Istanbul JSON (<code>coverage-final.json</code>)</td></tr>
+<tr><td><code>crap-core</code></td><td>— (shared library)</td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>crap-core</code> owns the CRAP formula, the analysis types, the reporters, and the wire envelope. Both adapters link it, so a Rust project and a TypeScript project get identical CRAP semantics — the same arithmetic, the same output shapes. The adapters differ only in how they parse source and read coverage.</p>
+<p><code>crap-core</code> also ships a <code>crap-render</code> binary that takes one or more pre-computed envelopes and renders a combined report. Cross-language scores are not directly comparable on their own axis; the combined view ranks functions by their CRAP-to-threshold ratio and risk band rather than raw score. See <a href="#multi-language-analysis">multi-language analysis</a>.</p>
+<h2 id="who-each-binary-is-for"><a class="header" href="#who-each-binary-is-for">Who each binary is for</a></h2>
+<ul>
+<li><strong><code>crap4rs</code></strong> — Rust authors who produce LCOV via <code>cargo-llvm-cov</code>.</li>
+<li><strong><code>crap4ts</code></strong> — TypeScript and JavaScript authors who produce Istanbul JSON via their test runner.</li>
+<li><strong><code>crap-render</code></strong> — anyone combining envelopes from more than one language into one report (a polyglot repo, a CI summary).</li>
+</ul>
+<p>The two adapters never need each other. Pick the one matching your language.</p>
+<h2 id="how-this-book-is-laid-out"><a class="header" href="#how-this-book-is-laid-out">How this book is laid out</a></h2>
+<ul>
+<li><a href="#installation">Installation</a> — get the binary onto your machine.</li>
+<li><a href="#quick-start">Quick start</a> — first analysis in a few commands.</li>
+<li><a href="#understanding-the-crap-score">Understanding CRAP</a> — the formula, risk bands, and the threshold gate.</li>
+<li><a href="#cli-reference">CLI reference</a> — every flag for the adapter binaries.</li>
+<li><a href="#configuration">Configuration</a> — the config file schema and precedence.</li>
+<li><a href="#output-formats">Output formats</a> — the table, JSON, HTML, and other reporters.</li>
+<li><a href="#ci-integration">CI integration</a> — the scorecard composite action and gating in pipelines.</li>
+<li><a href="#multi-language-analysis">Multi-language analysis</a> — <code>crap-render</code> and the combined view.</li>
+<li><a href="#limitations--faq">Limitations &amp; FAQ</a> — what CRAP measures, what it does not, and the honest edges.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
+<p>crap4rs analyzes Rust; crap4ts analyzes TypeScript and JavaScript. Both share the <code>crap-core</code> foundation, which also ships the <code>crap-render</code> binary used for multi-language reports. Pick the analyzer that matches your project, then install the matching coverage prerequisites below.</p>
+<h2 id="rust-analyzer--crap4rs"><a class="header" href="#rust-analyzer--crap4rs">Rust analyzer — crap4rs</a></h2>
+<p>Install from crates.io with a Rust toolchain present:</p>
+<pre><code class="language-bash">cargo install crap4rs
+</code></pre>
+<p>Prefer a prebuilt binary over a source build with <code>cargo binstall</code>. crap4rs ships <code>[package.metadata.binstall]</code>, so binstall resolves the matching release tarball and falls back to <code>cargo install</code> only when no prebuilt target exists:</p>
+<pre><code class="language-bash">cargo binstall crap4rs
+</code></pre>
+<p>The binary name is <code>crap4rs</code>.</p>
+<h2 id="typescript--javascript-analyzer--crap4ts"><a class="header" href="#typescript--javascript-analyzer--crap4ts">TypeScript / JavaScript analyzer — crap4ts</a></h2>
+<p>Install from npm:</p>
+<pre><code class="language-bash">npm install -g crap4ts
+</code></pre>
+<p>The npm package ships a native binding built with napi-rs for <code>linux</code> and <code>darwin</code> on <code>x64</code> and <code>arm64</code>; it requires Node 18 or later.</p>
+<blockquote>
+<p>The <code>crap4ts</code> CLI binary is not yet published to crates.io — only the npm package carries a working release. To run the CLI on a platform the npm package does not cover, install from source with a Rust toolchain:</p>
+<pre><code class="language-bash">cargo install crap4ts
+</code></pre>
+</blockquote>
+<p>The binary name is <code>crap4ts</code>.</p>
+<h2 id="multi-language-renderer--crap-render"><a class="header" href="#multi-language-renderer--crap-render">Multi-language renderer — crap-render</a></h2>
+<p><code>crap-render</code> composes per-language JSON envelopes into a combined report (HTML today). It ships inside <code>crap-core</code>:</p>
+<pre><code class="language-bash">cargo install crap-core      # installs the crap-render binary
+cargo binstall crap-core     # prebuilt, with cargo install fallback
+</code></pre>
+<p>You only need <code>crap-render</code> directly when combining Rust and TypeScript results by hand. See <a href="#multi-language-analysis">multi-language analysis</a> for its usage; in CI the <a href="#ci-integration">composite action</a> invokes it for you.</p>
+<h2 id="coverage-prerequisites"><a class="header" href="#coverage-prerequisites">Coverage prerequisites</a></h2>
+<p>crap4rs and crap4ts compute CRAP from your existing coverage data. Generate it with the tooling for your language before running an analysis.</p>
+<h3 id="rust--lcov"><a class="header" href="#rust--lcov">Rust — LCOV</a></h3>
+<p>crap4rs reads LCOV (<code>lcov.info</code>). Generate it with <a href="https://github.com/taiki-e/cargo-llvm-cov">cargo-llvm-cov</a>, which needs the <code>llvm-tools-preview</code> rustup component:</p>
+<pre><code class="language-bash">rustup component add llvm-tools-preview
+cargo install cargo-llvm-cov
+cargo llvm-cov --lcov --output-path lcov.info
+</code></pre>
+<h3 id="typescript--javascript--istanbul-json"><a class="header" href="#typescript--javascript--istanbul-json">TypeScript / JavaScript — Istanbul JSON</a></h3>
+<p>crap4ts reads Istanbul-format coverage (<code>coverage-final.json</code>). crap4ts consumes the istanbul provider’s JSON only — Vitest defaults to the v8 provider, whose JSON is a different shape the adapter does not read, so set the provider explicitly. Any Istanbul-compatible producer works — for example <a href="https://github.com/bcoe/c8">c8</a>, Vitest with the istanbul provider, or <code>nyc</code>. Configure your runner to emit the <code>json</code> reporter:</p>
+<pre><code class="language-bash">c8 --reporter=json npm test            # writes coverage/coverage-final.json
+vitest run --coverage --coverage.provider=istanbul --coverage.reporter=json
+</code></pre>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next steps</a></h2>
+<ul>
+<li><a href="#quick-start">Quick start</a> — run your first analysis.</li>
+<li><a href="#cli-reference">CLI reference</a> — every flag.</li>
+<li><a href="#ci-integration">CI integration</a> — the scorecard action and coverage setup on a runner.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="quick-start"><a class="header" href="#quick-start">Quick start</a></h1>
+<p>Two analyzers, one shared core: <code>crap4rs</code> scores Rust against LCOV coverage, <code>crap4ts</code> scores TypeScript/JavaScript against Istanbul JSON coverage. Each follows the same four steps — generate coverage, run the analyzer, read the table, gate. Install instructions live in <a href="#installation">installation.md</a>.</p>
+<p>The flow per adapter:</p>
+<ol>
+<li>Generate a coverage file from your test run.</li>
+<li>Point the analyzer at your source root and that coverage file.</li>
+<li>Read the ranked table on stdout.</li>
+<li>Re-run with <code>--strict</code> once you want CI to fail on the worst functions.</li>
+</ol>
+<h2 id="rust-end-to-end"><a class="header" href="#rust-end-to-end">Rust, end to end</a></h2>
+<pre><code class="language-bash"># 1. Generate LCOV coverage
+cargo llvm-cov --lcov --output-path lcov.info
+
+# 2. Run the analyzer (default complexity metric is cognitive)
+crap4rs --src src/ --coverage lcov.info
+
+# 3. Read the ranked table on stdout (printed above)
+
+# 4. Gate: fail (exit 1) on any function above the strict cutoff
+crap4rs --src src/ --coverage lcov.info --strict
+</code></pre>
+<p><code>--coverage</code> is required on the analysis path; <code>--src</code> defaults to <code>src</code> when omitted. The default metric for <code>crap4rs</code> is cognitive — <code>match</code>-heavy Rust inflates cyclomatic counts without adding real risk. Pass <code>--metric cyclomatic</code> to switch.</p>
+<h2 id="typescriptjavascript-end-to-end"><a class="header" href="#typescriptjavascript-end-to-end">TypeScript/JavaScript, end to end</a></h2>
+<pre><code class="language-bash"># 1. Generate Istanbul JSON coverage (must be the istanbul provider,
+#    not v8 — see installation.md)
+npm test -- --coverage
+
+# 2. Run the analyzer (crap4ts is cyclomatic-only)
+crap4ts --src src/ --coverage coverage-final.json --exclude '*.test.ts'
+
+# 3. Read the ranked table on stdout (printed above)
+
+# 4. Gate on the strict cutoff
+crap4ts --src src/ --coverage coverage-final.json --exclude '*.test.ts' --strict
+</code></pre>
+<p><code>crap4ts</code> measures cyclomatic complexity only. Coverage comes from the Istanbul JSON shape (<code>coverage-final.json</code>); the v8 provider’s JSON is a different shape the adapter does not consume.</p>
+<h2 id="reading-the-table"><a class="header" href="#reading-the-table">Reading the table</a></h2>
+<p>The default <code>table</code> output ranks functions by CRAP score, worst first. Each row carries the function’s location, complexity, line coverage percent, CRAP score, and its risk band. The score fuses complexity with the fraction of lines covered:</p>
+<pre><code>CRAP = complexity² × (1 − coverage)³ + complexity
+</code></pre>
+<p>The math, the units, and the risk bands are covered in <a href="#understanding-the-crap-score">understanding-crap.md</a>; every output format (JSON, Markdown, SARIF, HTML, and the rest) appears in <a href="#output-formats">output-formats.md</a>.</p>
+<h2 id="gating-with---strict"><a class="header" href="#gating-with---strict">Gating with <code>--strict</code></a></h2>
+<p>Without a threshold flag, the gate fires at CRAP 15. <code>--strict</code> lowers it to 8, <code>--lenient</code> raises it to 25:</p>
+<pre><code class="language-bash">crap4rs --src src/ --coverage lcov.info --strict
+</code></pre>
+<p>When any function exceeds the active cutoff, the process exits <code>1</code> — wire that into CI to block the merge. The preset cutoffs, the calibration caveat, and how the threshold gate differs from the score-based risk band are covered in <a href="#understanding-the-crap-score">understanding-crap.md</a>. The full flag surface is in <a href="#cli-reference">cli-reference.md</a>; CI wiring is in <a href="#ci-integration">ci-integration.md</a>.</p>
+<h2 id="clone-and-try"><a class="header" href="#clone-and-try">Clone and try</a></h2>
+<p>The repo ships a pedagogical sample at <code>crates/crap-examples/</code>: four Rust modules under <code>src/</code> and four matching TypeScript modules under <code>ts/</code>, picked so a single analysis spans every risk band. Committed coverage fixtures (<code>lcov.info</code>, <code>coverage-final.json</code>) let you run both adapters without generating coverage first.</p>
+<pre><code class="language-bash">git clone https://github.com/breezy-bays-labs/crap-rs.git
+cd crap-rs
+
+# Rust — paths in lcov.info are relative to --src
+crap4rs --src ./crates/crap-examples/src \
+  --coverage crates/crap-examples/lcov.info
+
+# TypeScript
+crap4ts --src ./crates/crap-examples/ts \
+  --coverage crates/crap-examples/coverage-final.json \
+  --exclude '*.test.ts'
+</code></pre>
+<p>The four modules together land in the Low, Acceptable, Moderate, and High bands on a fresh run. Per-language complexity counts differ between the adapters (cognitive for Rust, cyclomatic for TS), so the absolute scores differ — what holds constant is the cross-module ranking and the four-band spread. The corpus, the per-module intent, and the recipe for regenerating the fixtures are documented in <code>crates/crap-examples/README.md</code>. Analyzing more than one Rust crate at once with multiple <code>--src</code> roots is covered in <a href="#multi-language-analysis">multi-language.md</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="understanding-the-crap-score"><a class="header" href="#understanding-the-crap-score">Understanding the CRAP score</a></h1>
+<p>CRAP (Change Risk Anti-Patterns) scores a single function by combining its complexity with its test coverage. High complexity is tolerable when coverage is high; the same complexity with no coverage is dangerous to change. CRAP makes that tradeoff a number.</p>
+<h2 id="the-formula-1"><a class="header" href="#the-formula-1">The formula</a></h2>
+<pre><code>CRAP(c, cov) = c² × (1 − cov)³ + c
+</code></pre>
+<ul>
+<li><code>c</code> is the function’s complexity (cognitive or cyclomatic — see below). Always an integer ≥ 1.</li>
+<li><code>cov</code> is the line-coverage <strong>fraction</strong> in <code>[0, 1]</code> in this published form.</li>
+</ul>
+<p>Internally <code>compute_crap</code> takes coverage as a <strong>percent</strong> in <code>[0, 100]</code>, clamps it to that range, then divides by 100 before applying the cube. Keep the units straight: the formula above uses a fraction; the implementation signature uses a percent. Coverage outside the range is clamped (150% scores as 100%, −10% scores as 0%), never rejected. The result is rounded to two decimal places.</p>
+<h2 id="two-identities"><a class="header" href="#two-identities">Two identities</a></h2>
+<p>The cube term is what makes coverage dominate. Two endpoints fall out directly:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Coverage</th><th>Score</th><th>Why</th></tr>
+</thead>
+<tbody>
+<tr><td>100%</td><td><code>c</code></td><td><code>(1 − 1)³ = 0</code>, so only the trailing <code>+ c</code> survives. A fully covered function scores its raw complexity.</td></tr>
+<tr><td>0%</td><td><code>c² + c</code></td><td><code>(1 − 0)³ = 1</code>, so the full <code>c²</code> term is added. An untested function’s score grows quadratically with complexity.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The score is always ≥ 1, monotonically increases with complexity, and monotonically decreases with coverage.</p>
+<h2 id="worked-values"><a class="header" href="#worked-values">Worked values</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Complexity</th><th>Coverage</th><th>CRAP</th><th>Calculation</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>100%</td><td>1.00</td><td><code>1 × 0 + 1</code></td></tr>
+<tr><td>1</td><td>0%</td><td>2.00</td><td><code>1 × 1 + 1</code></td></tr>
+<tr><td>10</td><td>100%</td><td>10.00</td><td><code>100 × 0 + 10</code></td></tr>
+<tr><td>10</td><td>0%</td><td>110.00</td><td><code>100 × 1 + 10</code></td></tr>
+<tr><td>5</td><td>50%</td><td>8.13</td><td><code>25 × 0.5³ + 5 = 25 × 0.125 + 5</code></td></tr>
+<tr><td>15</td><td>90%</td><td>15.23</td><td><code>225 × 0.1³ + 15 = 225 × 0.001 + 15</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The 5@50% case shows the leverage of coverage: halving the tested lines on a complexity-5 function adds only ~3 to the score, but the same function untested would score 30.</p>
+<h2 id="cognitive-vs-cyclomatic-complexity"><a class="header" href="#cognitive-vs-cyclomatic-complexity">Cognitive vs cyclomatic complexity</a></h2>
+<p>CRAP is agnostic to which complexity metric feeds it — the formula is identical. crap4rs supports both:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Metric</th><th>Counts</th><th>Default</th></tr>
+</thead>
+<tbody>
+<tr><td>Cognitive</td><td>Nesting depth + structural complexity. Each construct adds <code>1 + nesting_depth</code>.</td><td>crap4rs default</td></tr>
+<tr><td>Cyclomatic</td><td>Decision points (branches). Each construct adds 1, flat.</td><td>Classic CRAP metric</td></tr>
+</tbody>
+</table>
+</div>
+<p>Cognitive is the crap4rs default because it suits match-heavy Rust. A flat <code>match</code> with N arms is one decision a reader processes at once, not N independent branches: cognitive scores it as <strong>1</strong>, cyclomatic as <strong>N</strong>. Nesting <code>match</code> inside a loop inside an <code>if</code> is what cognitive penalizes — and that is what actually makes Rust hard to change. crap4ts (the TypeScript adapter) is cyclomatic-only.</p>
+<p>Because the two metrics produce different-magnitude scores for the same code, never compare a cognitive CRAP score against a cyclomatic one as if they were the same scale.</p>
+<h2 id="what-coverage-means"><a class="header" href="#what-coverage-means">What coverage means</a></h2>
+<p>Coverage is <strong>line coverage</strong>, measured by a positional heuristic — not by function name. The complexity walker emits each function as a <code>(file, start_line, end_line)</code> span; the LCOV parser emits <code>(file, line, hits)</code> records. A function’s coverage is the fraction of instrumented lines that fall <strong>within its span</strong> (inclusive on both ends) and were hit at least once.</p>
+<p>This is positional matching, not name matching. There is no symbol demangling and no <code>FN</code>/<code>FNDA</code> parsing. A function whose span contains no instrumented lines is treated as 100% covered (nothing to miss). Coverage is computed strictly per file — lines in one file never count toward a function in another.</p>
+<p>Branch coverage, when present, is collected the same way (branch points within the span) and surfaced informationally. The CRAP gate is <strong>line-only</strong>; branch coverage never feeds the score.</p>
+<p>For where the spans and coverage records come from, see <a href="#introduction">introduction</a>. For coverage-file generation, see <a href="#quick-start">quick start</a>.</p>
+<h2 id="risk-bands"><a class="header" href="#risk-bands">Risk bands</a></h2>
+<p>Every score is classified into one of four bands by <code>classify_risk</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Band</th><th>Score range</th></tr>
+</thead>
+<tbody>
+<tr><td>Low</td><td>≤ 8</td></tr>
+<tr><td>Acceptable</td><td>≤ 15</td></tr>
+<tr><td>Moderate</td><td>≤ 25</td></tr>
+<tr><td>High</td><td>&gt; 25</td></tr>
+</tbody>
+</table>
+</div>
+<p>The bands are score-based, fixed, and metric-agnostic. They describe a function’s intrinsic risk regardless of any threshold you set.</p>
+<h2 id="bands-and-the-gate-are-two-separate-axes"><a class="header" href="#bands-and-the-gate-are-two-separate-axes">Bands and the gate are two separate axes</a></h2>
+<p>The cutoffs 8 / 15 / 25 appear twice in this tool, and they mean different things:</p>
+<ul>
+<li><strong>Risk bands</strong> (Low / Acceptable / Moderate / High) are a <em>classification</em>, derived purely from the score via <code>classify_risk</code>. They never change.</li>
+<li><strong>The threshold gate</strong> is a <em>pass/fail line</em>. A function “exceeds” when its score is above the active threshold. The default gate is 15; the strict preset is 8 and the lenient preset is 25.</li>
+</ul>
+<p>These two axes share the numbers 8 / 15 / 25 today by calibration convention — the presets are set at the band boundaries — but they are conceptually independent. A function can sit in the Moderate band (score 20) and still pass a lenient gate (threshold 25). Never read “risk level: Moderate” as “exceeds threshold,” or vice versa. The thresholds themselves are a calibration convention, not empirically derived values.</p>
+<p>For how to set the gate, see <a href="#cli-reference">CLI reference</a> and <a href="#configuration">configuration</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="cli-reference"><a class="header" href="#cli-reference">CLI reference</a></h1>
+<p><code>crap4rs</code> (Rust) and <code>crap4ts</code> (TypeScript) share one flag surface. crap-core drives both binaries; each binary supplies only its language metadata, default complexity metric, and help examples. Every flag below works identically on both unless noted.</p>
+<p>Run a binary’s own <code>--help</code> for the live, version-stamped surface. This chapter is the durable reference.</p>
+<pre><code class="language-bash">crap4rs --coverage lcov.info
+crap4ts --coverage coverage-final.json
+</code></pre>
+<p><code>--coverage</code> is required for analysis (see <a href="#input">Input</a>). For the file formats themselves, see <a href="#output-formats">output formats</a>; for the CRAP math, <a href="#understanding-the-crap-score">understanding CRAP</a>; for config-file keys, <a href="#configuration">configuration</a>.</p>
+<h2 id="subcommands"><a class="header" href="#subcommands">Subcommands</a></h2>
+<p>When a subcommand is present, the analysis path is skipped and <code>--coverage</code> is not required.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Subcommand</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>completions &lt;SHELL&gt;</code></td><td>Print a shell completion script to stdout. <code>&lt;SHELL&gt;</code> is one of <code>bash</code>, <code>zsh</code>, <code>fish</code>, <code>powershell</code>, <code>elvish</code>, <code>nushell</code>.</td></tr>
+<tr><td><code>init</code></td><td>Write an exhaustive, annotated starter config to the canonical config file name in the current directory. Refuses to overwrite an existing file unless <code>--force</code> is passed.</td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-bash">crap4rs completions zsh &gt; _crap4rs
+crap4rs init            # writes crap.toml (annotated; every key documented)
+crap4rs init --force    # overwrite an existing config
+</code></pre>
+<p><code>init</code> writes the same deterministic document regardless of flags. <code>--non-interactive</code> is accepted for back-compat but no longer changes the output. The generated config documents every supported key; trim it to what you use. Key reference: <a href="#configuration">configuration</a>.</p>
+<h2 id="input"><a class="header" href="#input">Input</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Value</th><th>Default</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--coverage</code></td><td><code>FILE</code></td><td>—</td><td>Coverage file in the adapter’s format (<code>lcov.info</code> for Rust, <code>coverage-final.json</code> for TS). Required at runtime for analysis; clap does not mark it required so subcommands work without it.</td></tr>
+<tr><td><code>--src</code></td><td><code>DIR</code></td><td><code>src</code></td><td>Source root to analyze. <strong>Repeatable</strong> — pass more than once to union several roots into one report against the shared <code>--coverage</code>. Falls back to the config <code>src</code> list, then <code>src</code>.</td></tr>
+<tr><td><code>--metric</code></td><td><code>cognitive</code> | <code>cyclomatic</code></td><td>per-adapter</td><td>See below.</td></tr>
+<tr><td><code>--missing-coverage-policy</code></td><td><code>pessimistic</code> | <code>optimistic</code> | <code>skip</code></td><td><code>pessimistic</code></td><td>How to score a function whose source file is absent from the coverage data. The pessimistic default scores such functions as 0% covered (<code>CRAP = c² + c</code>) — a deliberate choice that never hides risk, not a measured truth.</td></tr>
+<tr><td><code>--config</code></td><td><code>FILE</code></td><td>auto-discover</td><td>Path to the config TOML. Default discovers the adapter’s config file in the working directory. See <a href="#configuration">configuration</a>.</td></tr>
+<tr><td><code>--view</code></td><td><code>NAME</code></td><td>—</td><td>Apply a saved view preset from the config TOML. CLI flags override the preset’s fields. See <a href="#configuration">configuration</a>.</td></tr>
+<tr><td><code>--baseline</code></td><td><code>FILE</code></td><td>—</td><td>A previously emitted JSON envelope, used as the baseline for delta analysis. Delta is informational unless <code>--delta-gate</code> is set.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="--metric-default-differs-per-adapter"><a class="header" href="#--metric-default-differs-per-adapter"><code>--metric</code> default differs per adapter</a></h3>
+<p><code>crap4rs</code> defaults to <strong>cognitive</strong> complexity (it captures match arms and nested control flow better for Rust) and also accepts <code>--metric cyclomatic</code>.</p>
+<p><code>crap4ts</code> is <strong>cyclomatic-only</strong>. It defaults to cyclomatic; passing <code>--metric cognitive</code> exits 2 with an “is not yet supported” error.</p>
+<p>The complexity metric and the CRAP threshold both differ in magnitude between metrics; the threshold defaults are calibrated per metric.</p>
+<h2 id="output"><a class="header" href="#output">Output</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Value</th><th>Default</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--format</code> / <code>-f</code></td><td>spec list</td><td><code>table</code></td><td>Comma-separated list of <code>FORMAT</code> (stdout) or <code>FORMAT:FILE</code> (write to file). One analysis pass fans out to multiple sinks. At most one stdout entry. Formats and samples: <a href="#output-formats">output formats</a>.</td></tr>
+<tr><td><code>--threshold</code></td><td><code>FLOAT</code></td><td><code>15</code></td><td>CRAP cutoff — functions above it fail the gate. Defaults to the calibrated cutoff for the active metric. Mutually exclusive with <code>--strict</code> / <code>--lenient</code>.</td></tr>
+<tr><td><code>--strict</code></td><td>flag</td><td>—</td><td>Strict preset cutoff (<code>8</code>). Mutually exclusive with <code>--threshold</code> / <code>--lenient</code>.</td></tr>
+<tr><td><code>--lenient</code></td><td>flag</td><td>—</td><td>Lenient preset cutoff (<code>25</code>). Mutually exclusive with <code>--threshold</code> / <code>--strict</code>.</td></tr>
+<tr><td><code>--no-fail</code></td><td>flag</td><td>off</td><td>Always exit 0, even with violations. See <a href="#exit-codes">exit codes</a>.</td></tr>
+<tr><td><code>--delta-gate</code></td><td>flag</td><td>off</td><td>Fail (exit 1) when the <code>--baseline</code> comparison introduces new violations. Requires <code>--baseline</code>.</td></tr>
+<tr><td><code>--threshold-epsilon</code></td><td><code>EPS</code></td><td><code>0.0</code></td><td>Border-jitter suppression band for the delta gate. Requires <code>--baseline</code>. Finite, non-negative.</td></tr>
+<tr><td><code>--minimal-view</code></td><td>flag</td><td>off</td><td>Omit the denormalized <code>view.shown</code> row array from JSON. The gate is unaffected. JSON only.</td></tr>
+<tr><td><code>--summary</code></td><td>flag</td><td>off</td><td>Emit a single-line verdict instead of the full report. Short-circuits <code>--format</code>.</td></tr>
+<tr><td><code>--annotation-limit</code></td><td><code>N</code> (1–100)</td><td><code>10</code></td><td>Cap on <code>::warning</code> annotations emitted by <code>--format github-annotations</code>. Ignored by every other format.</td></tr>
+</tbody>
+</table>
+</div>
+<p>There is <strong>no <code>--threshold-preset</code> flag</strong> on the binary. Choose a preset with <code>--strict</code> / <code>--lenient</code>, or set <code>preset</code> in the config TOML (<a href="#configuration">configuration</a>). The composite action exposes a separate <code>threshold-preset</code> input (<a href="#ci-integration">CI integration</a>).</p>
+<h3 id="threshold-gate-vs-risk-bands"><a class="header" href="#threshold-gate-vs-risk-bands">Threshold gate vs risk bands</a></h3>
+<p>The threshold gate (<code>--threshold</code> / <code>--strict</code> / <code>--lenient</code>) decides exit code and the per-function <code>exceeds</code> flag, whereas the score-based risk bands are a separate axis used for display and ranking; <a href="#understanding-the-crap-score">understanding CRAP</a> covers how the two differ and why the <code>8 / 15 / 25</code> cutoffs are a calibration convention.</p>
+<h2 id="filtering"><a class="header" href="#filtering">Filtering</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Value</th><th>Default</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--exclude</code></td><td>glob</td><td>—</td><td>Glob to exclude from analysis. Repeatable. <code>target/</code> (Rust) and similar build output are excluded via <code>.gitignore</code>; test files are <strong>not</strong> excluded by default.</td></tr>
+<tr><td><code>--no-gitignore</code></td><td>flag</td><td>off</td><td>Analyze all files regardless of <code>.gitignore</code>.</td></tr>
+<tr><td><code>--diff</code></td><td><code>REF</code></td><td>—</td><td>Only analyze functions in files changed since the given git ref.</td></tr>
+<tr><td><code>--only-failing</code></td><td>flag</td><td>off</td><td>Display only functions above threshold. <strong>Display-only</strong> — see below.</td></tr>
+<tr><td><code>--min-coverage</code></td><td><code>PCT</code></td><td>—</td><td>Lower bound (inclusive) on coverage percent for the displayed view. Display-only.</td></tr>
+<tr><td><code>--max-coverage</code></td><td><code>PCT</code></td><td>—</td><td>Upper bound (inclusive) on coverage percent for the displayed view. Display-only.</td></tr>
+<tr><td><code>--sort-by</code></td><td><code>crap</code> | <code>coverage</code> | <code>complexity</code> | <code>path</code></td><td><code>crap</code></td><td>Sort key for the displayed view. Display-only.</td></tr>
+<tr><td><code>--top</code></td><td><code>N</code></td><td>no limit</td><td>Truncate the displayed view to the top N rows (<code>0</code> = no limit). Display-only.</td></tr>
+<tr><td><code>--group-by</code></td><td><code>file</code></td><td>—</td><td>Aggregate the displayed view by file. <code>--top</code> then truncates files, not functions. Display-only.</td></tr>
+<tr><td><code>--delta-top</code></td><td><code>N</code></td><td>no limit</td><td>Truncate the delta block (independent of <code>--top</code>).</td></tr>
+<tr><td><code>--delta-sort</code></td><td><code>score-delta</code> | <code>current-crap</code> | <code>baseline-crap</code> | <code>path</code></td><td><code>score-delta</code></td><td>Sort key for the delta block.</td></tr>
+<tr><td><code>--delta-only</code></td><td>kinds</td><td>all</td><td>Comma-separated <code>added</code>, <code>removed</code>, <code>modified</code> for the delta block.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="display-only-flags-never-move-the-gate"><a class="header" href="#display-only-flags-never-move-the-gate">Display-only flags never move the gate</a></h3>
+<p><code>--top</code>, <code>--sort-by</code>, <code>--only-failing</code>, <code>--min-coverage</code>, <code>--max-coverage</code>, and <code>--group-by</code> shape what the report <em>shows</em>. They never alter the analysis that drives the exit code. <code>result.passed</code> in JSON output, every aggregate (<code>average_crap</code>, <code>median_crap</code>, <code>distribution</code>), and the exit code always reflect the <strong>full, unfiltered</strong> codebase. Truncating violations out of the view with <code>--top 5</code> does not make a failing run pass.</p>
+<p>When you need the gate to see a narrower set, narrow the <em>analysis</em> input instead — scope <code>--src</code>, <code>--exclude</code>, or <code>--diff</code>.</p>
+<h2 id="display"><a class="header" href="#display">Display</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Value</th><th>Default</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--color</code></td><td><code>auto</code> | <code>always</code> | <code>never</code></td><td><code>auto</code></td><td>Terminal color. <code>auto</code> colorizes only when writing to a TTY.</td></tr>
+<tr><td><code>--verbose</code> / <code>-v</code></td><td>flag</td><td>off</td><td>Show parse diagnostics and matching statistics.</td></tr>
+<tr><td><code>--quiet</code> / <code>-q</code></td><td>flag</td><td>off</td><td>Suppress report output; set exit code only. Wins over <code>--summary</code>.</td></tr>
+<tr><td><code>--breakdown</code></td><td>flag</td><td>off</td><td>Show complexity contributors for above-threshold functions in table output. JSON always includes contributors.</td></tr>
+<tr><td><code>--explain</code></td><td>flag</td><td>off</td><td>Explain nested breakdown increments. Table only, and only with <code>--breakdown</code>.</td></tr>
+<tr><td><code>--md-full-table</code></td><td>flag</td><td>off</td><td>Append the full per-function table to <code>--format markdown</code>. Markdown only.</td></tr>
+<tr><td><code>--md-top</code></td><td><code>N</code></td><td><code>10</code></td><td>Rows in the markdown top-N table. Markdown only.</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="exit-codes"><a class="header" href="#exit-codes">Exit codes</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0</code></td><td>Analysis passed — no function exceeds the threshold. Also returned by <code>init</code> and <code>completions</code>, and by any run with <code>--no-fail</code>.</td></tr>
+<tr><td><code>1</code></td><td>At least one function exceeds the threshold (or, with <code>--delta-gate</code>, the baseline comparison introduced new violations).</td></tr>
+<tr><td><code>2</code></td><td>The run errored — missing <code>--coverage</code>, an unreadable file, an unsupported <code>--metric</code>, or any other failure.</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>--no-fail</code> overrides the exit-code translation only: a failing analysis exits <code>0</code>, but <code>result.passed</code> (and <code>delta.summary.passed</code> under <code>--delta-gate</code>) still reports the truthful state, so a consumer can detect a would-have-failed run from the JSON. Compose <code>--no-fail</code> with <code>--quiet</code> for silent success in CI.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="configuration"><a class="header" href="#configuration">Configuration</a></h1>
+<p>A <code>crap.toml</code> file records the options you would otherwise pass on every run. Config values are merged with CLI flags at load time; flags always win. For the flags themselves, see the <a href="#cli-reference">CLI reference</a>. For the CRAP math the thresholds gate against, see <a href="#understanding-the-crap-score">understanding CRAP</a>.</p>
+<h2 id="discovery-and---config"><a class="header" href="#discovery-and---config">Discovery and <code>--config</code></a></h2>
+<p>Without <code>--config</code>, the analyzer walks upward from its anchor directory looking for a config file. The anchor is the first <code>--src</code> root, or the working directory when <code>--src</code> is unset. Within each directory it resolves the candidate names in priority order; the <strong>nearest ancestor directory that holds any candidate wins</strong>, and the walk stops there.</p>
+<pre><code class="language-text">.
+├── crap.toml          # discovered from any subdirectory at or below here
+└── crates/
+    └── core/src/      # a run anchored here climbs to ./crap.toml
+</code></pre>
+<p>The walk has no <code>.git</code> or workspace boundary — it climbs to the filesystem root. A stray <code>crap.toml</code> in a parent of your project (or in <code>$HOME</code>) is discovered when no nearer file exists. Pass <code>--config &lt;path&gt;</code> to bypass discovery entirely and load exactly that file; the tool has no opinion on what you name it, so no deprecation or shadow notice fires for an explicit path.</p>
+<p>Discovery is by <strong>existence, not parseability</strong>. A present-but-malformed canonical file still wins and surfaces its parse error — it never silently falls through to an older file that happens to parse. Only a <code>NotFound</code> advances to the next candidate; any other I/O error (a <code>PermissionDenied</code> on a higher-priority file) stops the search and reports the path.</p>
+<h3 id="legacy-names-and-shadow-warnings"><a class="header" href="#legacy-names-and-shadow-warnings">Legacy names and shadow warnings</a></h3>
+<p>The canonical name is <code>crap.toml</code>. Each adapter also honors one legacy fallback for back-compat: <code>crap4rs.toml</code> (crap4rs) and <code>crap4ts.toml</code> (crap4ts). Discovering a legacy name emits a rename nudge:</p>
+<pre><code class="language-text">warning: using deprecated config name `crap4rs.toml`; rename it to `crap.toml`
+</code></pre>
+<p>When a lower-priority candidate also exists <strong>in the winning directory</strong>, it is reported as safe to remove:</p>
+<pre><code class="language-text">warning: `crap4rs.toml` is shadowed by `crap.toml` and ignored; it is safe to remove
+</code></pre>
+<p>Shadow detection is same-directory only — a file in a parent directory is never called redundant.</p>
+<h2 id="merge-precedence"><a class="header" href="#merge-precedence">Merge precedence</a></h2>
+<p>Each option resolves on a first-match-wins chain: <strong>CLI flag → per-language section → top-level config key → default</strong>. A bare CLI default (a flag the user did not set) does not count as “set” and defers to config. <code>--src</code> is the exception: a non-empty <code>--src</code> replaces the config <code>src</code> list wholesale, an empty <code>--src</code> defers to config, and an unset config defers to the <code>["src"]</code> default. <code>--src</code> has no per-language override.</p>
+<p>Threshold resolution is more specific — a literal cutoff always beats a named preset at the same level:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Order</th><th>Source</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><code>--threshold N</code> (CLI literal)</td></tr>
+<tr><td>2</td><td><code>--strict</code> / <code>--lenient</code> (CLI preset)</td></tr>
+<tr><td>3</td><td><code>[language.&lt;name&gt;]</code> <code>threshold</code></td></tr>
+<tr><td>4</td><td><code>[language.&lt;name&gt;]</code> <code>preset</code></td></tr>
+<tr><td>5</td><td>top-level <code>threshold</code></td></tr>
+<tr><td>6</td><td>top-level <code>preset</code></td></tr>
+<tr><td>7</td><td>no-flag default (the <code>default</code> preset, <strong>15</strong>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>The presets are flat across both metrics today: <code>strict = 8</code>, <code>default = 15</code>, <code>lenient = 25</code>. This is a calibration convention, not an empirically derived constant.</p>
+<h2 id="reference"><a class="header" href="#reference">Reference</a></h2>
+<p><code>crap.toml</code> deserializes with <code>deny_unknown_fields</code>: an unrecognized or misspelled key fails the run at load time rather than being silently ignored. Every key is optional — an absent key defers to the merge chain above.</p>
+<h3 id="top-level-keys"><a class="header" href="#top-level-keys">Top-level keys</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Type</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>threshold</code></td><td>float</td><td>Custom numeric CRAP cutoff. Mutually exclusive with <code>preset</code>.</td></tr>
+<tr><td><code>preset</code></td><td><code>"strict"</code> | <code>"default"</code> | <code>"lenient"</code></td><td>Named threshold preset. Mutually exclusive with <code>threshold</code>.</td></tr>
+<tr><td><code>metric</code></td><td><code>"cognitive"</code> | <code>"cyclomatic"</code></td><td>Complexity metric. The Rust adapter defaults to <code>cognitive</code>; crap4ts is <code>cyclomatic</code>-only. See the note on per-language placement below.</td></tr>
+<tr><td><code>missing_coverage_policy</code></td><td><code>"pessimistic"</code> | <code>"optimistic"</code> | <code>"skip"</code></td><td>How to score a function whose source file is entirely absent from coverage. The default, <code>pessimistic</code> (0% covered → <code>c²+c</code>), is a deliberate choice, not ground truth. <code>optimistic</code> treats it as 100% covered; <code>skip</code> omits it from the report.</td></tr>
+<tr><td><code>src</code></td><td>string | array of strings</td><td>Source root(s) to walk. A single root stays src-relative (byte-identical to the long-standing <code>src = "string"</code> form); multiple roots are keyed git-toplevel-relative and require a git work tree.</td></tr>
+<tr><td><code>exclude</code></td><td>array of strings</td><td>Glob patterns matched against project-relative file paths; matching files are dropped from analysis. Each exclusion should carry a tracking issue or ADR.</td></tr>
+<tr><td><code>overrides</code></td><td>array of tables</td><td>Per-path threshold overrides. See <a href="#overrides"><code>[[overrides]]</code></a>.</td></tr>
+<tr><td><code>views</code></td><td>table of tables</td><td>Saved view presets. See <a href="#viewsname"><code>[views.&lt;name&gt;]</code></a>.</td></tr>
+<tr><td><code>language</code></td><td>table of tables</td><td>Per-language overrides. See <a href="#languagename"><code>[language.&lt;name&gt;]</code></a>.</td></tr>
+<tr><td><code>output</code></td><td>table</td><td>Reporter knobs. See <a href="#output-1"><code>[output]</code></a>.</td></tr>
+<tr><td><code>delta</code></td><td>table</td><td>Delta-gate knobs. See <a href="#delta"><code>[delta]</code></a>.</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>threshold</code> and <code>preset</code> are mutually exclusive — a config that sets both is rejected. This carve-out applies at the top level and recursively inside each <code>[language.&lt;name&gt;]</code> section.</p>
+<h3 id="overrides"><a class="header" href="#overrides"><code>[[overrides]]</code></a></h3>
+<p>An array of tables, each applying a CRAP cutoff to files matching a glob:</p>
+<pre><code class="language-toml">[[overrides]]
+pattern = "src/domain/**"   # glob matched against project-relative paths
+threshold = 8.0             # finite, positive
+</code></pre>
+<h3 id="viewsname"><a class="header" href="#viewsname"><code>[views.&lt;name&gt;]</code></a></h3>
+<p>A reusable bundle of report-shaping flags, selected at runtime via <code>--view &lt;name&gt;</code>. Folding a preset into the run is OR-merge: a CLI bool of <code>false</code> reads as “unset” and a preset’s <code>true</code> still applies.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Type</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>top</code></td><td>int</td><td>Limit to the N highest-CRAP functions.</td></tr>
+<tr><td><code>min_coverage</code></td><td>float</td><td>Keep functions with coverage at or above this percent.</td></tr>
+<tr><td><code>max_coverage</code></td><td>float</td><td>Keep functions with coverage at or below this percent.</td></tr>
+<tr><td><code>sort</code></td><td><code>"crap"</code> | <code>"coverage"</code> | <code>"complexity"</code> | <code>"path"</code></td><td>Sort key.</td></tr>
+<tr><td><code>only_failing</code></td><td>bool</td><td>Show only functions that exceed their threshold.</td></tr>
+<tr><td><code>no_fail</code></td><td>bool</td><td>Report without failing the process on breaches.</td></tr>
+<tr><td><code>group_by</code></td><td><code>"file"</code></td><td>Group rows by file.</td></tr>
+<tr><td><code>minimal_view</code></td><td>bool</td><td>Render the compact view.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Coverage bounds are validated at load time: each must be in <code>[0, 100]</code>, and <code>min_coverage</code> must not exceed <code>max_coverage</code>.</p>
+<h3 id="languagename"><a class="header" href="#languagename"><code>[language.&lt;name&gt;]</code></a></h3>
+<p>Per-language override sections keyed by language name (<code>[language.rust]</code>, <code>[language.typescript]</code>). Each adapter reads <strong>only its own section</strong> and overlays a set value over the shared top-level default; languages the running adapter does not recognize are never selected. A section may assert any subset of <code>threshold</code>, <code>preset</code>, <code>metric</code>, and <code>exclude</code>.</p>
+<p><code>metric</code> lives here, not only at the top level — a per-language <code>metric</code> is the idiomatic place to set it for a multi-language project, since it sits above the top-level <code>metric</code> in the merge chain. The same <code>threshold</code>/<code>preset</code> mutual exclusion applies within each section.</p>
+<pre><code class="language-toml">metric = "cognitive"        # shared default
+
+[language.rust]
+threshold = 8.0             # crap4rs gates Rust at 8
+metric = "cognitive"
+
+[language.typescript]
+threshold = 15.0            # crap4ts gates TS at 15
+</code></pre>
+<h3 id="output-1"><a class="header" href="#output-1"><code>[output]</code></a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Type</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>annotation_limit</code></td><td>int <code>1..=100</code></td><td>Cap on <code>::warning</code> annotations emitted by the <code>github-annotations</code> reporter per run. Matches the <code>--annotation-limit</code> range.</td></tr>
+<tr><td><code>title</code></td><td>string</td><td>Scorecard header label. Absent renders the unlabeled header.</td></tr>
+<tr><td><code>subtitle</code></td><td>string</td><td>Line rendered beneath the title.</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="delta"><a class="header" href="#delta"><code>[delta]</code></a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Type</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>epsilon</code></td><td>float <code>&gt;= 0.0</code></td><td>Threshold-border jitter half-width (absolute CRAP points) for <code>--delta-gate</code>. A new violation crossing the threshold but staying within <code>epsilon</code> of it — on both the baseline and current side — is treated as border jitter and not counted. Default <code>0.0</code> disables suppression. This is a jitter knob, not a noise-only guarantee: a genuinely new in-band violation is suppressed too.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The <code>threshold</code>-vs-<code>preset</code> exclusivity, the <code>annotation_limit</code> range, and the <code>epsilon</code> finiteness are all enforced at load time so config and CLI agree on the legal values.</p>
+<h2 id="generated-artifacts-and-editor-wiring"><a class="header" href="#generated-artifacts-and-editor-wiring">Generated artifacts and editor wiring</a></h2>
+<p><code>crap4rs init</code> (and <code>crap4ts init</code>) writes an exhaustive annotated <code>crap.toml</code> — every supported key, with each key’s documentation as an inline comment. The committed <code>crap.example.toml</code> at the repo root is the same generator output, byte for byte. <code>init</code> refuses to overwrite an existing file; pass <code>--force</code> to regenerate.</p>
+<p>Because the file documents every option, the live config you keep is a trimmed subset. The example shows <code>threshold</code> live with <code>preset</code> commented out as the mutually-exclusive alternative — uncomment one and delete the other.</p>
+<p>The committed <code>crap.schema.json</code> is the JSON Schema for <code>crap.toml</code>, generated from the same field documentation that drives the annotated example and the docs.rs hovers. Point your editor at it for completion and validation:</p>
+<pre><code class="language-toml">#:schema ./crap.schema.json
+</code></pre>
+<p>The schema and the example share one prose source, so there is no second hand-authored description to drift.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="output-formats"><a class="header" href="#output-formats">Output formats</a></h1>
+<p><code>--format SPEC</code> selects what the analysis pass emits. One pass, many shapes: the analyzer walks the source and joins coverage once, then renders the result through every requested reporter. The flag mechanics (parsing, defaults, fan-out grammar) live in the <a href="#cli-reference">CLI reference</a>; this chapter shows one sample per reporter and states what each is for.</p>
+<h2 id="the---format-specfile-fan-out"><a class="header" href="#the---format-specfile-fan-out">The <code>--format SPEC[:FILE]</code> fan-out</a></h2>
+<p>Each <code>--format</code> entry is a <code>FORMAT</code> (write to stdout) or <code>FORMAT:FILE</code> (write to that path). Pass a comma-separated list to fan a single pass out to several sinks:</p>
+<pre><code class="language-bash">crap4rs --coverage lcov.info --format json:envelope.json,markdown:report.md,github-annotations
+</code></pre>
+<p>That run produces three artifacts from one analysis: a JSON envelope on disk, a Markdown report on disk, and GitHub Actions annotations on stdout.</p>
+<h3 id="the-single-stdout-rule"><a class="header" href="#the-single-stdout-rule">The single-stdout rule</a></h3>
+<p>At most one entry in a multi-format invocation may target stdout; the rest must name a file. Two stdout sinks would interleave indistinguishably. One stdout sink alongside file sinks is the shape CI workflows need — e.g. <code>markdown:scorecard.md,github-annotations</code>, where the runner intercepts the workflow commands from stdout while the Markdown lands on disk.</p>
+<p>When <code>--format</code> is omitted, the default is <code>table</code> to stdout.</p>
+<h2 id="the-reporters"><a class="header" href="#the-reporters">The reporters</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Format</th><th>Sink</th><th>For</th></tr>
+</thead>
+<tbody>
+<tr><td><code>table</code></td><td>terminal</td><td>Human reading at the terminal; the default</td></tr>
+<tr><td><code>json</code></td><td>machine</td><td>Full envelope — every function, summary, view, optional delta</td></tr>
+<tr><td><code>markdown</code></td><td>PR comment</td><td>Paste into a PR comment or issue; sticky-comment marker</td></tr>
+<tr><td><code>csv</code></td><td>spreadsheet</td><td>One row per function, no summary; pivot/sort externally</td></tr>
+<tr><td><code>sarif</code></td><td>Code Scanning</td><td>GitHub Code Scanning via <code>upload-sarif</code></td></tr>
+<tr><td><code>github-annotations</code></td><td>Actions runner</td><td>Inline <code>::warning</code> annotations on the Files Changed tab</td></tr>
+<tr><td><code>scorecard-row</code></td><td>aggregator</td><td>One <code>Row::CrapDelta</code> JSON object for scorecard composition</td></tr>
+<tr><td><code>html</code></td><td>browser</td><td>Self-contained dashboard</td></tr>
+<tr><td><code>advice</code></td><td>CI log / agent</td><td>Grep-friendly one-line-per-violation remediation hints (experimental)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="table"><a class="header" href="#table"><code>table</code></a></h3>
+<p>The default. ANSI-colored, fixed columns, a two-line summary footer. Colorize with <code>--color</code> (auto/always/never); see the <a href="#cli-reference">CLI reference</a>.</p>
+<pre><code class="language-text">crap4rs vX.Y.Z — CRAP Score Analysis
+
++------------------------------+--------------+----+------+-------+----------+
+| File                         | Function     | CC | Cov% | CRAP  | Risk     |
++============================================================================+
+| src/domain/crap.rs           | complex_fn   | 20 | 30.0 | 45.20 | high     |
+|------------------------------+--------------+----+------+-------+----------|
+| src/adapters/coverage/mod.rs | parse_record | 6  | 72.5 | 15.00 | moderate |
+|------------------------------+--------------+----+------+-------+----------|
+| src/lib.rs                   | simple_fn    | 2  | 95.0 | 3.00  | low      |
++------------------------------+--------------+----+------+-------+----------+
+
+Summary: 3 functions | 2 above threshold (8) | worst: 45.2 | FAIL
+         avg: 21.1 | median: 15.0 | low: 1 | acceptable: 0 | moderate: 1 | high: 1
+</code></pre>
+<p>The <code>Risk</code> column is the score-based risk band; the <code>above threshold</code> count is the gate. These are <a href="#understanding-the-crap-score">distinct axes</a> that share the same numbers by default. <code>CC</code> is the complexity count under the active metric — cognitive for crap4rs, cyclomatic for crap4ts (see <a href="#understanding-the-crap-score">understanding CRAP</a>).</p>
+<h3 id="json"><a class="header" href="#json"><code>json</code></a></h3>
+<p>The full envelope. <code>result</code> is the gate (every function, the summary, <code>passed</code>); <code>view</code> is the shaped display (<code>shown</code> rows, <code>spec</code>, <code>eligible_count</code>, <code>truncated</code>). When <code>--baseline</code> is set, a <code>delta</code> block joins the two. Pipe to <code>jq</code> for filtering. The <code>coverage</code> field reads as a percent here; the published formula uses a fraction — see <a href="#understanding-the-crap-score">understanding CRAP</a>.</p>
+<pre><code class="language-json">{
+  "language": "rust",
+  "metric": "cognitive",
+  "schema_version": 2,
+  "threshold": 8.0,
+  "result": {
+    "functions": [
+      {
+        "exceeds": false,
+        "threshold": 8.0,
+        "scored": {
+          "complexity": 5,
+          "complexity_metric": "cognitive",
+          "coverage_percent": 80.0,
+          "crap": { "value": 5.16, "risk_level": "acceptable" },
+          "identity": {
+            "file_path": "src/domain/crap.rs",
+            "qualified_name": "compute_crap",
+            "span": { "start_line": 1, "end_line": 10, "start_column": 0, "end_column": 0 }
+          },
+          "contributors": []
+        }
+      }
+    ],
+    "passed": true,
+    "summary": { "total_functions": 1, "exceeding_threshold": 0, "average_crap": 5.16, "median_crap": 5.16 }
+  },
+  "view": {
+    "eligible_count": 1,
+    "truncated": false,
+    "shown": [ "…same shape as result.functions…" ],
+    "spec": { "sort": "crap", "limit": null, "group_by": null }
+  }
+}
+</code></pre>
+<p><code>result</code> is unaffected by view-shaping flags (<code>--top</code>, <code>--sort-by</code>, <code>--only-failing</code>) — the gate stays over the full unfiltered set. Only <code>view</code> reflects shaping. Use this envelope as the <code>--baseline</code> for a later delta run.</p>
+<h3 id="markdown"><a class="header" href="#markdown"><code>markdown</code></a></h3>
+<p>GitHub-flavored Markdown for PR comments and issues. A compact summary block plus a top-N table (failures if any, otherwise worst-by-CRAP). The leading HTML comment is a sticky-comment marker a bot keys on to update one comment in place.</p>
+<pre><code class="language-markdown">&lt;!-- crap4rs:scorecard --&gt;
+
+# crap4rs vX.Y.Z — CRAP Score Analysis
+
+## Summary
+
+**Result:** FAIL · **Functions:** 3 · **Above threshold (8):** 2
+
+| Metric     | Worst | Average | Median |
+|------------|------:|--------:|-------:|
+| CRAP       | 45.20 |   21.07 |  15.00 |
+| Complexity |    20 |     9.3 |    6.0 |
+| Coverage   | 30.0% |   65.8% |  72.5% |
+
+**Risk distribution:** low 1 · acceptable 0 · moderate 1 · high 1
+
+## Failures (2 above threshold 8)
+
+| File | Function | CC | Cov% | CRAP | Risk |
+|------|----------|----|------|------|------|
+| src/domain/crap.rs | complex_fn | 20 | 30.0 | 45.20 | high |
+| src/adapters/coverage/mod.rs | parse_record | 6 | 72.5 | 15.00 | moderate |
+</code></pre>
+<p><code>--md-top N</code> bounds the table; <code>--md-full-table</code> appends the full row-per-function table. See the <a href="#cli-reference">CLI reference</a>.</p>
+<h3 id="csv"><a class="header" href="#csv"><code>csv</code></a></h3>
+<p>RFC 4180, one row per function shown by the view, no summary header. Data-only — pivot or sort it in a spreadsheet. The <code>complexity_metric</code> column carries the analysis-wide metric on every row.</p>
+<pre><code class="language-csv">file,function,start_line,end_line,complexity,complexity_metric,coverage_percent,crap_score,risk_level,exceeds_threshold
+src/domain/crap.rs,complex_fn,1,10,20,cognitive,30.0,45.20,high,true
+src/adapters/coverage/mod.rs,parse_record,1,10,6,cognitive,72.5,15.00,moderate,true
+src/lib.rs,simple_fn,1,10,2,cognitive,95.0,3.00,low,false
+</code></pre>
+<p>With <code>--baseline</code>, the schema mode-switches to row-per-change (a <code>change_kind</code> column plus side-by-side baseline/current scores). Pin your expected columns on whether <code>--baseline</code> was passed.</p>
+<h3 id="sarif"><a class="header" href="#sarif"><code>sarif</code></a></h3>
+<p>SARIF v2.1.0 for GitHub Code Scanning. One <code>result</code> per over-threshold function, derived from the gate (view-shaping does not alter it). The risk band sets the result <code>level</code>: High maps to <code>error</code>, Moderate to <code>warning</code>, and Low or Acceptable to <code>note</code>. Upload with the <code>upload-sarif</code> action; see <a href="#ci-integration">CI integration</a>.</p>
+<pre><code class="language-json">{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": { "driver": {
+        "name": "crap4rs",
+        "rules": [ { "id": "crap/threshold-exceeded", "name": "ThresholdExceeded" } ]
+      } },
+      "results": [
+        {
+          "ruleId": "crap/threshold-exceeded",
+          "level": "error",
+          "message": { "text": "Function `complex_fn` has CRAP 45.20 (complexity=20, coverage=30.0%) which exceeds threshold 8.0" },
+          "locations": [ { "physicalLocation": {
+            "artifactLocation": { "uri": "src/domain/crap.rs" },
+            "region": { "startLine": 1, "endLine": 10 }
+          } } ],
+          "partialFingerprints": { "functionIdentity": "src/domain/crap.rs:complex_fn" }
+        }
+      ]
+    }
+  ]
+}
+</code></pre>
+<h3 id="github-annotations"><a class="header" href="#github-annotations"><code>github-annotations</code></a></h3>
+<p><code>::warning</code> workflow-command lines, one per over-threshold function, sorted CRAP descending. The Actions runner renders each inline on the PR Files Changed tab — universal, free, no Code Scanning dependency. Derived from the gate, not the view.</p>
+<pre><code class="language-text">::warning file=src/domain/crap.rs,line=1,title=CRAP 45.2::Function `complex_fn` has CRAP 45.20 (complexity=20, coverage=30.0%) which exceeds threshold 8.0
+::warning file=src/adapters/coverage/mod.rs,line=1,title=CRAP 15.0::Function `parse_record` has CRAP 15.00 (complexity=6, coverage=72.5%) which exceeds threshold 8.0
+</code></pre>
+<p>GitHub silently drops annotations past a per-step cap (10 warning / 10 error / 10 notice per step). When the over-threshold set exceeds <code>--annotation-limit</code> (default 10), the reporter emits the top-N by CRAP and appends a trailing <code>::notice::N more functions exceed threshold; see scorecard for the full list</code> line. See the <a href="#cli-reference">CLI reference</a> for the flag.</p>
+<h3 id="scorecard-row"><a class="header" href="#scorecard-row"><code>scorecard-row</code></a></h3>
+<p>One <code>Row::CrapDelta</code> JSON object — no envelope, no markdown — for a downstream scorecard aggregator to compose into a multi-gate PR comment. <code>status</code> is minted producer-side (Red / Yellow / Green); <code>failure_detail_md</code> is present only on Red. The full wire shape, status policy, and schema versioning are in <a href="https://github.com/breezy-bays-labs/crap-rs/blob/main/docs/scorecard-row-contract.md"><code>docs/scorecard-row-contract.md</code></a>.</p>
+<pre><code class="language-json">{
+  "type": "CrapDelta",
+  "id": "crap_delta",
+  "label": "CRAP Δ",
+  "anchor": "crap-delta",
+  "status": "Red",
+  "threshold": 15,
+  "delta_count": 2,
+  "delta_text": "5 → 7 (+2)",
+  "failure_detail_md": "**New CRAP threshold violations (&gt;15):**\n- `foo` — `a.rs:1` — CRAP 22.0 (newly added)\n"
+}
+</code></pre>
+<p><code>crap4rs</code> and <code>crap4ts</code> route this format through the same shared pipeline, so the row shape is byte-identical across both. Consume it via the composite action’s <code>outputs.row-json</code>; see <a href="#ci-integration">CI integration</a>.</p>
+<h3 id="html"><a class="header" href="#html"><code>html</code></a></h3>
+<p>A self-contained HTML dashboard — inline CSS, inline script, no external assets, mobile-responsive. Renders a verdict-stamped header, KPI tiles, a risk-distribution bar, the worst offenders, and a <code>&lt;details&gt;</code> card per file with a function-level table. The bundled script handles a theme toggle, a file-list filter, and a <code>/</code> keyboard shortcut.</p>
+<pre><code class="language-bash">crap4rs --coverage lcov.info --format html:report.html
+</code></pre>
+<p>When <code>--baseline</code> is set, a delta tab is added alongside the current view. Unifying multiple languages into one HTML document goes through the <code>crap-render</code> binary, covered in <a href="#multi-language-analysis">multi-language</a>.</p>
+<h3 id="advice-experimental"><a class="header" href="#advice-experimental"><code>advice</code> (experimental)</a></h3>
+<p>A grep-friendly stream, one line per over-threshold function, in view order:</p>
+<pre><code class="language-text">[crap=45.20] src/cli/mod.rs:600-720 complex_handler [actions: add_tests_for_lines,extract_function]
+[crap=15.00] src/adapters/coverage/mod.rs:80-145 parse_record [actions: simplify_branching,accept_inherent_complexity]
+[crap=8.50] src/util.rs:30-42 opaque_helper [actions: none]
+</code></pre>
+<p>The shape is <code>[crap=N.NN] file:start-end qualified::name [actions: &lt;kinds&gt;]</code>. Lines are intentionally not aligned across rows so <code>awk</code> and <code>grep</code> parse the stream without padding. This format is experimental — the <code>actions</code> vocabulary may change.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="ci-integration"><a class="header" href="#ci-integration">CI integration</a></h1>
+<p>The <code>crap-scorecard</code> composite action runs a CRAP analysis inside your CI and turns it into a markdown scorecard, an optional gate that fails the build, an optional sticky PR comment, and an optional hosted HTML report. This chapter covers it from a consumer’s point of view. For the CRAP math see <a href="#understanding-the-crap-score">understanding-crap.md</a>; for the flag surface it wraps see <a href="#cli-reference">cli-reference.md</a>; for the report layouts it can render see <a href="#output-formats">output-formats.md</a>.</p>
+<p>The action reference uses <code>@main</code> and <code>@&lt;sha&gt;</code> interchangeably in snippets below. Pin to a release SHA in real workflows (<code>@&lt;sha&gt; # vN</code>); <code>@main</code> tracks the unstable tip.</p>
+<h2 id="what-the-action-does-and-doesnt-do"><a class="header" href="#what-the-action-does-and-doesnt-do">What the action does and doesn’t do</a></h2>
+<p>The action wraps the analyzer binary; it does not orchestrate coverage or git. Two things are the caller’s job, by design:</p>
+<ul>
+<li><strong>Coverage.</strong> Produce the coverage file before the action runs. Rust: <code>cargo llvm-cov --workspace --lcov --output-path lcov.info</code>. TypeScript: an Istanbul <code>coverage-final.json</code>. The path is <code>--coverage</code> (runtime-required — the action errors if it’s missing or unreadable).</li>
+<li><strong>Checkout and base refs.</strong> The action never runs <code>actions/checkout</code> and never reaches into git to fetch a base ref. Delta mode (below) needs you to produce the baseline yourself.</li>
+</ul>
+<p>Drawing the boundary there keeps the action a pure function of its inputs: the same coverage file plus the same flags produce the same scorecard, with no hidden git state.</p>
+<h2 id="minimal-workflow"><a class="header" href="#minimal-workflow">Minimal workflow</a></h2>
+<pre><code class="language-yaml">name: CRAP scorecard
+on:
+  pull_request:
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@&lt;sha&gt;
+        with:
+          persist-credentials: false
+      - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+      - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@&lt;sha&gt;
+        id: crap
+        with:
+          coverage: lcov.info
+      - run: echo "${{ steps.crap.outputs.markdown }}"
+</code></pre>
+<p>That run is report-only: it renders the scorecard to <code>outputs.markdown</code> and never fails the build. The sections below add gating, a PR comment, deltas, and a hosted report.</p>
+<h2 id="core-inputs"><a class="header" href="#core-inputs">Core inputs</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Input</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><code>coverage</code></td><td>Path to the coverage file. Runtime-required. LCOV (<code>.info</code>/<code>.lcov</code>) for Rust, Istanbul JSON (<code>.json</code>) for TypeScript.</td></tr>
+<tr><td><code>language</code></td><td><code>auto</code> (default — infers from the <code>coverage</code> extension), <code>rust</code>, or <code>typescript</code>.</td></tr>
+<tr><td><code>src</code></td><td>Source root passed to the analyzer. Newline-separated list for multi-root. <strong>Empty by default</strong> — when omitted, <code>--src</code> is not forwarded, so the analyzer’s own precedence wins (a <code>crap.toml</code> <code>src = [...]</code>, else its built-in <code>["src"]</code>). Pass <code>src: .</code> to scan the repo root.</td></tr>
+<tr><td><code>config</code></td><td>Path to a <code>crap.toml</code>. Forwarded only when set.</td></tr>
+</tbody>
+</table>
+</div>
+<p>When <code>src</code>, <code>threshold</code>, and <code>threshold-preset</code> are all omitted, the action forwards no corresponding flag and lets a <code>crap.toml</code> own those knobs (see <a href="#configuration">configuration.md</a>). A wrapper that injected a tool default as an explicit flag would invert that cascade, so the action does not.</p>
+<p>The default complexity metric is the adapter’s own: crap4rs uses cognitive, crap4ts uses cyclomatic. The action never passes <code>--metric</code>.</p>
+<h2 id="presets"><a class="header" href="#presets">Presets</a></h2>
+<p>Four optional preset inputs cover the common-case configuration in one line each. Presets are additive — every raw input still works, and an explicit raw input wins when set alongside a preset (the action emits a <code>::warning::</code> only on actual conflict, since a GitHub Actions composite cannot tell “caller passed the default” from “caller omitted it”).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Input</th><th>Values</th><th>Derives</th></tr>
+</thead>
+<tbody>
+<tr><td><code>threshold-preset</code></td><td><code>strict</code> | <code>default</code> | <code>lenient</code></td><td><code>threshold</code> = 8 / 15 / 25 (cognitive calibration)</td></tr>
+<tr><td><code>run-mode</code></td><td><code>full</code> | <code>delta</code> | <code>both</code></td><td>Baseline expectations (delta/both require <code>baseline:</code>)</td></tr>
+<tr><td><code>gate-mode</code></td><td><code>report-only</code> | <code>gate-on-analysis</code> | <code>gate-on-delta</code> | <code>gate-on-both</code></td><td>The atomic <code>analysis-gate</code> + <code>delta-gate</code> pair</td></tr>
+<tr><td><code>languages</code></td><td><code>rust</code> | <code>typescript</code> | <code>rust,typescript</code> | <code>all</code></td><td>Single value supersedes <code>language:</code>; a multi-value set triggers multi-language mode</td></tr>
+</tbody>
+</table>
+</div>
+<p>The 8/15/25 thresholds are a calibration convention, not empirically derived values, and they are the cognitive scale; crap4ts applies its own cyclomatic calibration automatically. <code>threshold-preset</code> and the score-based risk bands are distinct axes that happen to share 8/15/25 today — see <a href="#understanding-the-crap-score">understanding-crap.md</a>. The full input and output tables live in the <a href="https://github.com/breezy-bays-labs/crap-rs/blob/main/.github/actions/scorecard/README.md">action README</a>; this chapter names the inputs a consumer reaches for first.</p>
+<p><code>languages: rust,typescript</code> (or <code>all</code>) runs both adapters in one invocation and pairs the Rust inputs (<code>coverage</code>, <code>src</code>, <code>baseline</code>) with their <code>-ts</code> counterparts (<code>coverage-ts</code>, <code>src-ts</code>, <code>baseline-ts</code>). It produces one combined sticky comment and split outputs. See <a href="#multi-language-analysis">multi-language.md</a> for the paired-input contract and how the combined view ranks across languages (by CRAP-to-threshold ratio and risk band — cross-language scores are not directly comparable).</p>
+<h2 id="the-gate-mode-dial"><a class="header" href="#the-gate-mode-dial">The gate-mode dial</a></h2>
+<p>By default the action is measurement-only: it renders the scorecard and exits 0 even when functions sit above the threshold. <code>gate-mode</code> is the one dial that turns measurement into a hard gate. It sets <code>analysis-gate</code> and <code>delta-gate</code> together so the two cannot drift.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th><code>gate-mode</code></th><th>Fails the build when…</th></tr>
+</thead>
+<tbody>
+<tr><td><code>report-only</code> (default behavior)</td><td>Never — render only.</td></tr>
+<tr><td><code>gate-on-analysis</code></td><td>Any analyzed function exceeds the threshold.</td></tr>
+<tr><td><code>gate-on-delta</code></td><td>A new violation lands relative to the baseline (requires <code>baseline:</code>).</td></tr>
+<tr><td><code>gate-on-both</code></td><td>Either of the above.</td></tr>
+</tbody>
+</table>
+</div>
+<p>When a gate trips, the action exits non-zero after the scorecard is rendered, so <code>outputs.markdown</code> and the sticky comment are still produced — the gate fails the job; it does not suppress the report.</p>
+<pre><code class="language-yaml">- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@&lt;sha&gt;
+  with:
+    coverage: lcov.info
+    gate-mode: gate-on-analysis
+</code></pre>
+<h2 id="sticky-pr-comments"><a class="header" href="#sticky-pr-comments">Sticky PR comments</a></h2>
+<p>Set <code>comment-mode: sticky</code> to post (and update in place on each push) a single PR comment carrying the scorecard. This needs <code>pull-requests: write</code> on the calling job.</p>
+<pre><code class="language-yaml">permissions:
+  contents: read
+  pull-requests: write
+# ...
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@&lt;sha&gt;
+  with:
+    coverage: lcov.info
+    comment-mode: sticky
+    comment-header: crap-scorecard
+</code></pre>
+<p><code>comment-header</code> is the sticky identity — vary it to run two distinct scorecards on one PR (e.g. a gated production card and a report-only one) without their comments colliding. <code>comment-preamble</code> prepends a labeling line so a reader can tell two cards apart at a glance. The composed body is also exposed verbatim on the <code>sticky-message</code> output for aggregator bots that compose their own comment.</p>
+<h2 id="baseline-and-delta"><a class="header" href="#baseline-and-delta">Baseline and delta</a></h2>
+<p>A baseline is a previously captured JSON envelope (<code>crap4rs … --format json</code>). Supply it on <code>baseline:</code> to render a delta scorecard — what changed versus the baseline — and to enable <code>gate-on-delta</code>. Producing the baseline is the caller’s job (the action does not auto-checkout the base ref):</p>
+<pre><code class="language-yaml">steps:
+  - uses: actions/checkout@&lt;sha&gt;
+    with:
+      fetch-depth: 0
+      persist-credentials: false
+  - name: Capture baseline on the PR base
+    run: |
+      git switch --detach origin/${{ github.base_ref }}
+      cargo llvm-cov --workspace --lcov --output-path /tmp/base.lcov
+      cargo install --locked crap4rs
+      crap4rs --coverage /tmp/base.lcov --src . --format json --no-fail &gt; /tmp/baseline.json
+      git switch -
+  - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+  - uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@&lt;sha&gt;
+    with:
+      coverage: lcov.info
+      baseline: /tmp/baseline.json
+      gate-mode: gate-on-delta
+      comment-mode: sticky
+</code></pre>
+<p>The delta is recomputed from the two envelopes, so the baseline must carry the parameters the gate uses (threshold, epsilon). The action threads those through; a hand-built baseline that omits them recomputes against defaults. For the JSON envelope shape see <a href="#output-formats">output-formats.md</a>.</p>
+<h2 id="html-report-and-github-pages"><a class="header" href="#html-report-and-github-pages">HTML report and GitHub Pages</a></h2>
+<p><code>html-report: true</code> renders the full file-by-file HTML report (KPI tiles, distribution bar, file cards, optional dark mode), uploads it as a workflow artifact, and — under <code>comment-mode: sticky</code> — appends a download link to the sticky comment. A supplied <code>baseline:</code> activates the report’s Delta tab automatically. The artifact name is per language (<code>crap4rs-report-&lt;suffix&gt;</code> / <code>crap4ts-report-&lt;suffix&gt;</code>), suffixed with <code>-${{ runner.os }}</code> by default; override <code>html-artifact-name-suffix</code> for matrix legs beyond OS, or <code>actions/upload-artifact</code> fails on the second leg uploading to the same name.</p>
+<p>A workflow-artifact link makes the reviewer download a zip. <code>pages-publish: true</code> instead pushes the rendered HTML to a GitHub Pages branch and links the <strong>live hosted page</strong> in the sticky comment — one click, no download.</p>
+<pre><code class="language-yaml">permissions:
+  contents: write       # required for the gh-pages push
+  pull-requests: write  # required for the sticky comment
+# ...
+- uses: breezy-bays-labs/crap-rs/.github/actions/scorecard@&lt;sha&gt;
+  with:
+    coverage: lcov.info
+    baseline: baseline.json   # optional — enables the Delta tab
+    html-report: true         # required for pages-publish
+    comment-mode: sticky
+    pages-publish: ${{ github.event_name == 'pull_request' &amp;&amp; github.event.pull_request.head.repo.full_name == github.repository }}
+    pages-deploy-path: pr-${{ github.event.number }}
+    pages-url: https://acme.github.io/my-repo/pr-${{ github.event.number }}/
+</code></pre>
+<p>Mechanics that matter:</p>
+<ul>
+<li><strong><code>pages-publish</code> requires <code>html-report: true</code></strong> (there must be a rendered report to publish) and both <code>pages-deploy-path</code> (the path within the branch, e.g. <code>pr-123</code>) and <code>pages-url</code> (the full public URL, used verbatim as the sticky link). The action does not derive the URL — you pass it, so custom domains and project-vs-user Pages all work.</li>
+<li><strong>Publish before post.</strong> The push runs before the sticky comment is composed under <code>set -euo pipefail</code>, so a push failure reds the job rather than posting a dead link.</li>
+<li><strong>First-run ordering.</strong> When the Pages branch (default <code>gh-pages</code>) does not exist, the action creates it as an orphan branch with a <code>.nojekyll</code> marker on the first publish. Creating the branch does not make GitHub serve it — enable Pages on the branch once (Settings → Pages → Deploy from a branch → <code>gh-pages</code> → <code>/ (root)</code>). Until Pages is enabled and has built once, the link 404s even though the file was pushed.</li>
+<li><strong>Content is preserved.</strong> The publish copies into <code>&lt;pages-deploy-path&gt;/index.html</code>; it does not wipe the branch. Other PRs’ directories, the root report, and <code>baselines/</code> survive. Per-PR directories accumulate, so ship a <code>pull_request: types: [closed]</code> cleanup workflow that removes <code>pr-&lt;N&gt;/</code> on close, and give every job that pushes to the branch a shared <code>concurrency</code> group with <code>cancel-in-progress: false</code>.</li>
+</ul>
+<h2 id="key-outputs"><a class="header" href="#key-outputs">Key outputs</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Output</th><th>Use</th></tr>
+</thead>
+<tbody>
+<tr><td><code>markdown</code></td><td>The bare rendered scorecard. Consume directly in aggregator bots.</td></tr>
+<tr><td><code>sticky-message</code></td><td>The composed sticky body (preamble + scorecard + report link).</td></tr>
+<tr><td><code>row-json</code></td><td>The single-row <code>Row::CrapDelta</code> JSON for aggregator workflows that re-render with full layout control.</td></tr>
+<tr><td><code>json-envelope-path</code></td><td>Path on the runner to the full JSON envelope.</td></tr>
+<tr><td><code>analysis-passed</code> / <code>delta-passed</code></td><td><code>true</code>/<code>false</code> gate results. <code>delta-passed</code> is empty with no baseline.</td></tr>
+<tr><td><code>new-violations</code> / <code>regressions</code></td><td>Counts feeding <code>gate-on-delta</code>.</td></tr>
+<tr><td><code>threshold-resolved</code></td><td>The threshold the action resolved from its inputs. When the caller defers to <code>crap.toml</code>, this still reports the action’s <code>15</code> fallback, not the analyzer’s effective gate — read the envelope for that.</td></tr>
+<tr><td><code>html-artifact-url</code></td><td>Report URL when <code>html-report: true</code> (resolves only for GitHub-authenticated requests).</td></tr>
+</tbody>
+</table>
+</div>
+<p>In multi-language mode <code>row-json</code> is empty (the action warns) and you read the split <code>row-json-rust</code> / <code>row-json-typescript</code> instead — see <a href="#multi-language-analysis">multi-language.md</a>.</p>
+<h2 id="caveats"><a class="header" href="#caveats">Caveats</a></h2>
+<ul>
+<li><strong>Fork PRs get a read-only token.</strong> GitHub issues a read-only <code>GITHUB_TOKEN</code> for <code>pull_request</code> events from forks regardless of the job’s <code>permissions:</code> block. The <code>comment-mode: sticky</code> step silently no-ops, and <code>pages-publish</code> would 403 — gate it to same-repo events (as above) so a fork PR degrades cleanly to a summary-only card with no hosted link. Two standard workarounds restore fork coverage: a <code>pull_request_target</code> trigger with hardened checkout, or a separate <code>workflow_run</code>-triggered comment workflow with its own writable token. The advanced privileged-handoff topology (the <code>fork-handoff</code> input plus a base-repo <code>workflow_run</code> publisher) is documented in <a href="https://github.com/breezy-bays-labs/crap-rs/blob/main/docs/pages-fork-reports.md"><code>docs/pages-fork-reports.md</code></a>. Same-repo branches are unaffected.</li>
+<li><strong>crap4ts is not auto-installed.</strong> The action installs crap4rs via <code>cargo binstall</code>, but the TypeScript branch does <strong>not</strong> attempt to install crap4ts — it requires the binary pre-installed on <code>PATH</code> and fails with an actionable message when it’s missing. Prepend its directory to <code>PATH</code> in a step that runs before the action.</li>
+<li><strong>Integration / BDD / feature-gated code scores <code>c² + c</code>.</strong> Code with little or no line coverage scores its complexity squared. For analysis-only crates that is expected, not a bug — gate them <code>report-only</code> or scope <code>src</code>/<code>config</code> to exclude them rather than chasing a passing gate.</li>
+<li><strong><code>threshold-resolved</code> is the resolved input, not always the analyzer’s gate</strong> (see the outputs table) — only relevant when you let <code>crap.toml</code> own the threshold.</li>
+</ul>
+<p>The complete input and output tables, the aggregator pattern, and the deep multi-language and fork topologies stay in the <a href="https://github.com/breezy-bays-labs/crap-rs/blob/main/.github/actions/scorecard/README.md">action README</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="multi-language-analysis"><a class="header" href="#multi-language-analysis">Multi-language analysis</a></h1>
+<p>A polyglot repository has one CRAP score per function, in two scales that don’t share a number line. crap4rs scores Rust functions (cognitive complexity by default); crap4ts scores TypeScript functions (cyclomatic complexity only). <code>crap-render</code> composes their JSON envelopes into one HTML report with a Combined view and an optional Delta view — without pretending the two scales are interchangeable.</p>
+<p>For the analyzer flags that produce each envelope, see <a href="#cli-reference">CLI reference</a>. For the CRAP formula itself, see <a href="#understanding-the-crap-score">understanding CRAP</a>. This chapter owns the cross-language layer only: envelope production, the <code>crap-render</code> CLI, and the aggregation rules.</p>
+<h2 id="per-language-coverage-formats"><a class="header" href="#per-language-coverage-formats">Per-language coverage formats</a></h2>
+<p>Each adapter consumes the coverage format native to its toolchain. The formats are not interchangeable; pass each adapter the file its language emits.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Coverage file</th><th>Producer</th></tr>
+</thead>
+<tbody>
+<tr><td>Rust</td><td><code>lcov.info</code></td><td><code>cargo llvm-cov --lcov</code></td></tr>
+<tr><td>TypeScript</td><td><code>coverage-final.json</code></td><td>Istanbul (<code>nyc</code>, <code>c8</code>, Jest, Vitest)</td></tr>
+</tbody>
+</table>
+</div>
+<p>The composite action auto-detects the adapter from the <code>coverage</code> input’s extension (<code>.info</code>/<code>.lcov</code> → Rust, <code>.json</code> → TypeScript). See <a href="#ci-integration">CI integration</a>.</p>
+<h2 id="producing-envelopes"><a class="header" href="#producing-envelopes">Producing envelopes</a></h2>
+<p>The unified report composes per-adapter JSON envelopes — the same <code>--format json</code> output each analyzer already emits. Run each analyzer over its own source root and coverage file:</p>
+<pre><code class="language-bash">crap4rs --coverage lcov.info --src crates/core/src --format json &gt; rust.json
+crap4ts --coverage coverage-final.json --src apps/web/src --format json &gt; typescript.json
+</code></pre>
+<p>Each envelope carries its adapter’s <code>tool_version</code>, <code>language</code> tag, complexity <code>metric</code>, and <code>threshold</code>, so <code>crap-render</code> reconstructs the per-adapter footer without re-running analysis.</p>
+<h2 id="the-crap-render-cli"><a class="header" href="#the-crap-render-cli">The crap-render CLI</a></h2>
+<p><code>crap-render</code> ships with crap-core. It composes envelopes; it never analyzes source.</p>
+<pre><code class="language-bash">crap-render --input rust=rust.json --input typescript=typescript.json --format html --output report.html
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--input &lt;LANG&gt;=&lt;FILE&gt;</code></td><td>Pair an envelope with its language key. Repeatable; at least one required.</td></tr>
+<tr><td><code>--baseline &lt;LANG&gt;=&lt;FILE&gt;</code></td><td>Optional baseline envelope, matched to the <code>--input</code> of the same key. Repeatable.</td></tr>
+<tr><td><code>--format html</code></td><td>Output format. <code>html</code> is the only value today; the flag exists so future formats extend without a breaking change.</td></tr>
+<tr><td><code>--output &lt;PATH&gt;</code></td><td>Write target. Omit to write to stdout.</td></tr>
+<tr><td><code>--threshold &lt;N&gt;</code></td><td>Workspace threshold echoed in the scope banner. Defaults to the maximum across all per-envelope thresholds.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The language key in <code>--input rust=...</code> — not the envelope’s own <code>language</code> field — is the routing source of truth: it drives the segmented Language nav and the URL hash (<code>#rust:current</code>, <code>#typescript:delta</code>, <code>#combined:current</code>). Routing stays explicit so the renderer never has to trust per-envelope identity to place a block.</p>
+<p><code>&lt;LANG&gt;</code> is an arbitrary key. <code>rust</code> maps to the <code>crap4rs</code> / Rust labels and <code>typescript</code> to <code>crap4ts</code> / TypeScript; any other key falls through to itself as both tool name and display label. Adding a language is purely additive — supply another <code>--input</code> pair.</p>
+<h3 id="guards"><a class="header" href="#guards">Guards</a></h3>
+<p><code>crap-render</code> fails fast on operator errors:</p>
+<ul>
+<li>Two envelopes for the same language key are refused (the common “passed two <code>rust.json</code>” mistake), on both <code>--input</code> and <code>--baseline</code>.</li>
+<li>A <code>--baseline &lt;LANG&gt;=...</code> whose key has no matching <code>--input</code> is an error.</li>
+<li>An envelope whose <code>schema_version</code> is outside the supported range fails with a message naming the path and the offending value. Upgrade the emitting adapter or the renderer.</li>
+<li>An <code>--input</code> envelope that omits <code>metric</code> or <code>threshold</code> renders with the defaults (cognitive / <code>0</code>) and a <code>note:</code> on stderr, so a hand-built envelope can’t silently misrender.</li>
+</ul>
+<h2 id="the-unified-report-combined-and-delta-views"><a class="header" href="#the-unified-report-combined-and-delta-views">The unified report: Combined and Delta views</a></h2>
+<p>The report has two axes. The <strong>Language</strong> axis is a segmented nav (one panel per <code>--input</code>, plus a Combined panel). The <strong>View</strong> axis toggles <strong>Current</strong> vs <strong>Delta</strong> within a panel.</p>
+<p>The <strong>Combined</strong> panel aggregates across every adapter into one scorecard plus one workspace-wide ranked function table. The <strong>Delta</strong> axis appears only when at least one <code>--baseline</code> was supplied; it shows what changed since the baseline, per language and combined.</p>
+<h3 id="cross-language-aggregation-rules"><a class="header" href="#cross-language-aggregation-rules">Cross-language aggregation rules</a></h3>
+<p>Aggregation is deliberately conservative. Raw CRAP scores are <strong>not</strong> comparable across adapters — cognitive and cyclomatic complexity scale differently, so a Rust function at CRAP 20 and a TypeScript function at CRAP 20 are not equivalent risk. The composer never sorts on raw cross-language CRAP.</p>
+<p><strong>Additive counts (disjoint trees).</strong> Each adapter scans a disjoint source tree, so <code>total_functions</code>, <code>exceeding_threshold</code>, <code>total_files</code>, and the per-tier risk distribution sum cleanly. “Exceeds” is decided per-adapter against that adapter’s own threshold first, then counted — binary per function, so the sum is honest.</p>
+<p><strong>Ranking by risk band, then ratio.</strong> The Combined ranked table sorts by risk level descending, then by CRAP/threshold <strong>ratio</strong> descending within each band, with a stable tie-break on qualified name then file path. The ratio (“how far over this function’s own threshold”) is dimensionally consistent across adapters in a way raw CRAP is not. The same rule orders the Combined Delta regression table. Risk <strong>bands</strong> (the score-based classification) and the threshold <strong>gate</strong> are distinct axes that happen to share the 8/15/25 numbers today — see <a href="#understanding-the-crap-score">understanding CRAP</a>.</p>
+<p><strong>Consistent by construction.</strong> Both adapters derive every function’s risk level from one shared crap-core classifier and serialize it through one shared type. There is no per-language risk-classification step to drift, so the Combined ranking’s band axis is consistent across adapters by construction, not by convention.</p>
+<h3 id="asymmetric-baselines"><a class="header" href="#asymmetric-baselines">Asymmetric baselines</a></h3>
+<p>Baselines are independent per language. Supplying <code>--baseline rust=...</code> but not <code>--baseline typescript=...</code> is allowed and well-defined:</p>
+<ul>
+<li>Languages <strong>with</strong> a baseline get a working Delta tab and contribute to the Combined Delta ranking.</li>
+<li>Languages <strong>without</strong> a baseline render the Delta tab <strong>disabled</strong> (a tooltip points reviewers to supply one); their Current view is unaffected.</li>
+<li>The Combined Delta panel lists <code>contributing_languages</code> and <code>missing_baseline_languages</code> so reviewers see that the Combined Delta represents fewer languages than the Combined Current view.</li>
+</ul>
+<p>A baseline scored with a <strong>different complexity metric</strong> than its input is not diffed — cognitive and cyclomatic are incomparable scales, so the recomputed delta would be confident garbage. That language degrades to the disabled-Delta state with a metric-mismatch tooltip, a stderr warning, and an unchanged exit code; other languages are unaffected. An envelope that merely <em>omits</em> <code>metric</code> carries no evidence of disagreement, so absence never trips the guard.</p>
+<p>Combined Delta is regression-focused: it ranks regressions and new functions. Improvements and removed functions are summarized but not ranked.</p>
+<h2 id="ci-and-consumers"><a class="header" href="#ci-and-consumers">CI and consumers</a></h2>
+<p>In CI, the composite action drives <code>crap-render</code> for you — set <code>html-report: true</code> with <code>languages: rust,typescript</code> (or <code>all</code>) and pass per-language <code>src</code>/<code>coverage</code> inputs. The action fetches the latest released envelope as a baseline to populate the Delta tab. See <a href="#ci-integration">CI integration</a>. The manual <code>crap-render</code> invocation above is for local debugging and bespoke pipelines.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="limitations--faq"><a class="header" href="#limitations--faq">Limitations &amp; FAQ</a></h1>
+<p>Every analyzer makes choices. This chapter collects the ones that shape what a crap4rs score does and does not mean, in one place. Each limit links back to the chapter that owns the detail.</p>
+<h2 id="limitations"><a class="header" href="#limitations">Limitations</a></h2>
+<h3 id="matching-is-positional-not-by-name"><a class="header" href="#matching-is-positional-not-by-name">Matching is positional, not by name</a></h3>
+<p>crap4rs joins complexity data to coverage data by file path plus line range, never by function name. The syn walker emits <code>(file, start_line, end_line)</code> per function; LCOV <code>DA:</code> records give <code>(file, line, hits)</code>. A function’s coverage is the fraction of its lines that the coverage data marks executed. This is a positional heuristic: it carries no symbol demangling, no <code>FN:</code>/<code>FNDA:</code> parsing, and no name resolution. A macro that expands across a function’s declared span, or coverage data generated against a different revision of the file, can shift the join. See <a href="#understanding-the-crap-score">Understanding CRAP</a> for the matching model.</p>
+<h3 id="rust-coverage-is-lcov-only"><a class="header" href="#rust-coverage-is-lcov-only">Rust coverage is LCOV-only</a></h3>
+<p>The Rust adapter reads <code>lcov.info</code> and parses <code>SF:</code> and <code>DA:</code> records only. <code>FN:</code> and <code>FNDA:</code> records are ignored — they carry mangled symbols and duplicate information the line-range join already derives. Generate input with <code>cargo llvm-cov --lcov</code>. See <a href="#installation">Installation</a> for the coverage-generation command and <a href="#multi-language-analysis">Multi-language</a> for the TypeScript path (Istanbul <code>coverage-final.json</code>).</p>
+<h3 id="code-your-coverage-run-never-executes-scores-c²--c"><a class="header" href="#code-your-coverage-run-never-executes-scores-c²--c">Code your coverage run never executes scores <code>c² + c</code></a></h3>
+<p>A function whose file is absent from the coverage data is treated as 0% covered, so its CRAP score is <code>c² + c</code> (complexity squared plus complexity). This is the pessimistic default: it never hides risk. It also means code that a coverage run structurally cannot reach scores high by design, not by defect:</p>
+<ul>
+<li>Integration-only code, HTTP handlers, and binary entry points that <code>cargo llvm-cov --lib</code> does not exercise.</li>
+<li>Code reached only through BDD/cucumber harnesses run out of process.</li>
+<li><code>#[cfg(feature = "…")]</code> blocks excluded from the default-feature coverage build.</li>
+</ul>
+<p>These are expected high scores, not bugs. When more than half the analyzed files have every analyzed function at 0% line coverage, crap4rs prints a warning to stderr naming the likely cause — uninstrumented integration code — and points at <code>--exclude</code>. The gate still runs; the warning is advisory.</p>
+<p>To change the policy for files missing from coverage, set the missing-coverage policy:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Policy</th><th>Coverage assumed</th><th>Resulting CRAP</th><th>Use when</th></tr>
+</thead>
+<tbody>
+<tr><td><code>pessimistic</code> (default)</td><td>0%</td><td><code>c² + c</code></td><td>You want missing coverage to count as risk.</td></tr>
+<tr><td><code>optimistic</code></td><td>100%</td><td><code>c</code></td><td>You run a scoped test slice that legitimately omits files.</td></tr>
+<tr><td><code>skip</code></td><td>— (function omitted)</td><td>none</td><td>The function should not appear at all.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The default is a choice — the safe one — not a statement about the code. See <a href="#configuration">Configuration</a> for the policy key and <a href="#cli-reference">CLI reference</a> for the flag.</p>
+<h3 id="branch-coverage-is-informational-the-gate-is-line-only"><a class="header" href="#branch-coverage-is-informational-the-gate-is-line-only">Branch coverage is informational; the gate is line-only</a></h3>
+<p>When the coverage data carries branch records, crap4rs surfaces a branch-coverage percentage per function. The CRAP score and the <code>--threshold</code> gate are computed against line coverage only. Branch data is reported, never gated. Promoting it to a gate would be a separate decision. See <a href="#output-formats">Output formats</a> for where the branch column appears.</p>
+<h3 id="thresholds-are-a-calibration-convention"><a class="header" href="#thresholds-are-a-calibration-convention">Thresholds are a calibration convention</a></h3>
+<p>The default gate is 15; the strict preset is 8 and the lenient preset is 25. These numbers are a calibration convention, not an empirically derived constant. They are also distinct from the score-based risk bands (Low ≤ 8, Acceptable ≤ 15, Moderate ≤ 25, High above), which classify every function regardless of the gate. The two axes share the same numbers today but answer different questions: the band is a fixed score classification, the gate is the pass/fail line you set. See <a href="#understanding-the-crap-score">Understanding CRAP</a> for the bands and <a href="#configuration">Configuration</a> for the presets.</p>
+<h3 id="walker-scope-closures-fold-in-nested-functions-stand-alone"><a class="header" href="#walker-scope-closures-fold-in-nested-functions-stand-alone">Walker scope: closures fold in, nested functions stand alone</a></h3>
+<p>The complexity walker handles two nesting cases distinctly:</p>
+<ul>
+<li><strong>Closures</strong> count toward their enclosing function. A closure adds nothing by existing, but branching inside its body is charged one extra nesting level, so deeper logic costs more under the cognitive metric.</li>
+<li><strong>Nested <code>fn</code> items</strong> are recorded as their own separate functions, named by their module path rather than the enclosing function. A <code>fn helper</code> declared inside <code>outer::do_work</code> appears as <code>outer::helper</code>, scored independently.</li>
+</ul>
+<p>The default complexity metric for crap4rs is cognitive; cyclomatic is available via flag. See <a href="#cli-reference">CLI reference</a> for the metric flag and <a href="#understanding-the-crap-score">Understanding CRAP</a> for how each metric counts.</p>
+<h2 id="faq"><a class="header" href="#faq">FAQ</a></h2>
+<h3 id="why-does-a-fully-tested-function-still-show-a-crap-score-above-1"><a class="header" href="#why-does-a-fully-tested-function-still-show-a-crap-score-above-1">Why does a fully tested function still show a CRAP score above 1?</a></h3>
+<p>A CRAP score equals the complexity when coverage is 100%. A function with cognitive complexity 12 and full coverage scores 12 — the formula collapses to the complexity alone. The score above 1 reflects complexity, not a coverage gap. Decompose the function to lower it. See <a href="#understanding-the-crap-score">Understanding CRAP</a>.</p>
+<h3 id="why-is-my-handler-crate-all-red"><a class="header" href="#why-is-my-handler-crate-all-red">Why is my handler crate all red?</a></h3>
+<p><code>cargo llvm-cov --lib</code> does not instrument integration-only code, so those files are absent from coverage and score <code>c² + c</code> under the pessimistic default. Either generate coverage that exercises them, set the missing-coverage policy to <code>optimistic</code> for a scoped slice, or <code>--exclude</code> the uncoverable paths. See <a href="#configuration">Configuration</a>.</p>
+<h3 id="can-i-compare-a-rust-score-to-a-typescript-score-directly"><a class="header" href="#can-i-compare-a-rust-score-to-a-typescript-score-directly">Can I compare a Rust score to a TypeScript score directly?</a></h3>
+<p>No. Cross-language CRAP scores are not directly comparable. The combined view ranks functions by risk band first, then by the ratio of CRAP to its threshold within the band — not by raw score. See <a href="#multi-language-analysis">Multi-language</a>.</p>
+<h3 id="coverage-is-a-fraction-in-the-formula-but-i-pass-a-percent--which-is-it"><a class="header" href="#coverage-is-a-fraction-in-the-formula-but-i-pass-a-percent--which-is-it">Coverage is a fraction in the formula but I pass a percent — which is it?</a></h3>
+<p>The published formula uses coverage as a fraction in <code>[0, 1]</code>. The internal computation takes a percentage in <code>[0, 100]</code> and clamps out-of-range input. You generate coverage as LCOV either way; the unit difference lives inside the formula. See <a href="#understanding-the-crap-score">Understanding CRAP</a>.</p>
+<h3 id="the-advice-format-output-looks-rough--is-that-final"><a class="header" href="#the-advice-format-output-looks-rough--is-that-final">The <code>advice</code> format output looks rough — is that final?</a></h3>
+<p>The <code>advice</code> format is experimental. Its remediation phrasing may change. The numeric scores it reports are the same scores every other format reports. See <a href="#output-formats">Output formats</a>.</p>
+<h3 id="do-i-have-to-pass---coverage"><a class="header" href="#do-i-have-to-pass---coverage">Do I have to pass <code>--coverage</code>?</a></h3>
+<p>clap does not mark <code>--coverage</code> as required, but a run needs it: crap4rs computes coverage-aware scores and has nothing to join against without it. In the composite action, <code>--src</code> defaults to nothing so configuration wins. See <a href="#cli-reference">CLI reference</a> and <a href="#ci-integration">CI integration</a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-c22b7243.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>
