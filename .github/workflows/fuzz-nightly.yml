@@ -67,7 +67,7 @@ jobs:
           - { package: crap4ts, test: fuzz_istanbul_raw, dir: fuzz_istanbul }
           - { package: crap4ts, test: fuzz_istanbul_structured, dir: fuzz_istanbul }
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
       # SCOPED nightly — the ONLY nightly toolchain in this repo's CI, and only
